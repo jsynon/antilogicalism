@@ -1,6 +1,6 @@
 # Antilogicalism — Static Archive
 
-A static version of [Antilogicalism](https://antilogicalism.com/) published through GitHub Pages.
+A static version of Antilogicalism published through GitHub Pages.
 
 Live site:
 https://jsynon.github.io/antilogicalism/
