@@ -160,7 +160,7 @@ h2.comments-title {
 }
 
 ol.commentlist {
-	background: url(http://antilogicalism.test/wp-content/themes/book-lite/images/comment-divider.png) no-repeat right top;
+	background: url(/antilogicalism/wp-content/themes/book-lite/images/comment-divider.png) no-repeat right top;
 }
 
 ol.commentlist li div.vcard img.avatar {
@@ -175,7 +175,7 @@ ol.commentlist li ul.children {
 }
 
 ol.commentlist li.pingback {
-	background: url("http://antilogicalism.test/wp-content/themes/book-lite/images/comment-divider.png") no-repeat bottom right;
+	background: url("/antilogicalism/wp-content/themes/book-lite/images/comment-divider.png") no-repeat bottom right;
 }
 
 ol.commentlist li.pingback div.vcard {
@@ -183,7 +183,7 @@ ol.commentlist li.pingback div.vcard {
 }
 
 ol.commentlist article {
-	background: url("http://antilogicalism.test/wp-content/themes/book-lite/images/comment-divider.png") no-repeat right bottom;
+	background: url("/antilogicalism/wp-content/themes/book-lite/images/comment-divider.png") no-repeat right bottom;
 }
 
 /* Comment Form */

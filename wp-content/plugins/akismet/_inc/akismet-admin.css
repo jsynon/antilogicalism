@@ -95,7 +95,7 @@ body {
 
 /* Need this specificity to override the existing link rule */
 #akismet-plugin-container a.akismet-masthead__back-link {
-	background-image: url(http://antilogicalism.test/wp-content/plugins/akismet/_inc/img/arrow-left.svg);
+	background-image: url(/antilogicalism/wp-content/plugins/akismet/_inc/img/arrow-left.svg);
 	background-position: left;
 	background-repeat: no-repeat;
 	background-size: 16px;
@@ -195,7 +195,7 @@ body {
 }
 
 .akismet-card-actions__secondary-action a[target="_blank"]::after {
-	background: url('http://antilogicalism.test/wp-content/plugins/akismet/_inc/img/icon-external.svg') no-repeat;
+	background: url('/antilogicalism/wp-content/plugins/akismet/_inc/img/icon-external.svg') no-repeat;
 	background-size: contain;
 	content: "";
 	display: inline-block;

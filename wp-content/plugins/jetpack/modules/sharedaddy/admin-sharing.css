@@ -307,7 +307,7 @@ body.settings_page_sharing .advanced input[type=submit] {
 }
 
 .preview-digg .option-smart-on {
-	background: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-digg.png) no-repeat top left;
+	background: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-digg.png) no-repeat top left;
 	background-size: 76px 17px;
 	width:76px;
 	height:17px;
@@ -315,7 +315,7 @@ body.settings_page_sharing .advanced input[type=submit] {
 }
 
 .preview-facebook .option-smart-on {
-	background: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-like.png) no-repeat top left;
+	background: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-like.png) no-repeat top left;
 	background-size: 85px 20px;
 	width:85px;
 	height:20px;
@@ -324,35 +324,35 @@ body.settings_page_sharing .advanced input[type=submit] {
 
 .preview-twitter .option-smart-on,
 .preview-x .option-smart-on {
-	background: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-x.png?1) no-repeat top left;
+	background: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-x.png?1) no-repeat top left;
 	background-size: 60px 20px;
 	width:60px;
 	height:20px;
 }
 
 .preview-linkedin .option-smart-on {
-	background: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/linkedin-smart.png) no-repeat top center;
+	background: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/linkedin-smart.png) no-repeat top center;
 	background-size: 99px 18px;
 	width:99px;
 	height:20px;
 }
 
 .preview-tumblr .option-smart-on {
-	background: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-tumblr.png) no-repeat top left;
+	background: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-tumblr.png) no-repeat top left;
 	background-size: 62px 20px;
 	width: 62px;
 	height: 20px;
 }
 
 .preview-pinterest .option-smart-on {
-	background: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-pinterest.png) no-repeat top left;
+	background: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-pinterest.png) no-repeat top left;
 	background-size: 39px 20px;
 	width: 39px;
 	height: 20px;
 }
 
 .preview-pocket .option-smart-on {
-	background: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-pocket.png) no-repeat top left;
+	background: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-pocket.png) no-repeat top left;
 	background-size: 60px 20px;
 	width: 60px;
 	height: 20px;
@@ -370,32 +370,32 @@ body.settings_page_sharing .advanced input[type=submit] {
 (-webkit-min-device-pixel-ratio: 1.25),
 (min-resolution: 120dpi) {
 	.preview-digg .option-smart-on {
-		background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-digg@2x.png);
+		background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-digg@2x.png);
 	}
 
 	.preview-facebook .option-smart-on {
-		background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-like@2x.png);
+		background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-like@2x.png);
 	}
 
 	.preview-twitter .option-smart-on,
 	.preview-x .option-smart-on {
-		background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-x@2x.png?1);
+		background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-x@2x.png?1);
 	}
 
 	.preview-linkedin .option-smart-on {
-		background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/linkedin-smart@2x.png);
+		background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/linkedin-smart@2x.png);
 	}
 
 	.preview-tumblr .option-smart-on {
-		background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-tumblr@2x.png);
+		background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-tumblr@2x.png);
 	}
 
 	.preview-pinterest .option-smart-on {
-		background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-pinterest@2x.png);
+		background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-pinterest@2x.png);
 	}
 
 	.preview-pocket .option-smart-on {
-		background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-pocket@2x.png);
+		background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/sharedaddy/images/smart-pocket@2x.png);
 	}
 }
 

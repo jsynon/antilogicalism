@@ -67,7 +67,7 @@
   border-bottom-left-radius: 3px;
   cursor: pointer;
   border-right: 1px solid #454947;
-  background-image: url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png");
+  background-image: url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png");
   background-repeat: no-repeat;
 }
 
@@ -150,25 +150,25 @@
 }
 
 .su-box-style-soft .su-box-title {
-  background-image: url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-soft.png");
+  background-image: url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-soft.png");
   background-position: 0 0;
   background-repeat: repeat-x;
 }
 
 .su-box-style-glass .su-box-title {
-  background-image: url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-glass.png");
+  background-image: url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-glass.png");
   background-position: 0 50%;
   background-repeat: repeat-x;
 }
 
 .su-box-style-bubbles .su-box-title {
-  background-image: url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-bubbles.png");
+  background-image: url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-bubbles.png");
   background-position: 0 50%;
   background-repeat: repeat-x;
 }
 
 .su-box-style-noise .su-box-title {
-  background-image: url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-noise.png");
+  background-image: url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-noise.png");
   background-position: 0 0;
   background-repeat: repeat-x;
 }
@@ -281,35 +281,35 @@
 }
 
 .su-button-style-soft span {
-  background: 0 -20px url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-soft.png") repeat-x;
+  background: 0 -20px url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-soft.png") repeat-x;
 }
 
 .su-button-style-soft:hover span {
-  background: 0 0 url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-soft.png") repeat-x;
+  background: 0 0 url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-soft.png") repeat-x;
 }
 
 .su-button-style-glass span {
-  background: 0 50% url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-glass.png") repeat-x;
+  background: 0 50% url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-glass.png") repeat-x;
 }
 
 .su-button-style-glass:hover span {
-  background: 100% 50% url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-glass.png") repeat-x;
+  background: 100% 50% url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-glass.png") repeat-x;
 }
 
 .su-button-style-bubbles span {
-  background: 0 50% url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-bubbles.png") no-repeat;
+  background: 0 50% url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-bubbles.png") no-repeat;
 }
 
 .su-button-style-bubbles:hover span {
-  background: -710px 50% url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-bubbles.png") no-repeat;
+  background: -710px 50% url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-bubbles.png") no-repeat;
 }
 
 .su-button-style-noise span {
-  background: 0 0 url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-noise.png") repeat-x;
+  background: 0 0 url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-noise.png") repeat-x;
 }
 
 .su-button-style-noise:hover span {
-  background: 0 0 url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-noise.png") repeat-x;
+  background: 0 0 url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/styles/style-noise.png") repeat-x;
 }
 
 .su-button-style-stroked span {
@@ -459,7 +459,7 @@
   width: 40px;
   height: 40px;
   margin-top: -20px;
-  background: rgb(0, 0, 0) 0 0 url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/swiper/default.png") no-repeat;
+  background: rgb(0, 0, 0) 0 0 url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/swiper/default.png") no-repeat;
   background-color: rgba(0, 0, 0, 0.5);
   cursor: pointer;
   border-radius: 50%;
@@ -522,7 +522,7 @@
   width: 14px;
   height: 14px;
   margin: 0;
-  background: rgb(0, 0, 0) 0 -999px url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/swiper/default.png") no-repeat;
+  background: rgb(0, 0, 0) 0 -999px url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/swiper/default.png") no-repeat;
   background-color: rgba(0, 0, 0, 0.5);
   cursor: pointer;
   border-radius: 50%;
@@ -1915,7 +1915,7 @@
   display: block;
   width: 20px;
   height: 20px;
-  background-image: url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/quote.png");
+  background-image: url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/quote.png");
   content: "";
 }
 
@@ -2108,7 +2108,7 @@
   width: 40px;
   height: 40px;
   margin-top: -20px !important;
-  background: rgb(0, 0, 0) 0 0 url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/swiper/default.png") no-repeat;
+  background: rgb(0, 0, 0) 0 0 url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/swiper/default.png") no-repeat;
   background-color: rgba(0, 0, 0, 0.5);
   cursor: pointer;
   border-radius: 50%;
@@ -2171,7 +2171,7 @@
   width: 14px;
   height: 14px;
   margin: 0;
-  background: rgb(0, 0, 0) 0 -999px url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/swiper/default.png") no-repeat;
+  background: rgb(0, 0, 0) 0 -999px url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/swiper/default.png") no-repeat;
   background-color: rgba(0, 0, 0, 0.5);
   cursor: pointer;
   border-radius: 50%;
@@ -2705,7 +2705,7 @@
   cursor: pointer;
   opacity: 0.5;
   transition: opacity 0.2s;
-  background: 50% 50% url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/player/default-start.png") no-repeat;
+  background: 50% 50% url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/player/default-start.png") no-repeat;
 }
 
 .su-video:hover .jp-start {
@@ -2775,11 +2775,11 @@
 }
 
 .su-video .jp-gui .jp-play {
-  background: 0 0 url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png") no-repeat;
+  background: 0 0 url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png") no-repeat;
 }
 
 .su-video .jp-gui .jp-pause {
-  background: -30px 0 url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png") no-repeat;
+  background: -30px 0 url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png") no-repeat;
 }
 
 .su-video .jp-full-screen,
@@ -2795,11 +2795,11 @@
 }
 
 .su-video .jp-full-screen {
-  background: 0 -30px url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png") no-repeat;
+  background: 0 -30px url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png") no-repeat;
 }
 
 .su-video .jp-restore-screen {
-  background: -30px -30px url("http://antilogicalism.test/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png") no-repeat;
+  background: -30px -30px url("/antilogicalism/wp-content/plugins/shortcodes-ultimate/includes/images/player/default.png") no-repeat;
 }
 
 .su-video .jp-progress {

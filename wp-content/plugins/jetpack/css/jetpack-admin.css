@@ -175,7 +175,7 @@
   width: 30px;
   height: 30px;
   vertical-align: middle;
-  background: url(http://antilogicalism.test/wp-content/plugins/jetpack/images/connect-plug.svg) center center no-repeat;
+  background: url(/antilogicalism/wp-content/plugins/jetpack/images/connect-plug.svg) center center no-repeat;
   background-size: 100%;
 }
 .download-jetpack:after {
@@ -244,8 +244,8 @@
 
 @font-face {
   font-family: "automatticons";
-  src: url(http://antilogicalism.test/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.eot);
-  src: url(http://antilogicalism.test/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.eot#iefix) format("embedded-opentype"), url(http://antilogicalism.test/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.woff) format("woff"), url(http://antilogicalism.test/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.ttf) format("truetype"), url(http://antilogicalism.test/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.svg#automatticonsregular) format("svg");
+  src: url(/antilogicalism/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.eot);
+  src: url(/antilogicalism/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.eot#iefix) format("embedded-opentype"), url(/antilogicalism/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.woff) format("woff"), url(/antilogicalism/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.ttf) format("truetype"), url(/antilogicalism/wp-content/plugins/jetpack/_inc/fonts/automatticons/automatticons.svg#automatticonsregular) format("svg");
   font-weight: normal;
   font-style: normal;
 }
@@ -342,8 +342,8 @@
   position: relative;
   width: 214px;
   margin-right: 6px;
-  background: url(http://antilogicalism.test/wp-content/plugins/jetpack/images/jetpack-logo.png) center center no-repeat;
-  background: url(http://antilogicalism.test/wp-content/plugins/jetpack/images/jetpack-logo.svg) center center no-repeat, none;
+  background: url(/antilogicalism/wp-content/plugins/jetpack/images/jetpack-logo.png) center center no-repeat;
+  background: url(/antilogicalism/wp-content/plugins/jetpack/images/jetpack-logo.svg) center center no-repeat, none;
   background-size: 183px auto;
   color: #fff;
   line-height: 60px;
@@ -1091,7 +1091,7 @@
   font-weight: 400;
   height: 40px;
   width: 100%;
-  background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/images/icon-search.svg);
+  background-image: url(/antilogicalism/wp-content/plugins/jetpack/images/icon-search.svg);
   background-repeat: no-repeat;
   background-position: 8px center;
   float: none;

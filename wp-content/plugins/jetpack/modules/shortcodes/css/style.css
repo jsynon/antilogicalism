@@ -103,7 +103,7 @@ body.presentation-wrapper-fullscreen-parent {
 .presentation .nav-arrow-left,
 .presentation .nav-arrow-right {
 	height: 100%;
-	background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/shortcodes/images/slide-nav.png);
+	background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/shortcodes/images/slide-nav.png);
 	background-size: 450% 61px;
 }
 
@@ -124,7 +124,7 @@ body.presentation-wrapper-fullscreen-parent {
 	bottom: 0;
 	right: 0;
 	z-index: 3;
-	background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/shortcodes/images/expand.png);
+	background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/shortcodes/images/expand.png);
 	background-size: 100% 100%;
 }
 
@@ -138,7 +138,7 @@ body.presentation-wrapper-fullscreen-parent {
 }
 
 .presentation-wrapper-fullscreen .nav-fullscreen-button {
-	background-image: url(http://antilogicalism.test/wp-content/plugins/jetpack/modules/shortcodes/images/collapse.png);
+	background-image: url(/antilogicalism/wp-content/plugins/jetpack/modules/shortcodes/images/collapse.png);
 }
 
 /**
