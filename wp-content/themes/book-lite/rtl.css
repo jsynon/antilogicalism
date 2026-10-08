@@ -1,0 +1,236 @@
+/* =Reset
+-------------------------------------------------------------- */
+
+caption, th, td {
+	text-align: right;
+}
+
+/* =Global
+----------------------------------------------- */
+
+/* Text elements */
+
+ul, ol {
+	margin: 0 3em 1.8em 0;
+}
+
+ul ul, ol ol, ul ol, ol ul {
+	margin-right: 1.8em;
+	margin-left: auto;
+}
+
+blockquote {
+	padding: 0 4em 0 0;
+}
+
+blockquote:before {
+	right: 5%;
+	left: auto;
+}
+
+button,
+input,
+select,
+textarea {
+	margin: 0 1px 0 0;
+}
+
+textarea {
+	padding-right: 3px;
+	padding-left: 0;
+}
+
+/* =Menu
+----------------------------------------------- */
+
+.main-navigation {
+	float: right;
+}
+
+.main-navigation ul {
+	float: left;
+	padding-right: 0;
+	left: 50%;
+	right: auto;
+	padding-left: 0;
+}
+
+.main-navigation ul li {
+	float: right;
+	right: 50%;
+	left: auto;
+}
+
+.main-navigation ul li a:before,
+.main-navigation ul li a:before:hover {
+	margin: 0 0 0 17px;
+}
+
+.main-navigation ul ul li {
+	float: right;
+	right: auto;
+	left: auto;
+	text-align: right;
+}
+
+.main-navigation ul a {
+	padding: 10px 12px 10px 6px;
+}
+
+.main-navigation ul ul {
+	float: right;
+	right: 10px;
+	left: auto;
+}
+
+.main-navigation ul ul:before {
+	border-right: 7px solid transparent;
+	border-left: 7px solid transparent;
+	right: 10%;
+	left: auto;
+}
+
+.main-navigation ul ul ul:before {
+	border-left: 7px solid #000;
+	right: -14px;
+	left: auto;
+	border-right: none;
+}
+
+.main-navigation ul ul ul {
+	right: 100%;
+	left: auto;
+}
+
+/* =Content
+----------------------------------------------- */
+
+.format-standard .entry-content > p:first-child:first-letter,
+.page .entry-content > p:first-child:first-letter {
+	float: right;
+	margin: 9px 0 0 5px;
+}
+
+/* Keep reblogging styles from breaking the quotes */
+body .wpcom-reblog-snapshot .reblogger-note-content blockquote {
+	padding-right: 4em !important;
+}
+
+/* =Media
+----------------------------------------------- */
+
+img.alignright, img.alignnone {
+	margin: .9em 0 .9em 20px;
+}
+
+img.alignleft {
+	margin: .9em 20px .9em 0;
+}
+
+.gallery-caption {
+	right: 0;
+	left: auto;
+}
+
+.gallery-item {
+	float: right;
+}
+
+#image-navigation .next-image {
+	float: left;
+}
+
+/* =Navigation
+----------------------------------------------- */
+
+#main .nav-previous {
+	float: right;
+}
+
+#main .nav-next {
+	float: left;
+	text-align: left;
+}
+
+/* =Comments
+----------------------------------------------- */
+
+h2.comments-title {
+	text-align: right;
+}
+
+ol.commentlist {
+	background: url(http://antilogicalism.test/wp-content/themes/book-lite/images/comment-divider.png) no-repeat right top;
+}
+
+ol.commentlist li div.vcard img.avatar {
+	float:right;
+	margin-left:10px;
+	margin-right: auto;
+}
+
+ol.commentlist li ul.children {
+	margin-right: 1.8em;
+	margin-left: auto;
+}
+
+ol.commentlist li.pingback {
+	background: url("http://antilogicalism.test/wp-content/themes/book-lite/images/comment-divider.png") no-repeat bottom right;
+}
+
+ol.commentlist li.pingback div.vcard {
+	padding:0 0 0 170px;
+}
+
+ol.commentlist article {
+	background: url("http://antilogicalism.test/wp-content/themes/book-lite/images/comment-divider.png") no-repeat right bottom;
+}
+
+/* Comment Form */
+
+#respond h3 {
+	text-align: right;
+}
+
+#respond .comment-form-author label,
+#respond .comment-form-email label,
+#respond .comment-form-url label,
+#respond .comment-form-comment label {
+	right: 0px;
+	left: auto;
+}
+
+#respond .comment-form-author .required,
+#respond .comment-form-email .required {
+	right: 65.5%;
+	left: auto;
+}
+
+#respond #cancel-comment-reply-link {
+	margin-right: 10px;
+	margin-left: auto;
+}
+
+#cancel-comment-reply-link {
+	left: 1.8em;
+	right: auto;
+}
+
+/* =Widgets
+----------------------------------------------- */
+
+.widget-area {
+	float: right;
+	margin-right: 2%;
+	margin-left: auto;
+}
+
+.widget-area:first-child {
+	margin-right: 0;
+	margin-left: auto;
+}
+
+.widget ul, .widget ol {
+	margin-right: 0;
+	margin-left: auto;
+}
