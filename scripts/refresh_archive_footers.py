@@ -1,19 +1,22 @@
 
 #!/usr/bin/env python3
-"""Refresh only the Arts & Letters Daily widget in archive footers.
+"""Refresh Arts & Letters Daily footer widgets and remove old site credits.
 
 Default behavior is a dry run. Pass --apply to write changes.
+Every changed HTML file is backed up before writing.
 """
 
 from pathlib import Path
+from datetime import datetime
+from html import escape
 import argparse
 import re
 import sys
 
-from build_static_feeds import FEEDS, render_feed
+from build_static_feeds import FEEDS, load_items
 
 ROOT = Path(__file__).resolve().parents[1]
-BACKUP_ROOT = ROOT.parent / "antilogicalism-feed-refresh-backup"
+BACKUP_ROOT = ROOT.parent / "antilogicalism-footer-polish-backup"
 
 FEED_ID = "rssf95b51da4c"
 FEED_WIDGET_ID = "rss-3"
@@ -38,35 +41,66 @@ def widget_pattern(widget_id):
     )
 
 
-def refresh_widget(html, rendered_feed):
-    """Replace the static feed block inside rss-3 only."""
-    widget = find_one(
+def first_column_pattern():
+    return (
+        r'<div\b(?=[^>]*\bid="first")[^>]*>.*?'
+        r'(?=<!-- #first \.widget-area -->)'
+    )
+
+
+def render_native_widget(feed, items):
+    """Render a native WordPress RSS widget matching Quanta's structure."""
+    name = escape(feed["name"])
+    home = escape(feed["home"], quote=True)
+    feed_url = escape(feed["url"], quote=True)
+
+    output = [
+        '<aside id="rss-3" class="widget widget_rss">',
+        '<h1 class="widget-title">'
+        f'<a class="rsswidget rss-widget-feed" href="{feed_url}">'
+        '<img class="rss-widget-icon" style="border:0" '
+        'width="14" height="14" '
+        'src="/antilogicalism/wp-includes/images/rss.png" '
+        f'alt="RSS feed: {name}" loading="lazy"></a> '
+        f'<a class="rsswidget rss-widget-title" href="{home}">'
+        f'{name}</a></h1>',
+        "<ul>",
+    ]
+
+    for item in items:
+        title = escape(item["title"])
+        link = item.get("link", "")
+
+        if link.startswith(("https://", "http://")):
+            safe_link = escape(link, quote=True)
+            output.append(
+                f'<li><a class="rsswidget" href="{safe_link}">'
+                f'{title}</a></li>'
+            )
+        else:
+            output.append(
+                f'<li><span class="rsswidget">{title}</span></li>'
+            )
+
+    output.extend(["</ul>", "</aside>"])
+    return "".join(output)
+
+
+def refresh_widget(html, new_widget):
+    """Replace only the Arts & Letters Daily widget."""
+    old_widget_match = find_one(
         widget_pattern(FEED_WIDGET_ID),
         html,
         "Arts & Letters Daily widget",
     )
-    old_widget = widget.group(0)
+    old_widget = old_widget_match.group(0)
 
-    feed_block_pattern = (
-        r"<div\b"
-        r"(?=[^>]*\bclass=[\"'][^\"']*\bstatic-rss-feed\b[^\"']*[\"'])"
-        r"[^>]*>.*?</div>"
-    )
-    feed_block = find_one(
-        feed_block_pattern,
-        old_widget,
-        "static Arts & Letters Daily content block",
+    updated = (
+        html[:old_widget_match.start()]
+        + new_widget
+        + html[old_widget_match.end():]
     )
 
-    new_widget = (
-        old_widget[:feed_block.start()]
-        + rendered_feed
-        + old_widget[feed_block.end():]
-    )
-
-    updated = html[:widget.start()] + new_widget + html[widget.end():]
-
-    # Confirm the search and Quanta widgets are present exactly once.
     for widget_id in (SEARCH_WIDGET_ID, QUANTA_WIDGET_ID):
         count = len(re.findall(
             rf'\bid=["\']{re.escape(widget_id)}["\']',
@@ -78,7 +112,6 @@ def refresh_widget(html, rendered_feed):
                 f'Expected one id="{widget_id}"; found {count}.'
             )
 
-    # Ensure Quanta and the search column were not changed.
     original_quanta = find_one(
         widget_pattern(QUANTA_WIDGET_ID),
         html,
@@ -93,15 +126,11 @@ def refresh_widget(html, rendered_feed):
     if original_quanta != updated_quanta:
         raise RuntimeError("Quanta widget changed unexpectedly.")
 
-    first_column_pattern = (
-        r'<div\b(?=[^>]*\bid="first")[^>]*>.*?'
-        r'(?=<!-- #first \.widget-area -->)'
-    )
     original_first = find_one(
-        first_column_pattern, html, "original search column"
+        first_column_pattern(), html, "original search column"
     ).group(0)
     updated_first = find_one(
-        first_column_pattern, updated, "updated search column"
+        first_column_pattern(), updated, "updated search column"
     ).group(0)
 
     if original_first != updated_first:
@@ -110,26 +139,82 @@ def refresh_widget(html, rendered_feed):
     return updated
 
 
+def remove_old_site_credits(html):
+    """Remove only the old WordPress/Book Lite attribution block."""
+    pattern = (
+        r'<div\b'
+        r'(?=[^>]*\bclass=["\'][^"\']*\bsite-info\b[^"\']*["\'])'
+        r'[^>]*>.*?<!--\s*\.site-info\s*-->'
+    )
+    matches = list(re.finditer(pattern, html, re.I | re.S))
+
+    credit_matches = [
+        match for match in matches
+        if (
+            "Proudly powered by WordPress" in match.group(0)
+            and (
+                "wpshoppe.com" in match.group(0)
+                or "Book Lite" in match.group(0)
+            )
+        )
+    ]
+
+    if len(credit_matches) > 1:
+        raise RuntimeError(
+            f"Found {len(credit_matches)} old site-credit blocks."
+        )
+
+    if not credit_matches:
+        return html, False
+
+    match = credit_matches[0]
+    updated = html[:match.start()] + html[match.end():]
+
+    if (
+        "Proudly powered by WordPress" in updated
+        or "wpshoppe.com" in updated
+    ):
+        raise RuntimeError("Old site credits remain after removal.")
+
+    return updated, True
+
+
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description="Polish Antilogicalism footer feeds and credits."
+    )
     parser.add_argument(
         "--apply",
         action="store_true",
-        help="Write changes; otherwise perform a dry run.",
+        help="Write changes after creating backups. Default is dry run.",
     )
     args = parser.parse_args()
 
-    feed = next((item for item in FEEDS if item["id"] == FEED_ID), None)
+    feed = next(
+        (item for item in FEEDS if item["id"] == FEED_ID),
+        None,
+    )
     if feed is None:
         raise RuntimeError(f"Feed configuration not found: {FEED_ID}")
 
-    # Fetch/render once, then reuse the same result across all archive pages.
-    rendered_feed = render_feed(feed, {})
-    feed_unavailable = "static-rss-unavailable" in rendered_feed
+    try:
+        items = load_items(feed)
+    except Exception as exc:
+        print(f"Feed retrieval failed: {type(exc).__name__}: {exc}")
+        print("No files were changed.")
+        sys.exit(1)
 
-    files = sorted(ROOT.rglob("index.html"))
-    targets = []
+    if not items:
+        print("The feed returned no items. No files were changed.")
+        sys.exit(1)
+
+    new_widget = render_native_widget(feed, items)
+
+    files = sorted(ROOT.rglob("*.html"))
+    prepared = []
     failures = []
+    feed_updates = 0
+    credit_removals = 0
     unchanged = 0
 
     for path in files:
@@ -137,60 +222,92 @@ def main():
             continue
 
         try:
-            original = path.read_text(encoding="utf-8-sig", errors="replace")
+            original = path.read_text(
+                encoding="utf-8-sig",
+                errors="replace",
+            )
+            updated = original
+            feed_changed = False
+            credits_changed = False
 
-            if not all(marker in original for marker in (
-                'id="first"',
+            # Update the RSS widget only on pages containing the full footer.
+            if all(marker in updated for marker in (
                 f'id="{FEED_WIDGET_ID}"',
                 f'id="{QUANTA_WIDGET_ID}"',
                 f'id="{SEARCH_WIDGET_ID}"',
+                'id="first"',
             )):
-                continue
+                before = updated
+                updated = refresh_widget(updated, new_widget)
+                feed_changed = updated != before
 
-            updated = refresh_widget(original, rendered_feed)
+            updated, credits_changed = remove_old_site_credits(updated)
+
+            # Verify the new native widget structure if this page was updated.
+            if feed_changed:
+                widget = find_one(
+                    widget_pattern(FEED_WIDGET_ID),
+                    updated,
+                    "updated Arts & Letters Daily widget",
+                ).group(0)
+
+                if (
+                    'class="widget widget_rss"' not in widget
+                    or 'class="rsswidget"' not in widget
+                    or "<ul>" not in widget
+                ):
+                    raise RuntimeError(
+                        "New native RSS widget structure failed validation."
+                    )
+
+            if credits_changed and (
+                "Proudly powered by WordPress" in updated
+                or "wpshoppe.com" in updated
+            ):
+                raise RuntimeError("Old site attribution remains.")
 
             if updated == original:
                 unchanged += 1
             else:
-                targets.append((path, original, updated))
+                prepared.append((path, original, updated))
+
+            if feed_changed:
+                feed_updates += 1
+            if credits_changed:
+                credit_removals += 1
 
         except Exception as exc:
             failures.append((path, str(exc)))
 
-    print("Antilogicalism archive feed refresh")
+    print("Antilogicalism footer polish")
     print("Mode:", "APPLY" if args.apply else "DRY RUN")
     print("HTML files scanned:", len(files))
-    print("Pages ready to update:", len(targets))
+    print("Pages with feed updates:", feed_updates)
+    print("Files with credit removals:", credit_removals)
+    print("Files ready to change:", len(prepared))
     print("Already unchanged:", unchanged)
     print("Validation errors:", len(failures))
-    print("Feed result:", "fallback displayed" if feed_unavailable
-          else "live feed fetched")
+    print("Feed items fetched:", len(items))
 
     if failures:
         for path, error in failures[:30]:
             print(f"  {path.relative_to(ROOT)}: {error}")
         if len(failures) > 30:
             print(f"  ... and {len(failures) - 30} more")
-        sys.exit(1)
-
-    if feed_unavailable:
-        print(
-            "Feed retrieval failed. No files will be written; "
-            "check the feed before retrying."
-        )
+        print("No files were written.")
         sys.exit(1)
 
     if not args.apply:
         print("Dry run complete. No files were changed.")
         return
 
-    # Back up all target pages before writing any of them.
-    from datetime import datetime
-
-    backup_dir = BACKUP_ROOT / datetime.now().strftime("%Y%m%d-%H%M%S")
+    backup_dir = (
+        BACKUP_ROOT / datetime.now().strftime("%Y%m%d-%H%M%S")
+    )
     backups = []
 
-    for path, original, updated in targets:
+    # Back up every changed file before writing any file.
+    for path, original, updated in prepared:
         backup_path = backup_dir / path.relative_to(ROOT)
         backup_path.parent.mkdir(parents=True, exist_ok=True)
         backup_path.write_text(original, encoding="utf-8")
@@ -211,9 +328,10 @@ def main():
             )
         raise
 
-    print("Pages updated:", len(written))
+    print("Files updated:", len(written))
     print("Backup location:", backup_dir)
-    print("Search column and Quanta widget verified unchanged.")
+    print("Native Arts & Letters Daily widget generated.")
+    print("Quanta and search widget preservation validated.")
 
 
 if __name__ == "__main__":
