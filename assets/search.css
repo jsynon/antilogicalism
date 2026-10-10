@@ -1,0 +1,49 @@
+
+.antilogicalism-search-widget .antilogicalism-search {
+  margin: 0.75em 0;
+}
+
+.antilogicalism-search form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4em;
+  align-items: stretch;
+}
+
+.antilogicalism-search input[type="search"] {
+  box-sizing: border-box;
+  flex: 1 1 180px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.55em;
+}
+
+.antilogicalism-search button {
+  padding: 0.55em 0.85em;
+  cursor: pointer;
+}
+
+.antilogicalism-search [data-search-status] {
+  font-size: 0.9em;
+  margin: 0.75em 0;
+}
+
+.antilogicalism-search-results {
+  margin: 0;
+  padding-left: 1.25em;
+  overflow-wrap: anywhere;
+}
+
+.antilogicalism-search-results li {
+  margin: 0 0 1em;
+}
+
+.antilogicalism-search-results a {
+  font-weight: 600;
+}
+
+.antilogicalism-search-results p {
+  margin: 0.3em 0 0;
+  font-size: 0.9em;
+  line-height: 1.4;
+}

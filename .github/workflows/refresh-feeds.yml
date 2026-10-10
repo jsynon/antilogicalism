@@ -29,15 +29,19 @@ jobs:
       - name: Rebuild feed listings
         run: python scripts/build_static_feeds.py
 
-      - name: Commit updated feed listings
+      - name: Refresh archive footers
+        run: python scripts/refresh_archive_footers.py --apply
+
+      - name: Commit updated feed listings and archive pages
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          if git diff --quiet -- links/selected-feeds/index.html; then
+          git add -u
+
+          if git diff --cached --quiet; then
             echo "No feed changes to commit."
           else
-            git add links/selected-feeds/index.html
             git commit -m "Refresh static RSS feeds"
             git push
           fi
