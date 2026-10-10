@@ -1386,3 +1386,33 @@ h3.sd-title {
 
 
 }
+
+/* Mobile layout fix for Antilogicalism */
+@media screen and (max-width: 480px) {
+    .site-title {
+        font-size: 2rem;
+        font-size: clamp(1.5rem, 7vw, 2rem);
+        line-height: 1.2;
+        overflow-wrap: anywhere;
+        word-wrap: break-word;
+    }
+
+    .site-description {
+        max-width: 100%;
+        padding-left: 0.5em;
+        padding-right: 0.5em;
+        box-sizing: border-box;
+    }
+
+    #masthead,
+    #masthead nav,
+    #masthead nav h1 {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+}
+
+html,
+body {
+    max-width: 100%;
+}
