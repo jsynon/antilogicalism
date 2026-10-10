@@ -191,25 +191,6 @@ SCIENCE_FEEDS = [
     },
 ]
 
-
-POLITICAL_PAGE = ROOT / "links" / "political-and-cultural-links" / "index.template.html"
-POLITICAL_OUTPUT = ROOT / "links" / "political-and-cultural-links" / "index.html"
-
-POLITICAL_FEEDS = [
-    {
-        "id": "rssb66930c455",
-        "name": "ACLU",
-        "url": "https://www.aclu.org/feed",
-        "home": "https://www.aclu.org/",
-    },
-    {
-        "id": "rss7c38cc3f58",
-        "name": "Human Rights Watch",
-        "url": "https://www.hrw.org/rss/news",
-        "home": "https://www.hrw.org/",
-    },
-]
-
 STYLE = """
 <style id="static-rss-feed-styles">
 .static-rss-feed ul {
@@ -465,7 +446,6 @@ def main():
         (PAGE, OUTPUT, FEEDS, "Selected Feeds"),
         (PODCAST_PAGE, PODCAST_OUTPUT, PODCAST_FEEDS, "Podcasts"),
         (SCIENCE_PAGE, SCIENCE_OUTPUT, SCIENCE_FEEDS, "Science & Technology"),
-        (POLITICAL_PAGE, POLITICAL_OUTPUT, POLITICAL_FEEDS, "Political & Cultural"),
     ]
 
     cache = {}
