@@ -1,0 +1,417 @@
+
+from pathlib import Path
+from urllib.request import Request, urlopen
+from urllib.error import HTTPError
+from xml.etree import ElementTree as ET
+from html import escape, unescape
+import re
+import time
+
+ROOT = Path(__file__).resolve().parents[1]
+PAGE = ROOT / "links" / "selected-feeds" / "index.template.html"
+OUTPUT = ROOT / "links" / "selected-feeds" / "index.html"
+
+FEEDS = [
+    {
+        "id": "rssf95b51da4c",
+        "name": "Arts & Letters Daily",
+        "url": "https://www.aldaily.com/feed/",
+        "home": "https://www.aldaily.com/",
+        "excerpt": False,
+        "metadata": False,
+    },
+    {
+        "id": "rss08f19226d1",
+        "name": "History of Philosophy without any Gaps",
+        "url": "https://historyofphilosophy.net/rss.xml",
+        "home": "https://historyofphilosophy.net/",
+    },
+    {
+        "id": "rss109f310b91",
+        "name": "Aeon",
+        "url": "https://aeon.co/feed.rss",
+        "home": "https://aeon.co/",
+    },
+    {
+        "id": "rssa5bb327d5d",
+        "name": "1,000-Word Philosophy",
+        "url": "https://1000wordphilosophy.com/feed/",
+        "home": "https://1000wordphilosophy.com/",
+    },
+    {
+        "id": "rss11fe383801",
+        "name": "New Books Network – Philosophy",
+        "url": "https://feeds.simplecast.com/vSN7lVjn",
+        "home": "https://newbooksnetwork.com/",
+    },
+    {
+        "id": "rss7343edb60d",
+        "name": "The Marginalian",
+        "url": "https://www.themarginalian.org/feed/",
+        "home": "https://www.themarginalian.org/",
+    },
+    {
+        "id": "rss4026d2e23a",
+        "name": "Existential Comics",
+        "url": "https://existentialcomics.com/rss.xml",
+        "home": "https://existentialcomics.com/",
+    },
+    {
+        "id": "rss63774d9736",
+        "name": "Daily Nous",
+        "url": "https://dailynous.com/feed/",
+        "home": "https://dailynous.com/",
+    },
+    {
+        "id": "rsse495e6bb09",
+        "name": "Philosophy Now",
+        "url": "https://philosophynow.org/rss",
+        "home": "https://philosophynow.org/",
+    },
+    {
+        "id": "rss18805514a9",
+        "name": "Blog of the American Philosophical Association",
+        "url": "https://blog.apaonline.org/feed/",
+        "home": "https://blog.apaonline.org/",
+    },
+    {
+        "id": "rssa265dabfe6",
+        "name": "Philosophy News",
+        "url": "https://feeds.feedburner.com/philosophynews/jcFI",
+        "home": "https://philosophynews.com/",
+    },
+    {
+        "id": "rssab2a063ff6",
+        "name": "Quartz",
+        "url": "https://qz.com/rss",
+        "home": "https://qz.com/",
+    },
+    {
+        "id": "rss741628e40c",
+        "name": "UNESCO",
+        "url": "https://en.unesco.org/rss.xml",
+        "home": "https://www.unesco.org/en/newsroom",
+        "excerpt": False,
+    },
+    {
+        "id": "rss9988918535",
+        "name": "/r/askphilosophy",
+        "url": "https://www.reddit.com/r/askphilosophy/.rss?sort=new",
+        "home": "https://www.reddit.com/r/askphilosophy/",
+        "excerpt": False,
+    },
+    {
+        "id": "rss136c44107c",
+        "name": "/r/philosophy",
+        "url": "https://www.reddit.com/r/philosophy/.rss?sort=new",
+        "home": "https://www.reddit.com/r/philosophy/",
+        "excerpt": False,
+    },
+]
+
+STYLE = """
+<style id="static-rss-feed-styles">
+.static-rss-feed ul {
+    margin: 0 !important;
+    padding-left: 0;
+    list-style: none;
+}
+.static-rss-feed li {
+    margin-bottom: 1em;
+}
+.static-rss-feed .static-rss-title {
+    display: block;
+    margin-bottom: .35em;
+}
+.static-rss-feed .static-rss-meta {
+    margin: .25em 0 .4em;
+    font-size: 85%;
+}
+.static-rss-feed .static-rss-excerpt {
+    margin: .35em 0 0;
+}
+.static-rss-feed .static-rss-unavailable {
+    font-style: italic;
+}
+</style>
+"""
+
+
+def local_name(tag):
+    return tag.rsplit("}", 1)[-1].lower()
+
+
+def child_text(element, names):
+    for child in element:
+        if local_name(child.tag) in names:
+            value = " ".join(" ".join(child.itertext()).split())
+            if value:
+                return value
+    return ""
+
+
+def item_link(element):
+    for child in element:
+        if local_name(child.tag) == "link":
+            href = child.attrib.get("href", "").strip()
+            rel = child.attrib.get("rel", "alternate").lower()
+
+            if href and rel in ("alternate", ""):
+                return href
+
+            value = (child.text or "").strip()
+            if value:
+                return value
+
+    return ""
+
+
+def clean_html(value):
+    value = unescape(value or "")
+    value = re.sub(
+        r"<(script|style)\b[^>]*>.*?</\1>",
+        " ",
+        value,
+        flags=re.I | re.S,
+    )
+    value = re.sub(r"<[^>]+>", " ", value)
+    return " ".join(unescape(value).split())
+
+
+def excerpt_text(value, max_words=50):
+    words = clean_html(value).split()
+
+    if len(words) > max_words:
+        return " ".join(words[:max_words]) + "…"
+
+    return " ".join(words)
+
+
+def load_items(feed):
+    request = Request(
+        feed["url"],
+        headers={
+            "User-Agent": (
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 Chrome/130.0 Safari/537.36"
+            ),
+            "Accept": (
+                "application/rss+xml, application/atom+xml, "
+                "application/xml, text/xml, */*"
+            ),
+        },
+    )
+
+    body = None
+    last_error = None
+
+    # Retry temporary network failures and rate limits.
+    for attempt in range(3):
+        try:
+            with urlopen(request, timeout=18) as response:
+                body = response.read()
+            break
+        except Exception as exc:
+            last_error = exc
+
+            if attempt < 2:
+                delay = 3 * (attempt + 1)
+
+                # Give rate-limited servers a little more breathing room.
+                if isinstance(exc, HTTPError) and exc.code == 429:
+                    delay = 10 * (attempt + 1)
+
+                print(
+                    f"  Retry {attempt + 1}/2 for {feed['name']} "
+                    f"in {delay}s ({type(exc).__name__})"
+                )
+                time.sleep(delay)
+
+    if body is None:
+        raise last_error
+
+    # Some feeds prepend comments or other material before their XML.
+    starts = [
+        position
+        for marker in (b"<?xml", b"<rss", b"<feed")
+        if (position := body.find(marker)) >= 0
+    ]
+
+    if starts:
+        body = body[min(starts):]
+
+    root = ET.fromstring(body)
+
+    items = [
+        node
+        for node in root.iter()
+        if local_name(node.tag) in ("item", "entry")
+    ]
+
+    results = []
+
+    for item in items:
+        title = child_text(item, {"title"})
+        link = item_link(item)
+
+        if not title:
+            continue
+
+        description = child_text(
+            item,
+            {"encoded", "description", "summary", "content"},
+        )
+        author = child_text(item, {"creator", "author"})
+        date = child_text(
+            item,
+            {"pubdate", "published", "updated", "date"},
+        )
+
+        results.append({
+            "title": title,
+            "link": link,
+            "description": description,
+            "author": author,
+            "date": date,
+        })
+
+        if len(results) == 5:
+            break
+
+    if not results:
+        raise ValueError("The response contained no readable feed items")
+
+    return results
+
+
+def render_feed(feed, cache):
+    try:
+        if feed["id"] not in cache:
+            cache[feed["id"]] = load_items(feed)
+
+        items = cache[feed["id"]]
+
+    except Exception as exc:
+        message = (
+            f"Feed temporarily unavailable ({type(exc).__name__}). "
+            f'<a href="{escape(feed["home"], quote=True)}" '
+            'target="_blank" rel="noopener noreferrer">'
+            "Visit the source website</a>."
+        )
+
+        return (
+            '<div class="static-rss-feed">'
+            f'<p class="static-rss-unavailable">{message}</p>'
+            "</div>"
+        )
+
+    output = ['<div class="static-rss-feed"><ul>']
+
+    for item in items:
+        title = escape(item["title"])
+        link = item["link"]
+
+        if link.startswith(("https://", "http://")):
+            title_html = (
+                f'<a class="static-rss-title" '
+                f'href="{escape(link, quote=True)}" '
+                'target="_blank" rel="noopener noreferrer">'
+                f"{title}</a>"
+            )
+        else:
+            title_html = (
+                f'<span class="static-rss-title">{title}</span>'
+            )
+
+        output.append("<li>")
+        output.append(title_html)
+
+        if feed.get("metadata", True):
+            metadata = []
+
+            if item["date"]:
+                metadata.append(escape(item["date"]))
+
+            if item["author"]:
+                metadata.append("By " + escape(item["author"]))
+
+            if metadata:
+                output.append(
+                    '<div class="static-rss-meta">'
+                    + " · ".join(metadata)
+                    + "</div>"
+                )
+
+        if feed.get("excerpt", True) and item["description"]:
+            excerpt = excerpt_text(item["description"])
+
+            if excerpt:
+                output.append(
+                    '<p class="static-rss-excerpt">'
+                    + escape(excerpt)
+                    + "</p>"
+                )
+
+        output.append("</li>")
+
+    output.append("</ul></div>")
+    return "\n".join(output)
+
+
+def main():
+    if not PAGE.exists():
+        raise FileNotFoundError(f"Page not found: {PAGE}")
+
+    original = PAGE.read_text(encoding="utf-8", errors="replace")
+    preview = original
+    cache = {}
+    report = []
+
+    for feed in FEEDS:
+        pattern = re.compile(
+            r'<div\b(?=[^>]*data-id=["\']'
+            + re.escape(feed["id"])
+            + r'["\'])[^>]*>.*?</div>',
+            re.I | re.S,
+        )
+
+        replacement = render_feed(feed, cache)
+
+        preview, count = pattern.subn(
+            lambda _match: replacement,
+            preview,
+            count=1,
+        )
+
+        if count != 1:
+            report.append(
+                f"CHECK: {feed['name']} — placeholder matches: {count}"
+            )
+        elif feed["id"] in cache:
+            report.append(
+                f"OK: {feed['name']} — "
+                f"{len(cache[feed['id']])} items"
+            )
+        else:
+            report.append(
+                f"CHECK: {feed['name']} — fallback displayed"
+            )
+
+    if "</head>" in preview and 'id="static-rss-feed-styles"' not in preview:
+        preview = preview.replace(
+            "</head>",
+            STYLE + "\n</head>",
+            1,
+        )
+
+    OUTPUT.write_text(preview, encoding="utf-8")
+
+    print("\n".join(report))
+    print("\nOriginal page unchanged:", PAGE)
+    print("Preview created:", OUTPUT)
+    print("Original bytes:", len(original.encode("utf-8")))
+    print("Preview characters:", len(preview))
+
+
+if __name__ == "__main__":
+    main()

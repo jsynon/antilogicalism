@@ -1,0 +1,43 @@
+
+name: Refresh static RSS feeds
+
+on:
+  schedule:
+    - cron: "17 13 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-static-rss-feeds
+  cancel-in-progress: false
+
+jobs:
+  refresh-feeds:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Rebuild feed listings
+        run: python scripts/build_static_feeds.py
+
+      - name: Commit updated feed listings
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- links/selected-feeds/index.html; then
+            echo "No feed changes to commit."
+          else
+            git add links/selected-feeds/index.html
+            git commit -m "Refresh static RSS feeds"
+            git push
+          fi
