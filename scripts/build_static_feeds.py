@@ -10,6 +10,8 @@ import time
 ROOT = Path(__file__).resolve().parents[1]
 PAGE = ROOT / "links" / "selected-feeds" / "index.template.html"
 OUTPUT = ROOT / "links" / "selected-feeds" / "index.html"
+PODCAST_PAGE = ROOT / "links" / "podcasts" / "index.template.html"
+PODCAST_OUTPUT = ROOT / "links" / "podcasts" / "index.html"
 
 FEEDS = [
     {
@@ -40,7 +42,7 @@ FEEDS = [
     },
     {
         "id": "rss11fe383801",
-        "name": "New Books Network – Philosophy",
+        "name": "New Books Network â€“ Philosophy",
         "url": "https://feeds.simplecast.com/vSN7lVjn",
         "home": "https://newbooksnetwork.com/",
     },
@@ -106,6 +108,47 @@ FEEDS = [
         "url": "https://www.reddit.com/r/philosophy/.rss?sort=new",
         "home": "https://www.reddit.com/r/philosophy/",
         "excerpt": False,
+    },
+]
+
+
+PODCAST_FEEDS = [
+    {
+        "id": "rss089ce4bfad",
+        "name": "Philosophy Bites",
+        "url": "https://philosophybites.libsyn.com/rss",
+        "home": "https://philosophybites.com/",
+    },
+    {
+        "id": "rss047b578950",
+        "name": "Philosophy for Our Times",
+        "url": "http://feeds.feedburner.com/PhilosophyForOurTimes",
+        "home": "https://iai.tv/",
+    },
+    {
+        "id": "rss751e00b21d",
+        "name": "The Partially Examined Life",
+        "url": "https://partiallyexaminedlife.libsyn.com/rss",
+        "home": "https://partiallyexaminedlife.com/",
+    },
+    {
+        "id": "rss531b392752",
+        "name": "Philosophy Talk",
+        "url": "https://publicfeeds.net/f/15207/feed-rss.xml",
+        "home": "https://www.philosophytalk.org/",
+        "excerpt": False,
+    },
+    {
+        "id": "rssfd39ddfae0",
+        "name": "Quanta Magazine Podcasts",
+        "url": "https://api.quantamagazine.org/feed/podcast/",
+        "home": "https://www.quantamagazine.org/tag/podcast/",
+    },
+    {
+        "id": "rss647468fef7",
+        "name": "Talking Politics",
+        "url": "https://rss.acast.com/talkingpolitics",
+        "home": "https://www.talkingpoliticspodcast.com/",
     },
 ]
 
@@ -182,7 +225,7 @@ def excerpt_text(value, max_words=50):
     words = clean_html(value).split()
 
     if len(words) > max_words:
-        return " ".join(words[:max_words]) + "…"
+        return " ".join(words[:max_words]) + "â€¦"
 
     return " ".join(words)
 
@@ -338,7 +381,7 @@ def render_feed(feed, cache):
             if metadata:
                 output.append(
                     '<div class="static-rss-meta">'
-                    + " · ".join(metadata)
+                    + " Â· ".join(metadata)
                     + "</div>"
                 )
 
@@ -358,60 +401,70 @@ def render_feed(feed, cache):
     return "\n".join(output)
 
 
-def main():
-    if not PAGE.exists():
-        raise FileNotFoundError(f"Page not found: {PAGE}")
 
-    original = PAGE.read_text(encoding="utf-8", errors="replace")
-    preview = original
+def main():
+    pages = [
+        (PAGE, OUTPUT, FEEDS, "Selected Feeds"),
+        (PODCAST_PAGE, PODCAST_OUTPUT, PODCAST_FEEDS, "Podcasts"),
+    ]
+
     cache = {}
     report = []
 
-    for feed in FEEDS:
-        pattern = re.compile(
-            r'<div\b(?=[^>]*data-id=["\']'
-            + re.escape(feed["id"])
-            + r'["\'])[^>]*>.*?</div>',
-            re.I | re.S,
-        )
+    for page, output, feeds, label in pages:
+        if not page.exists():
+            raise FileNotFoundError(f"Template not found: {page}")
 
-        replacement = render_feed(feed, cache)
+        original = page.read_text(encoding="utf-8", errors="replace")
+        preview = original
 
-        preview, count = pattern.subn(
-            lambda _match: replacement,
-            preview,
-            count=1,
-        )
-
-        if count != 1:
-            report.append(
-                f"CHECK: {feed['name']} — placeholder matches: {count}"
-            )
-        elif feed["id"] in cache:
-            report.append(
-                f"OK: {feed['name']} — "
-                f"{len(cache[feed['id']])} items"
-            )
-        else:
-            report.append(
-                f"CHECK: {feed['name']} — fallback displayed"
+        for feed in feeds:
+            pattern = re.compile(
+                r'<div\b(?=[^>]*data-id=["\']'
+                + re.escape(feed["id"])
+                + r'["\'])[^>]*>.*?</div>',
+                re.I | re.S,
             )
 
-    if "</head>" in preview and 'id="static-rss-feed-styles"' not in preview:
-        preview = preview.replace(
-            "</head>",
-            STYLE + "\n</head>",
-            1,
-        )
+            replacement = render_feed(feed, cache)
+            preview, count = pattern.subn(
+                lambda _match: replacement,
+                preview,
+                count=1,
+            )
 
-    OUTPUT.write_text(preview, encoding="utf-8")
+            if count != 1:
+                report.append(
+                    f"CHECK: {label} / {feed['name']} "
+                    f"â€” placeholder matches: {count}"
+                )
+            elif feed["id"] in cache:
+                report.append(
+                    f"OK: {label} / {feed['name']} â€” "
+                    f"{len(cache[feed['id']])} items"
+                )
+            else:
+                report.append(
+                    f"CHECK: {label} / {feed['name']} â€” fallback displayed"
+                )
+
+        if "</head>" in preview and 'id="static-rss-feed-styles"' not in preview:
+            preview = preview.replace(
+                "</head>",
+                STYLE + "\n</head>",
+                1,
+            )
+
+        output.write_text(preview, encoding="utf-8")
+        report.append(f"Preview written: {output}")
+        report.append(
+            f"Template unchanged: {page} "
+            f"({len(original.encode('utf-8'))} bytes)"
+        )
 
     print("\n".join(report))
-    print("\nOriginal page unchanged:", PAGE)
-    print("Preview created:", OUTPUT)
-    print("Original bytes:", len(original.encode("utf-8")))
-    print("Preview characters:", len(preview))
 
 
 if __name__ == "__main__":
     main()
+
