@@ -199,3 +199,71 @@ The current repository preserves the exported website as a static snapshot. A fu
 That could make future rebuilds more reproducible, reduce manual path repair, and provide a more systematic way to maintain the document library.
 
 For now, the static archive provides a practical way to preserve Antilogicalism's published content without maintaining the original WordPress hosting environment.
+
+## Recent Maintenance: Footer and RSS Feed Automation
+
+The static archive now includes a maintenance workflow for restoring and updating RSS feed content without requiring WordPress or server-side PHP.
+
+### Footer restoration
+
+The original WordPress export included footer widgets and search functionality that depended on WordPress plugins and widgets. Those elements needed to be repaired for the static archive.
+
+The footer repair restored a working search interface and replaced the broken RSS widget with generated static HTML. Existing feed content, including Quanta, was preserved where appropriate. The repair also removed obsolete WordPress and Book Lite theme credits.
+
+The changes were applied across 1,532 HTML files. Feed content was refreshed in 1,511 files, with five articles rendered in the relevant feed widget. Automated validation completed with zero reported errors.
+
+The search interface uses local assets:
+
+- `assets/search.css`
+- `assets/search.js`
+
+These assets provide the search widget's styling and client-side behavior without depending on the former WordPress search implementation.
+
+### Static RSS feed generation
+
+RSS feeds cannot be fetched directly by ordinary browser-side JavaScript from every publisher because of cross-origin restrictions, and some feeds may not be accessible reliably from the browser. The archive therefore uses a build-time process to retrieve feed items and render them into static HTML.
+
+The main generator is:
+
+` scripts/build_static_feeds.py `
+
+The generator retrieves feed data, renders article entries into HTML, and supports fallback behavior when a feed cannot be retrieved. Network requests use a timeout and retry mechanism to make updates more resilient to temporary failures.
+
+The generated HTML is published with the rest of the static website. Visitors can read the rendered feed content without requiring the original WordPress RSS widgets.
+
+### Selected Feeds page
+
+The Selected Feeds page has been converted to use a template-driven static feed system.
+
+The principal files are:
+
+- `links/selected-feeds/index.template.html` — the template used to preserve the page's layout and structure.
+- `links/selected-feeds/index.html` — the generated HTML served by GitHub Pages.
+- `scripts/build_static_feeds.py` — the script responsible for retrieving and rendering feed content.
+
+The conversion preserves the existing feed selection and page layout while replacing the former WordPress-dependent feed rendering with generated HTML. The page retains its selected sources, including Arts & Letters Daily and Quanta, along with the other feeds in the collection.
+
+### Automated updates with GitHub Actions
+
+A GitHub Actions workflow periodically refreshes the generated feed content. The workflow can also be triggered manually.
+
+When the workflow runs, it retrieves the latest available feed items, regenerates the relevant HTML, and commits and pushes changes when the generated output differs from the existing version.
+
+This makes routine RSS updates automatic rather than requiring manual edits to the published HTML.
+
+The template is the source for maintaining the page's structure; the generated HTML is the published output. When changing the page's layout or feed configuration, update the appropriate source files and regenerate the output rather than treating the generated page as the sole source of truth.
+
+### Extending the approach to other links pages
+
+Other pages in the Links section contain additional RSS feeds and may benefit from the same static-generation approach.
+
+When converting another page:
+
+1. Preserve its existing layout, headings, feed order, and relevant links.
+2. Keep an original or template copy before modifying the page.
+3. Identify the original feed URLs and any display settings that need to be retained.
+4. Generate the static feed content and review the resulting HTML.
+5. Validate the page locally before replacing the published version.
+6. Extend the automation to cover the additional page and its feeds where appropriate.
+
+The Selected Feeds implementation provides a starting point for future conversions, but each page should be reviewed individually rather than assuming every WordPress RSS widget has identical settings or requirements.
