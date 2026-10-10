@@ -152,45 +152,6 @@ PODCAST_FEEDS = [
     },
 ]
 
-
-SCIENCE_PAGE = ROOT / "links" / "science-and-technology-links" / "index.template.html"
-SCIENCE_OUTPUT = ROOT / "links" / "science-and-technology-links" / "index.html"
-
-SCIENCE_FEEDS = [
-    {
-        "id": "rss44d00d930e",
-        "name": "Quanta Magazine",
-        "url": "https://api.quantamagazine.org/feed/",
-        "home": "https://www.quantamagazine.org/",
-    },
-    {
-        "id": "rssa78aec553c",
-        "name": "Nautilus Magazine",
-        "url": "https://nautil.us/feed/",
-        "home": "https://nautil.us/",
-    },
-    {
-        "id": "rss49968e16be",
-        "name": "Ars Technica",
-        "url": "https://feeds.feedburner.com/arstechnica/features",
-        "home": "https://arstechnica.com/",
-    },
-    {
-        "id": "rssd0441b9a64",
-        "name": "NASA",
-        "url": "https://www.nasa.gov/news-release/feed/",
-        "home": "https://www.nasa.gov/",
-    },
-    {
-        "id": "rss160b44e2ca",
-        "name": "AI News",
-        "url": "https://news.google.com/rss/topics/CAAqIAgKIhpDQkFTRFFvSEwyMHZNRzFyZWhJQ1pXNG9BQVAB",
-        "home": "https://news.google.com/",
-        "items": 10,
-        "excerpt": False,
-    },
-]
-
 STYLE = """
 <style id="static-rss-feed-styles">
 .static-rss-feed ul {
@@ -357,7 +318,7 @@ def load_items(feed):
             "date": date,
         })
 
-        if len(results) >= feed.get("items", 5):
+        if len(results) == 5:
             break
 
     if not results:
@@ -445,7 +406,6 @@ def main():
     pages = [
         (PAGE, OUTPUT, FEEDS, "Selected Feeds"),
         (PODCAST_PAGE, PODCAST_OUTPUT, PODCAST_FEEDS, "Podcasts"),
-        (SCIENCE_PAGE, SCIENCE_OUTPUT, SCIENCE_FEEDS, "Science & Technology"),
     ]
 
     cache = {}
