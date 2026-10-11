@@ -255,7 +255,15 @@ def is_excluded_path(path):
     parts = path.relative_to(ROOT).parts[:-1]
     lowered = [part.lower() for part in parts]
 
-    if any(part in {".git", "node_modules"} for part in lowered):
+    if any(
+        part in {
+            ".git",
+            "node_modules",
+            "_post-preview",
+            "_publication-staging",
+        }
+        for part in lowered
+    ):
         return True
 
     if any(
@@ -305,14 +313,9 @@ def main():
             excluded += 1
             continue
 
-        # Keep the same theme/footer checks used by the existing indexer.
-        if not all(marker in raw for marker in (
-            "jetpack-search-filters-9",
-            'id="rss-3"',
-            'id="rss-11"',
-        )):
-            excluded += 1
-            continue
+        # Do not require historical footer widgets: the static site's
+        # footer has changed since this indexer was originally written.
+        # ArticleParser validates the actual page structure below.
 
         parser = ArticleParser()
 
@@ -368,6 +371,12 @@ def main():
         "documents": documents,
         "terms": terms,
     }
+
+    # Never replace a working search index with an empty one.
+    if not documents:
+        raise RuntimeError(
+            "No pages were indexed; existing search-index.json was left unchanged."
+        )
 
     OUTPUT.write_text(
         json.dumps(index, ensure_ascii=False, separators=(",", ":")),

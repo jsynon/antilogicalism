@@ -1,0 +1,17 @@
+# Local article publishing tools
+_post-preview/
+_publication-staging/
+publish_post.py
+publish_post.preview-backup.py
+publish_final.py
+complete_publication.py
+fix_article_navigation.py
+fix_previous_article.py
+
+# Local HTML backups
+**/index.before-navigation.html
+**/index.before-newer-post.html
+
+# Python cache
+__pycache__/
+*.pyc
