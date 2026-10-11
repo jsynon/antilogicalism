@@ -16,6 +16,7 @@ from bs4 import BeautifulSoup
 ROOT = Path(__file__).resolve().parent
 BASE = '/antilogicalism/'
 BLOG = ROOT / 'index' / 'index.html'
+UNCATEGORIZED = ROOT / 'uncategorized' / 'index.html'
 PREVIEW = ROOT / '_post-preview'
 INDEXER = ROOT / 'scripts' / 'build_search_index.py'
 
@@ -164,6 +165,23 @@ def build_blog(blog_soup, title, body, permalink):
     return str(blog_soup)
 
 
+def build_uncategorized(category_soup, blog_html, permalink):
+    """Copy the newly generated Blog entry into the existing category list."""
+    category_list = listing(category_soup)
+    if any(a.get('href') == permalink for a in category_list.select('a[href]')):
+        raise FileExistsError('Post already appears in the Uncategorized listing')
+    updated_blog = BeautifulSoup(blog_html, 'html.parser')
+    new_entry = next(
+        (li for li in listing(updated_blog).find_all('li', recursive=False)
+         if li.find('a', href=permalink)), None
+    )
+    if new_entry is None:
+        raise RuntimeError('New post entry missing from generated Blog listing')
+    # Preserve the existing order of all older category entries.
+    category_list.insert(0, BeautifulSoup(str(new_entry), 'html.parser').li)
+    return str(category_soup)
+
+
 def prepare(source, date):
     title, body = load_article(source)
     slug = slugify(title)
@@ -176,8 +194,9 @@ def prepare(source, date):
     prior_url, prior_title, prior_path = latest_post(blog_soup)
     html = build_article(prior_path, title, body, date, permalink, prior_url, prior_title)
     blog_html = build_blog(blog_soup, title, body, permalink)
+    category_html = build_uncategorized(soup_file(UNCATEGORIZED), blog_html, permalink)
     return dict(title=title, permalink=permalink, relative=relative, article_html=html,
-                blog_html=blog_html, previous_path=str(prior_path.relative_to(ROOT)),
+                blog_html=blog_html, category_html=category_html, previous_path=str(prior_path.relative_to(ROOT)),
                 previous_url=prior_url, previous_title=prior_title,
                 source_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),
                 date=date.isoformat())
@@ -191,11 +210,14 @@ def preview(source, date):
     PREVIEW.mkdir(parents=True)
     (PREVIEW / 'index.html').write_text(result['article_html'], encoding='utf-8')
     (PREVIEW / 'blog.html').write_text(result['blog_html'], encoding='utf-8')
+    (PREVIEW / 'uncategorized.html').write_text(result['category_html'], encoding='utf-8')
     metadata = {k: v for k, v in result.items() if not k.endswith('_html')}
     metadata['source'] = str(source.resolve())
+    metadata['category_sha256'] = hashlib.sha256(UNCATEGORIZED.read_bytes()).hexdigest()
     (PREVIEW / 'manifest.json').write_text(json.dumps(metadata, indent=2), encoding='utf-8')
     print('Article preview:', PREVIEW / 'index.html')
     print('Blog preview:', PREVIEW / 'blog.html')
+    print('Uncategorized preview:', PREVIEW / 'uncategorized.html')
     print('Permalink:', result['permalink'])
     print('No published website files were changed.')
 
@@ -209,6 +231,8 @@ def publish(source):
         raise RuntimeError('Source file differs from the previewed file.')
     if hashlib.sha256(source.read_bytes()).hexdigest() != manifest['source_sha256']:
         raise RuntimeError('Article changed after preview. Remove _post-preview and preview again.')
+    if hashlib.sha256(UNCATEGORIZED.read_bytes()).hexdigest() != manifest.get('category_sha256'):
+        raise RuntimeError('Uncategorized page changed since preview. Preview again.')
     date = datetime.fromisoformat(manifest['date'])
     result = prepare(source, date)
     for key in ('permalink', 'previous_path', 'previous_url', 'title'):
@@ -229,7 +253,8 @@ def publish(source):
     # Back up all existing files before touching anything.
     backup = ROOT.parent / ('antilogicalism-publication-backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
     backup.mkdir(parents=True, exist_ok=False)
-    originals = {BLOG: BLOG.read_bytes(), previous: previous.read_bytes(), old_index: old_index.read_bytes()}
+    originals = {BLOG: BLOG.read_bytes(), UNCATEGORIZED: UNCATEGORIZED.read_bytes(),
+                 previous: previous.read_bytes(), old_index: old_index.read_bytes()}
     for path, content in originals.items():
         copy_path = backup / path.relative_to(ROOT)
         copy_path.parent.mkdir(parents=True, exist_ok=True)
@@ -238,6 +263,7 @@ def publish(source):
         article.parent.mkdir(parents=True, exist_ok=False)
         article.write_text(result['article_html'], encoding='utf-8')
         BLOG.write_text(result['blog_html'], encoding='utf-8')
+        UNCATEGORIZED.write_text(result['category_html'], encoding='utf-8')
         previous.write_text(previous_html, encoding='utf-8')
         subprocess.run([sys.executable, str(INDEXER)], cwd=str(ROOT), check=True)
         new_docs = json.loads(read(old_index))
@@ -254,7 +280,7 @@ def publish(source):
         print('Publication failed; original website files restored.', file=sys.stderr)
         raise
     print('Published locally:', article)
-    print('Blog and previous-post navigation updated.')
+    print('Blog, Uncategorized category, and previous-post navigation updated.')
     print(f'Search documents: {old_count} -> {new_count}')
     print('Backup:', backup)
     print('Review locally, then commit and push using GitHub Desktop.')
