@@ -123,6 +123,16 @@ def build_article(template_path, title, body, date, permalink, prior_url, prior_
             parent_link['title'] = date.strftime('%I:%M %p').lstrip('0')
     if soup.title:
         soup.title.string = f'{title} | Antilogicalism'
+    # Replace inherited SEO description with a summary of the new article.
+    rendered_text = BeautifulSoup(markdown.markdown(body, extensions=['extra', 'sane_lists']), 'html.parser')
+    first_paragraph = rendered_text.find('p')
+    description = (first_paragraph or rendered_text).get_text(' ', strip=True)
+    if len(description) > 160:
+        description = description[:157].rsplit(' ', 1)[0].rstrip(' ,.;:') + '...'
+    for old_description in soup.select('meta[name="description"]'):
+        old_description.decompose()
+    if soup.head:
+        soup.head.append(soup.new_tag('meta', attrs={'name': 'description', 'content': description}))
     for element in soup.select('link[rel="canonical"], link[rel="amphtml"], meta[property^="og:"], meta[name^="twitter:"]'):
         element.decompose()
     if soup.head:
