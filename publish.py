@@ -88,6 +88,27 @@ def nav_link(soup, direction, url, title):
     section.append(a)
 
 
+
+
+def sharing_html(title, permalink):
+    """Static sharing controls; no WordPress or Jetpack backend required."""
+    from html import escape
+    from urllib.parse import quote
+    url = 'https://jsynon.github.io' + permalink
+    encoded_url = quote(url, safe='')
+    encoded_title = quote(title, safe='')
+    email_subject = quote('[Shared Post] ' + title, safe='')
+    return (
+        '<div class="sharedaddy sd-sharing-enabled antilogicalism-static-sharing">'
+        '<div class="robots-nocontent sd-block sd-social sd-sharing">'
+        '<h3 class="sd-title">Share this:</h3><div class="sd-content"><ul>'
+        f'<li class="share-facebook"><a class="sd-button" href="https://www.facebook.com/sharer/sharer.php?u={encoded_url}" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><span>Facebook</span></a></li>'
+        f'<li class="share-twitter"><a class="sd-button" href="https://twitter.com/intent/tweet?url={encoded_url}&amp;text={encoded_title}" target="_blank" rel="noopener noreferrer" aria-label="Share on X"><span>Twitter</span></a></li>'
+        f'<li class="share-email"><a class="sd-button" href="mailto:?subject={email_subject}&amp;body={encoded_url}" aria-label="Share by email"><span>Email</span></a></li>'
+        '<li class="share-print"><button class="sd-button" type="button" onclick="window.print()" aria-label="Print this article"><span>Print</span></button></li>'
+        '<li class="share-end"></li></ul></div></div></div>'
+    )
+
 def build_article(template_path, title, body, date, permalink, prior_url, prior_title):
     soup = soup_file(template_path)
     # New posts inherit the footer from the latest published article.
@@ -116,6 +137,11 @@ def build_article(template_path, title, body, date, permalink, prior_url, prior_
     fragment = BeautifulSoup(markdown.markdown(body, extensions=['extra', 'sane_lists']), 'html.parser')
     for child in list(fragment.contents):
         content.append(child)
+    # The source template may contain old Jetpack sharing markup with stale URLs.
+    for old_share in article.select('.sharedaddy'):
+        old_share.decompose()
+    share = BeautifulSoup(sharing_html(title, permalink), 'html.parser')
+    content.insert_after(share.div)
     for element in article.select('.cats-links, footer.entry-meta'):
         element.decompose()
     meta = article.select_one('header.entry-header .entry-meta')
