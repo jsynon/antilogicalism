@@ -13,6 +13,7 @@
   const PAGE_SIZE = 10;
   const RESULTS_PER_BOOK = 2;
   const titleCollator = new Intl.Collator('en', {numeric: true, sensitivity: 'base'});
+  const authorCollator = new Intl.Collator('en', {sensitivity: 'base'});
   function titleSortKey(title) {
     return title.replace(/\b(volume|vol\.?)\s+([IVXLCDM]+)\b/gi, (whole, label, roman) => {
       const values = {I:1,V:5,X:10,L:50,C:100,D:500,M:1000};
@@ -20,14 +21,40 @@
       if (!/^(?=[IVXLCDM]+$)M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/.test(letters)) return whole;
       let value = 0;
       for (let i=0; i<letters.length; i++) {
-        const n = values[letters[i]], next = values[letters[i+1]] || 0;
-        value += n < next ? -n : n;
+        const n = values[letters[i]], following = values[letters[i+1]] || 0;
+        value += n < following ? -n : n;
       }
       return label + ' ' + value;
     });
   }
-  function compareTitles(a, b) {
-    return titleCollator.compare(titleSortKey(a), titleSortKey(b));
+  function authorName(title) {
+    const parts = title.split(/\s+—\s+/);
+    if (parts.length < 2) return '';
+    return parts.slice(1).join(' — ')
+      .replace(/^\s*(?:\((?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\s+by\s+\)|(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\s+by\s+)/i, '')
+      .replace(/\s*\((?:(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\b[^)]*|editors?|translators?|compilers?|annotators?|contributors?)\)\s*$/i, '')
+      .trim();
+  }
+  function surnameKey(name) {
+    if (!name) return '\uffff';
+    const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0].trim();
+    const commaParts = firstContributor.split(',').map(part => part.trim()).filter(Boolean);
+    if (commaParts.length > 1) return commaParts[0].split(/\s+/).pop();
+    const tokens = firstContributor.replace(/[.]/g, '').split(/\s+/).filter(Boolean);
+    while (tokens.length > 1 && /^(jr|sr|ii|iii|iv|v)$/i.test(tokens[tokens.length - 1])) tokens.pop();
+    if (tokens.length < 2) return tokens[0] || '';
+    const ofIndex = tokens.findIndex(token => token.toLocaleLowerCase() === 'of');
+    if (ofIndex === 1) return tokens[0];
+    const yIndex = tokens.findIndex(token => token.toLocaleLowerCase() === 'y');
+    if (yIndex > 0 && yIndex < tokens.length - 1) return tokens.slice(yIndex - 1).join(' ');
+    if (tokens.length > 2 && tokens[tokens.length - 2].toLocaleLowerCase() === 'the') return tokens[tokens.length - 3];
+    return tokens[tokens.length - 1];
+  }
+  function compareAuthors(a, b) {
+    const authorA = authorName(a), authorB = authorName(b);
+    return authorCollator.compare(surnameKey(authorA), surnameKey(authorB)) ||
+      authorCollator.compare(authorA, authorB) ||
+      titleCollator.compare(titleSortKey(a), titleSortKey(b));
   }
   let manifestPromise;
   const partitions = new Map();
@@ -444,7 +471,7 @@
     bookFilter.disabled = true;
     if (finder) finder.disabled = true;
     manifest().then(index => {
-      const books = Object.entries(index.books).sort((a,b)=>compareTitles(a[1].title,b[1].title));
+      const books = Object.entries(index.books).sort((a,b)=>compareAuthors(a[1].title,b[1].title));
       function refreshBooks() {
         const selected = bookFilter.value;
         const terms = (finder ? finder.value : '').toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
@@ -483,4 +510,3 @@
   button.addEventListener('click', search);
   query.addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
 })();
-
