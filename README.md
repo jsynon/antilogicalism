@@ -47,23 +47,6 @@ py -m http.server 8000
 
 Then open <http://localhost:8000/antilogicalism/>. Stop the server with **Ctrl+C**. The `py` launcher serves the files; it does not change them.
 
-## Archive housekeeping audit
-
-A read-only audit script is included at `scripts/audit_archive.py`. It checks local links in HTML pages and reports:
-
-- links to files that are missing from the archive;
-- links to fragments (`#section`) that do not exist on the target page;
-- pages with no incoming links from other HTML pages; and
-- pages not reachable by following HTML links from the homepage.
-
-Run it from PowerShell with:
-
-```powershell
-py D:\Downloads\antilogicalism\scripts\audit_archive.py D:\Downloads\antilogicalism
-```
-
-It writes CSV reports to a sibling folder named `antilogicalism-archive-audit`. Pass `--output` with another folder path to choose a different location. The script does not modify or delete website files. External websites are not checked, and a page reported as orphaned or unreachable should be reviewed before any changes; some pages may be intentionally retained or accessed through external links.
-
 ## Updating the site
 
 This repository is a static snapshot; editing the former WordPress installation does not automatically update it.
