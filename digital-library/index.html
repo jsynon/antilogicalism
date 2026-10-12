@@ -313,21 +313,21 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <p><a href="/antilogicalism/primary-sources/">Browse the Bookshelf</a></p>
 <p>Search within 642 books from the Antilogicalism bookshelf, spanning philosophy, religion, literature, and the sciences.</p>
 <div id="library-search-instructions" class="library-search-help">
-<p><strong>Search passages:</strong> Enter a word, phrase, or quotation, choose a match option, then select Search. <em>Exact phrase</em> keeps words together and in order. <em>All words</em> requires every term, in any order. <em>Any words</em> finds pages with at least one term. Searches ignore capitalization.</p>
-<p><strong>Limit by book:</strong> Type a title or author in Find a book, then choose a title under Search in a book. Leave All books selected to search the full collection.</p>
+<p id="library-search-passage-help"><strong>Search passages:</strong> Enter a word, phrase, or quotation, choose a match option, then select Search. <em>Exact phrase</em> keeps words together and in order. <em>All words</em> requires every term, in any order. <em>Any words</em> finds pages with at least one term. Searches ignore capitalization.</p>
+<p id="library-search-book-help"><strong>Limit by book:</strong> Type a title or author in Find a book, then choose a title under Search in a book. Leave All books selected to search the full collection.</p>
 </div>
 <div id="digital-library-search" data-index-root="/antilogicalism-library-data/data-v47/">
 <label for="library-query">Find a passage</label>
 <div class="library-search-options">
 <div class="library-filter-field"><label for="library-match-mode">Match</label>
-<select id="library-match-mode"><option value="phrase">Exact phrase</option><option value="words">All words</option><option value="any">Any words</option></select></div>
+<select id="library-match-mode" aria-describedby="library-search-passage-help"><option value="phrase">Exact phrase</option><option value="words">All words</option><option value="any">Any words</option></select></div>
 <div class="library-filter-field library-book-field"><label for="library-book-finder">Find a book</label>
-<input id="library-book-finder" type="search" placeholder="Title or author (e.g., The Republic, Plato)" aria-describedby="library-book-count">
+<input id="library-book-finder" type="search" placeholder="Title or author (e.g., The Republic, Plato)" aria-describedby="library-book-count library-search-book-help">
 <small id="library-book-count" role="status"></small>
 <label for="library-book-filter">Search in a book</label>
-<select id="library-book-filter"><option value="">All books</option></select></div>
+<select id="library-book-filter" aria-describedby="library-search-book-help"><option value="">All books</option></select></div>
 </div>
-<div class="library-search-controls"><input id="library-query" type="search" placeholder="Topic or phrase (e.g., virtue, free will)"><button id="library-search-button" type="button">Search</button></div>
+<div class="library-search-controls"><input id="library-query" type="search" aria-describedby="library-search-passage-help" placeholder="Topic or phrase (e.g., virtue, free will)"><button id="library-search-button" type="button">Search</button></div>
 <noscript><p>Enable JavaScript to search this library. You can still browse the Bookshelf above.</p></noscript>
 <div id="library-results" aria-live="polite"></div>
 </div>

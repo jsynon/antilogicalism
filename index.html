@@ -296,7 +296,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 	<div class="entry-content">
 		<p>Welcome! I enjoy keeping a record of ideas, whether my own or others, of which I consider important or interesting in some way. I want to build a website that I can use as my own personal hub for exploring ideas across the internet. On the <a href="/antilogicalism/primary-sources/">bookshelf</a>, I host a selection of primary sources from various fields of study, now accessible through a searchable digital library. In the <a href="/antilogicalism/links/">links section</a>, you can find useful websites and feeds that are always up to date. The contents of <a href="/antilogicalism/index/">my blog posts</a> range from trivial mundane matters to the deepest concern for the human condition. This endeavor has been primarily for my own edification. Some posts may hold great value to you, while others will be quite meaningless. Thanks for visiting!</p>
 <h4 style="text-align: center; font-size: 0.82em;"><strong><a href="/antilogicalism/my-writings/">About Me</a></strong><strong> | </strong><strong><a href="/antilogicalism/primary-sources/">Bookshelf</a></strong><strong> | </strong><strong><a id="library-search-home-link" href="/antilogicalism/digital-library/">Library Search</a></strong><strong> | </strong><strong><a href="/antilogicalism/index/">Blog</a></strong><strong> | </strong><strong><a href="/antilogicalism/links/">Links</a></strong></h4>
-<p style="text-align: center; margin-top: 1.1em;"><button id="surprise-me-home-button" type="button" data-archive="/antilogicalism/index/" aria-label="Open a random blog post">Surprise me</button></p>
+<p style="text-align: center; margin-top: 1.1em;"><button id="surprise-me-home-button" type="button" data-archive="/antilogicalism/index/" aria-label="Open a random blog post">Surprise me</button><span id="surprise-me-status" class="assistive-text" role="status" aria-live="polite"></span></p>
 					</div><!-- .entry-content -->
 </article><!-- #post-2 -->
 
@@ -566,7 +566,9 @@ c0.091-0.647,0.349-1.086,0.635-1.337c-2.22-0.251-4.555-1.111-4.555-4.943c0-1.091
   button.addEventListener('click', async () => {
     button.disabled = true;
     const originalLabel = button.textContent;
+    const status = document.getElementById('surprise-me-status');
     button.textContent = 'Finding a post…';
+    if (status) status.textContent = 'Finding a post.';
     try {
       const response = await fetch(archive, { credentials: 'same-origin' });
       if (!response.ok) throw new Error('Could not load the blog archive');
