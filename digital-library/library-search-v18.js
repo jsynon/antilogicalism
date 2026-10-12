@@ -102,6 +102,7 @@
   const chunks = new Map();
   let generation = 0;
   let active = null;
+  const bookIdsBySelection = new Map();
 
   async function loadJson(url) {
     const response = await fetch(url + '.gz', { cache: 'no-store' });
@@ -432,6 +433,8 @@
     const raw = query.value.trim().replace(/^"([\s\S]*)"$/, '$1');
     const mode = modeInput && ['words', 'any'].includes(modeInput.value) ? modeInput.value : 'phrase';
     const selectedBook = bookFilter ? bookFilter.value : '';
+    const selectedBookIds = selectedBook
+      ? (bookIdsBySelection.get(selectedBook) || new Set([selectedBook])) : null;
     if (!raw) return showMessage('Enter a word or phrase to search the library.');
     const term = normalized(raw).toLowerCase();
     const words = term.match(/[a-z0-9]+/g) || [];
@@ -465,7 +468,7 @@
       const idsByBook = new Map();
       for (const id of candidates) {
         const bookId = String(index.page_books[id]);
-        if (selectedBook && bookId !== selectedBook) continue;
+        if (selectedBookIds && !selectedBookIds.has(bookId)) continue;
         if (!idsByBook.has(bookId)) idsByBook.set(bookId, new Set());
         idsByBook.get(bookId).add(id);
       }
@@ -520,32 +523,44 @@
     bookFilter.disabled = true;
     if (finder) finder.disabled = true;
     manifest().then(index => {
-      const books = Object.entries(index.books)
+      const sortedBooks = Object.entries(index.books)
         .filter(([, book]) => book.title.trim().toLocaleLowerCase() !== 'unrecognised facts about modern psychiatric practice')
         .sort((a,b)=>compareAuthors(a[1].title,b[1].title));
+      const titleGroups = new Map();
+      for (const [id, book] of sortedBooks) {
+        const title = book.title.trim();
+        if (!titleGroups.has(title)) titleGroups.set(title, {id, title:book.title, ids:[]});
+        titleGroups.get(title).ids.push(String(id));
+      }
+      const books = [...titleGroups.values()];
       function refreshBooks() {
         const selected = bookFilter.value;
         const terms = (finder ? finder.value : '').toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
-        const matches = books.filter(([id, book])=>terms.every(term=>book.title.toLocaleLowerCase().includes(term)));
+        const matches = books.filter(book=>terms.every(term=>book.title.toLocaleLowerCase().includes(term)));
+        bookIdsBySelection.clear();
+        for (const book of books) bookIdsBySelection.set(book.id, new Set(book.ids));
         bookFilter.replaceChildren();
         const all = document.createElement('option');
         all.value = ''; all.textContent = 'All books'; bookFilter.append(all);
-        if (selected && !matches.some(([id])=>id===selected)) {
-          const current = books.find(([id])=>id===selected);
+        if (selected && !matches.some(book=>book.id===selected)) {
+          const current = books.find(book=>book.id===selected);
           if (current) {
             const option = document.createElement('option');
-            option.value = current[0]; option.textContent = current[1].title + ' (selected)';
+            option.value = current.id;
+            option.textContent = current.title + (current.ids.length > 1 ? ` (${current.ids.length} files, selected)` : ' (selected)');
             bookFilter.append(option);
           }
         }
-        for (const [id, book] of matches) {
+        for (const book of matches) {
           const option = document.createElement('option');
-          option.value = id; option.textContent = book.title; bookFilter.append(option);
+          option.value = book.id;
+          option.textContent = book.title + (book.ids.length > 1 ? ` (${book.ids.length} files)` : '');
+          bookFilter.append(option);
         }
         bookFilter.value = selected;
         if (count) count.textContent = terms.length
-          ? (matches.length ? `${matches.length} books match. Choose a title below.` : 'No titles match. Try fewer words.')
-          : `${books.length} books available.`;
+          ? (matches.length ? `${matches.length} titles match. Choose a title below.` : 'No titles match. Try fewer words.')
+          : `${books.length} titles available.`;
       }
       refreshBooks();
       bookFilter.disabled = false;
