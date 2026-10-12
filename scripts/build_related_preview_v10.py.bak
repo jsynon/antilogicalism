@@ -1,0 +1,158 @@
+#!/usr/bin/env python3
+"""Antilogicalism Related Articles v10: article-aware matching and coverage audit.
+Place beside build_related_preview_v7.py, v8.py, v9.py and build_search_index.py.
+Only writes new preview HTML files and a report; never changes index.html.
+"""
+import argparse
+from collections import Counter
+from html import escape
+from pathlib import Path
+from bs4 import BeautifulSoup
+import build_related_preview_v7 as v7
+import build_related_preview_v8 as v8
+import build_related_preview_v9 as v9
+
+ROOT = Path(__file__).resolve().parent.parent
+REPORT = ROOT.parent / 'antilogicalism-related-review-v10.html'
+TARGET_SLUGS = ('the-ethics-of-coercion', 'absurdism', 'the-deep-web')
+
+def select(sem, lex, title_sem, title_lex, short):
+    """Retain v9 rules; rescue short-post matches with title + content evidence.
+    No hard-coded article exceptions and no requirement to fill all three slots.
+    """
+    baseline = .70 * sem + .30 * lex
+    score = baseline + .06 * min(lex / .12, 1)
+    strong = sem >= .42 and baseline >= .30
+    supported = sem >= .35 and baseline >= .32 and lex >= .10
+    # Only for short source articles: title semantic AND title lexical support,
+    # plus nontrivial full-content semantic evidence. Avoid title-only coincidences.
+    rescue = (short and sem >= .32 and title_sem >= .43 and
+              title_lex >= .11 and baseline >= .265)
+    if rescue:
+        score += .025 * min(title_lex / .25, 1)
+    keep = strong or supported or rescue
+    borderline = not keep and sem >= .30 and baseline >= .265
+    return score, keep, borderline, 'short-title rescue' if rescue and not (strong or supported) else 'v9 confidence'
+
+def render_preview(post, picks):
+    rel = post['url'].removeprefix('/antilogicalism/').strip('/')
+    source = ROOT / rel / 'index.html'
+    target = ROOT / rel / 'related-preview-v10.html'
+    if not source.exists():
+        print('WARNING: missing preview source', source); return
+    if target.exists():
+        print('Existing preview preserved (delete only this file to regenerate):', target); return
+    if not picks:
+        print('No confident picks; no preview created for', post['title']); return
+    soup = BeautifulSoup(source.read_text(encoding='utf-8', errors='replace'), 'html.parser')
+    article = soup.select_one('article')
+    footer = article.select_one('footer.entry-meta') if article else None
+    if footer is None:
+        print('WARNING: no article footer:', source); return
+    section = soup.new_tag('section', attrs={'class':'antilogicalism-related','aria-label':'Related Articles'})
+    heading = soup.new_tag('h2'); heading.string = 'Related Articles'; section.append(heading)
+    ul = soup.new_tag('ul', attrs={'class':'related-list'})
+    for pick in picks:
+        p = pick['post']
+        li = soup.new_tag('li', attrs={'class':'related-item'})
+        a = soup.new_tag('a', href=p['url'], attrs={'class':'related-title'}); a.string = p['title']; li.append(a)
+        date = soup.new_tag('span', attrs={'class':'related-date'}); date.string = v8.date_for(p['url']); li.append(date)
+        desc = soup.new_tag('p', attrs={'class':'related-excerpt'}); desc.string = pick['excerpt']; li.append(desc)
+        ul.append(li)
+    section.append(ul)
+    style = soup.new_tag('style')
+    style.string = '''
+.antilogicalism-related{margin:2em 0 1.5em;padding:1.25em 1.5em;background:#f8f8f8;border-top:3px solid #dedede}
+.antilogicalism-related h2{font-size:1.25em;margin:0 0 1em}
+.antilogicalism-related .related-list{list-style:none;margin:0;padding:0}
+.antilogicalism-related .related-item{margin:0 0 1.1em;padding:0 0 1em;border-bottom:1px solid #e3e3e3}
+.antilogicalism-related .related-item:last-child{border-bottom:0;padding-bottom:0;margin-bottom:0}
+.antilogicalism-related .related-title{display:block;font-size:1.07em;font-weight:bold;line-height:1.4}
+.antilogicalism-related .related-date{display:block;color:#777;font-size:.82em;margin:.15em 0 .4em}
+.antilogicalism-related .related-excerpt{font-size:.93em;line-height:1.6;color:#555;margin:0}
+'''
+    footer.insert_before(style); footer.insert_before(section)
+    target.write_text(str(soup), encoding='utf-8')
+    print('Preview:', target)
+
+def main():
+    ap = argparse.ArgumentParser(description=__doc__)
+    ap.add_argument('--allow-download', action='store_true')
+    ap.add_argument('--samples', type=int, default=35)
+    ap.add_argument('--short-words', type=int, default=120)
+    args = ap.parse_args()
+    if args.samples < 1 or args.short_words < 1: ap.error('Invalid parameters')
+    posts = v7.collect()
+    if len(posts) < 4 or len({p['url'] for p in posts}) != len(posts):
+        raise SystemExit('Invalid or duplicate article collection')
+    print('Eligible articles:', len(posts))
+    from sentence_transformers import SentenceTransformer
+    model = SentenceTransformer('sentence-transformers/all-MiniLM-L6-v2', local_files_only=not args.allow_download)
+    full_texts = [p['title']+'. '+p['title']+'. '+p['body'][:2200] for p in posts]
+    full = model.encode(full_texts, batch_size=16, show_progress_bar=True, normalize_embeddings=True, convert_to_numpy=True)
+    title = model.encode([p['title'] for p in posts], batch_size=16, show_progress_bar=False, normalize_embeddings=True, convert_to_numpy=True)
+    lexical = v7.lexical_matrix(posts)
+    title_terms = [set(v7.tokenize(p['title'])) for p in posts]
+    lengths = [len(p['body'].split()) for p in posts]
+    ranked, near = [], []
+    for i, a in enumerate(posts):
+        picks, candidates = [], []
+        for j, b in enumerate(posts):
+            if i == j: continue
+            sem = float(full[i] @ full[j]); lex = lexical[i][j]
+            tsem = float(title[i] @ title[j])
+            common = title_terms[i] & title_terms[j]
+            tlex = len(common) / max(1, len(title_terms[i] | title_terms[j]))
+            score, keep, borderline, reason = select(sem, lex, tsem, tlex, lengths[i] <= args.short_words)
+            if keep or borderline:
+                item = dict(post=b, index=j, score=score, semantic=sem, lexical=lex,
+                            title_sem=tsem, title_lex=tlex, reason=reason)
+                (picks if keep else candidates).append(item)
+        picks.sort(key=lambda x:(-x['score'], x['post']['url']))
+        candidates.sort(key=lambda x:(-x['score'], x['post']['url']))
+        ranked.append(picks[:3]); near.append(candidates[:3])
+    coverage = Counter(map(len, ranked))
+    print('Coverage:', ', '.join(f'{k} links: {coverage[k]} articles' for k in range(4)))
+    samples = v7.choose_samples(posts, args.samples)
+    samples = sorted(set(samples) | {i for i,p in enumerate(posts) if any(p['url'].endswith('/'+s+'/') for s in TARGET_SLUGS)})
+    excerpt_cache = {}
+    def details(item, source):
+        j = item['index']
+        if j not in excerpt_cache: excerpt_cache[j] = v9.cleaned_excerpt(posts[j])
+        item['excerpt'] = excerpt_cache[j]
+        item['terms'] = v8.shared_terms(source, item['post'])
+    def html_row(item):
+        p = item['post']
+        return ('<li><a href="https://jsynon.github.io{}">{}</a>'
+                '<small>{} · score {:.3f} · semantic {:.3f} · lexical {:.3f} · title semantic {:.3f} · title overlap {:.3f} · {}</small>'
+                '<p>{}</p><small>Shared terms (diagnostic only): {}</small></li>').format(
+                escape(p['url'],quote=True),escape(p['title']),escape(v8.date_for(p['url'])),
+                item['score'],item['semantic'],item['lexical'],item['title_sem'],item['title_lex'],
+                escape(item['reason']),escape(item['excerpt']),escape(item['terms']))
+    sections = []
+    for i in samples:
+        p = posts[i]
+        for item in ranked[i]+near[i]: details(item,p)
+        main_rows = '<ol>'+''.join(map(html_row, ranked[i]))+'</ol>' if ranked[i] else '<p><em>No confident recommendations.</em></p>'
+        borderline = '<ol>'+''.join(map(html_row,near[i]))+'</ol>' if near[i] else '<p>None in diagnostic range.</p>'
+        sections.append('<section><h2>{}</h2><div class="path">{} · {} words</div>{}<details><summary>Borderline candidates (not displayed): {}</summary>{}</details></section>'.format(
+            escape(p['title']),escape(p['url']),lengths[i],main_rows,len(near[i]),borderline))
+    summary = ''.join(f'<li>{k} recommendations: <strong>{coverage[k]}</strong> articles ({coverage[k]/len(posts)*100:.1f}%)</li>' for k in range(4))
+    report = '''<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Antilogicalism Related Articles v10</title><style>
+body{font:16px/1.6 Georgia,serif;max-width:950px;margin:3rem auto;padding:0 1rem;color:#222}
+section{padding:1.2rem 0;border-top:1px solid #ccc}h1,h2{line-height:1.25}
+li{margin:1em 0}small,.path{display:block;color:#666;font:13px/1.5 Arial,sans-serif}
+li p{margin:.25em 0;color:#444}a{color:#175a83}details{margin:1rem 0;padding:.6rem 1rem;background:#f6f6f6}
+summary{cursor:pointer}</style></head><body><h1>Related Articles — v10</h1>
+<p>Read-only relevance review. Version 9 confidence rules retained; short articles can additionally qualify via corroborating title and body evidence. No forced recommendations. Excerpts use the Version 9 extraction method. Original pages remain unchanged.</p>
+<h2>Coverage across all {} articles</h2><ul>{}</ul><p>Short-source definition: {} words or fewer. Title evidence is diagnostic, not proof of relevance.</p>{}</body></html>'''.format(len(posts),summary,args.short_words,''.join(sections))
+    REPORT.write_text(report,encoding='utf-8')
+    print('Report:',REPORT)
+    for i,p in enumerate(posts):
+        if any(p['url'].endswith('/'+s+'/') for s in TARGET_SLUGS):
+            print('\n'+p['title']+':',[(x['post']['title'],round(x['score'],3),x['reason']) for x in ranked[i]])
+            for item in ranked[i]: details(item,p)
+            render_preview(p,ranked[i])
+    print('Original index.html files unchanged; nothing published.')
+
+if __name__ == '__main__': main()
