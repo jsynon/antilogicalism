@@ -71,5 +71,3 @@ The search page is part of this website repository. Its book text data is mainta
 
 - The archive does not include WordPress editing, accounts, comments, or other server-side features.
 - External services such as Google Drive and the separate library-data repository must remain available for their linked documents and search data to work.
-- The archive audit checks local HTML references only. It cannot confirm that an external website or shared document is still online or publicly accessible.
-- Some legacy links may be intentionally unresolved. Review reports before editing or removing anything.
