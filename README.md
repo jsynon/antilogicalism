@@ -1,295 +1,92 @@
-# Antilogicalism — Static Archive & Digital Library
+# Antilogicalism
 
-A restored static archive of Antilogicalism, preserving its writing, philosophy, and primary-source library without an active WordPress installation. The site also includes a searchable digital library built from the document collection.
+Antilogicalism is a restored archive of essays, philosophical writing, and reading resources. The original site ran on WordPress; the current public site is a static archive hosted with GitHub Pages.
 
-**Live website:** https://jsynon.github.io/antilogicalism/
+**Website:** [jsynon.github.io/antilogicalism](https://jsynon.github.io/antilogicalism/)
 
-## Overview
+## What’s here
 
-Antilogicalism originally ran on WordPress. When the hosting plan was allowed to expire, the goal was to preserve the existing website and make it accessible without continuing to pay for WordPress hosting.
+- **The archive:** essays, older blog posts, and philosophy and primary-source pages, preserved as static HTML.
+- **Site search:** search tools are included in the static site. The blog archive also offers browsing by date and category.
+- **Digital Library Search:** the [library search page](https://jsynon.github.io/antilogicalism/digital-library/) searches 642 book titles. Its large text-search dataset is maintained separately in the `antilogicalism-library-data` repository, keeping that dataset out of this website repository.
+- **Selected Feeds:** feed entries are generated as static HTML, so they can be read without WordPress or browser-side feed access.
 
-The site was exported as static HTML, CSS, JavaScript, and other assets, then published through GitHub Pages. Because the original site contained a large collection of PDF documents, those files were separated from the website and moved to Google Drive. The HTML links were then updated to point to the documents in their new location.
+The site can be browsed without installing WordPress. The book PDFs are hosted separately from the site; opening a document depends on the file and its sharing settings remaining available.
 
-The result is a static website hosted on GitHub Pages, with its PDF library hosted separately on Google Drive. A subsequent project added a full-text digital library search interface.
+## How the archive is hosted
 
-## Architecture
+GitHub Pages serves this repository’s HTML, styles, scripts, images, and other website assets. The former WordPress database and PHP application are not used by the published site. Book files and the searchable library data are maintained separately, so those services have their own availability and access requirements.
 
-The archive uses two hosting services for complementary purposes:
+The site is published under the `/antilogicalism/` project path. Internal links and static assets need to keep working from that path when pages are previewed or updated.
 
-- **GitHub Pages:** Serves the website, including its HTML pages, stylesheets, JavaScript, images, navigation, and other static assets.
-- **Google Drive:** Stores the PDF library and serves documents through their shared links.
+## Repository guide
 
-The original WordPress database and PHP application are not needed to serve the published static archive.
+| Path | Purpose |
+| --- | --- |
+| `index.html` | Homepage |
+| `index/` | Blog archive |
+| `digital-library/` | Digital Library Search page |
+| `assets/search.css`, `assets/search.js` | Static site search interface |
+| `search-index.json` | Data used by the site search |
+| `links/selected-feeds/` | Selected Feeds page and its template |
+| `scripts/build_search_index.py` | Builds the site search index |
+| `scripts/build_static_feeds.py` | Retrieves and renders feed entries as static HTML |
+| `.github/workflows/refresh-feeds.yml` | Scheduled and manual Selected Feeds refresh |
+| `publish.py` | Site publishing helper |
 
-This separation keeps the website repository smaller while preserving access to the document collection. It also means the website and the PDFs have separate hosting and availability dependencies.
+The repository also contains the static export’s many article pages, images, stylesheets, and supporting assets. The library search data repository is separate: [jsynon/antilogicalism-library-data](https://github.com/jsynon/antilogicalism-library-data).
 
-## How the Site Was Created
+## Preview locally
 
-### 1. Restore the original WordPress installation
+From PowerShell, start a simple local web server from the directory containing the repository folder:
 
-A backup of the WordPress site was restored locally using Laragon, creating a working development site at:
-
-`https://antilogicalism.test/`
-
-This provided a local copy of the original site from which to generate the archive.
-
-### 2. Export the website
-
-Simply Static was used to crawl the local WordPress site and generate a static export.
-
-The resulting archive was approximately 9 GB, largely because it included the site's PDF collection.
-
-### 3. Separate the PDF library
-
-The PDFs were removed from the static export, reducing the website to approximately 700 MB.
-
-The PDF files were moved to Google Drive while retaining their original year/month directory structure, corresponding to WordPress's `wp-content/uploads/YYYY/MM/` organization.
-
-Keeping this structure made it possible to match the original document paths to the files in their new location.
-
-### 4. Repair the static website paths
-
-The original export contained URLs pointing to the local `.test` domain and WordPress paths that did not work correctly on GitHub Pages.
-
-A Python script, `fix_site.py`, was used to rewrite those URLs and account for GitHub Pages serving this repository under the `/antilogicalism/` project path.
-
-This repaired the site's styling, navigation, images, scripts, and other internal resources.
-
-### 5. Reconnect the PDF links
-
-Removing the PDFs left existing HTML links pointing to their old WordPress upload locations. Manually repairing thousands of links would have been impractical.
-
-Instead, the PDF library was inventoried and the links were updated programmatically.
-
-#### Build a PDF inventory
-
-Google Apps Script generated a CSV inventory containing 703 PDF files. Each row records:
-
-- The original relative file path
-- The filename
-- The Google Drive file ID
-- The Google Drive sharing URL
-
-The inventory acts as a lookup table between the old WordPress paths and the new document URLs.
-
-#### Match and replace links
-
-A PowerShell script scanned the exported HTML files and searched their `href` and `src` attributes for links to PDFs in the old upload directories.
-
-For each PDF link, the script extracted the original relative path, normalized the path for consistent matching, and looked it up in the CSV inventory.
-
-When a match was found, the old URL was replaced with the corresponding Google Drive sharing URL.
-
-#### Run a dry run first
-
-The script initially ran in dry-run mode. It generated a CSV report showing the original URL, the matched destination when available, and the status of each link without modifying the HTML files.
-
-The dry run examined 1,529 HTML files and found:
-
-- 6,016 PDF links that matched the inventory
-- 358 links that did not match, corresponding to 15 distinct PDF paths
-
-The unmatched links were left untouched. Some may refer to ebooks that had previously been removed for copyright reasons, so they were not automatically restored or redirected.
-
-#### Apply the changes safely
-
-After reviewing the dry-run report, the script was run in apply mode. Before modifying a file, it created a backup of the original HTML file.
-
-The completed replacement run modified 161 HTML files, updated all 6,016 matched links, and left the 358 unmatched links unchanged.
-
-The repaired site was then committed and pushed to GitHub using GitHub Desktop. The published website and its Google Drive PDF links were tested successfully.
-
-
-## Digital Library Search — First Public Release (October 2026)
-
-The first version of **Antilogicalism Library Search** adds full-text discovery across the digitized book collection. Unlike the original site's general page search, this feature searches text extracted from individual book pages.
-
-### Collection and index
-
-- **652** books in the source catalog; **644** eligible for library search.
-- **280,699** indexed pages.
-- **819,383** distinct indexed terms across **1,332** index partitions.
-- **57,424,663** postings in the validated full-text index.
-- Book titles were reviewed and corrected in batches to replace unreliable filename-derived labels.
-- OCR and text-layout repairs improved the readability and searchability of selected books; Google Books copyright notices were excluded from indexing.
-
-The index was validated for the presence of book chunks and partitions, correct page mappings, and correctly ordered posting lists. These figures describe the indexed collection, not the number of PDFs hosted in this GitHub repository.
-
-### Reader experience
-
-The public library search is integrated into the site's existing **Book Lite** theme and navigation rather than presented as a separate application. Readers can search the indexed book text and navigate from results toward the corresponding documents. The original PDFs remain hosted outside GitHub Pages on Google Drive.
-
-The library search and the site's ordinary website search are distinct: one searches the book collection, while the other searches archived web pages.
-
-### Current scope
-
-This is the **first public version**, not a claim that every scan or bibliographic record is perfect. Some documents may still contain OCR errors, unusual page layouts, incorrect source metadata, or unresolved legacy links. Additional quality reviews and interface improvements can be made incrementally without changing the original WordPress backup.
-
-## How the Pieces Fit Together
-
-The publishing and document-access flow looks like this:
-
-```text
-Original WordPress Backup
-          |
-          v
-     Laragon
-          |
-          v
-    Simply Static
-          |
-          v
-  Static HTML Export
-          |
-          +-------------------------+
-          |                         |
-          v                         v
-  Website Assets              PDF Library
-          |                         |
-          v                         v
-     GitHub Pages              Google Drive
-          |                         |
-          +-----------+-------------+
-                      |
-                      v
-             Working Archive
+```powershell
+cd D:\Downloads
+py -m http.server 8000
 ```
 
-The important distinction is that GitHub Pages does not host or serve the PDF files themselves. It serves pages and search assets that direct readers to documents hosted by Google Drive.
+Then open <http://localhost:8000/antilogicalism/>. Stop the server with **Ctrl+C**. The `py` launcher serves the files; it does not change them.
 
-## Repository Structure
+## Archive housekeeping audit
 
-The repository contains the static export of the website, including its pages, images, stylesheets, scripts, and other supporting assets.
+A read-only audit script is included at `scripts/audit_archive.py`. It checks local links in HTML pages and reports:
 
-It also contains `fix_site.py`, which was used to repair URLs and paths for GitHub Pages.
+- links to files that are missing from the archive;
+- links to fragments (`#section`) that do not exist on the target page;
+- pages with no incoming links from other HTML pages; and
+- pages not reachable by following HTML links from the homepage.
 
-The PDF library is maintained separately in Google Drive rather than being included in the website repository. The inventory CSV and the PowerShell migration utilities were used during the repair process and are not necessarily part of the published site.
+Run it from PowerShell with:
 
-## How to Use the Website
+```powershell
+py D:\Downloads\antilogicalism\scripts\audit_archive.py D:\Downloads\antilogicalism
+```
 
-Simply visit the [live Antilogicalism archive](https://jsynon.github.io/antilogicalism/).
+It writes CSV reports to a sibling folder named `antilogicalism-archive-audit`. Pass `--output` with another folder path to choose a different location. The script does not modify or delete website files. External websites are not checked, and a page reported as orphaned or unreachable should be reviewed before any changes; some pages may be intentionally retained or accessed through external links.
 
-Browse the pages as you would any other website, or use the digital library search to discover text within books. When a page links to a PDF, the link opens the corresponding document through Google Drive.
+## Updating the site
 
-PDF access depends on the document remaining available in Drive and its sharing permissions allowing public access. A broken PDF link may therefore indicate a missing file, a changed sharing permission, or a stale link in the archived HTML.
+This repository is a static snapshot; editing the former WordPress installation does not automatically update it.
 
-No local WordPress installation is required to browse the published archive.
+1. Make changes in the local repository.
+2. Preview affected pages locally, including their paths under `/antilogicalism/`.
+3. Review the changed files in GitHub Desktop.
+4. Commit with a descriptive message and push to GitHub.
+5. Check the live page after GitHub Pages finishes publishing.
 
-## How to Update and Publish the Site
+When changing a generated page, update its source template or generator where applicable, then rebuild and review the output. In particular, the Selected Feeds page is generated from its template and feed configuration; avoid treating the generated HTML as its only source.
 
-The published website is a static snapshot, not a live WordPress installation. Changes made to the former WordPress site do not automatically appear here.
+### Refreshing Selected Feeds
 
-To update the archive:
+The scheduled GitHub Actions workflow updates the generated feed content daily and can also be started manually from the repository’s Actions tab. It commits changes when refreshed content differs. Feed publishers can change or become unavailable, so review the generated page after changing feed sources or the generator.
 
-1. Open the local repository in GitHub Desktop.
-2. Make the desired changes to the static files in the working copy.
-3. Preview and test the affected pages locally.
-4. Review the changes in GitHub Desktop.
-5. Commit the changes with a descriptive commit message.
-6. Push the commit to GitHub.
-7. Wait for GitHub Pages to publish the updated site, then verify the live result.
+### Updating Library Search
 
-For changes to HTML, CSS, JavaScript, or images, edit the relevant static files directly when appropriate.
+The search page is part of this website repository. Its book text data is maintained separately in `antilogicalism-library-data`. Keep the two repositories’ changes coordinated when updating the dataset or the page’s data-version reference. Avoid copying the large data files into this repository.
 
-For new PDF documents, upload the files to Google Drive, ensure their sharing permissions permit public access, and update the relevant links in the HTML. If maintaining the original WordPress upload structure, preserve the year/month organization and record the document's path and sharing URL in the PDF inventory.
+## Scope and limitations
 
-Avoid moving or deleting documents in Google Drive without checking for references to them in the archived pages.
-
-### Repairing PDF Links in the Future
-
-The original migration used a PowerShell utility to automate PDF link repair. Its working inputs were:
-
-- The local website directory
-- The PDF inventory CSV
-- A replacement report
-- A backup directory for modified HTML files
-
-If the repair process is needed again, start with a dry run. Review the unmatched links and confirm the proposed destinations before enabling changes. Preserve the backup step, and test the repaired pages before publishing.
-
-The original migration utilities were developed for this particular archive and local directory layout; they should be reviewed and adapted before being reused in another environment.
-
-## Maintenance and Limitations
-
-A few things are worth keeping in mind:
-
-- **Static snapshot:** The repository does not provide the editing features, database, or server-side functionality of WordPress.
-- **Separate document hosting:** The PDF library depends on Google Drive, its sharing settings, and the continued availability of the files.
-- **Unmatched legacy links:** Some old PDF references remain unresolved because their corresponding files were not found in the inventory. These links should be reviewed individually rather than automatically redirected.
-- **Repository size:** The PDF collection was excluded from the static export to keep the repository substantially smaller.
-- **Backups:** Keep the original WordPress backup and migration backups where practical. The original backup is the recovery source for content that cannot be reconstructed from the static export alone.
-
-## Future Possibilities
-
-The current repository preserves the exported website as a static snapshot. A future improvement could replace the Simply Static export workflow with a custom Python generator that builds the archive directly from the WordPress backup.
-
-That could make future rebuilds more reproducible, reduce manual path repair, and provide a more systematic way to maintain the document library.
-
-The static archive and its first library-search release provide a practical way to preserve and explore Antilogicalism’s published content without maintaining the original WordPress hosting environment.
-
-## Recent Maintenance: Footer and RSS Feed Automation
-
-The static archive now includes a maintenance workflow for restoring and updating RSS feed content without requiring WordPress or server-side PHP.
-
-### Footer restoration
-
-The original WordPress export included footer widgets and search functionality that depended on WordPress plugins and widgets. Those elements needed to be repaired for the static archive.
-
-The footer repair restored a working search interface and replaced the broken RSS widget with generated static HTML. Existing feed content, including Quanta, was preserved where appropriate. The repair also removed obsolete WordPress and Book Lite theme credits.
-
-The changes were applied across 1,532 HTML files. Feed content was refreshed in 1,511 files, with five articles rendered in the relevant feed widget. Automated validation completed with zero reported errors.
-
-The search interface uses local assets:
-
-- `assets/search.css`
-- `assets/search.js`
-
-These assets provide the search widget's styling and client-side behavior without depending on the former WordPress search implementation.
-
-### Static RSS feed generation
-
-RSS feeds cannot be fetched directly by ordinary browser-side JavaScript from every publisher because of cross-origin restrictions, and some feeds may not be accessible reliably from the browser. The archive therefore uses a build-time process to retrieve feed items and render them into static HTML.
-
-The main generator is:
-
-` scripts/build_static_feeds.py `
-
-The generator retrieves feed data, renders article entries into HTML, and supports fallback behavior when a feed cannot be retrieved. Network requests use a timeout and retry mechanism to make updates more resilient to temporary failures.
-
-The generated HTML is published with the rest of the static website. Visitors can read the rendered feed content without requiring the original WordPress RSS widgets.
-
-### Selected Feeds page
-
-The Selected Feeds page has been converted to use a template-driven static feed system.
-
-The principal files are:
-
-- `links/selected-feeds/index.template.html` — the template used to preserve the page's layout and structure.
-- `links/selected-feeds/index.html` — the generated HTML served by GitHub Pages.
-- `scripts/build_static_feeds.py` — the script responsible for retrieving and rendering feed content.
-
-The conversion preserves the existing feed selection and page layout while replacing the former WordPress-dependent feed rendering with generated HTML. The page retains its selected sources, including Arts & Letters Daily and Quanta, along with the other feeds in the collection.
-
-### Automated updates with GitHub Actions
-
-A GitHub Actions workflow periodically refreshes the generated feed content. The workflow can also be triggered manually.
-
-When the workflow runs, it retrieves the latest available feed items, regenerates the relevant HTML, and commits and pushes changes when the generated output differs from the existing version.
-
-This makes routine RSS updates automatic rather than requiring manual edits to the published HTML.
-
-The template is the source for maintaining the page's structure; the generated HTML is the published output. When changing the page's layout or feed configuration, update the appropriate source files and regenerate the output rather than treating the generated page as the sole source of truth.
-
-### Extending the approach to other links pages
-
-Other pages in the Links section contain additional RSS feeds and may benefit from the same static-generation approach.
-
-When converting another page:
-
-1. Preserve its existing layout, headings, feed order, and relevant links.
-2. Keep an original or template copy before modifying the page.
-3. Identify the original feed URLs and any display settings that need to be retained.
-4. Generate the static feed content and review the resulting HTML.
-5. Validate the page locally before replacing the published version.
-6. Extend the automation to cover the additional page and its feeds where appropriate.
-
-The Selected Feeds implementation provides a starting point for future conversions, but each page should be reviewed individually rather than assuming every WordPress RSS widget has identical settings or requirements.
+- The archive does not include WordPress editing, accounts, comments, or other server-side features.
+- External services such as Google Drive and the separate library-data repository must remain available for their linked documents and search data to work.
+- The archive audit checks local HTML references only. It cannot confirm that an external website or shared document is still online or publicly accessible.
+- Some legacy links may be intentionally unresolved. Review reports before editing or removing anything.
