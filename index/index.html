@@ -4,7 +4,7 @@
 <head><meta charset="utf-8"/>
 <meta content="width=device-width" name="viewport"/>
 <title>A Weblog of Ideas | Antilogicalism</title>
-<link href="http://gmpg.org/xfn/11" rel="profile"/>
+<link href="https://gmpg.org/xfn/11" rel="profile" />
 <link href="/antilogicalism/xmlrpc.php" rel="pingback"/>
 <!--[if lt IE 9]>
 <script src="/antilogicalism/wp-content/themes/book-lite/js/html5.js" type="text/javascript"></script>
@@ -76,6 +76,12 @@
 			.archive-browse { align-items: stretch; flex-direction: column; gap: 0.55rem; }
 			.archive-year-control select { width: 100%; }
 		}
+
+		.archive-top-search { margin: 1rem 0 1.25rem; }
+		.archive-top-search form { display: flex; gap: 0.5rem; max-width: 34rem; }
+		.archive-top-search input { flex: 1; min-width: 0; padding: 0.5rem 0.65rem; font: inherit; }
+		.archive-top-search button { padding: 0.5rem 0.85rem; font: inherit; cursor: pointer; }
+		@media (max-width: 480px) { .archive-top-search form { width: 100%; } }
 </style>
 <meta content="max-image-preview:large" name="robots"/>
 <!-- Jetpack Site Verification Tags -->
@@ -324,6 +330,12 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 </header><!-- .entry-header -->
 <div class="entry-content">
 <hr/>
+<div class="archive-top-search">
+<form data-antilogicalism-search="">
+<input aria-label="Search blog posts" placeholder="Search blog posts..." required="" type="search"/>
+<button type="submit">Search</button>
+</form>
+</div>
 <section class="archive-browse" aria-label="Browse the blog archive">
 <div class="archive-year-control">
 <label for="archive-year-filter">Browse posts by year</label>
