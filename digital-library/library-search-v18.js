@@ -50,9 +50,16 @@
     if (tokens.length > 2 && tokens[tokens.length - 2].toLocaleLowerCase() === 'the') return tokens[tokens.length - 3];
     return tokens[tokens.length - 1];
   }
+  function isSacredBooksOfTheEast(title) {
+    return /^Sacred Books of the East\b/i.test(title);
+  }
   function compareAuthors(a, b) {
+    const seriesA = isSacredBooksOfTheEast(a), seriesB = isSacredBooksOfTheEast(b);
+    if (seriesA && seriesB) return titleCollator.compare(titleSortKey(a), titleSortKey(b));
     const authorA = authorName(a), authorB = authorName(b);
-    return authorCollator.compare(surnameKey(authorA), surnameKey(authorB)) ||
+    const keyA = seriesA ? 'Sacred Books of the East' : surnameKey(authorA);
+    const keyB = seriesB ? 'Sacred Books of the East' : surnameKey(authorB);
+    return authorCollator.compare(keyA, keyB) ||
       authorCollator.compare(authorA, authorB) ||
       titleCollator.compare(titleSortKey(a), titleSortKey(b));
   }
