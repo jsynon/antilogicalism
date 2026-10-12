@@ -1,1 +1,0 @@
-!function(o){"use strict";const n=o(".wp-block-coblocks-gallery-masonry ul");o(document).ready((function(){n.imagesLoaded((function(){n.masonry({itemSelector:".coblocks-gallery--item",transitionDuration:"0",percentPosition:!0})}))}))}(jQuery);
