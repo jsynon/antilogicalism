@@ -50,15 +50,44 @@
     if (tokens.length > 2 && tokens[tokens.length - 2].toLocaleLowerCase() === 'the') return tokens[tokens.length - 3];
     return tokens[tokens.length - 1];
   }
-  function isSacredBooksOfTheEast(title) {
-    return /^Sacred Books of the East\b/i.test(title);
+  const groupedSeries = [
+    {name: 'Harvard Classics', pattern: /\bHarvard Classics\b/i},
+    {name: 'Sacred Books of the East', pattern: /^Sacred Books of the East\b/i}
+  ];
+  function seriesName(title) {
+    const series = groupedSeries.find(item => item.pattern.test(title));
+    return series ? series.name : '';
+  }
+  function seriesVolume(title) {
+    const match = title.match(/\b(?:volume|vol\.?)\s*([0-9]+|[ivxlcdm]+)\b/i);
+    if (!match) return null;
+    const token = match[1];
+    if (/^\d+$/.test(token)) return Number(token);
+    const letters = token.toUpperCase();
+    if (!/^(?=[IVXLCDM]+$)M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/.test(letters)) return null;
+    const values = {I:1,V:5,X:10,L:50,C:100,D:500,M:1000};
+    let value = 0;
+    for (let i = 0; i < letters.length; i++) {
+      const current = values[letters[i]], next = values[letters[i + 1]] || 0;
+      value += current < next ? -current : current;
+    }
+    return value;
+  }
+  function compareSeriesTitles(a, b) {
+    const volumeA = seriesVolume(a), volumeB = seriesVolume(b);
+    if (volumeA !== null || volumeB !== null) {
+      if (volumeA === null) return 1;
+      if (volumeB === null) return -1;
+      if (volumeA !== volumeB) return volumeA - volumeB;
+    }
+    return titleCollator.compare(titleSortKey(a), titleSortKey(b));
   }
   function compareAuthors(a, b) {
-    const seriesA = isSacredBooksOfTheEast(a), seriesB = isSacredBooksOfTheEast(b);
-    if (seriesA && seriesB) return titleCollator.compare(titleSortKey(a), titleSortKey(b));
+    const seriesA = seriesName(a), seriesB = seriesName(b);
     const authorA = authorName(a), authorB = authorName(b);
-    const keyA = seriesA ? 'Sacred Books of the East' : surnameKey(authorA);
-    const keyB = seriesB ? 'Sacred Books of the East' : surnameKey(authorB);
+    const keyA = seriesA || surnameKey(authorA);
+    const keyB = seriesB || surnameKey(authorB);
+    if (seriesA && seriesA === seriesB) return compareSeriesTitles(a, b);
     return authorCollator.compare(keyA, keyB) ||
       authorCollator.compare(authorA, authorB) ||
       titleCollator.compare(titleSortKey(a), titleSortKey(b));
