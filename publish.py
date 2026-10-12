@@ -286,16 +286,67 @@ def publish(source):
     print('Review locally, then commit and push using GitHub Desktop.')
 
 
+
+
+def sync_excerpt(article_path):
+    """Refresh existing Blog and Uncategorized excerpts from a published HTML article."""
+    article_path = article_path.resolve()
+    if not article_path.is_relative_to(ROOT) or article_path.name != 'index.html':
+        raise ValueError('Provide a published article index.html inside the website directory')
+    relative = article_path.relative_to(ROOT).parent.as_posix()
+    permalink = BASE + relative + '/'
+    article_soup = soup_file(article_path)
+    content = article_soup.select_one('article.post .entry-content')
+    if content is None:
+        raise RuntimeError('Article content not found')
+    para = content.find('p')
+    plain = (para or content).get_text(' ', strip=True)
+    if not plain:
+        raise RuntimeError('Article has no excerptable text')
+    excerpt = plain[:297].rstrip() + ('...' if len(plain) > 297 else '')
+    updates = {}
+    for path in (BLOG, UNCATEGORIZED):
+        original = read(path)
+        soup = BeautifulSoup(original, 'html.parser')
+        matches = [li for li in listing(soup).find_all('li', recursive=False)
+                   if li.find('a', href=permalink)]
+        if len(matches) != 1:
+            raise RuntimeError(f'Expected one listing entry in {path}, found {len(matches)}')
+        p = matches[0].select_one('.lcp_excerpt p')
+        if p is None or not p.get_text(' ', strip=True):
+            raise RuntimeError(f'Excerpt missing in {path}')
+        old = p.get_text()
+        if original.count(old) != 1:
+            raise RuntimeError(f'Excerpt is not uniquely identifiable in {path}')
+        updates[path] = original.replace(old, excerpt, 1)
+    if all(read(path) == html for path, html in updates.items()):
+        print('Excerpts already match the article; no changes needed.')
+        return
+    backup = ROOT.parent / ('antilogicalism-excerpt-backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
+    for path in updates:
+        destination = backup / path.relative_to(ROOT)
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(path, destination)
+    for path, html in updates.items():
+        path.write_text(html, encoding='utf-8')
+    print('Updated Blog and Uncategorized excerpts from:', article_path)
+    print('Backup:', backup)
+    print('Review locally, then commit and push using GitHub Desktop.')
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['preview', 'publish'])
+    parser.add_argument('action', choices=['preview', 'publish', 'sync-excerpt'])
     parser.add_argument('source', type=Path, help='UTF-8 Markdown file starting with # Title')
     parser.add_argument('--date', help='Publication date YYYY-MM-DD (preview only)')
     args = parser.parse_args()
     source = args.source.resolve()
     if not source.is_file():
         parser.error(f'Article not found: {source}')
-    if args.action == 'publish':
+    if args.action == 'sync-excerpt':
+        if args.date:
+            parser.error('--date is only allowed for preview')
+        sync_excerpt(source)
+    elif args.action == 'publish':
         if args.date:
             parser.error('--date is only allowed for preview')
         publish(source)
