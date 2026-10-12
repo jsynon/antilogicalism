@@ -19,6 +19,7 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKUP_ROOT = ROOT.parent / "antilogicalism-footer-polish-backup"
 
 FEED_ID = "rssf95b51da4c"
+FOOTER_FEED_LIMIT = 3
 FEED_WIDGET_ID = "rss-3"
 QUANTA_WIDGET_ID = "rss-11"
 SEARCH_WIDGET_ID = "antilogicalism-search-widget"
@@ -208,7 +209,7 @@ def main():
         print("The feed returned no items. No files were changed.")
         sys.exit(1)
 
-    new_widget = render_native_widget(feed, items)
+    new_widget = render_native_widget(feed, items[:FOOTER_FEED_LIMIT])
 
     files = sorted(ROOT.rglob("*.html"))
     prepared = []
