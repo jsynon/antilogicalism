@@ -4,7 +4,7 @@
 <head><meta charset="utf-8"/>
 <meta content="width=device-width" name="viewport"/>
 <title>The Death and Resurrection of Antilogicalism | Antilogicalism</title>
-<link href="http://gmpg.org/xfn/11" rel="profile"/>
+<link href="https://gmpg.org/xfn/11" rel="profile" />
 <link href="/antilogicalism/xmlrpc.php" rel="pingback"/>
 <!--[if lt IE 9]>
 <script src="/antilogicalism/wp-content/themes/book-lite/js/html5.js" type="text/javascript"></script>
@@ -246,58 +246,120 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <div class="entry-meta">
 			Posted on <a href="/antilogicalism/2026/10/10/the-death-and-resurrection-of-antilogicalism/" rel="bookmark" title="11:32 PM"><time class="entry-date" datetime="2026-10-10T23:32:06.712796-04:00" pubdate="">October 10, 2026</time></a><span class="byline"> by <span class="author vcard"><a class="url fn n" href="/antilogicalism/author/antilogicalism/" rel="author" title="View all posts by antilogicalism">antilogicalism</a></span></span> <span class="cats-links"> under <a href="/antilogicalism/uncategorized/" rel="category tag">Uncategorized</a></span></div><!-- .entry-meta -->
 </header><!-- .entry-header -->
-<div class="entry-content"><p>In 2016, I started Antilogicalism as a personal project dedicated to philosophy, literature, religion, and the exploration of ideas. Over the following decade, it became an extensive archive of articles, essays, quotations, books, and resources that reflected my intellectual interests and the development of my own thinking.</p>
-<p>I never intended for it to become a business. I never ran advertisements, pursued revenue, or concerned myself particularly with traffic. It was something I maintained because I believed the material was worth preserving and sharing.</p>
-<p>For nearly ten years, the website ran on WordPress. It was familiar, relatively easy to maintain, and provided everything I needed to publish new material and organize the archive. Eventually, however, I could no longer justify the expense of maintaining the hosting subscription. The plan expired, and Antilogicalism went offline. I had no plans to restore it, and genuinely believed the project had come to an end. For the first time in nearly a decade, the website was gone. Or so it seemed.</p>
-<h2>A Website in a Backup File</h2>
-<p>Fortunately, I had saved a backup of the original WordPress installation. The files and database were still there, even if the website itself was no longer accessible online. The problem was figuring out what to do with them.</p>
-<p>A WordPress website isn't simply a collection of HTML documents. Its content lives primarily in a database, while its appearance and functionality depend on PHP, themes, plugins, and a functioning web server. Restoring it meant reconstructing the environment in which it had originally operated.</p>
-<p>I decided to attempt the restoration with the assistance of ChatGPT. We began by installing Laragon, a local development environment for Windows that provides Apache, MySQL, PHP, and the other components necessary to run WordPress. Using the backup files, we reconstructed the original installation, imported the database from twenty SQL files, and worked through several configuration and compatibility problems.</p>
-<p>The database itself required some attention. We encountered issues involving character encoding and SQL defaults, but eventually managed to import the tables successfully. We then used WP-CLI to replace the original domain references with a local development address:</p>
-<p><code>https://antilogicalism.com</code></p>
-<p>became</p>
-<p><code>http://antilogicalism.test</code></p>
-<p>This allowed the restored WordPress installation to function entirely on my own computer. After repairing the remaining links and restoring the Book Lite theme, something remarkable happened. Antilogicalism was back. Not publicly, at least not yet. But there it was, running locally, with its familiar layout, articles, archives, and navigation intact. After believing that the website might be lost, seeing it functioning again was an extraordinary relief.</p>
-<h2>Escaping WordPress</h2>
-<p>Once the original website was running locally, another question presented itself: did I really need WordPress anymore?</p>
-<p>WordPress had served me well, but it also introduced dependencies. Maintaining the website required PHP, a database, server infrastructure, and a hosting subscription. Most of Antilogicalism, however, consisted of material that rarely changed. Its articles, essays, and resource collections were perfectly suited to a static website.</p>
-<p>A static website doesn't need a database or a server-side application to display its content. Instead, the pages are stored as ordinary HTML, CSS, JavaScript, and other files that can be served directly to visitors. We decided to convert the restored WordPress installation into a static archive and publish it using GitHub Pages.</p>
-<p>To accomplish this, we used a WordPress plugin called Simply Static, which crawled the locally restored website and generated a collection of static files. The initial export was enormous: approximately nine gigabytes. Most of that size came from the PDF ebook library that I had accumulated over the years. Even extracting the archive proved troublesome. Windows initially reported that the downloaded ZIP file was invalid, although 7-Zip eventually managed to open it.</p>
-<p>We removed the PDF files from the static export, reducing the website to approximately 700 megabytes. The books themselves were already available through Google Drive, so we could preserve access to the library without hosting all of those files directly on GitHub Pages. But this required another important step: mapping the old PDF addresses to their corresponding Google Drive links.</p>
-<p>Rather than simply allowing the old links to break, we worked to preserve access to the documents through their new locations. It was an important distinction. The goal wasn't merely to reproduce the appearance of Antilogicalism. It was to preserve its usefulness.</p>
-<h2>Rebuilding the Website on GitHub</h2>
-<p>With the static files prepared, I created a GitHub repository and used GitHub Desktop to publish the website. This wasn't entirely straightforward. Our first attempt produced a repository containing little more than a <code>.gitattributes</code> file. Subsequent attempts encountered a Git lock-file error that prevented the operation from completing.</p>
-<p>After resolving those issues, we successfully published the archive. The website was now accessible at:</p>
-<p>https://jsynon.github.io/antilogicalism/</p>
-<p>Unfortunately, the first published version was broken. Although the HTML files were present, many of their links still pointed to the local development domain, <code>antilogicalism.test</code>. Stylesheets, images, and navigation links weren't resolving correctly, and the Book Lite theme appeared to have fallen apart.</p>
-<p>We developed scripts to repair the URLs throughout the exported files, replacing the local WordPress addresses with their corresponding GitHub Pages paths. This was particularly important because the site was being hosted in a GitHub Pages project repository, meaning its files lived under <code>/antilogicalism/</code> rather than at the root of the domain.</p>
-<p>Once those paths were corrected, the original appearance returned. The familiar layout, typography, sidebars, navigation, and archives were functioning again. Antilogicalism was finally back online.</p>
-<h2>Restoring What Static HTML Couldn't Preserve</h2>
-<p>Converting WordPress into static files solved the hosting problem, but it introduced another challenge. Some of the website's features had depended on WordPress or external services. Simply exporting the pages wasn't enough to keep everything functioning.</p>
-<p>The search system was one example. The original website used a WordPress-based search feature that no longer worked once the server-side application was removed. Instead of abandoning search, we built a replacement using JavaScript.</p>
-<p>A Python script examined the exported HTML pages and generated a searchable index containing the site's content. The resulting index covered approximately 1,500 pages and contained more than 36,000 unique terms. The browser could then search that index without communicating with a database or running a server-side application.</p>
-<p>We also modified the website's footer, removed obsolete WordPress and Jetpack elements, and integrated the new search interface while preserving the original design. The result was a search system that belonged to the static website itself.</p>
-<p>Another challenge involved the RSS feeds. Antilogicalism had several pages dedicated to links and resources, including collections of philosophy publications, essays, cultural commentary, and other sources of intellectual interest. Previously, WordPress plugins had retrieved and displayed recent articles from those feeds. After the static conversion, those features could no longer update themselves.</p>
-<p>We solved the problem with Python and GitHub Actions. Instead of retrieving RSS feeds whenever someone visited the website, a Python script could retrieve the latest articles, generate the appropriate HTML, and update the relevant pages. GitHub Actions would then run the script automatically on a daily schedule, commit any changes, and publish the updated pages.</p>
-<p>In effect, we replaced a dynamic WordPress feature with an automated static publishing process. The website could continue updating its resource listings without requiring a traditional application server.</p>
-<p>We also encountered a peculiar mobile display problem. On my Android phone, Chrome was showing a large blank area along the right side of the website, even though the layout looked correct in desktop testing and incognito mode. After investigating the CSS and viewport behavior, we eventually discovered that clearing Chrome's cached files resolved the problem. The browser had apparently retained outdated styling information from an earlier version of the site. Sometimes the solution to a complicated-looking problem turns out to be remarkably simple.</p>
-<h2>Rebuilding with Artificial Intelligence</h2>
-<p>Perhaps the most interesting part of this entire experience was the role artificial intelligence played in making it possible.</p>
-<p>I have some background in programming and web development, but I wouldn't describe myself as an experienced software engineer. I can generally read code, understand what it's attempting to accomplish, and make modifications, but writing complex programs from scratch isn't something I would ordinarily attempt on my own.</p>
-<p>Throughout the restoration, I worked with ChatGPT to develop scripts, diagnose errors, understand unfamiliar tools, and plan each stage of the process. This wasn't simply a matter of asking an AI to build a website and waiting for the result. It was an iterative process. We examined files, ran commands, encountered errors, tested solutions, reviewed the results, and made corrections.</p>
-<p>I made decisions about what needed to be preserved, which changes were acceptable, and how the finished website should behave. ChatGPT helped translate those decisions into technical solutions. Sometimes its suggestions didn't work. Sometimes we had to investigate the same problem several times before discovering the actual cause. But the collaboration allowed me to accomplish things that would otherwise have required considerably more time, specialized knowledge, or money.</p>
-<p>What surprised me most was the speed. The entire restoration, from reconstructing the original WordPress installation to publishing and repairing the static website, took only a matter of days. Ten years of accumulated material had been recovered, reorganized, and returned to the internet. And in several respects, the new website was better than the old one.</p>
-<h2>A Different Kind of Independence</h2>
-<p>There is something satisfying about the fact that Antilogicalism no longer depends on a paid WordPress subscription.</p>
-<p>The website is now composed primarily of ordinary files maintained in a Git repository. Its appearance is preserved, its content is accessible, and its automated features operate through scripts and scheduled workflows.</p>
-<p>There are still dependencies, of course. GitHub hosts the website, Google Drive hosts the ebook collection, and the RSS feeds depend on their respective publishers. But the underlying archive is portable. If I ever need to move it again, I can take the files elsewhere.</p>
-<p>More importantly, I have a much better understanding of how the website works than I did before. For years, WordPress handled much of the technical infrastructure behind the scenes. Now I can examine the actual HTML, CSS, JavaScript, and Python responsible for the site's behavior.</p>
-<p>The restoration was therefore more than an exercise in recovering old files. It became an opportunity to learn, experiment, and regain control over a project that has accompanied me through a significant portion of my life.</p>
-<h2>Beginning Again</h2>
-<p>There is one final irony in all of this. For years, publishing a new article on Antilogicalism was as simple as logging into WordPress, opening the editor, and clicking Publish. Now that the website is static, even writing this article requires developing a new publishing process.</p>
-<p>But perhaps that's appropriate. Antilogicalism has always been an evolving project, even when its outward appearance remained relatively unchanged. It began in 2016 as a place to collect and share ideas. Ten years later, after a period of inactivity and an unexpected disappearance from the internet, it has returned in a different technical form.</p>
-<p>The original material is still here. The familiar design is still here. The reasons I created the website haven't changed. And now, for the first time in more than a year, I'm writing something new for it.</p>
-<p>Antilogicalism is alive again.</p></div><!-- .entry-content -->
+<div class="entry-content"><p>When I launched Antilogicalism in 2016, I wanted to create a place where people could explore philosophy, literature, religion, psychology, and the history of ideas. Over the years, the website grew into a collection of articles, essays, links, and hundreds of books and primary-source documents.</p>
+<p>Eventually, I allowed my WordPress hosting plan to expire. The website was no longer being actively maintained, and continuing to pay for hosting didn't make much sense. But I still had a backup of the original site, and I wasn't willing to let the archive disappear.</p>
+<p>What began as a relatively straightforward attempt to preserve the website turned into something much more ambitious.</p>
+<p>Over the course of several days in October 2026, with extensive assistance from ChatGPT, I recovered the original WordPress installation, converted it into a static website, migrated its PDF collection to Google Drive, repaired thousands of broken links, restored its search and RSS functionality, and built a new full-text search engine for its digital library.</p>
+<p>The result is a website that no longer requires WordPress hosting and a searchable collection containing <strong>644 books and 280,699 indexed pages</strong>.</p>
+<p>Here's how we did it.</p>
+<h2>1. Bringing the Original Website Back to Life</h2>
+<p>The first challenge was recovering the original WordPress installation.</p>
+<p>I had a backup of Antilogicalism, but a WordPress backup isn't itself a functioning website. It contains database records, application files, themes, plugins, and uploaded content that ordinarily depend on a web server running PHP and MySQL.</p>
+<p>To reconstruct the site, we used Laragon, a local development environment for Windows.</p>
+<p>We restored the WordPress database from its SQL backups, configured Apache and MySQL, and established a local development address:</p>
+<p><code>antilogicalism.test</code></p>
+<p>There were several complications along the way, including database import problems, character encoding issues, and URLs still pointing to the original public domain.</p>
+<p>Using WordPress command-line tools, we repaired the database references and eventually got the original Book Lite theme working locally.</p>
+<p>For the first time since the hosting plan expired, I could browse the old website again.</p>
+<p>But it was still running WordPress, and the goal was to eliminate the need for ongoing server-side hosting.</p>
+<h2>2. Turning WordPress into a Static Website</h2>
+<p>The next step was converting the recovered website into ordinary HTML, CSS, JavaScript, and image files.</p>
+<p>We used a WordPress plugin called Simply Static to crawl the local installation and export its pages.</p>
+<p>The initial export was enormous: approximately <strong>9 GB</strong>.</p>
+<p>Most of that size came from the site's collection of PDF books and documents.</p>
+<p>After extracting the archive, we removed the PDFs from the website files, reducing the static website to approximately 700 MB.</p>
+<p>That made it practical to publish the site through GitHub Pages, a free hosting service for static websites.</p>
+<p>However, the initial publication didn't work correctly.</p>
+<p>Stylesheets, images, navigation links, and other resources were broken because the exported pages still contained references to the local WordPress installation.</p>
+<p>We wrote a Python script to repair these paths throughout the exported files, accounting for GitHub Pages hosting the website under a repository subdirectory.</p>
+<p>After several rounds of testing and corrections, the original website was working again.</p>
+<p>The Book Lite theme, navigation, articles, and much of the original structure had survived the migration.</p>
+<p>Antilogicalism was now publicly accessible without requiring a WordPress server.</p>
+<h2>3. Reconnecting Thousands of PDF Links</h2>
+<p>There was still one major problem.</p>
+<p>The original website contained thousands of links to PDF documents that had been stored in WordPress's uploads directory.</p>
+<p>Since we'd removed the PDFs from the GitHub repository, those links no longer worked.</p>
+<p>Rather than abandon the library, we migrated the documents to Google Drive.</p>
+<p>We preserved the original year-and-month directory structure of the WordPress uploads. This turned out to be an important decision because it allowed us to associate the original document paths with their new Google Drive locations.</p>
+<p>Using Google Apps Script, we generated an inventory of <strong>703 PDF files</strong>, recording their original paths, filenames, Google Drive identifiers, and sharing URLs.</p>
+<p>We then developed a PowerShell script to examine the static website and identify PDF links that could be matched against that inventory.</p>
+<p>The initial dry run examined 1,529 HTML files and identified:</p>
+<ul><li>6,016 PDF links that matched documents in Google Drive.</li><li>358 unmatched links, representing 15 distinct PDF paths.</li></ul>
+<p>We deliberately left the unmatched links alone rather than guessing where they should point. Some may have referenced documents removed from the original collection.</p>
+<p>After reviewing the results, we applied the replacements.</p>
+<p>The script modified 161 HTML files and successfully redirected all 6,016 matched links to their corresponding Google Drive documents.</p>
+<p>This was one of the most satisfying parts of the entire project. Thousands of references that would otherwise have required manual repair were restored through a combination of file inventories, path matching, and automated replacement.</p>
+<p>The website and its digital library were connected again.</p>
+<h2>4. Restoring Search and RSS Feeds</h2>
+<p>Converting WordPress into a static website introduced another set of problems.</p>
+<p>WordPress search depends on server-side functionality, and many of the site's RSS widgets relied on plugins that were no longer running.</p>
+<p>The pages looked like the original website, but some of their functionality was missing.</p>
+<p>We replaced the WordPress search system with a client-side search index generated from the static pages.</p>
+<p>We also rebuilt the RSS feed functionality.</p>
+<p>Instead of asking WordPress to retrieve and display feed content whenever someone visited the website, we developed Python scripts that periodically fetch the feeds and insert the latest articles into static HTML.</p>
+<p>GitHub Actions now handles these updates automatically.</p>
+<p>We preserved the existing layout of the pages and converted their feed sections to a template-driven system. This allowed us to restore sources such as Arts &amp; Letters Daily, Quanta, and other publications without rebuilding the website around a new platform.</p>
+<p>We also repaired the footer widgets and removed obsolete elements that no longer served a purpose.</p>
+<p>By this point, Antilogicalism wasn't merely a preserved copy of the original website. It had become a maintainable static publication with working search and automatically refreshed content.</p>
+<p>But there was still something I'd wanted to do with the book collection itself.</p>
+<h2>5. Building a Searchable Philosophical Library</h2>
+<p>Having hundreds of PDF documents available for download is useful, but it's not the same as being able to search their contents.</p>
+<p>I wanted visitors to be able to search the entire collection for a word, phrase, philosopher, or concept and discover where that material appeared.</p>
+<p>That required a completely different kind of search engine.</p>
+<p>Instead of indexing website articles, we needed to extract and organize the text inside hundreds of PDF documents, some of which were scanned books with imperfect optical character recognition.</p>
+<p>We began by building a catalog of the collection.</p>
+<p>Of the 652 books in the source catalog, 644 became eligible for the searchable index.</p>
+<p>We then processed their text at the individual-page level.</p>
+<p>The resulting collection contained <strong>280,699 searchable pages</strong>.</p>
+<p>This was a much larger undertaking than the website's original search functionality.</p>
+<p>The index ultimately contained:</p>
+<table><thead><tr><th>Metric</th><th>Total</th></tr></thead><tbody><tr><td>Searchable books</td><td>644</td></tr><tr><td>Indexed pages</td><td>280,699</td></tr><tr><td>Unique search terms</td><td>819,383</td></tr><tr><td>Search index partitions</td><td>1,332</td></tr><tr><td>Indexed term occurrences in posting lists</td><td>57,424,663</td></tr></tbody></table>
+<p>Rather than treating each PDF as a single document, the system records searchable information for individual pages.</p>
+<p>That distinction is important. A search engine that merely tells you a 900-page book contains a word isn't nearly as useful as one that identifies the relevant pages.</p>
+<h2>6. Cleaning Up the Collection</h2>
+<p>Indexing the text was only part of the challenge.</p>
+<p>The PDFs came from different sources, with inconsistent filenames, scanned pages, OCR artifacts, and occasional problems in their underlying text.</p>
+<p>Some filenames didn't accurately identify the books they contained.</p>
+<p>We identified 394 books that needed proper bibliographic titles rather than titles derived from their filenames.</p>
+<p>These were reviewed in batches using excerpts from the documents themselves.</p>
+<p>We also discovered cases where a PDF's contents didn't match its expected identity, along with text extraction problems that could interfere with searching.</p>
+<p>Several rounds of repair focused on improving text layout, separating words and lines correctly, and addressing extraction problems.</p>
+<p>In one of the later repair passes, we validated 2,130 page records across eight books and updated 2,010 indexed pages while preserving the existing page identifiers.</p>
+<p>This kind of work isn't particularly glamorous, but it matters.</p>
+<p>A searchable library is only as useful as the quality of its underlying text and metadata. A sophisticated search interface can't compensate for missing words, misleading titles, or badly extracted pages.</p>
+<p>We also excluded Google Books copyright notices from the searchable index so that repetitive scanning notices wouldn't contaminate the results.</p>
+<p>The objective wasn't simply to produce a large index. It was to make the collection genuinely useful for reading and research.</p>
+<h2>7. Bringing the Search Engine to the Website</h2>
+<p>The final challenge was making the search engine available through the public website.</p>
+<p>Antilogicalism runs on GitHub Pages, which means there is no traditional server-side application handling search requests.</p>
+<p>We therefore designed the library search around precomputed index data that could be accessed by JavaScript in the visitor's browser.</p>
+<p>The collection was organized into partitions, allowing the search interface to retrieve relevant index data without treating the entire library as one enormous file.</p>
+<p>We also wanted the library search to feel like part of Antilogicalism, not an unrelated application.</p>
+<p>The interface was integrated with the site's existing Book Lite design, preserving the familiar navigation, typography, and layout.</p>
+<p>Search results connect readers with relevant books and pages, while the original PDF collection remains hosted separately on Google Drive.</p>
+<p>The first public version of <strong>Antilogicalism Library Search</strong> is now live.</p>
+<p>It represents a substantial improvement over the original website's document collection. Instead of browsing filenames or opening books individually, visitors can search across hundreds of works from one interface.</p>
+<h2>8. What I Learned from the Project</h2>
+<p>One of the most interesting aspects of this experience was the role of AI-assisted development.</p>
+<p>I have some background in programming and web development, but I didn't personally write thousands of lines of Python, JavaScript, and PowerShell from scratch.</p>
+<p>Instead, I worked iteratively with ChatGPT to design the system, diagnose problems, develop scripts, inspect output, and test the results.</p>
+<p>My role involved defining what I wanted, running the tools locally, examining what they produced, identifying problems, and deciding which changes to accept.</p>
+<p>There were plenty of failed attempts, unexpected results, and revisions.</p>
+<p>Some scripts worked immediately. Others needed several rounds of correction. Large indexing jobs required patience, and we learned to preserve backups, stage changes, and validate results before replacing working files.</p>
+<p>The experience reinforced something I've come to appreciate about programming: understanding the problem and knowing how to test a solution are just as important as writing the code.</p>
+<p>AI assistance made it possible for me to undertake a project that would otherwise have required substantially more time and technical expertise.</p>
+<p>But it didn't eliminate the need for judgment, experimentation, or careful verification.</p>
+<h2>9. Where Antilogicalism Goes from Here</h2>
+<p>The library search is still in its first public version.</p>
+<p>There is room to improve the search experience, refine the book metadata, address remaining OCR problems, and make it easier to navigate between search results and their source documents.</p>
+<p>I'd also like to continue improving the website's publishing tools and eventually explore ways of making the archive more interactive.</p>
+<p>For now, though, I'm pleased that the collection has a new life.</p>
+<p>What began as an attempt to rescue a website from an old backup has become a much more ambitious preservation and research project.</p>
+<p>The original WordPress installation is no longer required to serve the site. Thousands of document links have been restored. The RSS feeds update automatically. The site's articles are searchable. And hundreds of books can now be searched at the individual-page level.</p>
+<p>Antilogicalism began in 2016 as an effort to collect and share ideas.</p>
+<p>Ten years later, the technology behind it has changed considerably, but the underlying purpose remains the same: to make philosophy, literature, and the history of ideas easier to explore.</p>
+<p><strong>Explore Antilogicalism:</strong> <a href="https://jsynon.github.io/antilogicalism/">https://jsynon.github.io/antilogicalism/</a></p>
+<p><em>October 2026</em></p></div><!-- .entry-content -->
 <!-- .entry-meta -->
 </article><nav class="navigation" id="nav-below"><div class="nav-previous"><a href="/antilogicalism/2025/03/18/the-ethics-of-coercion/" rel="prev">← The Ethics of Coercion</a></div></nav><!-- #post-12013 -->
 <!-- #nav-below -->
