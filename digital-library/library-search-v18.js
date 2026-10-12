@@ -478,7 +478,9 @@
     bookFilter.disabled = true;
     if (finder) finder.disabled = true;
     manifest().then(index => {
-      const books = Object.entries(index.books).sort((a,b)=>compareAuthors(a[1].title,b[1].title));
+      const books = Object.entries(index.books)
+        .filter(([, book]) => book.title.trim().toLocaleLowerCase() !== 'unrecognised facts about modern psychiatric practice')
+        .sort((a,b)=>compareAuthors(a[1].title,b[1].title));
       function refreshBooks() {
         const selected = bookFilter.value;
         const terms = (finder ? finder.value : '').toLocaleLowerCase().trim().split(/\s+/).filter(Boolean);
