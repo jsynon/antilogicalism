@@ -90,6 +90,18 @@ def nav_link(soup, direction, url, title):
 
 def build_article(template_path, title, body, date, permalink, prior_url, prior_title):
     soup = soup_file(template_path)
+    # New posts inherit the footer from the latest published article.
+    # Fail early if that template is missing either site-wide resource link.
+    footer = soup.select_one('#antilogicalism-search-widget')
+    required_links = {
+        '/antilogicalism/digital-library/': 'Library Search',
+        'https://github.com/jsynon/antilogicalism': 'GitHub Repository',
+    }
+    if footer is None:
+        raise RuntimeError('Latest article template is missing the Search Posts footer widget')
+    for href, label in required_links.items():
+        if footer.select_one(f'a[href="{href}"]') is None:
+            raise RuntimeError(f'Latest article template is missing the {label} footer link')
     article = soup.select_one('article.post')
     if article is None:
         raise RuntimeError('Book Lite template article missing')
