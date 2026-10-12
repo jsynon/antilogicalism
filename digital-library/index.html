@@ -316,7 +316,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <label for="library-query">Find a passage</label>
 <div class="library-search-options">
 <div class="library-filter-field"><label for="library-match-mode">Match</label>
-<select id="library-match-mode"><option value="phrase">Exact phrase</option><option value="words">All words on the same page</option></select></div>
+<select id="library-match-mode"><option value="phrase">Exact phrase</option><option value="words">All words</option><option value="any">Any words</option></select></div>
 <div class="library-filter-field library-book-field"><label for="library-book-finder">Find a book</label>
 <input id="library-book-finder" type="search" placeholder="Title or author (e.g., The Republic, Plato)" aria-describedby="library-book-count">
 <small id="library-book-count" role="status"></small>
@@ -324,7 +324,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <select id="library-book-filter"><option value="">All books</option></select></div>
 </div>
 <div class="library-search-controls"><input id="library-query" type="search" placeholder="Topic or phrase (e.g., virtue, free will)"><button id="library-search-button" type="button">Search</button></div>
-<p class="library-search-help">Exact phrase matches words together in order. All words finds pages containing every search word, in any order. Search is case-insensitive.</p>
+<p class="library-search-help">Exact phrase finds words together in order. All words finds pages containing every search word, in any order. Any words finds pages containing at least one search word, in any order. Search is case-insensitive.</p>
 <noscript><p>Enable JavaScript to search this library. You can still browse the Bookshelf above.</p></noscript>
 <div id="library-results" aria-live="polite"></div>
 </div>

@@ -124,7 +124,7 @@
   }
   function escapeRegex(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
   function matchRanges(text, term, mode) {
-    const needles = mode === 'words'
+    const needles = mode === 'words' || mode === 'any'
       ? [...new Set(term.match(/[a-z0-9]+/g) || [])] : [term];
     const ranges = [];
     for (const needle of needles) {
@@ -136,7 +136,7 @@
         ranges.push({start, end: start + match[2].length});
         found = true;
       }
-      if (!found) return [];
+      if (!found && mode === 'words') return [];
     }
     return ranges.sort((a,b)=>a.start-b.start);
   }
@@ -194,12 +194,12 @@
       return rankText(page, page.text || '', term, mode);
     }
     let matches = page.regions.map(region => rankText(page, region.text || '', term, mode)).filter(Boolean);
-    // All-words mode keeps its existing page-wide meaning, while the excerpt stays within a region.
-    if (!matches.length && mode === 'words' && matchRanges(displayText(page.text || ''), term, mode).length) {
+    // Word searches can match across PDF text regions; keep each excerpt inside one region.
+    if (!matches.length && (mode === 'words' || mode === 'any') && matchRanges(displayText(page.text || ''), term, mode).length) {
       const needles = [...new Set(term.match(/[a-z0-9]+/g) || [])];
       matches = page.regions.map(region => {
         const found = needles.filter(needle => matchRanges(displayText(region.text || ''), needle, 'phrase').length);
-        const match = found.length ? rankText(page, region.text || '', found.join(' '), 'words') : null;
+        const match = found.length ? rankText(page, region.text || '', found.join(' '), mode) : null;
         if (match) match.score += found.length;
         return match;
       }).filter(Boolean);
@@ -214,7 +214,7 @@
   }
   function highlight(element, text, term, mode) {
     // Excerpts may contain only part of an all-words match, so mark each word independently.
-    const needles = mode === 'words' ? [...new Set(term.match(/[a-z0-9]+/g) || [])] : [term];
+    const needles = mode === 'words' || mode === 'any' ? [...new Set(term.match(/[a-z0-9]+/g) || [])] : [term];
     const ranges = needles.flatMap(needle => matchRanges(text, needle, 'phrase'))
       .sort((a,b)=>a.start-b.start);
     appendHighlighted(element, text, ranges);
@@ -248,7 +248,7 @@
       ends.push(i + 1);
     }
     const searchText = characters.join('');
-    const needles = mode === 'words' ? [...new Set(term.match(/[a-z0-9]+/g) || [])] : [term];
+    const needles = mode === 'words' || mode === 'any' ? [...new Set(term.match(/[a-z0-9]+/g) || [])] : [term];
     return needles.flatMap(needle => matchRanges(searchText, needle, 'phrase'))
       .map(range => ({start: starts[range.start], end: ends[range.end - 1]}))
       .sort((a,b) => a.start-b.start);
@@ -396,7 +396,7 @@
     const myGeneration = ++generation;
     active = null;
     const raw = query.value.trim().replace(/^"([\s\S]*)"$/, '$1');
-    const mode = modeInput && modeInput.value === 'words' ? 'words' : 'phrase';
+    const mode = modeInput && ['words', 'any'].includes(modeInput.value) ? modeInput.value : 'phrase';
     const selectedBook = bookFilter ? bookFilter.value : '';
     if (!raw) return showMessage('Enter a word or phrase to search the library.');
     const term = normalized(raw).toLowerCase();
@@ -407,18 +407,26 @@
     try {
       const index = await manifest();
       if (myGeneration !== generation) return;
-      const prefixes = [...new Set(words.map(wordPrefix))];
       const available = new Set(index.partitions);
-      if (prefixes.some(prefix => !available.has(prefix))) return showMessage('No matching passages in the selected books. OCR errors may prevent a match.');
+      const searchableWords = [...new Set(words)].filter(word => available.has(wordPrefix(word)));
+      if (!searchableWords.length || (mode !== 'any' && searchableWords.length !== new Set(words).size)) {
+        return showMessage('No matching passages in the selected books. OCR errors may prevent a match.');
+      }
+      const prefixes = [...new Set(searchableWords.map(wordPrefix))];
       const loaded = new Map(await Promise.all(prefixes.map(async prefix => [prefix, await partition(prefix)])));
       if (myGeneration !== generation) return;
-      const lists = [...new Set(words)].map(word =>
+      const lists = searchableWords.map(word =>
         decodeDeltas(loaded.get(wordPrefix(word))[word] || []));
-      lists.sort((a, b) => a.length - b.length);
-      let candidates = lists.length ? lists[0].slice() : [];
-      for (const list of lists.slice(1)) {
-        candidates = intersection(candidates, list);
-        if (!candidates.length) break;
+      let candidates;
+      if (mode === 'any') {
+        candidates = [...new Set(lists.flat())].sort((a, b) => a - b);
+      } else {
+        lists.sort((a, b) => a.length - b.length);
+        candidates = lists.length ? lists[0].slice() : [];
+        for (const list of lists.slice(1)) {
+          candidates = intersection(candidates, list);
+          if (!candidates.length) break;
+        }
       }
       const idsByBook = new Map();
       for (const id of candidates) {
