@@ -1,6 +1,6 @@
-# Antilogicalism — Static Archive
+# Antilogicalism — Static Archive & Digital Library
 
-A static archive of Antilogicalism, preserving the site's writing, philosophy, and primary-source library without requiring an active WordPress installation.
+A restored static archive of Antilogicalism, preserving its writing, philosophy, and primary-source library without an active WordPress installation. The site also includes a searchable digital library built from the document collection.
 
 **Live website:** https://jsynon.github.io/antilogicalism/
 
@@ -10,11 +10,11 @@ Antilogicalism originally ran on WordPress. When the hosting plan was allowed to
 
 The site was exported as static HTML, CSS, JavaScript, and other assets, then published through GitHub Pages. Because the original site contained a large collection of PDF documents, those files were separated from the website and moved to Google Drive. The HTML links were then updated to point to the documents in their new location.
 
-The result is a static website hosted on GitHub Pages, with its PDF library hosted separately on Google Drive.
+The result is a static website hosted on GitHub Pages, with its PDF library hosted separately on Google Drive. A subsequent project added a full-text digital library search interface.
 
 ## Architecture
 
-The archive uses two services for two different purposes:
+The archive uses two hosting services for complementary purposes:
 
 - **GitHub Pages:** Serves the website, including its HTML pages, stylesheets, JavaScript, images, navigation, and other static assets.
 - **Google Drive:** Stores the PDF library and serves documents through their shared links.
@@ -99,6 +99,32 @@ The completed replacement run modified 161 HTML files, updated all 6,016 matched
 
 The repaired site was then committed and pushed to GitHub using GitHub Desktop. The published website and its Google Drive PDF links were tested successfully.
 
+
+## Digital Library Search — First Public Release (October 2026)
+
+The first version of **Antilogicalism Library Search** adds full-text discovery across the digitized book collection. Unlike the original site's general page search, this feature searches text extracted from individual book pages.
+
+### Collection and index
+
+- **652** books in the source catalog; **644** eligible for library search.
+- **280,699** indexed pages.
+- **819,383** distinct indexed terms across **1,332** index partitions.
+- **57,424,663** postings in the validated full-text index.
+- Book titles were reviewed and corrected in batches to replace unreliable filename-derived labels.
+- OCR and text-layout repairs improved the readability and searchability of selected books; Google Books copyright notices were excluded from indexing.
+
+The index was validated for the presence of book chunks and partitions, correct page mappings, and correctly ordered posting lists. These figures describe the indexed collection, not the number of PDFs hosted in this GitHub repository.
+
+### Reader experience
+
+The public library search is integrated into the site's existing **Book Lite** theme and navigation rather than presented as a separate application. Readers can search the indexed book text and navigate from results toward the corresponding documents. The original PDFs remain hosted outside GitHub Pages on Google Drive.
+
+The library search and the site's ordinary website search are distinct: one searches the book collection, while the other searches archived web pages.
+
+### Current scope
+
+This is the **first public version**, not a claim that every scan or bibliographic record is perfect. Some documents may still contain OCR errors, unusual page layouts, incorrect source metadata, or unresolved legacy links. Additional quality reviews and interface improvements can be made incrementally without changing the original WordPress backup.
+
 ## How the Pieces Fit Together
 
 The publishing and document-access flow looks like this:
@@ -129,7 +155,7 @@ Original WordPress Backup
              Working Archive
 ```
 
-The important distinction is that GitHub Pages does not host or serve the PDF files themselves. It serves pages containing links to documents hosted by Google Drive.
+The important distinction is that GitHub Pages does not host or serve the PDF files themselves. It serves pages and search assets that direct readers to documents hosted by Google Drive.
 
 ## Repository Structure
 
@@ -143,7 +169,7 @@ The PDF library is maintained separately in Google Drive rather than being inclu
 
 Simply visit the [live Antilogicalism archive](https://jsynon.github.io/antilogicalism/).
 
-Browse the pages as you would any other website. When a page links to a PDF, the link opens the corresponding document through Google Drive.
+Browse the pages as you would any other website, or use the digital library search to discover text within books. When a page links to a PDF, the link opens the corresponding document through Google Drive.
 
 PDF access depends on the document remaining available in Drive and its sharing permissions allowing public access. A broken PDF link may therefore indicate a missing file, a changed sharing permission, or a stale link in the archived HTML.
 
@@ -198,7 +224,7 @@ The current repository preserves the exported website as a static snapshot. A fu
 
 That could make future rebuilds more reproducible, reduce manual path repair, and provide a more systematic way to maintain the document library.
 
-For now, the static archive provides a practical way to preserve Antilogicalism's published content without maintaining the original WordPress hosting environment.
+The static archive and its first library-search release provide a practical way to preserve and explore Antilogicalism’s published content without maintaining the original WordPress hosting environment.
 
 ## Recent Maintenance: Footer and RSS Feed Automation
 
