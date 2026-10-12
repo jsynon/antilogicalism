@@ -58,8 +58,13 @@
     const series = groupedSeries.find(item => item.pattern.test(title));
     return series ? series.name : '';
   }
-  function seriesVolume(title) {
-    const match = title.match(/\b(?:volume|vol\.?)\s*([0-9]+|[ivxlcdm]+)\b/i);
+  function seriesVolume(title, series) {
+    // Many Harvard Classics entries are cataloged under the title of the
+    // individual work (e.g. "Sacred Writings, Vol. I ... (Harvard Classics,
+    // Vol. 44)"). Use the collection's own volume number, not the work's.
+    const match = series === 'Harvard Classics'
+      ? title.match(/\bHarvard Classics\b[^)]*?\b(?:volume|vol\.?)\s*([0-9]+)\b/i)
+      : title.match(/\b(?:volume|vol\.?)\s*([0-9]+|[ivxlcdm]+)\b/i);
     if (!match) return null;
     const token = match[1];
     if (/^\d+$/.test(token)) return Number(token);
@@ -73,8 +78,8 @@
     }
     return value;
   }
-  function compareSeriesTitles(a, b) {
-    const volumeA = seriesVolume(a), volumeB = seriesVolume(b);
+  function compareSeriesTitles(a, b, series) {
+    const volumeA = seriesVolume(a, series), volumeB = seriesVolume(b, series);
     if (volumeA !== null || volumeB !== null) {
       if (volumeA === null) return 1;
       if (volumeB === null) return -1;
@@ -87,7 +92,7 @@
     const authorA = authorName(a), authorB = authorName(b);
     const keyA = seriesA || surnameKey(authorA);
     const keyB = seriesB || surnameKey(authorB);
-    if (seriesA && seriesA === seriesB) return compareSeriesTitles(a, b);
+    if (seriesA && seriesA === seriesB) return compareSeriesTitles(a, b, seriesA);
     return authorCollator.compare(keyA, keyB) ||
       authorCollator.compare(authorA, authorB) ||
       titleCollator.compare(titleSortKey(a), titleSortKey(b));
