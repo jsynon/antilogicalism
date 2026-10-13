@@ -7,8 +7,8 @@
 <style id="antilogicalism-clean-body-system">
 /* Shared page-body treatment. The Book Lite masthead, navigation, and footer are untouched. */
 #primary .entry-content{color:#3e454a}
-#primary .entry-content a{color:#36566a;text-decoration-thickness:1px;text-underline-offset:.16em}
-#primary .entry-content a:hover{color:#233f50}
+#primary .entry-content a{color:#111;text-decoration-thickness:1px;text-underline-offset:.16em}
+#primary .entry-content a:hover{color:#000}
 #primary .entry-content a:focus-visible,
 #primary .entry-content button:focus-visible,
 #primary .entry-content input:focus-visible,
@@ -270,7 +270,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #lcp_instance_0{list-style:none;margin:0;padding:0}
 #lcp_instance_0>li{margin:0;padding:1rem 0;border-bottom:1px solid #e0e2e3}
 #lcp_instance_0>li:first-child{border-top:1px solid #e0e2e3}
-#primary .entry-content #lcp_instance_0>li>a{font-weight:600;color:#111;text-decoration:none}
+#primary .entry-content #lcp_instance_0>li>a{font-weight:600;color:#111;text-decoration:underline;text-underline-offset:.12em}
 #lcp_instance_0>li>a:hover{text-decoration:underline}
 #lcp_instance_0 .lcp_excerpt p{margin:6px 0 0;line-height:1.6;color:#111}
 #lcp_instance_0>li[hidden]{display:none!important}
@@ -288,6 +288,12 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content .bookshelf-category-intro p:first-of-type::first-line,
 #primary .entry-content .philosophy-intro::first-line,
 #primary .entry-content .bookshelf-browse-note::first-line{font-variant:small-caps;letter-spacing:.02em}
+#primary .entry-content a:not([aria-current="page"]){color:#111!important}
+#primary .entry-content a:hover:not([aria-current="page"]){color:#000!important}
+#primary .entry-content #bookshelf-browse-page .bookshelf-page-nav a[aria-current="page"],
+#primary .entry-content #philosophy-browse-page .bookshelf-page-nav a[aria-current="page"]{background:#111!important;border-color:#111!important;color:#fff!important}
+#primary .entry-content #library-search-instructions,
+#primary .entry-content #library-search-instructions p{font-family:inherit!important;font-size:inherit!important}
 </style>
 </head>
 <body class="wp-singular page-template-default page page-id-372 wp-theme-book-lite custom-header">
