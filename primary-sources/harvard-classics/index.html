@@ -287,6 +287,83 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #bookshelf-browse-page .bookshelf-extra-notes p{font-size:15px;line-height:1.65}
 @media(max-width:650px){#bookshelf-browse-page .bookshelf-controls{grid-template-columns:1fr}#bookshelf-browse-page .bookshelf-pagination{gap:8px;flex-wrap:wrap}}
 </style>
+<style id="bookshelf-nested-clean-body-styles">
+/* Match the Bookshelf reference while leaving the theme shell intact. */
+#primary .entry-content #bookshelf-browse-page,
+#primary .entry-content #philosophy-browse-page{font-size:17px!important;line-height:1.65!important;color:#3e454a!important}
+#primary .entry-content #bookshelf-browse-page a,
+#primary .entry-content #philosophy-browse-page a{color:#36566a!important;text-decoration-thickness:1px;text-underline-offset:.16em}
+#primary .entry-content #bookshelf-browse-page a:hover,
+#primary .entry-content #philosophy-browse-page a:hover{color:#233f50!important;text-decoration:underline}
+#primary .entry-content #bookshelf-browse-page a:focus-visible,
+#primary .entry-content #bookshelf-browse-page button:focus-visible,
+#primary .entry-content #bookshelf-browse-page select:focus-visible,
+#primary .entry-content #philosophy-browse-page a:focus-visible,
+#primary .entry-content #philosophy-browse-page button:focus-visible,
+#primary .entry-content #philosophy-browse-page select:focus-visible{outline:2px solid #6b91a8!important;outline-offset:2px}
+#primary .entry-content #bookshelf-browse-page .bookshelf-page-nav,
+#primary .entry-content #philosophy-browse-page .bookshelf-page-nav{gap:8px;margin:0 0 1.2rem;padding:0 0 .9rem;border-bottom:1px solid #e0e2e3}
+#primary .entry-content #bookshelf-browse-page .bookshelf-page-nav a,
+#primary .entry-content #philosophy-browse-page .bookshelf-page-nav a{display:inline-flex;align-items:center;min-height:32px;padding:3px 0;margin-right:12px;border:0;border-radius:0;background:transparent;color:#36566a!important;font-size:15px;line-height:1.45;font-weight:400}
+#primary .entry-content #bookshelf-browse-page .bookshelf-page-nav a:hover,
+#primary .entry-content #philosophy-browse-page .bookshelf-page-nav a:hover{background:transparent;text-decoration:underline}
+#primary .entry-content #bookshelf-browse-page .bookshelf-page-nav a[aria-current="page"],
+#primary .entry-content #philosophy-browse-page .bookshelf-page-nav a[aria-current="page"]{background:transparent;border:0;color:#30363a!important;font-weight:700;text-decoration:underline}
+#primary .entry-content #bookshelf-browse-page .bookshelf-category-intro,
+#primary .entry-content #philosophy-browse-page .philosophy-intro{margin:0 0 1.5rem;font-size:17px;line-height:1.7;color:#454c51}
+#primary .entry-content #bookshelf-browse-page #bookshelf-browse,
+#primary .entry-content #philosophy-browse-page #philosophy-browse{padding-top:1.2rem;border-top:1px solid #e0e2e3}
+#primary .entry-content #bookshelf-browse-page #bookshelf-browse h2,
+#primary .entry-content #philosophy-browse-page #philosophy-browse h2{margin:0 0 .65rem;padding:0;text-align:left;font-size:22px;line-height:1.35;font-style:normal;font-weight:600;color:#30363a}
+#primary .entry-content #bookshelf-browse-page .bookshelf-browse-note,
+#primary .entry-content #philosophy-browse-page .philosophy-browse-note{margin:0 0 1rem;font-size:16px;color:#50585e}
+#primary .entry-content #bookshelf-browse-page .bookshelf-controls,
+#primary .entry-content #philosophy-browse-page .philosophy-controls{gap:.75rem 1rem;margin:0 0 1.2rem;padding:.9rem 0;border:0;border-bottom:1px solid #e0e2e3;border-radius:0;background:transparent}
+#primary .entry-content #bookshelf-browse-page .bookshelf-controls label,
+#primary .entry-content #philosophy-browse-page .philosophy-controls label{gap:.3rem;color:#454c51;font-size:15px;font-weight:600}
+#primary .entry-content #bookshelf-browse-page .bookshelf-controls select,
+#primary .entry-content #bookshelf-browse-page .bookshelf-controls input,
+#primary .entry-content #philosophy-browse-page .philosophy-controls select,
+#primary .entry-content #philosophy-browse-page .philosophy-controls input{width:100%;min-height:42px;padding:8px 11px;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;font-size:16px}
+#primary .entry-content #bookshelf-browse-page .bookshelf-results,
+#primary .entry-content #bookshelf-browse-page .bookshelf-static-list,
+#primary .entry-content #philosophy-browse-page .philosophy-results{display:block}
+#primary .entry-content #bookshelf-browse-page .bookshelf-result,
+#primary .entry-content #bookshelf-browse-page .bookshelf-static-entry,
+#primary .entry-content #philosophy-browse-page .philosophy-result{margin:0;padding:1rem 0;border:0;border-bottom:1px solid #e0e2e3;border-radius:0;background:transparent;box-shadow:none}
+#primary .entry-content #bookshelf-browse-page .bookshelf-result h3,
+#primary .entry-content #philosophy-browse-page .philosophy-result h3{margin:0 0 .35rem;font-size:18px;line-height:1.4;font-style:normal;text-align:left;font-weight:600;color:#36566a}
+#primary .entry-content #bookshelf-browse-page .bookshelf-work-group+.bookshelf-work-group,
+#primary .entry-content #philosophy-browse-page .philosophy-work-group+.philosophy-work-group{margin-top:.7rem;padding-top:.6rem;border-top:1px solid #e4e6e7}
+#primary .entry-content #bookshelf-browse-page .bookshelf-book-links,
+#primary .entry-content #philosophy-browse-page .philosophy-book-links{list-style:none!important;margin:0!important;padding:0!important}
+#primary .entry-content #bookshelf-browse-page .bookshelf-book-links a,
+#primary .entry-content #philosophy-browse-page .philosophy-book-links a{display:block;padding:5px 0;font-size:17px;line-height:1.5;font-weight:500;text-decoration:none}
+#primary .entry-content #bookshelf-browse-page .bookshelf-book-links a:hover,
+#primary .entry-content #philosophy-browse-page .philosophy-book-links a:hover{text-decoration:underline}
+#primary .entry-content #bookshelf-browse-page .bookshelf-descriptions p,
+#primary .entry-content #philosophy-browse-page .philosophy-descriptions p{margin:0 0 .65rem;font-size:16px;line-height:1.65;color:#50585e}
+#primary .entry-content #bookshelf-browse-page .bookshelf-byline,
+#primary .entry-content #bookshelf-browse-page .bookshelf-series,
+#primary .entry-content #philosophy-browse-page .philosophy-byline{margin:0 0 .3rem;font-size:15px;color:#626b70}
+#primary .entry-content #bookshelf-browse-page .bookshelf-pagination,
+#primary .entry-content #philosophy-browse-page .philosophy-pagination{gap:.7rem;margin:1.2rem 0 0}
+#primary .entry-content #bookshelf-browse-page .bookshelf-pagination button,
+#primary .entry-content #philosophy-browse-page .philosophy-pagination button{min-height:40px;padding:7px 13px;border:1px solid #262b2f;border-radius:2px;background:#262b2f;color:#fff;font:inherit;font-size:15px}
+#primary .entry-content #bookshelf-browse-page .bookshelf-pagination button:hover:not(:disabled),
+#primary .entry-content #philosophy-browse-page .philosophy-pagination button:hover:not(:disabled){background:#111518}
+#primary .entry-content #bookshelf-browse-page .bookshelf-page-label,
+#primary .entry-content #philosophy-browse-page .philosophy-page-label{font-size:14px;color:#626b70}
+#primary .entry-content #bookshelf-browse-page .bookshelf-empty,
+#primary .entry-content #philosophy-browse-page .philosophy-empty{padding:1rem 0;border:0;border-bottom:1px solid #e0e2e3;border-radius:0;background:transparent;color:#50585e}
+#primary .entry-content #bookshelf-browse-page .bookshelf-extras{margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid #e0e2e3}
+#primary .entry-content #bookshelf-browse-page .bookshelf-extras h2{margin:0 0 .7rem;font-size:21px;color:#30363a}
+#primary .entry-content #bookshelf-browse-page .bookshelf-resource{padding:.8rem 0;border-bottom:1px solid #e0e2e3}
+#primary .entry-content #bookshelf-browse-page .bookshelf-resource h3{font-size:18px;color:#36566a}
+#primary .entry-content #bookshelf-browse-page .bookshelf-extra-notes p{font-size:16px;line-height:1.65;color:#50585e}
+#primary .entry-content #philosophy-browse-page .philosophy-period-badges span{padding:0;background:transparent;border-radius:0;color:#626b70;font-size:13px}
+@media(max-width:650px){#primary .entry-content #bookshelf-browse-page .bookshelf-controls,#primary .entry-content #philosophy-browse-page .philosophy-controls{grid-template-columns:1fr}#primary .entry-content #philosophy-browse-page .philosophy-result-heading{flex-direction:column}}
+</style>
 </head>
 
 <body class="wp-singular page-template-default page page-id-9849 page-child parent-pageid-6350 wp-theme-book-lite custom-header">
