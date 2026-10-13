@@ -304,7 +304,14 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #digital-library-search .library-search-controls input{flex:1 1 15em}
 #primary .entry-content #digital-library-search #library-search-button{border-color:#262b2f!important;background:#262b2f!important;color:#fff!important}
 #primary .entry-content #digital-library-search #library-search-button:hover{border-color:#111518!important;background:#111518!important}
-@media(max-width:560px){#digital-library-search .library-search-options{grid-template-columns:1fr!important}.library-filter-field:first-child,.library-book-field,.library-title-field{grid-column:1!important;grid-row:auto!important}}
+@media(max-width:560px){
+#digital-library-search .library-search-options{grid-template-columns:minmax(0,1fr)!important}
+#digital-library-search .library-filter-field:first-child,
+#digital-library-search .library-book-field,
+#digital-library-search .library-title-field{grid-column:1!important;grid-row:auto!important;width:100%;min-width:0}
+#digital-library-search .library-filter-field select,
+#digital-library-search .library-filter-field input{width:100%;min-width:0;box-sizing:border-box}
+}
 #digital-library-search .library-pdf-unavailable{color:#626b70}
 </style>
 <style id="antilogicalism-theme-typography">
