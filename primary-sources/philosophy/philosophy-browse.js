@@ -4,6 +4,7 @@
 
   const periodSelect = root.querySelector("#philosophy-period");
   const authorSearch = root.querySelector("#philosophy-author-search");
+  const titleSearch = root.querySelector("#philosophy-title-search");
   const results = root.querySelector(".philosophy-results");
   const pageLabel = root.querySelector(".philosophy-page-label");
   const previous = root.querySelector(".philosophy-previous");
@@ -132,8 +133,18 @@
   };
 
   const render = () => {
-    const query = normalize(authorSearch.value.trim());
-    const items = authorItems(activeEntries()).filter((item) => !query || normalize(item.author).includes(query));
+    const authorQuery = normalize(authorSearch.value.trim());
+    const titleQuery = normalize(titleSearch.value.trim());
+    const items = authorItems(activeEntries())
+      .filter((item) => !authorQuery || normalize(item.author).includes(authorQuery))
+      .map((item) => {
+        const blocks = item.blocks.map((block) => ({
+          ...block,
+          books: block.books.filter((book) => !titleQuery || normalize(book.title).includes(titleQuery)),
+        })).filter((block) => block.books.length);
+        return { ...item, blocks, periods: new Set(blocks.map((block) => block.periodLabel)) };
+      })
+      .filter((item) => item.blocks.length);
 
     const pageCount = Math.max(1, Math.ceil(items.length / perPage));
     currentPage = Math.min(Math.max(1, currentPage), pageCount);
@@ -141,7 +152,7 @@
     results.replaceChildren();
     visible.forEach((item) => results.append(renderAuthor(item)));
 
-    if (!items.length) results.append(setText("p", "philosophy-empty", "No authors found."));
+    if (!items.length) results.append(setText("p", "philosophy-empty", titleQuery ? "No matching books found." : "No authors found."));
     pageLabel.textContent = items.length
       ? `Page ${currentPage} of ${pageCount} · ${perPage} author entries per page`
       : "No entries to display";
@@ -157,6 +168,7 @@
     render();
   });
   authorSearch.addEventListener("input", resetAndRender);
+  titleSearch.addEventListener("input", resetAndRender);
   window.addEventListener("popstate", () => {
     const period = new URLSearchParams(window.location.search).get("era");
     periodSelect.value = validPeriods.has(period) ? period : "all";

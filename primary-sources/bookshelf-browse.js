@@ -3,6 +3,7 @@
   if (!root) return;
 
   const authorSearch = root.querySelector("#bookshelf-author-search");
+  const titleSearch = root.querySelector("#bookshelf-title-search");
   const results = root.querySelector(".bookshelf-results");
   const pageLabel = root.querySelector(".bookshelf-page-label");
   const previous = root.querySelector(".bookshelf-previous");
@@ -120,15 +121,24 @@
   };
 
   const render = () => {
-    const authors = authorItems(data.entries);
-    const query = normalize(authorSearch.value.trim());
-    const filtered = authors.filter((item) => !query || normalize(item.author).includes(query));
+    const authorQuery = normalize(authorSearch.value.trim());
+    const titleQuery = normalize(titleSearch.value.trim());
+    const filtered = authorItems(data.entries)
+      .filter((item) => !authorQuery || normalize(item.author).includes(authorQuery))
+      .map((item) => ({
+        ...item,
+        entries: item.entries.map((entry) => ({
+          ...entry,
+          books: entry.books.filter((book) => !titleQuery || normalize(book.title).includes(titleQuery)),
+        })).filter((entry) => entry.books.length),
+      }))
+      .filter((item) => item.entries.length);
     const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
     currentPage = Math.min(Math.max(1, currentPage), pageCount);
     const visible = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
     results.replaceChildren();
     visible.forEach((item) => results.append(renderAuthor(item)));
-    if (!filtered.length) results.append(setText("p", "bookshelf-empty", "No authors found."));
+    if (!filtered.length) results.append(setText("p", "bookshelf-empty", titleQuery ? "No matching books found." : "No authors found."));
     pageLabel.textContent = filtered.length
       ? `Page ${currentPage} of ${pageCount} · ${perPage} authors per page`
       : "No entries to display";
@@ -139,6 +149,7 @@
   const resetAndRender = () => { currentPage = 1; render(); };
   const scrollToResults = () => results.scrollIntoView({ behavior: "smooth", block: "start" });
   authorSearch.addEventListener("input", resetAndRender);
+  titleSearch.addEventListener("input", resetAndRender);
   previous.addEventListener("click", () => { currentPage -= 1; render(); scrollToResults(); });
   next.addEventListener("click", () => { currentPage += 1; render(); scrollToResults(); });
 
