@@ -250,22 +250,29 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 </style>
 <link href="/antilogicalism/assets/search.css" rel="stylesheet"/>
 <style id="weblog-body-styles">
+#primary .entry-content{color:#111}
+#primary .entry-content a{color:#111;text-decoration-thickness:1px;text-underline-offset:.16em}
+#primary .entry-content a:hover{color:#000}
 .archive-top-search{margin:.25rem 0 1rem}
 .archive-top-search form{display:flex;gap:.5rem;width:100%;max-width:none}
 .archive-top-search input{flex:1;min-width:0}
+#primary .entry-content .archive-top-search input{min-height:50px;border:2px solid #111;border-radius:0;color:#111}
+#primary .entry-content .archive-top-search input::placeholder{color:#666;opacity:1}
+#primary .entry-content .archive-top-search button{border:1px solid #111;background:#111;color:#fff;border-radius:0}
+#primary .entry-content .archive-top-search button:hover{background:#000}
 .archive-browse{display:flex;align-items:flex-end;flex-wrap:wrap;gap:.65rem 1rem;margin:1rem 0 .35rem;padding:.9rem 0;border-top:1px solid #d8dcde;border-bottom:1px solid #d8dcde;background:transparent}
 .archive-year-control{display:flex;flex-direction:column;gap:.3rem}
 .archive-year-control label,.archive-category-menu summary{font-weight:600}
 .archive-year-control select,.archive-category-control select{min-width:11rem;max-width:100%;font:inherit}
 .archive-category-control{display:flex;flex-direction:column;gap:.3rem}
 .archive-about-link{padding:.48rem 0;margin-left:auto}
-.archive-results-count{margin:.75rem 0;color:#626b70}
+.archive-results-count{margin:.75rem 0;color:#111}
 #lcp_instance_0{list-style:none;margin:0;padding:0}
 #lcp_instance_0>li{margin:0;padding:1rem 0;border-bottom:1px solid #e0e2e3}
 #lcp_instance_0>li:first-child{border-top:1px solid #e0e2e3}
-#primary .entry-content #lcp_instance_0>li>a{font-weight:600;color:#36566a;text-decoration:none}
+#primary .entry-content #lcp_instance_0>li>a{font-weight:600;color:#111;text-decoration:none}
 #lcp_instance_0>li>a:hover{text-decoration:underline}
-#lcp_instance_0 .lcp_excerpt p{margin:6px 0 0;line-height:1.6;color:#454c51}
+#lcp_instance_0 .lcp_excerpt p{margin:6px 0 0;line-height:1.6;color:#111}
 #lcp_instance_0>li[hidden]{display:none!important}
 @media(max-width:480px){.archive-browse{align-items:stretch;flex-direction:column;gap:.45rem}.archive-year-control select,.archive-category-control select{width:100%}.archive-about-link{margin-left:0}.archive-top-search form{width:100%}}
 </style>
@@ -275,8 +282,12 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content .library-search-help>p:first-of-type::first-letter,
 #primary .entry-content .bookshelf-category-intro p:first-of-type::first-letter,
 #primary .entry-content .philosophy-intro::first-letter,
-#primary .entry-content .bookshelf-browse-note::first-letter,
-#primary .entry-content #lcp_instance_0>li:first-child .lcp_excerpt p:first-of-type::first-letter{float:left;font-family:inherit;font-size:3.4em;line-height:.8;font-weight:400;padding:0 .1em 0 0}
+#primary .entry-content .bookshelf-browse-note::first-letter{float:left;font-family:inherit;font-size:3.4em;line-height:.8;font-weight:400;padding:0 .1em 0 0}
+#primary .entry-content .bookshelf-intro::first-line,
+#primary .entry-content .library-search-help>p:first-of-type::first-line,
+#primary .entry-content .bookshelf-category-intro p:first-of-type::first-line,
+#primary .entry-content .philosophy-intro::first-line,
+#primary .entry-content .bookshelf-browse-note::first-line{font-variant:small-caps;letter-spacing:.02em}
 </style>
 </head>
 <body class="wp-singular page-template-default page page-id-372 wp-theme-book-lite custom-header">

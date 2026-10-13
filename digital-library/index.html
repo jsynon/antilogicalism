@@ -281,9 +281,9 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #digital-library-search .library-result p{margin:.35em 0 .65em;overflow-wrap:anywhere}
 #digital-library-search .library-more{margin:1.4rem 0}
 #digital-library-search .library-more[hidden]{display:none}
-#digital-library .library-search-help{line-height:1.6;color:#626b70}
+#digital-library .library-search-help{line-height:1.6;color:#111}
 #library-search-section{margin:.5rem 0 1.6rem;padding:0 0 1.2rem;border-bottom:1px solid #dfe2e3}
-#library-search-instructions{max-width:680px;margin:0 auto 1rem;text-align:center;color:#545c61}
+#library-search-instructions{max-width:680px;margin:0 auto 1rem;text-align:left;color:#222}
 #library-search-instructions p{margin:.25rem 0}
 #library-search-book-help{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
 #digital-library-search .library-search-options{display:grid!important;grid-template-columns:minmax(150px,170px) minmax(0,1fr)!important;gap:.75rem 1rem;align-items:start!important;margin:1rem 0}
@@ -313,8 +313,12 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content .library-search-help>p:first-of-type::first-letter,
 #primary .entry-content .bookshelf-category-intro p:first-of-type::first-letter,
 #primary .entry-content .philosophy-intro::first-letter,
-#primary .entry-content .bookshelf-browse-note::first-letter,
-#primary .entry-content #lcp_instance_0>li:first-child .lcp_excerpt p:first-of-type::first-letter{float:left;font-family:inherit;font-size:3.4em;line-height:.8;font-weight:400;padding:0 .1em 0 0}
+#primary .entry-content .bookshelf-browse-note::first-letter{float:left;font-family:inherit;font-size:3.4em;line-height:.8;font-weight:400;padding:0 .1em 0 0}
+#primary .entry-content .bookshelf-intro::first-line,
+#primary .entry-content .library-search-help>p:first-of-type::first-line,
+#primary .entry-content .bookshelf-category-intro p:first-of-type::first-line,
+#primary .entry-content .philosophy-intro::first-line,
+#primary .entry-content .bookshelf-browse-note::first-line{font-variant:small-caps;letter-spacing:.02em}
 </style>
 </head>
 
