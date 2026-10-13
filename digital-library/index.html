@@ -52,6 +52,12 @@
 #digital-library-search .library-original p{white-space:pre-wrap;overflow-wrap:anywhere}
 #digital-library-search mark{background:#fff1a8;color:inherit;padding:0 .08em}
 #digital-library-search .library-search-controls input{flex:1 1 15em}
+/* Keep the title chooser out of the initial layout shown in the reference.
+   It appears after the visitor starts filtering books, preserving selection. */
+#digital-library-search:not(.has-book-filter-text) .library-book-field label[for="library-book-filter"],
+#digital-library-search:not(.has-book-filter-text) #library-book-filter{display:none!important}
+#digital-library-search.has-book-filter-text .library-book-field label[for="library-book-filter"],
+#digital-library-search.has-book-filter-text #library-book-filter{display:block}
 @media(max-width:560px){#digital-library-search .library-search-options{grid-template-columns:1fr}.library-book-field{grid-column:1!important;grid-row:auto!important}}
 #digital-library-search .library-pdf-unavailable{font-size:.88em;color:#626b70}
 </style>
@@ -354,6 +360,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 </div>
 <div class="library-search-controls"><input id="library-query" type="search" aria-describedby="library-search-passage-help" placeholder="Topic or phrase (e.g., virtue, free will)"><button id="library-search-button" type="button">Search</button></div>
 <noscript><p>Enable JavaScript to search this library. You can still browse the Bookshelf above.</p></noscript>
+<script>(function(){var root=document.getElementById("digital-library-search");var finder=document.getElementById("library-book-finder");if(!root||!finder)return;var update=function(){root.classList.toggle("has-book-filter-text",finder.value.trim().length>0);};finder.addEventListener("input",update);update();})();</script>
 <div id="library-results" aria-live="polite"></div>
 </div>
 <script>(function(){var count=document.getElementById('library-book-count');if(!count)return;var relabel=function(){var text=count.textContent;if(/\btexts?\b/i.test(text))count.textContent=text.replace(/\btexts?\b/gi,'titles');};new MutationObserver(relabel).observe(count,{childList:true,characterData:true,subtree:true});relabel();})();</script>
