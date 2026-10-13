@@ -45,16 +45,17 @@
   .ald-browser h2{margin:.1rem 0 .45rem;font-family:Georgia,serif;font-size:clamp(1.55rem,3vw,2.1rem);font-weight:normal}.ald-intro{margin:0;color:var(--ald-muted);max-width:58ch}
   .ald-mode{display:flex;gap:.45rem;border-bottom:1px solid var(--ald-rule);margin:1.2rem 0 1rem}.ald-mode button{font:inherit;color:var(--ald-ink);background:transparent;border:0;border-bottom:3px solid transparent;padding:.65rem .8rem;cursor:pointer}.ald-mode button[aria-selected="true"]{border-color:var(--ald-accent);font-weight:600}
   .ald-controls{display:grid;grid-template-columns:minmax(200px,2fr) minmax(190px,1fr);gap:.35rem 1rem;align-items:end}.ald-search-label,.ald-filter-wrap label{font-size:.85rem;color:var(--ald-muted)}.ald-search-label{grid-column:1}.ald-controls input,.ald-filter-wrap select{width:100%;min-height:42px;padding:.55rem .7rem;border:1px solid #bdb3a5;background:#fff;color:var(--ald-ink);font:inherit}.ald-filter-wrap{display:grid;gap:.35rem}.ald-count{font-size:.9rem;color:var(--ald-muted);margin:1rem 0 .6rem;border-bottom:1px solid var(--ald-rule);padding-bottom:.6rem}
-  .ald-author-group{margin:1rem 0}.ald-author-group h3{font-family:Georgia,serif;font-size:1.2rem;margin:.45rem 0;border-bottom:1px solid var(--ald-rule);padding-bottom:.3rem}.ald-author-group h4{font-size:1rem;margin:.9rem 0 .25rem;color:var(--ald-accent)}.ald-book-list{list-style:none;margin:0;padding:0}.ald-book-list li{padding:.55rem 0;border-bottom:1px dotted var(--ald-rule)}.ald-book-list a{color:var(--ald-accent);text-decoration:underline;text-underline-offset:2px}.ald-book-list a:hover,.ald-book-list a:focus{text-decoration-thickness:2px}.ald-empty{color:var(--ald-muted);padding:1rem 0}.ald-note{font-size:.82rem;color:var(--ald-muted);margin:1.4rem 0 0}.ald-alpha{display:flex;flex-wrap:wrap;gap:.25rem;margin:.5rem 0 1rem}.ald-alpha button{border:1px solid var(--ald-rule);background:white;color:var(--ald-accent);padding:.25rem .5rem;cursor:pointer}.ald-alpha button[aria-pressed="true"]{background:var(--ald-accent);color:white}.ald-alpha button:disabled{opacity:.4;cursor:default}.ald-pager{display:flex;align-items:center;justify-content:center;gap:.8rem;margin:1rem 0}.ald-pager button{font:inherit;padding:.4rem .7rem;border:1px solid var(--ald-rule);background:#fff;color:var(--ald-accent);cursor:pointer}.ald-pager button:disabled{opacity:.45;cursor:default}
+  .ald-author-group{margin:1rem 0}.ald-author-group h3{font-family:Georgia,serif;font-size:1.4rem;font-weight:600;line-height:1.35;margin:.6rem 0 .35rem;border-bottom:1px solid var(--ald-rule);padding-bottom:.35rem}.ald-author-group h4{font-size:1rem;margin:.9rem 0 .25rem;color:var(--ald-accent)}.ald-book-list{list-style:none;margin:0;padding:0}.ald-book-list li{padding:.55rem 0;border-bottom:1px dotted var(--ald-rule)}.ald-book-list a{color:var(--ald-accent);text-decoration:underline;text-underline-offset:2px}.ald-book-list a:hover,.ald-book-list a:focus{text-decoration-thickness:2px}.ald-empty{color:var(--ald-muted);padding:1rem 0}.ald-note{font-size:.82rem;color:var(--ald-muted);margin:1.4rem 0 0}.ald-alpha{display:flex;flex-wrap:wrap;gap:.25rem;margin:.5rem 0 1rem}.ald-alpha button{border:1px solid var(--ald-rule);background:white;color:var(--ald-accent);padding:.25rem .5rem;cursor:pointer}.ald-alpha button[aria-pressed="true"]{background:var(--ald-accent);color:white}.ald-alpha button:disabled{opacity:.4;cursor:default}.ald-pager{display:flex;align-items:center;justify-content:center;gap:.8rem;margin:1rem 0}.ald-pager button{font:inherit;padding:.4rem .7rem;border:1px solid var(--ald-rule);background:#fff;color:var(--ald-accent);cursor:pointer}.ald-pager button:disabled{opacity:.45;cursor:default}
   @media(max-width:600px){.ald-controls{grid-template-columns:1fr}.ald-search-label{grid-column:auto}.ald-browser{padding:1rem}.ald-mode button{padding:.55rem .4rem;font-size:.92rem}}
   `;
   document.head.appendChild(style);
 
-  fetch(catalogUrl).then(r => { if (!r.ok) throw new Error('Catalog could not be loaded'); return r.json(); }).then(data => {
+  Promise.resolve(window.ANTILOGICALISM_LIBRARY_CATALOG || fetch(catalogUrl).then(r => { if (!r.ok) throw new Error('Catalog could not be loaded'); return r.json(); })).then(data => {
     const books = data.books || [];
     const modeButtons = [...host.querySelectorAll('[data-mode]')];
     const query = host.querySelector('#ald-query');
     const filter = host.querySelector('#ald-filter');
+    const filterLabel = host.querySelector('.ald-filter-wrap label');
     const count = host.querySelector('.ald-count');
     const results = host.querySelector('#ald-results');
     let mode = 'authors', letter = '', page = 0;
@@ -62,6 +63,7 @@
     const subjects = data.subjects || [];
 
     function options() {
+      filterLabel.textContent = mode === 'subjects' ? 'Subject' : 'Collection';
       if (mode === 'subjects') {
         filter.innerHTML = `<option value="all">${labels.all}</option>` + subjects.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('') + `<option value="__unclassified">${labels.uncategorized}</option>`;
         filter.value = 'all';
