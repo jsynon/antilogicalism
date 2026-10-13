@@ -1,0 +1,287 @@
+/* Antilogicalism shared page body style */
+/* Append this block to assets/search.css. The header, sidebar, and footer are untouched. */
+
+/* Shared reading width, spacing, and link color for the Bookshelf, its child pages,
+   Library Search, and the blog archive. */
+body.page-id-6350 #primary .entry-content,
+body.parent-pageid-6350 #primary .entry-content,
+body.ancestor-pageid-6350 #primary .entry-content,
+body.page-id-372 #primary .entry-content,
+#digital-library .entry-content {
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+  line-height: 1.65;
+}
+
+body.page-id-6350 #primary .entry-title,
+body.parent-pageid-6350 #primary .entry-title,
+body.ancestor-pageid-6350 #primary .entry-title,
+body.page-id-372 #primary .entry-title,
+#digital-library .entry-title {
+  margin-bottom: 1.15em;
+  font-weight: 400;
+  letter-spacing: .02em;
+}
+
+body.page-id-6350 #primary .entry-content a,
+body.parent-pageid-6350 #primary .entry-content a,
+body.ancestor-pageid-6350 #primary .entry-content a,
+body.page-id-372 #primary .entry-content a,
+#digital-library .entry-content a {
+  color: #315f7b;
+  text-underline-offset: 3px;
+}
+
+body.page-id-6350 #primary .entry-content > p,
+body.parent-pageid-6350 #primary .entry-content > p,
+body.ancestor-pageid-6350 #primary .entry-content > p,
+body.page-id-372 #primary .entry-content > p,
+#digital-library .entry-content > p {
+  margin-bottom: 1em;
+}
+
+/* Bookshelf index and subject pages: clear link rows with fine separators. */
+body.page-id-6350 #primary .entry-content > h2,
+body.parent-pageid-6350 #primary .entry-content > h2,
+body.ancestor-pageid-6350 #primary .entry-content > h2 {
+  margin: 1.65em 0 .45em;
+  padding-bottom: .3em;
+  border-bottom: 1px solid #d6d9dc;
+}
+
+body.page-id-6350 #primary .entry-content > h4,
+body.parent-pageid-6350 #primary .entry-content > h4,
+body.ancestor-pageid-6350 #primary .entry-content > h4 {
+  margin: .25em 0 0;
+  padding: .52em .05em;
+  border-bottom: 1px solid #d6d9dc;
+  font-size: 1.08em;
+  text-align: left !important;
+}
+
+body.page-id-6350 #primary .entry-content > h4 a,
+body.parent-pageid-6350 #primary .entry-content > h4 a,
+body.ancestor-pageid-6350 #primary .entry-content > h4 a {
+  text-decoration: none;
+}
+
+body.page-id-6350 #primary .entry-content > h4 a:hover,
+body.parent-pageid-6350 #primary .entry-content > h4 a:hover,
+body.ancestor-pageid-6350 #primary .entry-content > h4 a:hover {
+  text-decoration: underline;
+}
+
+body.page-id-6350 #primary .entry-content > h4 + p,
+body.parent-pageid-6350 #primary .entry-content > h4 + p,
+body.ancestor-pageid-6350 #primary .entry-content > h4 + p {
+  margin: .55em 0 1.1em;
+}
+
+body.page-id-6350 #primary .entry-content hr,
+body.parent-pageid-6350 #primary .entry-content hr,
+body.ancestor-pageid-6350 #primary .entry-content hr {
+  border: 0;
+  border-top: 1px solid #d6d9dc;
+  margin: 1.7em 0;
+}
+
+#library-search-bookshelf-link {
+  margin: 0 0 1.4em !important;
+  padding-bottom: .8em;
+  border-bottom: 1px solid #d6d9dc;
+}
+
+/* Digital Library: quiet, consistent fields without a surrounding card. */
+#digital-library .entry-content {
+  max-width: 720px;
+}
+
+#digital-library .library-search-help {
+  color: #555f67;
+  font-size: .94em;
+  line-height: 1.6;
+}
+
+#digital-library-search {
+  margin: 1.35em 0 .8em;
+}
+
+#digital-library-search > label,
+#digital-library-search .library-filter-field > label {
+  display: block;
+  margin: 0 0 .3em;
+  font-weight: 400;
+}
+
+#digital-library-search .library-search-options {
+  display: flex;
+  align-items: end;
+  flex-wrap: wrap;
+  gap: .7em;
+  margin: .6em 0;
+}
+
+#digital-library-search .library-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: .25em;
+  min-width: 0;
+}
+
+#digital-library-search .library-filter-field:first-child {
+  flex: 0 1 9.5em;
+}
+
+#digital-library-search .library-book-field {
+  flex: 1 1 100%;
+  width: 100%;
+}
+
+#digital-library-search input,
+#digital-library-search select,
+body.page-id-372 .archive-top-search input,
+body.page-id-372 .archive-year-control select {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-height: 2.6em;
+  padding: .48em .62em;
+  border: 1px solid #aeb5ba;
+  border-radius: 2px;
+  background: #fff;
+  color: #20252a;
+  font: inherit;
+}
+
+#digital-library-search .library-search-controls,
+body.page-id-372 .archive-top-search form {
+  display: flex;
+  align-items: stretch;
+  gap: .55em;
+}
+
+#digital-library-search .library-search-controls input,
+body.page-id-372 .archive-top-search input {
+  flex: 1 1 15em;
+  min-width: 0;
+  width: auto;
+}
+
+#digital-library-search button,
+body.page-id-372 .archive-top-search button {
+  flex: 0 0 auto;
+  min-height: 2.6em;
+  padding: .48em .95em;
+  border: 1px solid #252a2e;
+  border-radius: 2px;
+  background: #252a2e;
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+}
+
+#digital-library-search button:hover,
+body.page-id-372 .archive-top-search button:hover {
+  background: #3d454b;
+}
+
+#digital-library-search .library-result {
+  padding: 1.1em 0;
+  border-bottom: 1px solid #d6d9dc;
+}
+
+#digital-library-search .library-result .library-page-kind,
+#digital-library-search .library-pdf-unavailable {
+  color: #58616a;
+}
+
+/* Blog archive: filters and post list share the same quiet divider treatment. */
+body.page-id-372 .archive-top-search {
+  margin: 1em 0 1.2em;
+}
+
+body.page-id-372 .archive-browse {
+  align-items: end;
+  gap: .75em 1.2em;
+  margin: 1em 0 .35em;
+  padding: .8em 0;
+  border: 1px solid #d6d9dc;
+  border-width: 1px 0;
+  background: transparent;
+}
+
+body.page-id-372 .archive-year-control label,
+body.page-id-372 .archive-category-menu summary {
+  font-weight: 400;
+}
+
+body.page-id-372 .archive-category-menu ul {
+  background: #fff;
+  border: 1px solid #c6cbd0;
+  box-shadow: none;
+}
+
+body.page-id-372 .archive-category-menu li a:hover,
+body.page-id-372 .archive-category-menu li a:focus {
+  background: #f2f4f5;
+}
+
+body.page-id-372 .archive-results-count {
+  color: #58616a;
+  margin: .7em 0 .4em;
+}
+
+body.page-id-372 #lcp_instance_0 {
+  margin: 1em 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.page-id-372 #lcp_instance_0 > li {
+  margin: 0;
+  padding: 1.05em 0;
+  border-bottom: 1px solid #d6d9dc;
+}
+
+body.page-id-372 #lcp_instance_0 > li > a {
+  font-size: 1.08em;
+}
+
+body.page-id-372 #lcp_instance_0 .lcp_excerpt {
+  margin-top: .25em;
+}
+
+body.page-id-372 #lcp_instance_0 .lcp_excerpt p {
+  margin: .25em 0 0;
+}
+
+@media (max-width: 520px) {
+  #digital-library-search .library-search-options {
+    align-items: stretch;
+  }
+
+  #digital-library-search .library-filter-field:first-child,
+  #digital-library-search .library-book-field {
+    flex-basis: 100%;
+  }
+
+  #digital-library-search .library-search-controls,
+  body.page-id-372 .archive-top-search form {
+    flex-wrap: wrap;
+  }
+
+  #digital-library-search .library-search-controls button,
+  body.page-id-372 .archive-top-search button {
+    flex: 1 0 100%;
+  }
+
+  body.page-id-372 .archive-browse {
+    align-items: stretch;
+    flex-direction: column;
+    gap: .55em;
+  }
+
+  body.page-id-372 .archive-year-control select {
+    width: 100%;
+  }
+}
