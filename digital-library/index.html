@@ -6,21 +6,21 @@
 <title>Digital Library | Antilogicalism</title>
 <style id="antilogicalism-clean-body-system">
 /* Shared page-body treatment. The Book Lite masthead, navigation, and footer are untouched. */
-#primary .entry-content{color:#333;line-height:1.7}
-#primary .entry-content a{color:#526978;text-decoration-thickness:1px;text-underline-offset:.16em}
-#primary .entry-content a:hover{color:#354d5a}
+#primary .entry-content{color:#3e454a;font-size:17px;line-height:1.65}
+#primary .entry-content a{color:#36566a;text-decoration-thickness:1px;text-underline-offset:.16em}
+#primary .entry-content a:hover{color:#233f50}
 #primary .entry-content a:focus-visible,
 #primary .entry-content button:focus-visible,
 #primary .entry-content input:focus-visible,
 #primary .entry-content select:focus-visible,
 #primary .entry-content summary:focus-visible{outline:2px solid #6b91a8;outline-offset:2px}
-#primary .entry-content h2{margin:1.7rem 0 .85rem;padding:0 0 .45rem;border-bottom:1px solid #d8dadd;color:#30363a;font-family:inherit;font-size:23px;line-height:1.35;font-weight:600;text-align:left}
+#primary .entry-content h2{color:#30363a}
 #primary .entry-content h3{color:#30363a;font-weight:600}
 #primary .entry-content hr{height:0;border:0;border-top:1px solid #e0e2e3;margin:1.3rem 0}
 #primary .entry-content input,
 #primary .entry-content select{max-width:100%;min-height:42px;padding:8px 11px;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;box-sizing:border-box}
-#primary .entry-content button{min-height:42px;padding:7px 13px;border:1px solid #aeb7bc;border-radius:2px;background:#fff;color:#333;font:inherit;cursor:pointer}
-#primary .entry-content button:hover{background:#f3f5f6}
+#primary .entry-content button{min-height:42px;padding:7px 13px;border:1px solid #262b2f;border-radius:2px;background:#262b2f;color:#fff;font:inherit;cursor:pointer}
+#primary .entry-content button:hover{background:#111518}
 </style>
 <style id="digital-library-styles">
 #digital-library-search .library-search-controls{display:flex;gap:.55rem;flex-wrap:wrap;margin:.8rem 0 1rem}
@@ -35,12 +35,15 @@
 #digital-library-search .library-more[hidden]{display:none}
 #digital-library .library-search-help{font-size:.92em;line-height:1.6;color:#626b70}
 #library-search-section{margin:1rem 0 1.6rem;padding:0 0 1.4rem;border-bottom:1px solid #dfe2e3}
-#library-search-heading{margin:0 0 1rem!important;padding:0 0 .55rem!important;border-bottom:1px solid #d8dadd!important;color:#30363a!important;font-family:inherit!important;font-size:25px!important;line-height:1.35!important;font-weight:600!important;text-align:center!important}
-#digital-library-search .library-search-options{display:flex;gap:.8rem 1rem;flex-wrap:wrap;align-items:flex-end;margin:.8rem 0}
+#library-search-heading{margin:0 0 .6rem!important;padding:0!important;border:0!important;color:#555d62!important;font-family:Arial,sans-serif!important;font-size:20px!important;line-height:1.4!important;font-weight:400!important;text-align:center!important}
+#library-search-instructions{max-width:680px;margin:0 auto 1rem;text-align:center;color:#545c61;font-family:Arial,sans-serif;font-size:16px;line-height:1.6}
+#library-search-instructions p{margin:.25rem 0}
+#library-search-book-help{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+#digital-library-search .library-search-options{display:grid;grid-template-columns:minmax(150px,170px) minmax(0,1fr);gap:.75rem 1rem;align-items:end;margin:1rem 0}
 #digital-library-search select{font:inherit;max-width:100%;min-width:0}
 #digital-library-search .library-filter-field{display:flex;flex-direction:column;gap:.3rem;min-width:0}
 #digital-library-search .library-filter-field label,#digital-library-search>label{font-weight:600}
-#digital-library-search .library-book-field{flex:1 1 100%;width:100%}
+#digital-library-search .library-book-field{grid-column:2;grid-row:1;min-width:0;width:auto}
 #library-book-filter{width:100%}
 #library-book-finder{font:inherit;width:100%;box-sizing:border-box}
 #digital-library-search .library-original{margin:.7rem 0;font-size:.9em}
@@ -49,6 +52,7 @@
 #digital-library-search .library-original p{white-space:pre-wrap;overflow-wrap:anywhere}
 #digital-library-search mark{background:#fff1a8;color:inherit;padding:0 .08em}
 #digital-library-search .library-search-controls input{flex:1 1 15em}
+@media(max-width:560px){#digital-library-search .library-search-options{grid-template-columns:1fr}.library-book-field{grid-column:1!important;grid-row:auto!important}}
 #digital-library-search .library-pdf-unavailable{font-size:.88em;color:#626b70}
 </style>
 <link rel="profile" href="https://gmpg.org/xfn/11">
@@ -334,18 +338,18 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <section id="library-search-section" aria-labelledby="library-search-heading">
 <h2 id="library-search-heading">Library Search</h2>
 <div id="library-search-instructions" class="library-search-help">
-<p id="library-search-passage-help"><strong>Search passages:</strong> Enter a word, phrase, or quotation, choose a match option, then select Search. <em>Exact phrase</em> keeps words together and in order. <em>All words</em> requires every term, in any order. <em>Any words</em> finds pages with at least one term. Searches ignore capitalization.</p>
+<p id="library-search-passage-help">Search passages from the collection by exact phrase, all words, or any words. You can narrow your search to a particular title or author.</p>
 <p id="library-search-book-help"><strong>Limit by title:</strong> Type a title or author in Find a book, then choose a title under Search in a book. The selector groups matching titles; leave All books selected to search the full-text index.</p>
 </div>
 <div id="digital-library-search" data-index-root="/antilogicalism-library-data/data-v47/">
-<label for="library-query">Find a passage</label>
+<label for="library-query">Search in a book</label>
 <div class="library-search-options">
 <div class="library-filter-field"><label for="library-match-mode">Match</label>
 <select id="library-match-mode" aria-describedby="library-search-passage-help"><option value="phrase">Exact phrase</option><option value="words">All words</option><option value="any">Any words</option></select></div>
 <div class="library-filter-field library-book-field"><label for="library-book-finder">Find a book</label>
 <input id="library-book-finder" type="search" placeholder="Title or author (e.g., The Republic, Plato)" aria-describedby="library-book-count library-search-book-help">
 <small id="library-book-count" role="status"></small>
-<label for="library-book-filter">Search in a book</label>
+<label for="library-book-filter">Choose a title</label>
 <select id="library-book-filter" aria-describedby="library-search-book-help"><option value="">All books</option></select></div>
 </div>
 <div class="library-search-controls"><input id="library-query" type="search" aria-describedby="library-search-passage-help" placeholder="Topic or phrase (e.g., virtue, free will)"><button id="library-search-button" type="button">Search</button></div>
@@ -354,6 +358,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 </div>
 <script>(function(){var count=document.getElementById('library-book-count');if(!count)return;var relabel=function(){var text=count.textContent;if(/\btexts?\b/i.test(text))count.textContent=text.replace(/\btexts?\b/gi,'titles');};new MutationObserver(relabel).observe(count,{childList:true,characterData:true,subtree:true});relabel();})();</script>
 <p class="library-search-help">Search uses text extracted from PDFs and may miss some matches. Check quotations against the original PDF. PDF page numbers may differ from printed page numbers.</p>
+<p class="library-browse-bookshelf"><a href="/antilogicalism/primary-sources/">Browse the Bookshelf →</a></p>
 </section>
 </div></article><!-- #post-6350 -->
 
