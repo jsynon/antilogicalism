@@ -244,11 +244,11 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 </style>
 <link rel="stylesheet" href="/antilogicalism/assets/search.css">
 <link rel="canonical" href="https://jsynon.github.io/antilogicalism/digital-library/">
-<meta name="description" content="Search passages across 644 books from the Antilogicalism Bookshelf and browse by author or subject.">
+<meta name="description" content="Search passages across 644 indexed PDF files; browse 642 distinct titles from 643 catalog file entries.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Digital Library | Antilogicalism">
 <meta property="og:url" content="https://jsynon.github.io/antilogicalism/digital-library/">
-<meta property="og:description" content="Search passages across 644 books from the Antilogicalism Bookshelf and browse by author or subject.">
+<meta property="og:description" content="Search passages across 644 indexed PDF files; browse 642 distinct titles from 643 catalog file entries.">
 <meta name="twitter:text:title" content="Library Search | Antilogicalism">
 <style id="digital-library-styles">
 #digital-library-search .library-search-controls{display:flex;gap:.7em;flex-wrap:wrap;margin:.6em 0}
@@ -314,12 +314,12 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <header class="entry-header"><h1 class="entry-title">Digital Library</h1></header>
 <div class="entry-content">
 <p><a href="/antilogicalism/primary-sources/">Browse the Bookshelf</a> | <a href="#library-directory">Browse the Library</a></p>
-<p>Use Library Search to find passages across 644 books, or browse by author, subject, and collection.</p>
+<p>Library Search indexes 644 PDF files and offers 642 distinct title choices. Browsing lists 643 catalog file entries representing 642 distinct titles; one title has two files. The psychiatric-practice title excluded from browsing remains in the full-text index.</p>
 <section id="library-search-section" aria-labelledby="library-search-heading">
 <h2 id="library-search-heading">Library Search</h2>
 <div id="library-search-instructions" class="library-search-help">
 <p id="library-search-passage-help"><strong>Search passages:</strong> Enter a word, phrase, or quotation, choose a match option, then select Search. <em>Exact phrase</em> keeps words together and in order. <em>All words</em> requires every term, in any order. <em>Any words</em> finds pages with at least one term. Searches ignore capitalization.</p>
-<p id="library-search-book-help"><strong>Limit by book:</strong> Type a title or author in Find a book, then choose a title under Search in a book. Leave All books selected to search the full collection.</p>
+<p id="library-search-book-help"><strong>Limit by title:</strong> Type a title or author in Find a book, then choose a title under Search in a book. The selector groups matching titles; leave All books selected to search the full-text index.</p>
 </div>
 <div id="digital-library-search" data-index-root="/antilogicalism-library-data/data-v47/">
 <label for="library-query">Find a passage</label>
@@ -336,6 +336,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <noscript><p>Enable JavaScript to search this library. You can still browse the Bookshelf above.</p></noscript>
 <div id="library-results" aria-live="polite"></div>
 </div>
+<script>(function(){var count=document.getElementById('library-book-count');if(!count)return;var relabel=function(){var text=count.textContent;if(/\btexts?\b/i.test(text))count.textContent=text.replace(/\btexts?\b/gi,'titles');};new MutationObserver(relabel).observe(count,{childList:true,characterData:true,subtree:true});relabel();})();</script>
 <p class="library-search-help">Search uses text extracted from PDFs and may miss some matches. Check quotations against the original PDF. PDF page numbers may differ from printed page numbers.</p>
 </section>
 <section id="library-directory" aria-label="Browse the digital library"></section>
