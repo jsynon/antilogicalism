@@ -4,6 +4,43 @@
 
 <meta name="viewport" content="width=device-width">
 <title>A History of Ideas | Antilogicalism</title>
+<style id="antilogicalism-clean-body-system">
+/* Shared page-body treatment. The Book Lite masthead, navigation, and footer are untouched. */
+#primary .entry-content{color:#333;line-height:1.7}
+#primary .entry-content a{color:#315f7a;text-decoration-thickness:1px;text-underline-offset:.16em}
+#primary .entry-content a:hover{color:#1f465f}
+#primary .entry-content a:focus-visible,
+#primary .entry-content button:focus-visible,
+#primary .entry-content input:focus-visible,
+#primary .entry-content select:focus-visible,
+#primary .entry-content summary:focus-visible{outline:2px solid #6b91a8;outline-offset:2px}
+#primary .entry-content h2{margin:1.7rem 0 .85rem;padding:0 0 .45rem;border-bottom:1px solid #d8dadd;color:#30363a;font-family:inherit;font-size:1.35rem;line-height:1.35;font-weight:600;text-align:left}
+#primary .entry-content h3{color:#30363a;font-weight:600}
+#primary .entry-content hr{height:0;border:0;border-top:1px solid #e0e2e3;margin:1.3rem 0}
+#primary .entry-content input,
+#primary .entry-content select{max-width:100%;min-height:2.5rem;padding:.48rem .6rem;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;box-sizing:border-box}
+#primary .entry-content button{min-height:2.5rem;padding:.45rem .85rem;border:1px solid #315f7a;border-radius:2px;background:#315f7a;color:#fff;font:inherit;cursor:pointer}
+#primary .entry-content button:hover{background:#244a61}
+</style>
+<style id="bookshelf-guide-styles">
+.bookshelf-guide{max-width:100%;margin:0 auto;color:inherit;font-size:1rem;line-height:1.7}
+.bookshelf-guide,.bookshelf-guide *{box-sizing:border-box}
+.bookshelf-guide a{color:#315f7a;text-decoration-thickness:1px;text-underline-offset:.16em}
+.bookshelf-guide a:hover{color:#1f465f}
+.bookshelf-intro{margin:0 0 1.6rem;line-height:1.75}
+.bookshelf-section{margin:0 0 2rem}
+.bookshelf-guide .bookshelf-section h2{margin:1.5rem 0 .8rem;padding:0 0 .45rem;border-bottom:1px solid #d8dadd;color:#30363a;font-size:1.35rem;line-height:1.35;font-style:normal;text-align:left;font-weight:600}
+.bookshelf-subjects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:2rem;row-gap:0;list-style:none!important;margin:0!important;padding:0!important}
+.bookshelf-subjects li{margin:0!important;padding:0!important;border-bottom:1px solid #e4e6e7}
+.bookshelf-subjects a{display:block;padding:.58rem 0;font-size:1rem;font-weight:500;line-height:1.45;text-decoration:none}
+.bookshelf-subjects a:hover{text-decoration:underline}
+.bookshelf-collection{margin:0;padding:1rem 0;border-bottom:1px solid #e0e2e3}
+.bookshelf-collection:last-child{border-bottom:0}
+.bookshelf-guide .bookshelf-collection h3{margin:0 0 .35rem;font-size:1.15rem;line-height:1.4;font-style:normal;text-align:left;font-weight:600}
+.bookshelf-collection h3 a{color:#315f7a}
+.bookshelf-guide .bookshelf-collection p{margin:0;font-size:.98rem;line-height:1.7}
+@media(max-width:560px){.bookshelf-subjects{grid-template-columns:1fr}.bookshelf-guide .bookshelf-section h2{font-size:1.25rem}}
+</style>
 <link rel="profile" href="https://gmpg.org/xfn/11">
 <link rel="pingback" href="/antilogicalism/xmlrpc.php">
 <!--[if lt IE 9]>
@@ -243,28 +280,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 }
 </style>
 <link rel="stylesheet" href="/antilogicalism/assets/search.css">
-<style id="bookshelf-guide-styles">
-.bookshelf-guide{max-width:100%;margin:0 auto;color:#282828;font-size:18px;line-height:1.7}
-.bookshelf-guide,.bookshelf-guide *{box-sizing:border-box}
-.bookshelf-guide a{color:#234d68;text-decoration:none;text-underline-offset:.15em}
-.bookshelf-guide a:hover{color:#14374e;text-decoration:underline}
-.bookshelf-guide a:focus-visible{outline:3px solid #b77a24;outline-offset:3px}
-.bookshelf-intro{font-size:18px;line-height:1.75;margin:0 0 32px}
-.bookshelf-section{margin:0 0 38px}
-.bookshelf-guide .bookshelf-section h2{font-size:25px;line-height:1.3;font-style:normal;text-align:left;font-weight:600;color:#292f32;margin:0 0 16px;padding:0 0 9px;border-bottom:2px solid #ddd9d0}
-.bookshelf-subjects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;list-style:none!important;margin:0!important;padding:0!important}
-.bookshelf-subjects li{margin:0!important;padding:0!important}
-.bookshelf-subjects a{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:62px;padding:13px 17px;border:1px solid #ded9ce;border-left:4px solid #71899a;border-radius:5px;background:#faf9f6;box-shadow:0 2px 5px rgba(36,44,48,.05);font-size:18px;font-weight:600;line-height:1.35;transition:background-color .15s ease,border-color .15s ease,box-shadow .15s ease}
-.bookshelf-subjects a::after{content:"→";font-size:20px;color:#71899a;transition:transform .15s ease}
-.bookshelf-subjects a:hover{background:#f1efe8;border-color:#c8c1b3;box-shadow:0 4px 10px rgba(36,44,48,.09);text-decoration:none}
-.bookshelf-subjects a:hover::after{transform:translateX(3px)}
-.bookshelf-collection{margin:0 0 14px;padding:17px 19px;border:1px solid #e4e0d7;border-radius:5px;background:#fbfaf7}
-.bookshelf-collection:last-child{margin-bottom:0}
-.bookshelf-guide .bookshelf-collection h3{margin:0 0 7px;font-size:24px;line-height:1.35;font-style:normal;text-align:left;font-weight:600}
-.bookshelf-collection h3 a{color:#23465d}
-.bookshelf-collection h3 a:hover{text-decoration:underline}
-.bookshelf-guide .bookshelf-collection p{margin:0;font-size:17px;line-height:1.7}
-@media(max-width:560px){.bookshelf-subjects{grid-template-columns:1fr}.bookshelf-guide .bookshelf-section h2{font-size:23px}.bookshelf-guide .bookshelf-collection h3{font-size:22px}.bookshelf-collection{padding:15px 16px}}\n</style>
+
 
 </head>
 

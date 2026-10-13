@@ -4,6 +4,53 @@
 
 <meta name="viewport" content="width=device-width">
 <title>Digital Library | Antilogicalism</title>
+<style id="antilogicalism-clean-body-system">
+/* Shared page-body treatment. The Book Lite masthead, navigation, and footer are untouched. */
+#primary .entry-content{color:#333;line-height:1.7}
+#primary .entry-content a{color:#315f7a;text-decoration-thickness:1px;text-underline-offset:.16em}
+#primary .entry-content a:hover{color:#1f465f}
+#primary .entry-content a:focus-visible,
+#primary .entry-content button:focus-visible,
+#primary .entry-content input:focus-visible,
+#primary .entry-content select:focus-visible,
+#primary .entry-content summary:focus-visible{outline:2px solid #6b91a8;outline-offset:2px}
+#primary .entry-content h2{margin:1.7rem 0 .85rem;padding:0 0 .45rem;border-bottom:1px solid #d8dadd;color:#30363a;font-family:inherit;font-size:1.35rem;line-height:1.35;font-weight:600;text-align:left}
+#primary .entry-content h3{color:#30363a;font-weight:600}
+#primary .entry-content hr{height:0;border:0;border-top:1px solid #e0e2e3;margin:1.3rem 0}
+#primary .entry-content input,
+#primary .entry-content select{max-width:100%;min-height:2.5rem;padding:.48rem .6rem;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;box-sizing:border-box}
+#primary .entry-content button{min-height:2.5rem;padding:.45rem .85rem;border:1px solid #315f7a;border-radius:2px;background:#315f7a;color:#fff;font:inherit;cursor:pointer}
+#primary .entry-content button:hover{background:#244a61}
+</style>
+<style id="digital-library-styles">
+#digital-library-search .library-search-controls{display:flex;gap:.55rem;flex-wrap:wrap;margin:.8rem 0 1rem}
+#digital-library-search input{flex:1;min-width:0;width:100%;max-width:100%;font:inherit;box-sizing:border-box}
+#digital-library-search button{flex:0 0 auto}
+#digital-library-search button:disabled{cursor:wait;opacity:.7}
+#digital-library-search .library-result{padding:1.15rem 0;border-bottom:1px solid #dfe2e3}
+#digital-library-search .library-result .library-page-kind{font-size:.88em;color:#687177;margin:.2em 0 .5em}
+#digital-library-search .library-result h3{font-size:1.08em;line-height:1.45;margin:0 0 .4em;overflow-wrap:anywhere}
+#digital-library-search .library-result p{margin:.35em 0 .65em;overflow-wrap:anywhere}
+#digital-library-search .library-more{margin:1.4rem 0}
+#digital-library-search .library-more[hidden]{display:none}
+#digital-library .library-search-help{font-size:.92em;line-height:1.6;color:#626b70}
+#library-search-section{margin:1rem 0 1.6rem;padding:0 0 1.4rem;border-bottom:1px solid #dfe2e3}
+#library-search-heading{margin:0 0 .85rem!important;padding:0 0 .45rem!important;border-bottom:1px solid #d8dadd!important;color:#30363a!important;font-family:inherit!important;font-size:1.35rem!important;line-height:1.35!important;font-weight:600!important}
+#digital-library-search .library-search-options{display:flex;gap:.8rem 1rem;flex-wrap:wrap;align-items:flex-end;margin:.8rem 0}
+#digital-library-search select{font:inherit;max-width:100%;min-width:0}
+#digital-library-search .library-filter-field{display:flex;flex-direction:column;gap:.3rem;min-width:0}
+#digital-library-search .library-filter-field label,#digital-library-search>label{font-weight:600}
+#digital-library-search .library-book-field{flex:1 1 100%;width:100%}
+#library-book-filter{width:100%}
+#library-book-finder{font:inherit;width:100%;box-sizing:border-box}
+#digital-library-search .library-original{margin:.7rem 0;font-size:.9em}
+#digital-library-search .library-original .library-region-label{font-weight:bold;white-space:normal}
+#digital-library-search .library-original summary{cursor:pointer}
+#digital-library-search .library-original p{white-space:pre-wrap;overflow-wrap:anywhere}
+#digital-library-search mark{background:#fff1a8;color:inherit;padding:0 .08em}
+#digital-library-search .library-search-controls input{flex:1 1 15em}
+#digital-library-search .library-pdf-unavailable{font-size:.88em;color:#626b70}
+</style>
 <link rel="profile" href="https://gmpg.org/xfn/11">
 
 <!--[if lt IE 9]>
@@ -250,35 +297,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <meta property="og:url" content="https://jsynon.github.io/antilogicalism/digital-library/">
 <meta property="og:description" content="Search passages in the Antilogicalism Digital Library.">
 <meta name="twitter:text:title" content="Library Search | Antilogicalism">
-<style id="digital-library-styles">
-#digital-library-search .library-search-controls{display:flex;gap:.7em;flex-wrap:wrap;margin:.6em 0}
-#digital-library-search input{flex:1;min-width:0;width:100%;max-width:100%;font:inherit;padding:.65em;box-sizing:border-box}
-#digital-library-search button{font:inherit;padding:.65em 1em;cursor:pointer}
-#digital-library-search button:disabled{cursor:wait}
-#digital-library-search .library-result{padding:1.3em 0;border-bottom:1px solid #ddd}
-#digital-library-search .library-result .library-page-kind{font-size:.85em;color:#666;margin:.2em 0 .6em}
-#digital-library-search .library-result h3{font-size:1.1em;line-height:1.5;margin:0 0 .5em;overflow-wrap:anywhere}
-#digital-library-search .library-result p{margin:.4em 0 .7em;overflow-wrap:anywhere}
-#digital-library-search .library-more{margin:1.5em 0}
-#digital-library-search .library-more[hidden]{display:none}
-#digital-library .library-search-help{font-size:.9em;line-height:1.6;color:#666}
-#library-search-section{margin:1.6rem 0 2.2rem;padding:0 0 1.6rem;border-bottom:2px solid #d9d0c3}
-#library-search-heading{font:normal clamp(1.8rem,3vw,2.2rem)/1.2 Georgia,serif;color:#302b25;margin:0 0 1rem}
-#digital-library-search .library-search-options{display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin:.8em 0}
-#digital-library-search select{font:inherit;max-width:100%;min-width:0;padding:.3em}
-#digital-library-search .library-filter-field{display:flex;flex-direction:column;gap:.25em;min-width:0}
-#digital-library-search .library-book-field{flex:1 1 100%;width:100%}
-#library-book-filter{width:100%}
-#library-book-finder{font:inherit;width:100%;box-sizing:border-box;padding:.4em}
-#digital-library-search .library-original{margin:.7em 0;font-size:.9em}
-#digital-library-search .library-original .library-region-label{font-weight:bold;white-space:normal}
-#digital-library-search .library-original summary{cursor:pointer}
-#digital-library-search .library-original p{white-space:pre-wrap;overflow-wrap:anywhere}
-#digital-library-search mark{background:#fff1a8;color:inherit;padding:0 .08em}
-#digital-library-search .library-search-controls input{flex:1 1 15em}
-#digital-library-search .library-search-controls button{flex:0 0 auto}
-#digital-library-search .library-pdf-unavailable{font-size:.85em;color:#666}
-</style>
+
 <script defer src="./library-search-v18.js"></script>
 </head>
 

@@ -4,84 +4,56 @@
 <head><meta charset="utf-8"/>
 <meta content="width=device-width" name="viewport"/>
 <title>A Weblog of Ideas | Antilogicalism</title>
+<style id="antilogicalism-clean-body-system">
+/* Shared page-body treatment. The Book Lite masthead, navigation, and footer are untouched. */
+#primary .entry-content{color:#333;line-height:1.7}
+#primary .entry-content a{color:#315f7a;text-decoration-thickness:1px;text-underline-offset:.16em}
+#primary .entry-content a:hover{color:#1f465f}
+#primary .entry-content a:focus-visible,
+#primary .entry-content button:focus-visible,
+#primary .entry-content input:focus-visible,
+#primary .entry-content select:focus-visible,
+#primary .entry-content summary:focus-visible{outline:2px solid #6b91a8;outline-offset:2px}
+#primary .entry-content h2{margin:1.7rem 0 .85rem;padding:0 0 .45rem;border-bottom:1px solid #d8dadd;color:#30363a;font-family:inherit;font-size:1.35rem;line-height:1.35;font-weight:600;text-align:left}
+#primary .entry-content h3{color:#30363a;font-weight:600}
+#primary .entry-content hr{height:0;border:0;border-top:1px solid #e0e2e3;margin:1.3rem 0}
+#primary .entry-content input,
+#primary .entry-content select{max-width:100%;min-height:2.5rem;padding:.48rem .6rem;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;box-sizing:border-box}
+#primary .entry-content button{min-height:2.5rem;padding:.45rem .85rem;border:1px solid #315f7a;border-radius:2px;background:#315f7a;color:#fff;font:inherit;cursor:pointer}
+#primary .entry-content button:hover{background:#244a61}
+</style>
+<style id="weblog-body-styles">
+.archive-top-search{margin:.25rem 0 1rem}
+.archive-top-search form{display:flex;gap:.5rem;max-width:34rem}
+.archive-top-search input{flex:1;min-width:0}
+.archive-browse{display:flex;align-items:flex-end;flex-wrap:wrap;gap:.65rem 1.25rem;margin:1rem 0 .35rem;padding:.9rem 0;border-top:1px solid #e0e2e3;border-bottom:1px solid #e0e2e3;background:transparent}
+.archive-year-control{display:flex;flex-direction:column;gap:.3rem}
+.archive-year-control label,.archive-category-menu summary{font-weight:600}
+.archive-year-control select{min-width:11rem;max-width:100%;font:inherit}
+.archive-category-menu{position:relative;padding:.48rem 0}
+.archive-category-menu summary{cursor:pointer}
+.archive-category-menu ul{position:absolute;z-index:10;top:100%;left:0;min-width:12rem;max-height:18rem;overflow-y:auto;margin:0;padding:.35rem 0;list-style:none;background:#fff;border:1px solid #d8dcde;box-shadow:0 3px 8px rgba(0,0,0,.08)}
+.archive-category-menu li{margin:0;padding:0}
+.archive-category-menu li a{display:block;padding:.4rem .75rem;text-decoration:none}
+.archive-category-menu li a:hover,.archive-category-menu li a:focus{background:#f3f5f6}
+.archive-about-link{padding:.48rem 0}
+.archive-results-count{margin:.75rem 0;font-size:.92em;color:#626b70}
+#lcp_instance_0{list-style:none;margin:0;padding:0}
+#lcp_instance_0>li{margin:0;padding:1rem 0;border-bottom:1px solid #e0e2e3}
+#lcp_instance_0>li:first-child{border-top:1px solid #e0e2e3}
+#lcp_instance_0>li>a{font-size:1.08rem;font-weight:600;text-decoration:none}
+#lcp_instance_0>li>a:hover{text-decoration:underline}
+#lcp_instance_0 .lcp_excerpt p{margin:.35rem 0 0;font-size:.96rem;line-height:1.65;color:#4f585d}
+#lcp_instance_0>li[hidden]{display:none!important}
+@media(max-width:480px){.archive-browse{align-items:stretch;flex-direction:column;gap:.45rem}.archive-year-control select{width:100%}.archive-top-search form{width:100%}}
+</style>
 <link href="https://gmpg.org/xfn/11" rel="profile" />
 
 <!--[if lt IE 9]>
 <script src="/antilogicalism/wp-content/themes/book-lite/js/html5.js" type="text/javascript"></script>
 <![endif]-->
 <style type="text/css">
-		 .widget-area {
-		 	width: 32%;
-		 }
-	
-		.archive-browse {
-			display: flex;
-			align-items: end;
-			flex-wrap: wrap;
-			gap: 0.8rem 1.25rem;
-			margin: 1.25rem 0 0.35rem;
-			padding: 1rem;
-			background: #f6f6f6;
-			border: 1px solid #e5e5e5;
-		}
-		.archive-year-control {
-			display: flex;
-			flex-direction: column;
-			gap: 0.3rem;
-		}
-		.archive-year-control label,
-		.archive-category-menu summary {
-			font-weight: 600;
-		}
-		.archive-year-control select {
-			min-width: 11rem;
-			max-width: 100%;
-			padding: 0.45rem 0.6rem;
-			font: inherit;
-		}
-		.archive-category-menu {
-			position: relative;
-			padding: 0.48rem 0;
-		}
-		.archive-category-menu summary {
-			cursor: pointer;
-		}
-		.archive-category-menu ul {
-			position: absolute;
-			z-index: 10;
-			top: 100%;
-			left: 0;
-			min-width: 12rem;
-			max-height: 18rem;
-			overflow-y: auto;
-			margin: 0;
-			padding: 0.45rem 0;
-			list-style: none;
-			background: #fff;
-			border: 1px solid #d7d7d7;
-			box-shadow: 0 4px 12px rgba(0,0,0,.12);
-		}
-		.archive-category-menu li { margin: 0; padding: 0; }
-		.archive-category-menu li a {
-			display: block;
-			padding: 0.4rem 0.75rem;
-			text-decoration: none;
-		}
-		.archive-category-menu li a:hover,
-		.archive-category-menu li a:focus { background: #f1f1f1; }
-		.archive-about-link { padding: 0.48rem 0; }
-		.archive-results-count { margin: 0.5rem 0 1rem; font-size: 0.92em; }
-		#lcp_instance_0 > li[hidden] { display: none !important; }
-		@media (max-width: 480px) {
-			.archive-browse { align-items: stretch; flex-direction: column; gap: 0.55rem; }
-			.archive-year-control select { width: 100%; }
-		}
-
-		.archive-top-search { margin: 1rem 0 1.25rem; }
-		.archive-top-search form { display: flex; gap: 0.5rem; max-width: 34rem; }
-		.archive-top-search input { flex: 1; min-width: 0; padding: 0.5rem 0.65rem; font: inherit; }
-		.archive-top-search button { padding: 0.5rem 0.85rem; font: inherit; cursor: pointer; }
-		@media (max-width: 480px) { .archive-top-search form { width: 100%; } }
+.widget-area{width:32%}
 </style>
 <meta content="max-image-preview:large" name="robots"/>
 <!-- Jetpack Site Verification Tags -->
@@ -329,7 +301,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <h1 class="entry-title">A Weblog of Ideas</h1>
 </header><!-- .entry-header -->
 <div class="entry-content">
-<hr/>
 <div class="archive-top-search">
 <form data-antilogicalism-search="">
 <input aria-label="Search blog posts" placeholder="Search blog posts..." required="" type="search"/>
@@ -363,7 +334,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <a class="archive-about-link" href="/antilogicalism/my-writings/">About Me</a>
 </section>
 <p class="archive-results-count" id="archive-results-count" aria-live="polite">Showing 380 of 380 posts.</p>
-<hr/>
 <ul class="lcp_catlist" id="lcp_instance_0"><li><a href="/antilogicalism/2026/10/10/the-death-and-resurrection-of-antilogicalism/">The Death and Resurrection of Antilogicalism</a><div class="lcp_excerpt"><p>When I launched Antilogicalism in 2016, I wanted to create a place where people could explore philosophy, literature, religion, psychology, and the history of ideas. Over the years, the website grew into a collection of articles, essays, links, and hundreds of books and primary-source documents.</p></div></li><li><a href="/antilogicalism/2025/03/18/the-ethics-of-coercion/">The Ethics of Coercion</a><div class="lcp_excerpt"><p>Forcing individuals to take medication or submit to psychiatric treatment under the threat of legal action or coercion represents a violation of fundamental human rights and personal autonomy.</p>
 </div></li><li><a href="/antilogicalism/2025/03/17/gravity-grace/">Gravity &amp; Grace</a><div class="lcp_excerpt"><p>Simone Weil (1909–1943) was a French philosopher, political thinker, and mystic whose work continues to provoke deep reflection on justice, suffering, and the nature of God. Her philosophy is characterized by an intense commitment to truth, self-sacrifice, and the rejection of power.</p>
 </div></li><li><a href="/antilogicalism/2025/03/02/enlightenment-failure/">Enlightenment Failure</a><div class="lcp_excerpt"><p>Modernity, with its Enlightenment roots and subsequent philosophical developments, brought forth a radical rethinking of metaphysics and ethics. The optimism of reason and progress eventually gave way to an awareness of fragmentation—a disintegration of unified, tradition-based systems of thought. Philosophers such as Alasdair MacIntyre famously critiqued modern ethics for its disconnection from ancient and medieval ...</p></div></li><li><a href="/antilogicalism/2025/02/24/godel-existentialism/">Gödel &amp; Existentialism</a><div class="lcp_excerpt"><p>When we juxtapose Gödel’s mathematical insights with the central tenets of existentialism, a profound parallel emerges. Gödel’s theorem serves as a metaphor for the human predicament: just as no formal system can capture every mathematical truth, no philosophical system can fully account for the depth and complexity of human existence.</p>
