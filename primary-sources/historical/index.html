@@ -427,8 +427,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 }
 </style>
 <style id="author-search-layout">
-#primary .entry-content #bookshelf-browse-page .bookshelf-controls{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-@media(max-width:650px){#primary .entry-content #bookshelf-browse-page .bookshelf-controls{grid-template-columns:minmax(0,1fr)!important}}
+#primary .entry-content #bookshelf-browse-page .bookshelf-controls{grid-template-columns:minmax(0,1fr)!important}
 </style>
 </head>
 
@@ -471,11 +470,8 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
   <section id="bookshelf-browse" aria-labelledby="bookshelf-browse-heading">
     <h2 id="bookshelf-browse-heading">Browse Historical</h2>
     <div class="bookshelf-controls">
-      <label for="bookshelf-author-search">Search by author
-        <input id="bookshelf-author-search" type="search" placeholder="Type an author name" autocomplete="off">
-      </label>
-      <label for="bookshelf-title-search">Search by title
-        <input id="bookshelf-title-search" type="search" placeholder="Type a book title" autocomplete="off">
+      <label for="bookshelf-search">Search by title or author
+        <input id="bookshelf-search" type="search" placeholder="Type a title or author name" autocomplete="off">
       </label>
     </div>
     <div class="bookshelf-results" aria-live="polite" aria-busy="true"><p>Loading the collection…</p></div>

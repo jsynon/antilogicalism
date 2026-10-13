@@ -3,8 +3,9 @@
   if (!root) return;
 
   const periodSelect = root.querySelector("#philosophy-period");
-  const authorSearch = root.querySelector("#philosophy-author-search");
-  const titleSearch = root.querySelector("#philosophy-title-search");
+  const searchInput = root.querySelector("#philosophy-search");
+  const legacyAuthorSearch = root.querySelector("#philosophy-author-search");
+  const legacyTitleSearch = root.querySelector("#philosophy-title-search");
   const results = root.querySelector(".philosophy-results");
   const pageLabel = root.querySelector(".philosophy-page-label");
   const previous = root.querySelector(".philosophy-previous");
@@ -133,18 +134,22 @@
   };
 
   const render = () => {
-    const authorQuery = normalize(authorSearch.value.trim());
-    const titleQuery = normalize(titleSearch?.value.trim() || "");
+    const combinedSearch = Boolean(searchInput) || !legacyTitleSearch;
+    const query = normalize((searchInput || legacyAuthorSearch)?.value.trim() || "");
+    const authorQuery = combinedSearch ? query : normalize(legacyAuthorSearch?.value.trim() || "");
+    const titleQuery = combinedSearch ? query : normalize(legacyTitleSearch?.value.trim() || "");
     const items = authorItems(activeEntries())
-      .filter((item) => !authorQuery || normalize(item.author).includes(authorQuery))
       .map((item) => {
+        const authorMatches = Boolean(authorQuery) && normalize(item.author).includes(authorQuery);
         const blocks = item.blocks.map((block) => ({
           ...block,
-          books: block.books.filter((book) => !titleQuery || normalize(book.title).includes(titleQuery)),
+          books: block.books.filter((book) => combinedSearch
+            ? (!query || authorMatches || normalize(book.title).includes(query))
+            : (!titleQuery || normalize(book.title).includes(titleQuery))),
         })).filter((block) => block.books.length);
         return { ...item, blocks, periods: new Set(blocks.map((block) => block.periodLabel)) };
       })
-      .filter((item) => item.blocks.length);
+      .filter((item) => item.blocks.length && (combinedSearch || !authorQuery || normalize(item.author).includes(authorQuery)));
 
     const pageCount = Math.max(1, Math.ceil(items.length / perPage));
     currentPage = Math.min(Math.max(1, currentPage), pageCount);
@@ -152,7 +157,7 @@
     results.replaceChildren();
     visible.forEach((item) => results.append(renderAuthor(item)));
 
-    if (!items.length) results.append(setText("p", "philosophy-empty", titleQuery ? "No matching books found." : "No authors found."));
+    if (!items.length) results.append(setText("p", "philosophy-empty", (query || authorQuery || titleQuery) ? "No matching books or authors found." : "No authors found."));
     pageLabel.textContent = items.length
       ? `Page ${currentPage} of ${pageCount} · ${perPage} author entries per page`
       : "No entries to display";
@@ -167,8 +172,11 @@
     syncPeriodUrl();
     render();
   });
-  authorSearch.addEventListener("input", resetAndRender);
-  if (titleSearch) titleSearch.addEventListener("input", resetAndRender);
+  if (searchInput) searchInput.addEventListener("input", resetAndRender);
+  else {
+    legacyAuthorSearch?.addEventListener("input", resetAndRender);
+    legacyTitleSearch?.addEventListener("input", resetAndRender);
+  }
   window.addEventListener("popstate", () => {
     const period = new URLSearchParams(window.location.search).get("era");
     periodSelect.value = validPeriods.has(period) ? period : "all";

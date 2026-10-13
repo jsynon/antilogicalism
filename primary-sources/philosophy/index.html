@@ -424,7 +424,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 }
 </style>
 <style id="author-search-layout">
-#primary .entry-content #philosophy-browse-page .philosophy-controls{grid-template-columns:minmax(0,.8fr) repeat(2,minmax(0,1.2fr))!important}
+#primary .entry-content #philosophy-browse-page .philosophy-controls{grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr)!important}
 @media(max-width:650px){#primary .entry-content #philosophy-browse-page .philosophy-controls{grid-template-columns:minmax(0,1fr)!important}}
 </style>
 </head>
@@ -476,11 +476,8 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
           <option value="20th-century-present">~20th Century</option>
         </select>
       </label>
-      <label for="philosophy-author-search">Search by author
-        <input id="philosophy-author-search" type="search" placeholder="Type an author name" autocomplete="off">
-      </label>
-      <label for="philosophy-title-search">Search by title
-        <input id="philosophy-title-search" type="search" placeholder="Type a book title" autocomplete="off">
+      <label for="philosophy-search">Search by title or author
+        <input id="philosophy-search" type="search" placeholder="Type a title or author name" autocomplete="off">
       </label>
     </div>
 
