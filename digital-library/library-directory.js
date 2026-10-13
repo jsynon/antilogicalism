@@ -52,9 +52,6 @@
 
   Promise.resolve(window.ANTILOGICALISM_LIBRARY_CATALOG || fetch(catalogUrl).then(r => { if (!r.ok) throw new Error('Catalog could not be loaded'); return r.json(); })).then(data => {
     const books = data.books || [];
-    const distinctTitleCount = new Set(books.map(b => norm(b.title))).size;
-    const catalogIntro = host.querySelector('.ald-intro');
-    catalogIntro.textContent = `Explore the catalog by author, subject, or collection. ${books.length} file entries represent ${distinctTitleCount} distinct titles. Collected and anonymous works are grouped together.`;
     const modeButtons = [...host.querySelectorAll('[data-mode]')];
     const query = host.querySelector('#ald-query');
     const filter = host.querySelector('#ald-filter');
@@ -92,11 +89,11 @@
     }
     function render() {
       const list=filtered();
-      if (!list.length) { count.textContent=`0 matching entries; ${books.length} file entries represent ${distinctTitleCount} distinct titles`; results.innerHTML='<p class="ald-empty">No books match this search.</p>'; return; }
+      if (!list.length) { count.textContent='No matching books'; results.innerHTML='<p class="ald-empty">No books match this search.</p>'; return; }
       if (mode==='subjects') {
         const pages=Math.ceil(list.length/perPage); page=Math.min(page,pages-1);
         const start=page*perPage, visible=list.slice(start,start+perPage);
-        count.textContent=`Showing entries ${start+1}–${Math.min(start+perPage,list.length)} of ${list.length}; ${books.length} file entries represent ${distinctTitleCount} distinct titles`;
+        count.textContent=`Showing books ${start+1}–${Math.min(start+perPage,list.length)} of ${list.length}`;
         results.innerHTML=visible.map(b=>`<div class="ald-author-group"><ul class="ald-book-list"><li>${b.url?`<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.title)}</a>`:`${esc(b.title)} <span class="ald-note">(link unavailable)</span>`}${b.subjects.length?` <span class="ald-note">· ${esc(b.subjects.join(', '))}</span>`:''}</li></ul></div>`).join('')+pager(pages);
         wirePager();
         return;
@@ -116,7 +113,7 @@
       const pages=Math.ceil((isCollective?collectiveBooks.length:visibleKeys.length)/itemsPerPage); page=Math.min(page,pages-1);
       const start=page*itemsPerPage, pageKeys=isCollective?[labels.collective]:visibleKeys.slice(start,start+itemsPerPage);
       const visibleBookCount=new Set(visibleKeys.flatMap(k=>groups.get(k).map(b=>b.id))).size;
-      count.textContent=isCollective?`Showing entries ${start+1}–${Math.min(start+perPage,collectiveBooks.length)} of ${collectiveBooks.length} collected and anonymous file entries; ${books.length} file entries represent ${distinctTitleCount} distinct titles`: `${visibleBookCount} file entries across ${visibleKeys.length} authors; showing authors ${start+1}–${Math.min(start+authorGroupsPerPage,visibleKeys.length)} of ${visibleKeys.length}. Overall: ${books.length} file entries, ${distinctTitleCount} distinct titles`;
+      count.textContent=isCollective?`Showing ${start+1}–${Math.min(start+perPage,collectiveBooks.length)} of ${collectiveBooks.length} collected and anonymous works`: `${visibleBookCount} books across ${visibleKeys.length} authors; showing authors ${start+1}–${Math.min(start+authorGroupsPerPage,visibleKeys.length)} of ${visibleKeys.length}`;
       const renderBooks=items=>`<ul class="ald-book-list">${items.map(b=>`<li>${b.url?`<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.workTitle||b.title)}</a>`:`${esc(b.workTitle||b.title)} <span class="ald-note">(link unavailable)</span>`}</li>`).join('')}</ul>`;
       const renderCollective=items=>{
         const collections=new Map();
