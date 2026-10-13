@@ -134,7 +134,7 @@
 
   const render = () => {
     const authorQuery = normalize(authorSearch.value.trim());
-    const titleQuery = normalize(titleSearch.value.trim());
+    const titleQuery = normalize(titleSearch?.value.trim() || "");
     const items = authorItems(activeEntries())
       .filter((item) => !authorQuery || normalize(item.author).includes(authorQuery))
       .map((item) => {
@@ -168,7 +168,7 @@
     render();
   });
   authorSearch.addEventListener("input", resetAndRender);
-  titleSearch.addEventListener("input", resetAndRender);
+  if (titleSearch) titleSearch.addEventListener("input", resetAndRender);
   window.addEventListener("popstate", () => {
     const period = new URLSearchParams(window.location.search).get("era");
     periodSelect.value = validPeriods.has(period) ? period : "all";

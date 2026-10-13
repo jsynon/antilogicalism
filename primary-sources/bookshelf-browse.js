@@ -122,7 +122,7 @@
 
   const render = () => {
     const authorQuery = normalize(authorSearch.value.trim());
-    const titleQuery = normalize(titleSearch.value.trim());
+    const titleQuery = normalize(titleSearch?.value.trim() || "");
     const filtered = authorItems(data.entries)
       .filter((item) => !authorQuery || normalize(item.author).includes(authorQuery))
       .map((item) => ({
@@ -149,7 +149,7 @@
   const resetAndRender = () => { currentPage = 1; render(); };
   const scrollToResults = () => results.scrollIntoView({ behavior: "smooth", block: "start" });
   authorSearch.addEventListener("input", resetAndRender);
-  titleSearch.addEventListener("input", resetAndRender);
+  if (titleSearch) titleSearch.addEventListener("input", resetAndRender);
   previous.addEventListener("click", () => { currentPage -= 1; render(); scrollToResults(); });
   next.addEventListener("click", () => { currentPage += 1; render(); scrollToResults(); });
 
