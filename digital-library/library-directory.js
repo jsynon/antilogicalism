@@ -5,7 +5,7 @@
   const catalogUrl = (script && script.dataset.catalog) || './library-catalog.json';
   const labels = {
     authors: 'Browse by Author', subjects: 'Browse by Subject', all: 'All Books',
-    uncategorized: 'Not yet classified', collective: 'Anonymous, Traditional & Collective Works'
+    uncategorized: 'Not yet classified', collective: 'Collected, Anonymous & Traditional Works'
   };
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase();
@@ -45,7 +45,7 @@
   .ald-browser h2{margin:.1rem 0 .45rem;font-family:Georgia,serif;font-size:clamp(1.55rem,3vw,2.1rem);font-weight:normal}.ald-intro{margin:0;color:var(--ald-muted);max-width:58ch}
   .ald-mode{display:flex;gap:.45rem;border-bottom:1px solid var(--ald-rule);margin:1.2rem 0 1rem}.ald-mode button{font:inherit;color:var(--ald-ink);background:transparent;border:0;border-bottom:3px solid transparent;padding:.65rem .8rem;cursor:pointer}.ald-mode button[aria-selected="true"]{border-color:var(--ald-accent);font-weight:600}
   .ald-controls{display:grid;grid-template-columns:minmax(200px,2fr) minmax(190px,1fr);gap:.35rem 1rem;align-items:end}.ald-search-label,.ald-filter-wrap label{font-size:.85rem;color:var(--ald-muted)}.ald-search-label{grid-column:1}.ald-controls input,.ald-filter-wrap select{width:100%;min-height:42px;padding:.55rem .7rem;border:1px solid #bdb3a5;background:#fff;color:var(--ald-ink);font:inherit}.ald-filter-wrap{display:grid;gap:.35rem}.ald-count{font-size:.9rem;color:var(--ald-muted);margin:1rem 0 .6rem;border-bottom:1px solid var(--ald-rule);padding-bottom:.6rem}
-  .ald-author-group{margin:1rem 0}.ald-author-results>.ald-author-group+.ald-author-group{margin-top:1.25rem;padding-top:.8rem;border-top:1px solid var(--ald-rule)}.ald-author-group h3{font-family:Georgia,serif;font-size:1.4rem;font-style:normal;font-weight:600;line-height:1.35;margin:.15rem 0 .35rem;padding:0}.ald-author-group h4{font-family:Georgia,serif;font-size:1.18rem;font-weight:600;margin:1rem 0 .35rem;color:var(--ald-accent);padding-bottom:.25rem}.ald-collection-group+.ald-collection-group{margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--ald-rule)}.ald-book-list{list-style:none;margin:0;padding:0}.ald-book-list li{padding:.35rem 0}.ald-book-list a{color:var(--ald-accent);text-decoration:underline;text-underline-offset:2px}.ald-book-list a:hover,.ald-book-list a:focus{text-decoration-thickness:2px}.ald-empty{color:var(--ald-muted);padding:1rem 0}.ald-note{font-size:.82rem;color:var(--ald-muted);margin:1.4rem 0 0}.ald-alpha{display:flex;flex-wrap:wrap;gap:.25rem;margin:.5rem 0 1rem}.ald-alpha button{border:1px solid var(--ald-rule);background:white;color:var(--ald-accent);padding:.25rem .5rem;cursor:pointer}.ald-alpha button[aria-pressed="true"]{background:var(--ald-accent);color:white}.ald-alpha button:disabled{opacity:.4;cursor:default}.ald-pager{display:flex;align-items:center;justify-content:center;gap:.8rem;margin:1rem 0}.ald-pager button{font:inherit;padding:.4rem .7rem;border:1px solid var(--ald-rule);background:#fff;color:var(--ald-accent);cursor:pointer}.ald-pager button:disabled{opacity:.45;cursor:default}
+  .ald-author-group{margin:1rem 0}.ald-author-results>.ald-author-group+.ald-author-group{margin-top:1.25rem;padding-top:.8rem;border-top:1px solid var(--ald-rule)}.ald-author-group h3{font-family:Georgia,serif;font-size:1.7rem!important;font-style:normal!important;font-weight:600;line-height:1.3;margin:.15rem 0 .4rem;padding:0}.ald-author-group h4{font-family:Georgia,serif;font-size:1.18rem;font-weight:600;margin:1rem 0 .35rem;color:var(--ald-accent);padding-bottom:.25rem}.ald-collection-group+.ald-collection-group{margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--ald-rule)}.ald-book-list{list-style:none;margin:0;padding:0}.ald-book-list li{padding:.35rem 0}.ald-book-list a{color:var(--ald-accent);text-decoration:underline;text-underline-offset:2px}.ald-book-list a:hover,.ald-book-list a:focus{text-decoration-thickness:2px}.ald-empty{color:var(--ald-muted);padding:1rem 0}.ald-note{font-size:.82rem;color:var(--ald-muted);margin:1.4rem 0 0}.ald-alpha{display:flex;flex-wrap:wrap;gap:.25rem;margin:.5rem 0 1rem}.ald-alpha button{border:1px solid var(--ald-rule);background:white;color:var(--ald-accent);padding:.25rem .5rem;cursor:pointer}.ald-alpha button[aria-pressed="true"]{background:var(--ald-accent);color:white}.ald-alpha button:disabled{opacity:.4;cursor:default}.ald-pager{display:flex;align-items:center;justify-content:center;gap:.8rem;margin:1rem 0}.ald-pager button{font:inherit;padding:.4rem .7rem;border:1px solid var(--ald-rule);background:#fff;color:var(--ald-accent);cursor:pointer}.ald-pager button:disabled{opacity:.45;cursor:default}
   @media(max-width:600px){.ald-controls{grid-template-columns:1fr}.ald-search-label{grid-column:auto}.ald-browser{padding:1rem}.ald-mode button{padding:.55rem .4rem;font-size:.92rem}}
   `;
   document.head.appendChild(style);
@@ -81,7 +81,7 @@
         const matchesQ = !q || norm(b.title).includes(q) || norm(names).includes(q);
         const matchesF = mode === 'subjects'
           ? (f==='all' || (f==='__unclassified' ? !b.subjects.length : b.subjects.includes(f)))
-          : (f==='all' || (f==='__collective' ? b.authorGroup==='collective' : true));
+          : (f==='all' || (f==='__collective' ? (b.authorGroup==='collective'||Boolean(b.collection)) : true));
         return matchesQ && matchesF;
       }).sort((a,b) => mode==='authors'
         ? norm(a.sortSurname || a.author).localeCompare(norm(b.sortSurname || b.author)) || norm(a.author).localeCompare(norm(b.author)) || norm(a.title).localeCompare(norm(b.title))
@@ -99,7 +99,7 @@
         return;
       }
       const groups=new Map();
-      list.forEach(b=>{const names=b.authorGroup==='collective'?[labels.collective]:(b.authors||[b.author||labels.collective]);for(const key of new Set(names)){if(!groups.has(key))groups.set(key,[]);groups.get(key).push(b);}});
+      list.forEach(b=>{const names=(b.authorGroup==='collective'||b.collection)?[labels.collective]:(b.authors||[b.author||labels.collective]);for(const key of new Set(names)){if(!groups.has(key))groups.set(key,[]);groups.get(key).push(b);}});
       const keys=[...groups.keys()].sort((a,b)=>{
         const ac=a===labels.collective,bc=b===labels.collective;if(ac!==bc)return ac?1:-1;
         return norm(surnameFor(a)).localeCompare(norm(surnameFor(b)))||norm(a).localeCompare(norm(b));
@@ -108,12 +108,12 @@
       const letters=[...new Set(keys.filter(k=>k!==labels.collective).map(k=>surnameFor(k).charAt(0).toUpperCase()))].sort();
       const alpha=isCollective?'':`<nav class="ald-alpha" aria-label="Author initials">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c=>`<button type="button" data-letter="${c}" aria-pressed="${letter===c}" ${letters.includes(c)?'':'disabled'}>${c}</button>`).join('')}<button type="button" data-letter="" aria-pressed="${!letter}">All</button></nav>`;
       const visibleKeys=keys.filter(k=>!letter || (k!==labels.collective && surnameFor(k).toUpperCase().startsWith(letter)));
-      const collectiveBooks=isCollective?(groups.get(labels.collective)||[]).slice().sort((a,b)=>(a.collectionOrder??999)-(b.collectionOrder??999)||(a.collectionVolume??Number.MAX_SAFE_INTEGER)-(b.collectionVolume??Number.MAX_SAFE_INTEGER)||norm(a.title).localeCompare(norm(b.title))):[];
+      const collectiveBooks=isCollective?(groups.get(labels.collective)||[]).slice().sort((a,b)=>(a.collectionOrder??999)-(b.collectionOrder??999)||norm(a.collection||'').localeCompare(norm(b.collection||''))||(a.collectionVolume??Number.MAX_SAFE_INTEGER)-(b.collectionVolume??Number.MAX_SAFE_INTEGER)||norm(a.title).localeCompare(norm(b.title))):[];
       const itemsPerPage=isCollective?perPage:authorGroupsPerPage;
       const pages=Math.ceil((isCollective?collectiveBooks.length:visibleKeys.length)/itemsPerPage); page=Math.min(page,pages-1);
       const start=page*itemsPerPage, pageKeys=isCollective?[labels.collective]:visibleKeys.slice(start,start+itemsPerPage);
       const visibleBookCount=new Set(visibleKeys.flatMap(k=>groups.get(k).map(b=>b.id))).size;
-      count.textContent=isCollective?`Showing ${start+1}–${Math.min(start+perPage,collectiveBooks.length)} of ${collectiveBooks.length} anonymous and collective titles`: `${visibleBookCount} books across ${visibleKeys.length} authors; showing authors ${start+1}–${Math.min(start+authorGroupsPerPage,visibleKeys.length)} of ${visibleKeys.length}`;
+      count.textContent=isCollective?`Showing ${start+1}–${Math.min(start+perPage,collectiveBooks.length)} of ${collectiveBooks.length} collected and anonymous titles`: `${visibleBookCount} books across ${visibleKeys.length} authors; showing authors ${start+1}–${Math.min(start+authorGroupsPerPage,visibleKeys.length)} of ${visibleKeys.length}`;
       const renderBooks=items=>`<ul class="ald-book-list">${items.map(b=>`<li>${b.url?`<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.workTitle||b.title)}</a>`:`${esc(b.workTitle||b.title)} <span class="ald-note">(link unavailable)</span>`}</li>`).join('')}</ul>`;
       const renderCollective=items=>{
         const collections=new Map();
