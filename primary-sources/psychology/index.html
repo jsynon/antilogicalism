@@ -402,17 +402,11 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <style id="bookshelf-navigation-groups">
 #primary .entry-content #bookshelf-browse-page .bookshelf-page-nav,
 #primary .entry-content #philosophy-browse-page .bookshelf-page-nav {
-  display:grid!important;
-  grid-template-columns:max-content minmax(0,1fr)!important;
-  align-items:start;
-  column-gap:18px!important;
-  row-gap:10px!important;
-  margin:0 0 1.2rem!important;
-  padding:0 0 1rem!important;
-  border-bottom:1px solid #e0e2e3!important;
+  display:flex!important;flex-direction:column;align-items:stretch;gap:12px!important;
+  margin:0 0 1.2rem!important;padding:0 0 1rem!important;border-bottom:1px solid #e0e2e3!important;
 }
-#primary .entry-content .bookshelf-nav-home {grid-column:1;grid-row:1 / span 2;padding-top:23px}
-#primary .entry-content .bookshelf-nav-group {grid-column:2;min-width:0}
+#primary .entry-content .bookshelf-nav-home {padding-top:0}
+#primary .entry-content .bookshelf-nav-group {width:100%;min-width:0}
 #primary .entry-content .bookshelf-nav-label {display:block;margin:0 0 5px;color:#444b4e;font-size:.84em;font-weight:700;line-height:1.2;letter-spacing:.035em;font-variant:small-caps}
 #primary .entry-content .bookshelf-nav-links {display:flex;flex-wrap:wrap;gap:6px}
 #primary .entry-content #bookshelf-browse-page .bookshelf-page-nav a,
@@ -428,9 +422,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content .bookshelf-nav-home a {font-weight:600!important}
 @media(max-width:640px) {
   #primary .entry-content #bookshelf-browse-page .bookshelf-page-nav,
-  #primary .entry-content #philosophy-browse-page .bookshelf-page-nav {display:flex!important;flex-direction:column;gap:12px!important}
-  #primary .entry-content .bookshelf-nav-home {padding-top:0}
-  #primary .entry-content .bookshelf-nav-group {width:100%}
+  #primary .entry-content #philosophy-browse-page .bookshelf-page-nav {gap:12px!important}
   #primary .entry-content .bookshelf-nav-links {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
   #primary .entry-content #bookshelf-browse-page .bookshelf-page-nav a,
   #primary .entry-content #philosophy-browse-page .bookshelf-page-nav a {min-width:0;min-height:42px;padding:7px 8px;overflow-wrap:anywhere;hyphens:auto}
@@ -476,7 +468,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
   <div class="bookshelf-category-intro" aria-label="About this collection"></div>
   <section id="bookshelf-browse" aria-labelledby="bookshelf-browse-heading">
     <h2 id="bookshelf-browse-heading">Browse Psychology</h2>
-    <p class="bookshelf-browse-note">Browse books alphabetically by author.</p>
     <div class="bookshelf-controls">
       <label class="bookshelf-initial-field" for="bookshelf-author-initial">Author initial
         <select id="bookshelf-author-initial"><option value="all">All authors</option></select>
