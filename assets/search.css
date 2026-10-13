@@ -336,3 +336,147 @@ body.page-id-372 #lcp_instance_0 .lcp_excerpt p {
     width: 100%;
   }
 }
+
+
+/* Antilogicalism shared page body style v2 */
+/* Targets the current static Bookshelf, Digital Library, and Blog markup. */
+
+:is(body.page-id-6350, body.parent-pageid-6350, body.ancestor-pageid-6350, body.page-id-372) #primary .entry-content,
+#digital-library .entry-content {
+  max-width: 780px;
+  margin-inline: auto;
+  line-height: 1.72;
+}
+
+:is(body.page-id-6350, body.parent-pageid-6350, body.ancestor-pageid-6350, body.page-id-372) #primary .entry-content a,
+#digital-library .entry-content a {
+  color: #315f7b;
+  text-underline-offset: 3px;
+}
+
+/* Bookshelf: rules for the current subject navigation and collection sections. */
+body.page-id-6350 #bookshelf-subjects,
+body.page-id-6350 #bookshelf-collections {
+  margin: 1.8em 0 .75em;
+  padding: 0 0 .4em;
+  border-bottom: 1px solid #cfd5d9;
+  font-size: 1.3em;
+  font-weight: 500;
+  text-align: left;
+}
+
+body.page-id-6350 #bookshelf-subjects + * a {
+  display: inline-block;
+  margin: .2em .35em .35em 0;
+  padding: .42em .65em;
+  border: 1px solid #d5dadd;
+  color: #315f7b;
+  text-decoration: none;
+}
+
+body.page-id-6350 #bookshelf-subjects + * a:hover,
+body.page-id-6350 #bookshelf-subjects + * a:focus-visible {
+  border-color: #315f7b;
+  text-decoration: underline;
+}
+
+body.page-id-6350 #bookshelf-collections ~ * h3,
+body.page-id-6350 #bookshelf-collections ~ * h4 {
+  margin: 1.1em 0 .25em;
+  text-align: left !important;
+}
+
+/* Library Search: clear labels and comfortably sized fields. */
+#digital-library #library-search-section {
+  margin-top: .5em;
+}
+
+#digital-library #library-search-heading {
+  margin: 1.35em 0 .5em;
+  padding-bottom: .35em;
+  border-bottom: 1px solid #cfd5d9;
+  font-weight: 500;
+}
+
+#digital-library #library-search-instructions {
+  margin: 0 0 1.2em;
+  color: #4f5960;
+  font-size: .96em;
+}
+
+#digital-library #digital-library-search > label,
+#digital-library #digital-library-search .library-filter-field > label {
+  display: block;
+  margin-bottom: .3em;
+  font-weight: 600;
+}
+
+#digital-library #digital-library-search input,
+#digital-library #digital-library-search select {
+  min-height: 2.65em;
+  padding: .48em .62em;
+  border: 1px solid #aeb7bd;
+  border-radius: 2px;
+  background: #fff;
+  color: #20252a;
+  font: inherit;
+}
+
+#digital-library #digital-library-search button {
+  min-height: 2.65em;
+  padding: .48em .95em;
+  border: 1px solid #315f7b;
+  border-radius: 2px;
+  background: #315f7b;
+  color: #fff;
+  font: inherit;
+}
+
+#digital-library #digital-library-search button:hover {
+  background: #244b63;
+}
+
+/* Blog: divider-led list and calmer, consistent archive controls. */
+body.page-id-372 #archive-year-filter {
+  min-height: 2.5em;
+  padding: .35em .55em;
+  border: 1px solid #aeb7bd;
+  border-radius: 2px;
+  background: #fff;
+  color: #20252a;
+  font: inherit;
+}
+
+body.page-id-372 #lcp_instance_0 {
+  margin: 1em 0;
+  padding: 0;
+  list-style: none;
+}
+
+body.page-id-372 #lcp_instance_0 > li {
+  margin: 0;
+  padding: 1.05em 0;
+  border-bottom: 1px solid #d6d9dc;
+}
+
+body.page-id-372 #lcp_instance_0 > li > a {
+  color: #315f7b;
+  font-size: 1.08em;
+  text-decoration: none;
+}
+
+body.page-id-372 #lcp_instance_0 > li > a:hover,
+body.page-id-372 #lcp_instance_0 > li > a:focus-visible {
+  text-decoration: underline;
+}
+
+body.page-id-372 #lcp_instance_0 .lcp_excerpt {
+  margin-top: .25em;
+}
+
+@media (max-width: 600px) {
+  body.page-id-6350 #bookshelf-subjects + * a {
+    margin-right: .2em;
+    padding: .38em .52em;
+  }
+}
