@@ -2,7 +2,6 @@
   const root = document.getElementById("bookshelf-browse");
   if (!root) return;
 
-  const initialSelect = root.querySelector("#bookshelf-author-initial");
   const authorSearch = root.querySelector("#bookshelf-author-search");
   const results = root.querySelector(".bookshelf-results");
   const pageLabel = root.querySelector(".bookshelf-page-label");
@@ -16,9 +15,6 @@
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("en-US");
-
-  const getInitial = (item) => normalize(item.sortSurname || item.author || "")
-    .replace(/^[^a-z]+/, "").charAt(0).toUpperCase();
 
   const setText = (tag, className, value) => {
     const node = document.createElement(tag);
@@ -125,17 +121,8 @@
 
   const render = () => {
     const authors = authorItems(data.entries);
-    const initials = [...new Set(authors.map(getInitial).filter(Boolean))].sort();
-    const prior = initialSelect.value;
-    initialSelect.replaceChildren(new Option("All authors", "all"));
-    initials.forEach((letter) => initialSelect.add(new Option(letter, letter)));
-    initialSelect.value = initials.includes(prior) ? prior : "all";
-
     const query = normalize(authorSearch.value.trim());
-    const filtered = authors.filter((item) =>
-      (initialSelect.value === "all" || getInitial(item) === initialSelect.value) &&
-      (!query || normalize(item.author).includes(query))
-    );
+    const filtered = authors.filter((item) => !query || normalize(item.author).includes(query));
     const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
     currentPage = Math.min(Math.max(1, currentPage), pageCount);
     const visible = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
@@ -151,7 +138,6 @@
 
   const resetAndRender = () => { currentPage = 1; render(); };
   const scrollToResults = () => results.scrollIntoView({ behavior: "smooth", block: "start" });
-  initialSelect.addEventListener("change", resetAndRender);
   authorSearch.addEventListener("input", resetAndRender);
   previous.addEventListener("click", () => { currentPage -= 1; render(); scrollToResults(); });
   next.addEventListener("click", () => { currentPage += 1; render(); scrollToResults(); });

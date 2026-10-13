@@ -3,7 +3,6 @@
   if (!root) return;
 
   const periodSelect = root.querySelector("#philosophy-period");
-  const initialSelect = root.querySelector("#philosophy-author-initial");
   const authorSearch = root.querySelector("#philosophy-author-search");
   const results = root.querySelector(".philosophy-results");
   const pageLabel = root.querySelector(".philosophy-page-label");
@@ -28,11 +27,6 @@
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("en-US");
-
-  const getInitial = (entry) => {
-    const key = entry.sortSurname || entry.author || "";
-    return normalize(key).replace(/^[^a-z]+/, "").charAt(0).toUpperCase();
-  };
 
   const activeEntries = () => data.entries.filter((entry) =>
     periodSelect.value === "all" || entry.period === periodSelect.value
@@ -137,21 +131,9 @@
     return card;
   };
 
-  const refreshInitialOptions = () => {
-    const initials = [...new Set(authorItems(activeEntries()).map(getInitial).filter(Boolean))].sort();
-    const previousValue = initialSelect.value;
-    initialSelect.replaceChildren(new Option("All authors", "all"));
-    initials.forEach((letter) => initialSelect.add(new Option(letter, letter)));
-    initialSelect.value = initials.includes(previousValue) ? previousValue : "all";
-  };
-
   const render = () => {
-    refreshInitialOptions();
     const query = normalize(authorSearch.value.trim());
-    let items = authorItems(activeEntries()).filter((item) =>
-      (initialSelect.value === "all" || getInitial(item) === initialSelect.value) &&
-      (!query || normalize(item.author).includes(query))
-    );
+    const items = authorItems(activeEntries()).filter((item) => !query || normalize(item.author).includes(query));
 
     const pageCount = Math.max(1, Math.ceil(items.length / perPage));
     currentPage = Math.min(Math.max(1, currentPage), pageCount);
@@ -159,7 +141,7 @@
     results.replaceChildren();
     visible.forEach((item) => results.append(renderAuthor(item)));
 
-    if (!items.length) results.append(setText("p", "philosophy-empty", "No authors match this selection."));
+    if (!items.length) results.append(setText("p", "philosophy-empty", "No authors found."));
     pageLabel.textContent = items.length
       ? `Page ${currentPage} of ${pageCount} · ${perPage} author entries per page`
       : "No entries to display";
@@ -169,12 +151,10 @@
 
   const resetAndRender = () => { currentPage = 1; render(); };
   const scrollToResults = () => results.scrollIntoView({ behavior: "smooth", block: "start" });
-  [periodSelect, initialSelect].forEach((control) => {
-    control.addEventListener("change", () => {
-      currentPage = 1;
-      if (control === periodSelect) syncPeriodUrl();
-      render();
-    });
+  periodSelect.addEventListener("change", () => {
+    currentPage = 1;
+    syncPeriodUrl();
+    render();
   });
   authorSearch.addEventListener("input", resetAndRender);
   window.addEventListener("popstate", () => {

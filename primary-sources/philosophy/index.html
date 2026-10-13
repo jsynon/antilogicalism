@@ -423,6 +423,10 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
   #primary .entry-content #philosophy-browse-page .bookshelf-page-nav a {min-width:0;min-height:42px;padding:7px 8px;overflow-wrap:anywhere;hyphens:auto}
 }
 </style>
+<style id="author-search-layout">
+#primary .entry-content #philosophy-browse-page .philosophy-controls{grid-template-columns:minmax(0,1fr) minmax(0,1.2fr)!important}
+@media(max-width:650px){#primary .entry-content #philosophy-browse-page .philosophy-controls{grid-template-columns:minmax(0,1fr)!important}}
+</style>
 </head>
 
 <body class="wp-singular page-template-default page page-id-6351 page-parent page-child parent-pageid-6350 wp-theme-book-lite custom-header">
@@ -471,9 +475,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
           <option value="modern">Modern Period</option>
           <option value="20th-century-present">~20th Century</option>
         </select>
-      </label>
-      <label class="philosophy-initial-field" for="philosophy-author-initial">Author initial
-        <select id="philosophy-author-initial"><option value="all">All authors</option></select>
       </label>
       <label for="philosophy-author-search">Find an author
         <input id="philosophy-author-search" type="search" placeholder="Type an author name" autocomplete="off">

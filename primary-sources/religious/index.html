@@ -426,6 +426,9 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
   #primary .entry-content #philosophy-browse-page .bookshelf-page-nav a {min-width:0;min-height:42px;padding:7px 8px;overflow-wrap:anywhere;hyphens:auto}
 }
 </style>
+<style id="author-search-layout">
+#primary .entry-content #bookshelf-browse-page .bookshelf-controls{grid-template-columns:minmax(0,1fr)!important}
+</style>
 </head>
 
 <body class="wp-singular page-template-default page page-id-6356 page-child parent-pageid-6350 wp-theme-book-lite custom-header">
@@ -467,9 +470,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
   <section id="bookshelf-browse" aria-labelledby="bookshelf-browse-heading">
     <h2 id="bookshelf-browse-heading">Browse Religious</h2>
     <div class="bookshelf-controls">
-      <label class="bookshelf-initial-field" for="bookshelf-author-initial">Author initial
-        <select id="bookshelf-author-initial"><option value="all">All authors</option></select>
-      </label>
       <label for="bookshelf-author-search">Find an author
         <input id="bookshelf-author-search" type="search" placeholder="Type an author name" autocomplete="off">
       </label>
