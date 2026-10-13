@@ -59,7 +59,7 @@
     const count = host.querySelector('.ald-count');
     const results = host.querySelector('#ald-results');
     let mode = 'authors', letter = '', page = 0;
-    const perPage = 30, authorGroupsPerPage = 24;
+    const perPage = 15, authorGroupsPerPage = 15;
     const subjects = data.subjects || [];
 
     function options() {
@@ -104,14 +104,16 @@
         const ac=a===labels.collective,bc=b===labels.collective;if(ac!==bc)return ac?1:-1;
         return norm(surnameFor(a)).localeCompare(norm(surnameFor(b)))||norm(a).localeCompare(norm(b));
       });
-      const letters=[...new Set(keys.filter(k=>k!==labels.collective).map(k=>surnameFor(k).charAt(0).toUpperCase()))].sort();
       const isCollective=filter.value==='__collective';
+      const letters=[...new Set(keys.filter(k=>k!==labels.collective).map(k=>surnameFor(k).charAt(0).toUpperCase()))].sort();
       const alpha=isCollective?'':`<nav class="ald-alpha" aria-label="Author initials">${'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').map(c=>`<button type="button" data-letter="${c}" aria-pressed="${letter===c}" ${letters.includes(c)?'':'disabled'}>${c}</button>`).join('')}<button type="button" data-letter="" aria-pressed="${!letter}">All</button></nav>`;
-      const visibleKeys=keys.filter(k=>k===labels.collective || !letter || surnameFor(k).toUpperCase().startsWith(letter));
-      const pages=Math.ceil(visibleKeys.length/authorGroupsPerPage); page=Math.min(page,pages-1);
-      const start=page*authorGroupsPerPage, pageKeys=visibleKeys.slice(start,start+authorGroupsPerPage);
+      const visibleKeys=keys.filter(k=>!letter || (k!==labels.collective && surnameFor(k).toUpperCase().startsWith(letter)));
+      const collectiveBooks=isCollective?(groups.get(labels.collective)||[]).slice().sort((a,b)=>(a.collectionOrder??999)-(b.collectionOrder??999)||(a.collectionVolume??Number.MAX_SAFE_INTEGER)-(b.collectionVolume??Number.MAX_SAFE_INTEGER)||norm(a.title).localeCompare(norm(b.title))):[];
+      const itemsPerPage=isCollective?perPage:authorGroupsPerPage;
+      const pages=Math.ceil((isCollective?collectiveBooks.length:visibleKeys.length)/itemsPerPage); page=Math.min(page,pages-1);
+      const start=page*itemsPerPage, pageKeys=isCollective?[labels.collective]:visibleKeys.slice(start,start+itemsPerPage);
       const visibleBookCount=new Set(visibleKeys.flatMap(k=>groups.get(k).map(b=>b.id))).size;
-      count.textContent=isCollective?`${visibleBookCount} anonymous and collective titles, grouped by collection`: `${visibleBookCount} books across ${visibleKeys.length} authors; showing authors ${start+1}–${Math.min(start+authorGroupsPerPage,visibleKeys.length)} of ${visibleKeys.length}`;
+      count.textContent=isCollective?`Showing ${start+1}–${Math.min(start+perPage,collectiveBooks.length)} of ${collectiveBooks.length} anonymous and collective titles`: `${visibleBookCount} books across ${visibleKeys.length} authors; showing authors ${start+1}–${Math.min(start+authorGroupsPerPage,visibleKeys.length)} of ${visibleKeys.length}`;
       const renderBooks=items=>`<ul class="ald-book-list">${items.map(b=>`<li>${b.url?`<a href="${esc(b.url)}" target="_blank" rel="noopener">${esc(b.workTitle||b.title)}</a>`:`${esc(b.workTitle||b.title)} <span class="ald-note">(link unavailable)</span>`}</li>`).join('')}</ul>`;
       const renderCollective=items=>{
         const collections=new Map();
@@ -121,7 +123,7 @@
           return `<section class="ald-collection-group"><h4>${esc(name)}</h4>${renderBooks(entries)}</section>`;
         }).join('');
       };
-      const output=pageKeys.map(k=>k===labels.collective?`<section class="ald-author-group ald-collective"><h3>${esc(k)}</h3>${renderCollective(groups.get(k))}</section>`:`<section class="ald-author-group"><h3>${esc(k)}</h3>${renderBooks(groups.get(k).sort((a,b)=>norm(a.title).localeCompare(norm(b.title))))}</section>`).join('');
+      const output=pageKeys.map(k=>k===labels.collective?`<section class="ald-author-group ald-collective"><h3>${esc(k)}</h3>${renderCollective(isCollective?collectiveBooks.slice(start,start+perPage):groups.get(k))}</section>`:`<section class="ald-author-group"><h3>${esc(k)}</h3>${renderBooks(groups.get(k).sort((a,b)=>norm(a.title).localeCompare(norm(b.title))))}</section>`).join('');
       results.innerHTML=alpha+`<div class="ald-author-results">${output||'<p class="ald-empty">No authors match this letter.</p>'}</div>`+pager(pages);
       results.querySelectorAll('[data-letter]').forEach(btn=>btn.addEventListener('click',()=>{letter=btn.dataset.letter;page=0;render();}));
       wirePager();
@@ -129,6 +131,6 @@
     function pager(pages){return pages>1?`<nav class="ald-pager" aria-label="Catalog pages"><button type="button" data-page="prev" ${page===0?'disabled':''}>Previous</button><span>Page ${page+1} of ${pages}</span><button type="button" data-page="next" ${page>=pages-1?'disabled':''}>Next</button></nav>`:'';}
     function wirePager(){results.querySelectorAll('[data-page]').forEach(btn=>btn.addEventListener('click',()=>{page+=btn.dataset.page==='next'?1:-1;render();}));}
     modeButtons.forEach(btn=>btn.addEventListener('click',()=>{mode=btn.dataset.mode;page=0;modeButtons.forEach(x=>x.setAttribute('aria-selected',String(x===btn)));options();render();}));
-    query.addEventListener('input',()=>{page=0;render();});filter.addEventListener('change',()=>{page=0;render();});options();render();
+    query.addEventListener('input',()=>{page=0;render();});filter.addEventListener('change',()=>{letter='';page=0;render();});options();render();
   }).catch(() => { host.querySelector('.ald-results').innerHTML='<p class="ald-empty">The library catalog could not be loaded. Check that the catalog JSON file is beside this page.</p>'; });
 })();
