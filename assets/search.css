@@ -480,3 +480,62 @@ body.page-id-372 #lcp_instance_0 .lcp_excerpt {
     padding: .38em .52em;
   }
 }
+
+
+/* Antilogicalism Bookshelf cleanup v3 */
+/* Bring the Bookshelf landing page back in line with the plain Blog layout. */
+
+body.page-id-6350 #bookshelf-subjects + * a {
+  display: inline-block;
+  margin: .15em 1.4em .3em 0 !important;
+  padding: .12em 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #315f7b;
+  font-weight: 400;
+  text-decoration: none;
+}
+
+body.page-id-6350 #bookshelf-subjects + * a:hover,
+body.page-id-6350 #bookshelf-subjects + * a:focus-visible {
+  text-decoration: underline;
+}
+
+/* Collection descriptions stay visible, but no longer sit inside cards. */
+body.page-id-6350 #primary .entry-content .collection,
+body.page-id-6350 #primary .entry-content article[class*="collection"],
+body.page-id-6350 #primary .entry-content [class*="collection-card"] {
+  margin: 1.1em 0 !important;
+  padding: 0 0 1em !important;
+  border: 0 !important;
+  border-bottom: 1px solid #d6d9dc !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.page-id-6350 #primary .entry-content .collection h3,
+body.page-id-6350 #primary .entry-content .collection h4,
+body.page-id-6350 #primary .entry-content article[class*="collection"] h3,
+body.page-id-6350 #primary .entry-content article[class*="collection"] h4,
+body.page-id-6350 #primary .entry-content [class*="collection-card"] h3,
+body.page-id-6350 #primary .entry-content [class*="collection-card"] h4 {
+  margin: 0 0 .3em !important;
+  font-size: 1.16em;
+  font-weight: 400 !important;
+  text-align: left !important;
+}
+
+body.page-id-6350 #primary .entry-content .collection p,
+body.page-id-6350 #primary .entry-content article[class*="collection"] p,
+body.page-id-6350 #primary .entry-content [class*="collection-card"] p {
+  margin: .25em 0 0;
+}
+
+@media (max-width: 600px) {
+  body.page-id-6350 #bookshelf-subjects + * a {
+    margin-right: .8em !important;
+  }
+}
