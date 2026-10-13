@@ -14,6 +14,17 @@
   let data = null;
   let currentPage = 1;
 
+  const validPeriods = new Set([...periodSelect.options].map((option) => option.value));
+  const requestedPeriod = new URLSearchParams(window.location.search).get("era");
+  if (validPeriods.has(requestedPeriod)) periodSelect.value = requestedPeriod;
+
+  const syncPeriodUrl = () => {
+    const url = new URL(window.location.href);
+    if (periodSelect.value === "all") url.searchParams.delete("era");
+    else url.searchParams.set("era", periodSelect.value);
+    window.history.replaceState({}, "", url);
+  };
+
   const normalize = (value) => String(value || "")
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
@@ -183,8 +194,15 @@
   [periodSelect, modeSelect, initialSelect].forEach((control) => {
     control.addEventListener("change", () => {
       currentPage = 1;
+      if (control === periodSelect) syncPeriodUrl();
       render();
     });
+  });
+  window.addEventListener("popstate", () => {
+    const period = new URLSearchParams(window.location.search).get("era");
+    periodSelect.value = validPeriods.has(period) ? period : "all";
+    currentPage = 1;
+    render();
   });
   previous.addEventListener("click", () => {
     currentPage -= 1;

@@ -251,11 +251,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #philosophy-browse-page a:hover{text-decoration:underline;color:#14374e}
 #philosophy-browse-page a:focus-visible,#philosophy-browse-page button:focus-visible,#philosophy-browse-page select:focus-visible{outline:3px solid #b77a24;outline-offset:3px}
 #philosophy-browse-page .philosophy-intro{font-size:18px;line-height:1.7;margin:0 0 26px}
-#philosophy-browse-page .philosophy-period-nav{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:0 0 36px}
-#philosophy-browse-page .philosophy-period-card{display:flex;flex-direction:column;gap:4px;min-height:88px;padding:15px 16px;border:1px solid #ded9ce;border-left:4px solid #71899a;border-radius:5px;background:#faf9f6;box-shadow:0 2px 5px rgba(36,44,48,.05)}
-#philosophy-browse-page .philosophy-period-card strong{font-size:18px;line-height:1.3}
-#philosophy-browse-page .philosophy-period-card span{font-size:14px;color:#5d6264}
-#philosophy-browse-page .philosophy-period-card:hover{background:#f1efe8;border-color:#c8c1b3;text-decoration:none}
 #philosophy-browse-page #philosophy-browse{padding-top:25px;border-top:2px solid #ddd9d0}
 #philosophy-browse-page #philosophy-browse h2{margin:0 0 8px;padding:0;text-align:left;font-size:27px;line-height:1.3;font-style:normal;font-weight:600;color:#292f32}
 #philosophy-browse-page .philosophy-browse-note{margin:0 0 20px;font-size:16px}
@@ -283,7 +278,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #philosophy-browse-page .philosophy-pagination button:disabled{opacity:.45;cursor:default}
 #philosophy-browse-page .philosophy-page-label{font-size:14px;color:#555}
 #philosophy-browse-page .philosophy-empty{padding:18px;border:1px solid #e1ddd4;border-radius:5px;background:#faf9f6}
-@media(max-width:650px){#philosophy-browse-page .philosophy-period-nav{grid-template-columns:1fr}#philosophy-browse-page .philosophy-period-card{min-height:0}#philosophy-browse-page .philosophy-controls{grid-template-columns:1fr}#philosophy-browse-page .philosophy-result-heading{flex-direction:column}#philosophy-browse-page .philosophy-pagination{gap:8px;flex-wrap:wrap}}
+@media(max-width:650px){#philosophy-browse-page .philosophy-controls{grid-template-columns:1fr}#philosophy-browse-page .philosophy-result-heading{flex-direction:column}#philosophy-browse-page .philosophy-pagination{gap:8px;flex-wrap:wrap}}
 </style>
 </head>
 
@@ -321,17 +316,11 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 
 	<div class="entry-content">
 <div id="philosophy-browse-page">
-  <p class="philosophy-intro">Browse the Philosophy collection by period, author, or collected works. The original descriptions and Google Drive links stay with the books they describe.</p>
-
-  <nav class="philosophy-period-nav" aria-label="Original Philosophy period pages">
-    <a class="philosophy-period-card" href="/antilogicalism/primary-sources/philosophy/ancient-medieval/"><strong>Ancient &amp; Medieval</strong><span>Open the original period page</span></a>
-    <a class="philosophy-period-card" href="/antilogicalism/primary-sources/philosophy/modern/"><strong>Modern Period</strong><span>Open the original period page</span></a>
-    <a class="philosophy-period-card" href="/antilogicalism/primary-sources/philosophy/20th-century-present/"><strong>~20th Century</strong><span>Open the original period page</span></a>
-  </nav>
+  <p class="philosophy-intro">Browse Philosophy by era or author. Each book keeps its description and link to the PDF.</p>
 
   <section id="philosophy-browse" aria-labelledby="philosophy-browse-heading">
     <h2 id="philosophy-browse-heading">Browse Philosophy</h2>
-    <p class="philosophy-browse-note">Each listing keeps its original description and PDF links. Choose a period, then browse authors, anonymous titles, or collections.</p>
+    <p class="philosophy-browse-note">Choose an era and browse the annotated book listings by author or collected works.</p>
 
     <div class="philosophy-controls">
       <label for="philosophy-period">Period

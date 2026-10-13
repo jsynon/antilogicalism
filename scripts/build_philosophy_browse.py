@@ -149,7 +149,9 @@ def build(root: Path, catalog_path: Path | None) -> dict:
     metadata = load_metadata(catalog_path, output_path)
     entries: list[dict] = []
     for period, label in PERIODS:
-        source = philosophy / period / "index.html"
+        source = philosophy / "_source-pages" / f"{period}.html"
+        if not source.exists():
+            source = philosophy / period / "index.html"
         if not source.exists():
             raise FileNotFoundError(f"Missing source page: {source}")
         blocks = extract_blocks(source.read_text(encoding="utf-8"))
