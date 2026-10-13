@@ -276,12 +276,12 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #digital-library-search button{flex:0 0 auto}
 #digital-library-search button:disabled{cursor:wait;opacity:.7}
 #digital-library-search .library-result{padding:1.15rem 0;border-bottom:1px solid #dfe2e3}
-#digital-library-search .library-result .library-page-kind{font-size:.88em;color:#687177;margin:.2em 0 .5em}
-#digital-library-search .library-result h3{font-size:1.08em;line-height:1.45;margin:0 0 .4em;overflow-wrap:anywhere}
+#digital-library-search .library-result .library-page-kind{color:#687177;margin:.2em 0 .5em}
+#digital-library-search .library-result h3{line-height:1.45;margin:0 0 .4em;overflow-wrap:anywhere}
 #digital-library-search .library-result p{margin:.35em 0 .65em;overflow-wrap:anywhere}
 #digital-library-search .library-more{margin:1.4rem 0}
 #digital-library-search .library-more[hidden]{display:none}
-#digital-library .library-search-help{font-size:.92em;line-height:1.6;color:#626b70}
+#digital-library .library-search-help{line-height:1.6;color:#626b70}
 #library-search-section{margin:.5rem 0 1.6rem;padding:0 0 1.2rem;border-bottom:1px solid #dfe2e3}
 #library-search-instructions{max-width:680px;margin:0 auto 1rem;text-align:center;color:#545c61}
 #library-search-instructions p{margin:.25rem 0}
@@ -296,7 +296,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #digital-library-search>label{display:block;margin:.25rem 0 .35rem}
 #library-book-filter{width:100%}
 #library-book-finder{font:inherit;width:100%;box-sizing:border-box}
-#digital-library-search .library-original{margin:.7rem 0;font-size:.9em}
+#digital-library-search .library-original{margin:.7rem 0}
 #digital-library-search .library-original .library-region-label{font-weight:bold;white-space:normal}
 #digital-library-search .library-original summary{cursor:pointer}
 #digital-library-search .library-original p{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -305,7 +305,16 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content #digital-library-search #library-search-button{border-color:#262b2f!important;background:#262b2f!important;color:#fff!important}
 #primary .entry-content #digital-library-search #library-search-button:hover{border-color:#111518!important;background:#111518!important}
 @media(max-width:560px){#digital-library-search .library-search-options{grid-template-columns:1fr!important}.library-filter-field:first-child,.library-book-field,.library-title-field{grid-column:1!important;grid-row:auto!important}}
-#digital-library-search .library-pdf-unavailable{font-size:.88em;color:#626b70}
+#digital-library-search .library-pdf-unavailable{color:#626b70}
+</style>
+<style id="antilogicalism-theme-typography">
+/* Let Book Lite set the font and scale throughout every edited page. */
+#primary .entry-content .bookshelf-intro::first-letter,
+#primary .entry-content .library-search-help>p:first-of-type::first-letter,
+#primary .entry-content .bookshelf-category-intro p:first-of-type::first-letter,
+#primary .entry-content .philosophy-intro::first-letter,
+#primary .entry-content .bookshelf-browse-note::first-letter,
+#primary .entry-content #lcp_instance_0>li:first-child .lcp_excerpt p:first-of-type::first-letter{float:left;font-family:inherit;font-size:3.4em;line-height:.8;font-weight:400;padding:0 .1em 0 0}
 </style>
 </head>
 

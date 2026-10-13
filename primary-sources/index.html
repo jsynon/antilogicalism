@@ -270,18 +270,27 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 .bookshelf-guide a:hover{color:#233f50}
 .bookshelf-intro{margin:0 0 1.6rem;line-height:1.75}
 .bookshelf-section{margin:0 0 2rem}
-.bookshelf-guide .bookshelf-section h2{margin:1.6rem 0 .7rem;padding:0 0 .45rem;border-bottom:1px solid #d5d9dc;color:#262b2f;font-size:21px;line-height:1.35;font-style:normal;text-align:left;font-weight:600}
+.bookshelf-guide .bookshelf-section h2{margin:1.6rem 0 .7rem;padding:0 0 .45rem;border-bottom:1px solid #d5d9dc;color:#262b2f;line-height:1.35;font-style:normal;text-align:left;font-weight:600}
 .bookshelf-subjects{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:1rem;row-gap:.55rem;list-style:none!important;margin:0!important;padding:0!important}
 .bookshelf-subjects li{margin:0!important;padding:0!important;border:0!important}
 #primary .entry-content .bookshelf-guide ul.bookshelf-subjects>li>a{display:block!important;min-height:42px;padding:9px 11px!important;border:1px solid #c8cdd0!important;border-radius:2px!important;background:#fafafa!important;color:#36566a!important;line-height:1.45;text-decoration:none!important;transition:background-color .15s ease,border-color .15s ease}
 #primary .entry-content .bookshelf-guide ul.bookshelf-subjects>li>a:hover{background:#f0f1f2!important;border-color:#aeb6bb!important;color:#233f50!important}
 .bookshelf-collection{margin:0;padding:1rem 0;border-bottom:1px solid #e0e2e3}
 .bookshelf-collection:last-child{border-bottom:0}
-.bookshelf-guide .bookshelf-collection h3{margin:0 0 3px;font-size:17px;line-height:1.4;font-style:normal;text-align:left;font-weight:600}
+.bookshelf-guide .bookshelf-collection h3{margin:0 0 3px;line-height:1.4;font-style:normal;text-align:left;font-weight:600}
 .bookshelf-collection h3 a{color:#36566a;text-decoration:none}
 .bookshelf-collection h3 a:hover{text-decoration:underline}
-.bookshelf-guide .bookshelf-collection p{margin:0;font-size:16px;line-height:1.65;color:#50585e}
-@media(max-width:560px){.bookshelf-subjects{grid-template-columns:1fr}.bookshelf-guide .bookshelf-section h2{font-size:20px}}
+.bookshelf-guide .bookshelf-collection p{margin:0;line-height:1.65;color:#50585e}
+@media(max-width:560px){.bookshelf-subjects{grid-template-columns:1fr}}
+</style>
+<style id="antilogicalism-theme-typography">
+/* Let Book Lite set the font and scale throughout every edited page. */
+#primary .entry-content .bookshelf-intro::first-letter,
+#primary .entry-content .library-search-help>p:first-of-type::first-letter,
+#primary .entry-content .bookshelf-category-intro p:first-of-type::first-letter,
+#primary .entry-content .philosophy-intro::first-letter,
+#primary .entry-content .bookshelf-browse-note::first-letter,
+#primary .entry-content #lcp_instance_0>li:first-child .lcp_excerpt p:first-of-type::first-letter{float:left;font-family:inherit;font-size:3.4em;line-height:.8;font-weight:400;padding:0 .1em 0 0}
 </style>
 </head>
 
