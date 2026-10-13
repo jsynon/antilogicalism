@@ -44,6 +44,7 @@
 #digital-library-search .library-filter-field{display:flex;flex-direction:column;gap:.3rem;min-width:0}
 #digital-library-search .library-filter-field label,#digital-library-search>label{font-weight:600}
 #digital-library-search .library-book-field{grid-column:2;grid-row:1;min-width:0;width:auto}
+#digital-library-search .library-title-field{grid-column:1 / -1;grid-row:2;min-width:0;width:100%}
 #library-book-filter{width:100%}
 #library-book-finder{font:inherit;width:100%;box-sizing:border-box}
 #digital-library-search .library-original{margin:.7rem 0;font-size:.9em}
@@ -52,12 +53,6 @@
 #digital-library-search .library-original p{white-space:pre-wrap;overflow-wrap:anywhere}
 #digital-library-search mark{background:#fff1a8;color:inherit;padding:0 .08em}
 #digital-library-search .library-search-controls input{flex:1 1 15em}
-/* Keep the title chooser out of the initial layout shown in the reference.
-   It appears after the visitor starts filtering books, preserving selection. */
-#digital-library-search:not(.has-book-filter-text) .library-book-field label[for="library-book-filter"],
-#digital-library-search:not(.has-book-filter-text) #library-book-filter{display:none!important}
-#digital-library-search.has-book-filter-text .library-book-field label[for="library-book-filter"],
-#digital-library-search.has-book-filter-text #library-book-filter{display:block}
 @media(max-width:560px){#digital-library-search .library-search-options{grid-template-columns:1fr}.library-book-field{grid-column:1!important;grid-row:auto!important}}
 #digital-library-search .library-pdf-unavailable{font-size:.88em;color:#626b70}
 </style>
@@ -354,13 +349,11 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <select id="library-match-mode" aria-describedby="library-search-passage-help"><option value="phrase">Exact phrase</option><option value="words">All words</option><option value="any">Any words</option></select></div>
 <div class="library-filter-field library-book-field"><label for="library-book-finder">Find a book</label>
 <input id="library-book-finder" type="search" placeholder="Title or author (e.g., The Republic, Plato)" aria-describedby="library-book-count library-search-book-help">
-<small id="library-book-count" role="status"></small>
-<label for="library-book-filter">Choose a title</label>
-<select id="library-book-filter" aria-describedby="library-search-book-help"><option value="">All books</option></select></div>
+<small id="library-book-count" role="status"></small></div>
+<div class="library-filter-field library-title-field"><label for="library-book-filter">Choose a title</label><select id="library-book-filter" aria-describedby="library-search-book-help"><option value="">All books</option></select></div>
 </div>
 <div class="library-search-controls"><input id="library-query" type="search" aria-describedby="library-search-passage-help" placeholder="Topic or phrase (e.g., virtue, free will)"><button id="library-search-button" type="button">Search</button></div>
 <noscript><p>Enable JavaScript to search this library. You can still browse the Bookshelf above.</p></noscript>
-<script>(function(){var root=document.getElementById("digital-library-search");var finder=document.getElementById("library-book-finder");if(!root||!finder)return;var update=function(){root.classList.toggle("has-book-filter-text",finder.value.trim().length>0);};finder.addEventListener("input",update);update();})();</script>
 <div id="library-results" aria-live="polite"></div>
 </div>
 <script>(function(){var count=document.getElementById('library-book-count');if(!count)return;var relabel=function(){var text=count.textContent;if(/\btexts?\b/i.test(text))count.textContent=text.replace(/\btexts?\b/gi,'titles');};new MutationObserver(relabel).observe(count,{childList:true,characterData:true,subtree:true});relabel();})();</script>
