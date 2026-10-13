@@ -20,9 +20,9 @@
   host.innerHTML = `
     <section class="ald-browser" aria-labelledby="ald-title">
       <header class="ald-browser-head">
-        <p class="ald-eyebrow">Digital Library</p>
-        <h2 id="ald-title">Explore the collection</h2>
-        <p class="ald-intro">Browse the library by author or subject, or search the catalog by title and name.</p>
+        <p class="ald-eyebrow">Library Browsing</p>
+        <h2 id="ald-title">Browse by Author or Subject</h2>
+        <p class="ald-intro">Explore the catalog by author, subject, or collection. Collected and anonymous works are grouped together.</p>
       </header>
       <div class="ald-mode" role="tablist" aria-label="Browse catalog">
         <button type="button" role="tab" aria-selected="true" data-mode="authors">${labels.authors}</button>
@@ -42,7 +42,7 @@
   style.textContent = `
   .ald-browser{--ald-ink:#302b25;--ald-muted:#746b60;--ald-rule:#d9d0c3;--ald-paper:#faf8f3;--ald-accent:#73563b;color:var(--ald-ink);margin:2rem 0;padding:clamp(1rem,3vw,2rem);border:1px solid var(--ald-rule);background:var(--ald-paper);font-family:inherit}
   .ald-browser *{box-sizing:border-box}.ald-browser-head{margin:0 0 1.25rem}.ald-eyebrow{margin:0 0 .25rem;text-transform:uppercase;letter-spacing:.13em;font-size:.72rem;color:var(--ald-muted)}
-  .ald-browser h2{margin:.1rem 0 .45rem;font-family:Georgia,serif;font-size:clamp(1.55rem,3vw,2.1rem);font-weight:normal}.ald-intro{margin:0;color:var(--ald-muted);max-width:58ch}
+  .ald-browser h2{margin:.1rem 0 .45rem;font-family:Georgia,serif;font-size:clamp(1.8rem,3vw,2.2rem);font-weight:normal;line-height:1.2}.ald-intro{margin:0;color:var(--ald-muted);max-width:58ch}
   .ald-mode{display:flex;gap:.45rem;border-bottom:1px solid var(--ald-rule);margin:1.2rem 0 1rem}.ald-mode button{font:inherit;color:var(--ald-ink);background:transparent;border:0;border-bottom:3px solid transparent;padding:.65rem .8rem;cursor:pointer}.ald-mode button[aria-selected="true"]{border-color:var(--ald-accent);font-weight:600}
   .ald-controls{display:grid;grid-template-columns:minmax(200px,2fr) minmax(190px,1fr);gap:.35rem 1rem;align-items:end}.ald-search-label,.ald-filter-wrap label{font-size:.85rem;color:var(--ald-muted)}.ald-search-label{grid-column:1}.ald-controls input,.ald-filter-wrap select{width:100%;min-height:42px;padding:.55rem .7rem;border:1px solid #bdb3a5;background:#fff;color:var(--ald-ink);font:inherit}.ald-filter-wrap{display:grid;gap:.35rem}.ald-count{font-size:.9rem;color:var(--ald-muted);margin:1rem 0 .6rem;border-bottom:1px solid var(--ald-rule);padding-bottom:.6rem}
   .ald-author-group{margin:1rem 0}.ald-author-results>.ald-author-group+.ald-author-group{margin-top:1.25rem;padding-top:.8rem;border-top:1px solid var(--ald-rule)}.ald-author-group h3{font-family:Georgia,serif;font-size:1.7rem!important;font-style:normal!important;font-weight:600;line-height:1.3;margin:.15rem 0 .4rem;padding:0}.ald-author-group h4{font-family:Georgia,serif;font-size:1.18rem;font-weight:600;margin:1rem 0 .35rem;color:var(--ald-accent);padding-bottom:.25rem}.ald-collection-group+.ald-collection-group{margin-top:.75rem;padding-top:.5rem;border-top:1px solid var(--ald-rule)}.ald-book-list{list-style:none;margin:0;padding:0}.ald-book-list li{padding:.35rem 0}.ald-book-list a{color:var(--ald-accent);text-decoration:underline;text-underline-offset:2px}.ald-book-list a:hover,.ald-book-list a:focus{text-decoration-thickness:2px}.ald-empty{color:var(--ald-muted);padding:1rem 0}.ald-note{font-size:.82rem;color:var(--ald-muted);margin:1.4rem 0 0}.ald-alpha{display:flex;flex-wrap:wrap;gap:.25rem;margin:.5rem 0 1rem}.ald-alpha button{border:1px solid var(--ald-rule);background:white;color:var(--ald-accent);padding:.25rem .5rem;cursor:pointer}.ald-alpha button[aria-pressed="true"]{background:var(--ald-accent);color:white}.ald-alpha button:disabled{opacity:.4;cursor:default}.ald-pager{display:flex;align-items:center;justify-content:center;gap:.8rem;margin:1rem 0}.ald-pager button{font:inherit;padding:.4rem .7rem;border:1px solid var(--ald-rule);background:#fff;color:var(--ald-accent);cursor:pointer}.ald-pager button:disabled{opacity:.45;cursor:default}

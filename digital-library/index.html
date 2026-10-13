@@ -262,6 +262,8 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #digital-library-search .library-more{margin:1.5em 0}
 #digital-library-search .library-more[hidden]{display:none}
 #digital-library .library-search-help{font-size:.9em;line-height:1.6;color:#666}
+#library-search-section{margin:1.6rem 0 2.2rem;padding:0 0 1.6rem;border-bottom:2px solid #d9d0c3}
+#library-search-heading{font:normal clamp(1.8rem,3vw,2.2rem)/1.2 Georgia,serif;color:#302b25;margin:0 0 1rem}
 #digital-library-search .library-search-options{display:flex;gap:.5em;flex-wrap:wrap;align-items:center;margin:.8em 0}
 #digital-library-search select{font:inherit;max-width:100%;min-width:0;padding:.3em}
 #digital-library-search .library-filter-field{display:flex;flex-direction:column;gap:.25em;min-width:0}
@@ -278,7 +280,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #digital-library-search .library-pdf-unavailable{font-size:.85em;color:#666}
 </style>
 <script defer src="./library-search-v18.js"></script>
-<script defer src="/antilogicalism/digital-library/library-directory.js?v=6" data-catalog="/antilogicalism/digital-library/library-catalog.json"></script>
+<script defer src="/antilogicalism/digital-library/library-directory.js?v=7" data-catalog="/antilogicalism/digital-library/library-catalog.json"></script>
 </head>
 
 <body class="wp-singular page-template-default page   wp-theme-book-lite custom-header">
@@ -311,8 +313,10 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <article id="digital-library" class="page type-page status-publish hentry">
 <header class="entry-header"><h1 class="entry-title">Digital Library</h1></header>
 <div class="entry-content">
-<p><a href="/antilogicalism/primary-sources/">Browse the Bookshelf</a> | <a href="#library-directory">Browse by author or subject</a></p>
-<p>Search the full text of 644 books from the Antilogicalism bookshelf, or explore the collection by author and subject.</p>
+<p><a href="/antilogicalism/primary-sources/">Browse the Bookshelf</a> | <a href="#library-directory">Browse the Library</a></p>
+<p>Use Library Search to find passages across 644 books, or browse by author, subject, and collection.</p>
+<section id="library-search-section" aria-labelledby="library-search-heading">
+<h2 id="library-search-heading">Library Search</h2>
 <div id="library-search-instructions" class="library-search-help">
 <p id="library-search-passage-help"><strong>Search passages:</strong> Enter a word, phrase, or quotation, choose a match option, then select Search. <em>Exact phrase</em> keeps words together and in order. <em>All words</em> requires every term, in any order. <em>Any words</em> finds pages with at least one term. Searches ignore capitalization.</p>
 <p id="library-search-book-help"><strong>Limit by book:</strong> Type a title or author in Find a book, then choose a title under Search in a book. Leave All books selected to search the full collection.</p>
@@ -333,6 +337,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <div id="library-results" aria-live="polite"></div>
 </div>
 <p class="library-search-help">Search uses text extracted from PDFs and may miss some matches. Check quotations against the original PDF. PDF page numbers may differ from printed page numbers.</p>
+</section>
 <section id="library-directory" aria-label="Browse the digital library"></section>
 </div></article><!-- #post-6350 -->
 
