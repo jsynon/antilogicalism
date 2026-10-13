@@ -2,9 +2,8 @@
   const root = document.getElementById("bookshelf-browse");
   if (!root) return;
 
-  const modeSelect = root.querySelector("#bookshelf-browse-mode");
   const initialSelect = root.querySelector("#bookshelf-author-initial");
-  const initialField = root.querySelector(".bookshelf-initial-field");
+  const authorSearch = root.querySelector("#bookshelf-author-search");
   const results = root.querySelector(".bookshelf-results");
   const pageLabel = root.querySelector(".bookshelf-page-label");
   const previous = root.querySelector(".bookshelf-previous");
@@ -18,13 +17,13 @@
     .replace(/[\u0300-\u036f]/g, "")
     .toLocaleLowerCase("en-US");
 
-  const getInitial = (entry) => normalize(entry.sortSurname || entry.author || "")
+  const getInitial = (item) => normalize(item.sortSurname || item.author || "")
     .replace(/^[^a-z]+/, "").charAt(0).toUpperCase();
 
-  const setText = (tag, className, text) => {
+  const setText = (tag, className, value) => {
     const node = document.createElement(tag);
     node.className = className;
-    node.textContent = text;
+    node.textContent = value;
     return node;
   };
 
@@ -32,13 +31,11 @@
     const grouped = new Map();
     entries.forEach((entry) => {
       const key = normalize(entry.author || "Anonymous");
-      if (!grouped.has(key)) {
-        grouped.set(key, {
-          author: entry.author || "Anonymous",
-          sortSurname: entry.sortSurname || entry.author || "",
-          entries: [],
-        });
-      }
+      if (!grouped.has(key)) grouped.set(key, {
+        author: entry.author || "Anonymous",
+        sortSurname: entry.sortSurname || entry.author || "",
+        entries: [],
+      });
       grouped.get(key).entries.push(entry);
     });
     return [...grouped.values()].sort((a, b) =>
@@ -75,7 +72,7 @@
     return section;
   };
 
-  const renderEntryContent = (container, entry) => {
+  const renderEntry = (container, entry) => {
     if (entry.section) container.append(setText("p", "bookshelf-series", entry.section));
     container.append(renderBookLinks(entry.books));
     container.append(renderDescriptions(entry.descriptions));
@@ -88,38 +85,11 @@
     item.entries.forEach((entry) => {
       const group = document.createElement("div");
       group.className = "bookshelf-work-group";
-      renderEntryContent(group, entry);
+      renderEntry(group, entry);
       card.append(group);
     });
     return card;
   };
-
-  const renderSingleEntry = (entry) => {
-    const card = document.createElement("article");
-    card.className = `bookshelf-result bookshelf-${entry.kind}-result`;
-    card.append(setText("h3", "", entry.books[0]?.title || entry.collectionTitle || "Untitled entry"));
-    if (entry.kind === "collection" && entry.collectionTitle) {
-      card.append(setText("p", "bookshelf-byline", entry.collectionTitle));
-    } else if (entry.author && entry.author !== "Anonymous") {
-      card.append(setText("p", "bookshelf-byline", `Author: ${entry.author}`));
-    }
-    renderEntryContent(card, entry);
-    return card;
-  };
-
-  const refreshInitialOptions = () => {
-    const isAuthorMode = modeSelect.value === "author";
-    initialField.hidden = !isAuthorMode;
-    const initials = [...new Set(authorItems(data.entries).map(getInitial).filter(Boolean))].sort();
-    const previousValue = initialSelect.value;
-    initialSelect.replaceChildren(new Option("All authors", "all"));
-    initials.forEach((letter) => initialSelect.add(new Option(letter, letter)));
-    initialSelect.value = initials.includes(previousValue) ? previousValue : "all";
-  };
-
-  const collectionEntries = () => data.entries.filter((entry) =>
-    entry.kind === "collection" || entry.books.some((book) => Boolean(book.collection))
-  );
 
   const renderExtras = (catalog) => {
     const extras = document.querySelector(".bookshelf-extras");
@@ -154,70 +124,51 @@
   };
 
   const render = () => {
-    refreshInitialOptions();
-    const mode = modeSelect.value;
-    let items = [];
-    if (mode === "author") {
-      items = authorItems(data.entries);
-      if (initialSelect.value !== "all") items = items.filter((item) => getInitial(item) === initialSelect.value);
-    } else if (mode === "anonymous") {
-      items = data.entries.filter((entry) => entry.kind === "anonymous");
-      items.sort((a, b) => normalize(a.books[0]?.title).localeCompare(normalize(b.books[0]?.title)));
-    } else {
-      items = collectionEntries();
-      items.sort((a, b) => {
-        const left = a.collectionTitle || a.books[0]?.collection || a.books[0]?.title || "";
-        const right = b.collectionTitle || b.books[0]?.collection || b.books[0]?.title || "";
-        return normalize(left).localeCompare(normalize(right)) ||
-          (a.books[0]?.collectionOrder || 999) - (b.books[0]?.collectionOrder || 999) ||
-          (a.books[0]?.collectionVolume || a.sourceOrder) - (b.books[0]?.collectionVolume || b.sourceOrder);
-      });
-    }
+    const authors = authorItems(data.entries);
+    const initials = [...new Set(authors.map(getInitial).filter(Boolean))].sort();
+    const prior = initialSelect.value;
+    initialSelect.replaceChildren(new Option("All authors", "all"));
+    initials.forEach((letter) => initialSelect.add(new Option(letter, letter)));
+    initialSelect.value = initials.includes(prior) ? prior : "all";
 
-    const pageCount = Math.max(1, Math.ceil(items.length / perPage));
+    const query = normalize(authorSearch.value.trim());
+    const filtered = authors.filter((item) =>
+      (initialSelect.value === "all" || getInitial(item) === initialSelect.value) &&
+      (!query || normalize(item.author).includes(query))
+    );
+    const pageCount = Math.max(1, Math.ceil(filtered.length / perPage));
     currentPage = Math.min(Math.max(1, currentPage), pageCount);
-    const visible = items.slice((currentPage - 1) * perPage, currentPage * perPage);
+    const visible = filtered.slice((currentPage - 1) * perPage, currentPage * perPage);
     results.replaceChildren();
-    visible.forEach((item) => results.append(mode === "author" ? renderAuthor(item) : renderSingleEntry(item)));
-
-    if (!items.length) {
-      const message = mode === "anonymous"
-        ? "There are no anonymous titles in this collection."
-        : "There are no collected works in this collection.";
-      results.append(setText("p", "bookshelf-empty", message));
-    }
-    const unit = mode === "author" ? "authors" : mode === "anonymous" ? "titles" : "collection entries";
-    pageLabel.textContent = items.length
-      ? `Page ${currentPage} of ${pageCount} · ${perPage} ${unit} per page`
+    visible.forEach((item) => results.append(renderAuthor(item)));
+    if (!filtered.length) results.append(setText("p", "bookshelf-empty", "No authors found."));
+    pageLabel.textContent = filtered.length
+      ? `Page ${currentPage} of ${pageCount} · ${perPage} authors per page`
       : "No entries to display";
     previous.disabled = currentPage <= 1;
     next.disabled = currentPage >= pageCount;
   };
 
-  [modeSelect, initialSelect].forEach((control) => control.addEventListener("change", () => {
-    currentPage = 1;
-    render();
-  }));
-  previous.addEventListener("click", () => { currentPage -= 1; render(); });
-  next.addEventListener("click", () => { currentPage += 1; render(); });
+  const resetAndRender = () => { currentPage = 1; render(); };
+  const scrollToResults = () => results.scrollIntoView({ behavior: "smooth", block: "start" });
+  initialSelect.addEventListener("change", resetAndRender);
+  authorSearch.addEventListener("input", resetAndRender);
+  previous.addEventListener("click", () => { currentPage -= 1; render(); scrollToResults(); });
+  next.addEventListener("click", () => { currentPage += 1; render(); scrollToResults(); });
 
   const displayCatalog = (catalog) => {
-      data = catalog;
-      if (!data.entries.some((entry) => entry.kind === "anonymous")) {
-        modeSelect.querySelector('option[value="anonymous"]')?.remove();
-      }
-      if (!collectionEntries().length) modeSelect.querySelector('option[value="collection"]')?.remove();
-      const intro = document.querySelector(".bookshelf-category-intro");
-      if (intro && data.introHtml) intro.innerHTML = data.introHtml;
-      renderExtras(data);
-      results.setAttribute("aria-busy", "false");
-      render();
+    data = catalog;
+    const intro = document.querySelector(".bookshelf-category-intro");
+    if (intro && data.introHtml) intro.innerHTML = data.introHtml;
+    renderExtras(data);
+    results.setAttribute("aria-busy", "false");
+    render();
   };
 
   const showLoadError = () => {
-      results.setAttribute("aria-busy", "false");
-      results.replaceChildren(setText("p", "bookshelf-empty", "The browse list could not be loaded. Please reload the page."));
-      pageLabel.textContent = "Browse list unavailable";
+    results.setAttribute("aria-busy", "false");
+    results.replaceChildren(setText("p", "bookshelf-empty", "The browse list could not be loaded. Please reload the page."));
+    pageLabel.textContent = "Browse list unavailable";
   };
 
   if (window.BOOKSHELF_BROWSE_DATA) {

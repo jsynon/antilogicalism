@@ -249,16 +249,21 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #bookshelf-browse-page a{color:#234d68;text-decoration:none}
 #bookshelf-browse-page a:hover{color:#14374e;text-decoration:underline}
 #bookshelf-browse-page a:focus-visible,#bookshelf-browse-page button:focus-visible,#bookshelf-browse-page select:focus-visible{outline:3px solid #b77a24;outline-offset:3px}
+#bookshelf-browse-page .bookshelf-page-nav{display:flex;flex-wrap:wrap;gap:7px;margin:0 0 25px;padding:0 0 19px;border-bottom:1px solid #e2ded5}
+#bookshelf-browse-page .bookshelf-page-nav a{display:inline-flex;align-items:center;min-height:34px;padding:5px 10px;border:1px solid #d8d3c9;border-radius:4px;background:#faf9f6;color:#40515b;font-size:13px;line-height:1.25;font-weight:600}
+#bookshelf-browse-page .bookshelf-page-nav a:hover{background:#f0eee8;text-decoration:none}
+#bookshelf-browse-page .bookshelf-page-nav a[aria-current="page"]{background:#3f5c6c;border-color:#3f5c6c;color:#fff}
 #bookshelf-browse-page .bookshelf-category-intro{margin:0 0 26px;font-size:18px;line-height:1.7}
 #bookshelf-browse-page .bookshelf-category-intro:empty{display:none}
 #bookshelf-browse-page #bookshelf-browse{padding-top:25px;border-top:2px solid #ddd9d0}
 #bookshelf-browse-page #bookshelf-browse h2{margin:0 0 8px;padding:0;text-align:left;font-size:27px;line-height:1.3;font-style:normal;font-weight:600;color:#292f32}
 #bookshelf-browse-page .bookshelf-browse-note{margin:0 0 20px;font-size:16px}
-#bookshelf-browse-page .bookshelf-controls{display:grid;grid-template-columns:1.3fr .7fr;gap:12px;margin:0 0 22px;padding:16px;background:#f7f5ef;border:1px solid #e1ddd3;border-radius:5px}
+#bookshelf-browse-page .bookshelf-controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:0 0 22px;padding:16px;background:#f7f5ef;border:1px solid #e1ddd3;border-radius:5px}
 #bookshelf-browse-page .bookshelf-controls label{display:flex;flex-direction:column;gap:6px;font-size:15px;font-weight:700;color:#42484a}
-#bookshelf-browse-page .bookshelf-controls select{width:100%;min-height:44px;padding:8px 11px;border:1px solid #cfcac0;border-radius:4px;background:#fff;color:#262a2c;font:inherit;font-size:16px}
+#bookshelf-browse-page .bookshelf-controls select,#bookshelf-browse-page .bookshelf-controls input{width:100%;min-height:44px;padding:8px 11px;border:1px solid #cfcac0;border-radius:4px;background:#fff;color:#262a2c;font:inherit;font-size:16px}
 #bookshelf-browse-page .bookshelf-results{display:grid;gap:14px}
-#bookshelf-browse-page .bookshelf-result{padding:19px 20px;border:1px solid #e1ddd4;border-radius:5px;background:#fff}
+#bookshelf-browse-page .bookshelf-result,#bookshelf-browse-page .bookshelf-static-entry{padding:19px 20px;border:1px solid #e1ddd4;border-radius:5px;background:#fff}
+#bookshelf-browse-page .bookshelf-static-list{display:grid;gap:14px}
 #bookshelf-browse-page .bookshelf-result h3{margin:0 0 10px;font-size:23px;line-height:1.3;font-style:normal;text-align:left;font-weight:600;color:#263d4a}
 #bookshelf-browse-page .bookshelf-work-group+.bookshelf-work-group{margin-top:16px;padding-top:14px;border-top:1px solid #e6e2d9}
 #bookshelf-browse-page .bookshelf-book-links{list-style:none!important;margin:0!important;padding:0!important}
@@ -318,20 +323,17 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 
 	<div class="entry-content">
 <div id="bookshelf-browse-page">
+  <nav class="bookshelf-page-nav" aria-label="Bookshelf pages"><a href="/antilogicalism/primary-sources/">Bookshelf home</a><a href="/antilogicalism/primary-sources/philosophy/">Philosophy</a><a href="/antilogicalism/primary-sources/science/">Science</a><a href="/antilogicalism/primary-sources/psychology/">Psychology</a><a href="/antilogicalism/primary-sources/religious/" aria-current="page">Religious</a><a href="/antilogicalism/primary-sources/political-cultural/">Political &amp; Cultural</a><a href="/antilogicalism/primary-sources/literature/">Literature</a><a href="/antilogicalism/primary-sources/historical/">Historical</a><a href="/antilogicalism/primary-sources/church-fathers/">Church Fathers</a><a href="/antilogicalism/primary-sources/harvard-classics/">Harvard Classics</a><a href="/antilogicalism/primary-sources/sacred-books-of-the-east/">Sacred Books of the East</a></nav>
   <div class="bookshelf-category-intro" aria-label="About this collection"></div>
   <section id="bookshelf-browse" aria-labelledby="bookshelf-browse-heading">
     <h2 id="bookshelf-browse-heading">Browse Religious</h2>
-    <p class="bookshelf-browse-note">Browse the annotated books by author, anonymous title, or collection. Each title keeps its description and PDF link.</p>
+    <p class="bookshelf-browse-note">Browse books alphabetically by author.</p>
     <div class="bookshelf-controls">
-      <label for="bookshelf-browse-mode">Browse by
-        <select id="bookshelf-browse-mode">
-          <option value="author">Author, A–Z</option>
-          <option value="anonymous">Anonymous title</option>
-          <option value="collection">Collections</option>
-        </select>
-      </label>
       <label class="bookshelf-initial-field" for="bookshelf-author-initial">Author initial
         <select id="bookshelf-author-initial"><option value="all">All authors</option></select>
+      </label>
+      <label for="bookshelf-author-search">Find an author
+        <input id="bookshelf-author-search" type="search" placeholder="Type an author name" autocomplete="off">
       </label>
     </div>
     <div class="bookshelf-results" aria-live="polite" aria-busy="true"><p>Loading the collection…</p></div>
