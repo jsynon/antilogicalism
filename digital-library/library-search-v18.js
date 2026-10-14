@@ -356,7 +356,7 @@
     const details = document.createElement('details');
     details.className = 'library-original';
     const summary = document.createElement('summary');
-    summary.textContent = 'View cleaned page text';
+    summary.textContent = 'View original page text';
     const originals = [];
     details.append(summary);
     for (const region of match.rawRegions || [{region:'whole', text:match.rawText}]) {
