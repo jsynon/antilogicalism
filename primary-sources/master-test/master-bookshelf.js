@@ -3,6 +3,8 @@
   if (!root) return;
 
   const categorySelect = root.querySelector("#master-category");
+  const periodSelect = root.querySelector("#master-period");
+  const periodNote = root.querySelector(".master-period-note");
   const searchInput = root.querySelector("#master-search");
   const searchButton = root.querySelector(".master-search-button");
   const categoryIntro = root.querySelector(".master-category-intro");
@@ -13,10 +15,6 @@
   const next = root.querySelector(".master-next");
   const resources = root.querySelector(".master-resources");
   const notes = root.querySelector(".master-notes");
-  const scriptUrl = document.currentScript && document.currentScript.src
-    ? document.currentScript.src
-    : window.location.href;
-  const catalogBase = new URL("../", scriptUrl);
   const perPage = 15;
   const cache = new Map();
   let catalog = null;
@@ -49,17 +47,8 @@
 
   const visibleEntries = () => {
     if (!catalog) return [];
-    return catalog.entries;
-  };
-
-  const fetchCatalog = async (key) => {
-    if (cache.has(key)) return cache.get(key);
-    const url = new URL(categories[key].file, catalogBase);
-    const response = await fetch(url);
-    if (!response.ok) throw new Error(`Catalog request failed for ${key}: ${response.status}`);
-    const data = await response.json();
-    cache.set(key, data);
-    return data;
+    if (!categories[categorySelect.value].philosophy || periodSelect.value === "all") return catalog.entries;
+    return catalog.entries.filter((entry) => entry.period === periodSelect.value);
   };
 
   const groupByAuthor = (entries) => {
@@ -202,7 +191,11 @@
   const updateAddress = () => {
     const url = new URL(window.location.href);
     url.searchParams.set("category", categorySelect.value);
-    url.searchParams.delete("era");
+    if (categories[categorySelect.value].philosophy && periodSelect.value !== "all") {
+      url.searchParams.set("era", periodSelect.value);
+    } else {
+      url.searchParams.delete("era");
+    }
     if (searchInput.value.trim()) url.searchParams.set("q", searchInput.value.trim());
     else url.searchParams.delete("q");
     window.history.replaceState({}, "", url);
@@ -212,6 +205,14 @@
     catalog = nextCatalog;
     const category = categories[key];
     categorySelect.value = key;
+    periodSelect.disabled = !category.philosophy;
+    periodNote.hidden = category.philosophy;
+    if (category.philosophy) {
+      const valid = new Set(["all", ...(catalog.periods || []).map((period) => period.id)]);
+      if (!valid.has(periodSelect.value)) periodSelect.value = "all";
+    } else {
+      periodSelect.value = "all";
+    }
     categoryIntro.innerHTML = catalog.introHtml || "";
     root.querySelector(".master-browse-heading").textContent = `Browse ${category.name}`;
     renderExtras();
@@ -222,6 +223,10 @@
   const loadCategory = async (key) => {
     if (!categories[key]) key = "philosophy";
     categorySelect.value = key;
+    const isPhilosophy = categories[key].philosophy;
+    periodSelect.disabled = !isPhilosophy;
+    periodNote.hidden = isPhilosophy;
+    if (!isPhilosophy) periodSelect.value = "all";
     currentPage = 1;
     results.setAttribute("aria-busy", "true");
     results.replaceChildren(textNode("p", "master-loading", key === "all"
@@ -236,9 +241,15 @@
     const thisRequest = ++requestNumber;
     try {
       if (key === "all") {
-        const catalogs = await Promise.all(subjectCategoryKeys.map(async (categoryKey) =>
-          [categoryKey, await fetchCatalog(categoryKey)]
-        ));
+        const catalogs = await Promise.all(subjectCategoryKeys.map(async (categoryKey) => {
+          if (cache.has(categoryKey)) return [categoryKey, cache.get(categoryKey)];
+          const url = new URL(`../${categories[categoryKey].file}`, window.location.href);
+          const response = await fetch(url);
+          if (!response.ok) throw new Error("Catalog request failed");
+          const data = await response.json();
+          cache.set(categoryKey, data);
+          return [categoryKey, data];
+        }));
         if (thisRequest !== requestNumber) return;
         const entries = catalogs.flatMap(([categoryKey, data]) => data.entries.map((entry) => ({
           ...entry,
@@ -249,8 +260,16 @@
         return;
       }
 
-      const data = await fetchCatalog(key);
+      if (cache.has(key)) {
+        displayCatalog(key, cache.get(key));
+        return;
+      }
+      const url = new URL(`../${categories[key].file}`, window.location.href);
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Catalog request failed");
+      const data = await response.json();
       if (thisRequest !== requestNumber) return;
+      cache.set(key, data);
       displayCatalog(key, data);
     } catch (error) {
       if (thisRequest !== requestNumber) return;
@@ -264,6 +283,7 @@
   const initialParams = new URLSearchParams(window.location.search);
   const initialCategory = categories[initialParams.get("category")] ? initialParams.get("category") : "philosophy";
   if (initialParams.has("q")) searchInput.value = initialParams.get("q");
+  if (initialParams.has("era")) periodSelect.value = initialParams.get("era");
 
   categorySelect.addEventListener("change", () => loadCategory(categorySelect.value));
   searchInput.addEventListener("input", () => {
@@ -276,6 +296,11 @@
     updateAddress();
     renderResults();
     results.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+  periodSelect.addEventListener("change", () => {
+    currentPage = 1;
+    updateAddress();
+    renderResults();
   });
   previous.addEventListener("click", () => {
     currentPage -= 1;

@@ -325,11 +325,13 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content #master-bookshelf-test .bookshelf-intro{margin:0 0 1.5rem;line-height:1.7;color:#454c51}
 #primary .entry-content #master-bookshelf-test h2{margin:0 0 .65rem;padding:0;text-align:left;line-height:1.35;font-style:normal;font-weight:600;color:#30363a}
 #primary .entry-content #master-bookshelf-test .master-browse-section{padding-top:1.2rem;border-top:1px solid #e0e2e3}
-#primary .entry-content #master-bookshelf-test .master-controls{display:grid;grid-template-columns:minmax(0,1fr);gap:.75rem 1rem;margin:0 0 1rem;padding:.9rem 0;border-bottom:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf-test .master-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.75rem 1rem;margin:0 0 1rem;padding:.9rem 0;border-bottom:1px solid #e0e2e3}
 #primary .entry-content #master-bookshelf-test .master-controls label,
 #primary .entry-content #master-bookshelf-test .master-search-row label{display:block;color:#454c51;font-weight:600}
 #primary .entry-content #master-bookshelf-test select,
 #primary .entry-content #master-bookshelf-test input{display:block;width:100%;min-height:42px;margin-top:.3rem;padding:8px 11px;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;box-sizing:border-box}
+#primary .entry-content #master-bookshelf-test .master-period-note{display:block;margin-top:.3rem;color:#626b70;font-size:inherit;font-weight:400}
+#primary .entry-content #master-bookshelf-test select:disabled{color:#626b70;background:#f7f7f7}
 #primary .entry-content #master-bookshelf-test .master-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:.75rem;margin:0 0 1.2rem}
 #primary .entry-content #master-bookshelf-test .master-search-button{min-height:40px;padding:7px 13px;border:1px solid #262b2f;border-radius:2px;background:#262b2f;color:#fff;font:inherit}
 #primary .entry-content #master-bookshelf-test .master-search-button:hover{background:#111518}
@@ -373,7 +375,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content #master-bookshelf-test button:focus-visible,
 #primary .entry-content #master-bookshelf-test input:focus-visible,
 #primary .entry-content #master-bookshelf-test select:focus-visible{outline:2px solid #6b91a8;outline-offset:2px}
-@media(max-width:650px){#primary .entry-content #master-bookshelf-test .master-search-row{grid-template-columns:minmax(0,1fr)}#primary .entry-content #master-bookshelf-test .master-results-heading{align-items:flex-start;flex-direction:column;gap:.15rem}#primary .entry-content #master-bookshelf-test .master-search-button{width:100%}#primary .entry-content #master-bookshelf-test .master-pagination{gap:.5rem;flex-wrap:wrap}}
+@media(max-width:650px){#primary .entry-content #master-bookshelf-test .master-controls{grid-template-columns:1fr}#primary .entry-content #master-bookshelf-test .master-search-row{grid-template-columns:minmax(0,1fr)}#primary .entry-content #master-bookshelf-test .master-results-heading{align-items:flex-start;flex-direction:column;gap:.15rem}#primary .entry-content #master-bookshelf-test .master-search-button{width:100%}#primary .entry-content #master-bookshelf-test .master-pagination{gap:.5rem;flex-wrap:wrap}}
 </style>
 </head>
 
@@ -430,6 +432,15 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
             <option value="historical">Historical</option>
           </optgroup>
         </select>
+      </label>
+      <label class="master-period-wrap" for="master-period">Period
+        <select id="master-period">
+          <option value="all">All Philosophy</option>
+          <option value="ancient-medieval">Ancient &amp; Medieval</option>
+          <option value="modern">Modern Period</option>
+          <option value="20th-century-present">~20th Century</option>
+        </select>
+        <span class="master-period-note" hidden>Available for Philosophy only</span>
       </label>
     </div>
     <div class="master-search-row">
@@ -777,6 +788,6 @@ c0.091-0.647,0.349-1.086,0.635-1.337c-2.22-0.251-4.555-1.111-4.555-4.943c0-1.091
 </svg>
 
 <script src="/antilogicalism/assets/search.js" defer></script>
-<script src="/antilogicalism/primary-sources/master-test/master-bookshelf.js?v=20261013-master-test-fix-1" defer></script>
+<script src="/antilogicalism/primary-sources/master-test/master-bookshelf.js" defer></script>
 </body>
 </html>
