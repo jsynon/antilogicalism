@@ -2,7 +2,7 @@
 
 **An independent digital archive of philosophy, literature, history, religion, and the humanities.**
 
-[Visit the Website](https://jsynon.github.io/antilogicalism/) | [Explore the Bookshelf](https://jsynon.github.io/antilogicalism/primary-sources/) | [Library Data](https://github.com/jsynon/antilogicalism-library-data)
+[Visit the Website](https://jsynon.github.io/antilogicalism/) | [Explore the Bookshelf](https://jsynon.github.io/antilogicalism/primary-sources/) | [Library Search](https://jsynon.github.io/antilogicalism/digital-library/) | [Library Data](https://github.com/jsynon/antilogicalism-library-data)
 
 ## About
 
