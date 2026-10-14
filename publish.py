@@ -100,14 +100,15 @@ def sharing_html(title, permalink):
     email_body = quote(public_url, safe='')
     safe_title = escape(title, quote=True)
     safe_permalink = escape(permalink, quote=True)
+    safe_public_url = escape(public_url, quote=True)
     return (
         '<div class="sharedaddy sd-sharing-enabled antilogicalism-static-sharing">'
         '<div class="robots-nocontent sd-block sd-social sd-social-official sd-sharing">'
         '<h3 class="sd-title">Share this:</h3><div class="sd-content"><ul>'
-        f'<li class="share-facebook"><div class="fb-share-button" data-href="{safe_permalink}" data-layout="button_count"></div></li>'
-        f'<li class="share-twitter"><a class="twitter-share-button" data-text="{safe_title}" data-url="{safe_permalink}" data-via="antilogicalism" href="https://twitter.com/share">Tweet</a></li>'
+        f'<li class="share-facebook"><div class="fb-share-button" data-href="{safe_public_url}" data-layout="button_count"></div></li>'
+        f'<li class="share-twitter"><a class="twitter-share-button" data-text="{safe_title}" data-url="{safe_public_url}" data-via="antilogicalism" href="https://twitter.com/share">Tweet</a></li>'
         f'<li class="share-email"><a class="share-email sd-button" href="mailto:?subject={email_subject}&amp;body={email_body}" rel="nofollow noopener noreferrer" target="_blank" title="Click to email a link to a friend"><span>Email</span></a></li>'
-        f'<li class="share-print"><a class="share-print sd-button" href="{safe_permalink}#print" rel="nofollow noopener noreferrer" target="_blank" title="Click to print"><span>Print</span></a></li>'
+        f'<li class="share-print"><a class="share-print sd-button" href="{safe_public_url}#print" rel="nofollow noopener noreferrer" target="_blank" title="Click to print"><span>Print</span></a></li>'
         '<li class="share-end"></li></ul></div></div></div>'
     )
 
