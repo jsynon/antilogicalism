@@ -1,6 +1,6 @@
 
 #!/usr/bin/env python3
-"""Refresh Arts & Letters Daily footer widgets and remove old site credits.
+"""Refresh footer RSS widgets and remove old site credits.
 
 Default behavior is a dry run. Pass --apply to write changes.
 Every changed HTML file is backed up before writing.
@@ -13,7 +13,7 @@ import argparse
 import re
 import sys
 
-from build_static_feeds import FEEDS, load_items
+from build_static_feeds import FEEDS, SCIENCE_FEEDS, load_items
 
 ROOT = Path(__file__).resolve().parents[1]
 BACKUP_ROOT = ROOT.parent / "antilogicalism-footer-polish-backup"
@@ -21,7 +21,9 @@ BACKUP_ROOT = ROOT.parent / "antilogicalism-footer-polish-backup"
 FEED_ID = "rssf95b51da4c"
 FOOTER_FEED_LIMIT = 3
 FEED_WIDGET_ID = "rss-3"
+QUANTA_FEED_ID = "rss44d00d930e"
 QUANTA_WIDGET_ID = "rss-11"
+QUANTA_FEED_LIMIT = 5
 SEARCH_WIDGET_ID = "antilogicalism-search-widget"
 
 
@@ -49,14 +51,14 @@ def first_column_pattern():
     )
 
 
-def render_native_widget(feed, items):
-    """Render a native WordPress RSS widget matching Quanta's structure."""
+def render_native_widget(feed, items, widget_id):
+    """Render a native WordPress RSS widget."""
     name = escape(feed["name"])
     home = escape(feed["home"], quote=True)
     feed_url = escape(feed["url"], quote=True)
 
     output = [
-        '<aside id="rss-3" class="widget widget_rss">',
+        f'<aside id="{escape(widget_id, quote=True)}" class="widget widget_rss">',
         '<h1 class="widget-title">'
         f'<a class="rsswidget rss-widget-feed" href="{feed_url}">'
         '<img class="rss-widget-icon" style="border:0" '
@@ -87,58 +89,70 @@ def render_native_widget(feed, items):
     return "".join(output)
 
 
-def refresh_widget(html, new_widget):
-    """Replace only the Arts & Letters Daily widget."""
-    old_widget_match = find_one(
-        widget_pattern(FEED_WIDGET_ID),
+def replace_widget(html, widget_id, new_widget, description):
+    """Replace exactly one matching footer widget."""
+    match = find_one(
+        widget_pattern(widget_id),
         html,
-        "Arts & Letters Daily widget",
+        description,
     )
-    old_widget = old_widget_match.group(0)
+    return html[:match.start()] + new_widget + html[match.end():]
 
-    updated = (
-        html[:old_widget_match.start()]
-        + new_widget
-        + html[old_widget_match.end():]
-    )
 
-    for widget_id in (SEARCH_WIDGET_ID, QUANTA_WIDGET_ID):
-        count = len(re.findall(
-            rf'\bid=["\']{re.escape(widget_id)}["\']',
-            updated,
-            re.I,
-        ))
-        if count != 1:
-            raise RuntimeError(
-                f'Expected one id="{widget_id}"; found {count}.'
-            )
-
-    original_quanta = find_one(
-        widget_pattern(QUANTA_WIDGET_ID),
-        html,
-        "original Quanta widget",
-    ).group(0)
-    updated_quanta = find_one(
-        widget_pattern(QUANTA_WIDGET_ID),
-        updated,
-        "updated Quanta widget",
-    ).group(0)
-
-    if original_quanta != updated_quanta:
-        raise RuntimeError("Quanta widget changed unexpectedly.")
-
+def refresh_widgets(html, aldaily_widget, quanta_widget):
+    """Replace both RSS widgets while preserving the search column."""
     original_first = find_one(
         first_column_pattern(), html, "original search column"
     ).group(0)
+
+    updated = replace_widget(
+        html,
+        FEED_WIDGET_ID,
+        aldaily_widget,
+        "Arts & Letters Daily widget",
+    )
+    updated = replace_widget(
+        updated,
+        QUANTA_WIDGET_ID,
+        quanta_widget,
+        "Quanta widget",
+    )
+
+    for widget_id, description in (
+        (FEED_WIDGET_ID, "Arts & Letters Daily"),
+        (QUANTA_WIDGET_ID, "Quanta"),
+    ):
+        widget = find_one(
+            widget_pattern(widget_id),
+            updated,
+            f"updated {description} widget",
+        ).group(0)
+        if (
+            'class="widget widget_rss"' not in widget
+            or 'class="rsswidget"' not in widget
+            or "<ul>" not in widget
+        ):
+            raise RuntimeError(
+                f"Updated {description} widget failed validation."
+            )
+
+    count = len(re.findall(
+        rf'\bid=["\']{re.escape(SEARCH_WIDGET_ID)}["\']',
+        updated,
+        re.I,
+    ))
+    if count != 1:
+        raise RuntimeError(
+            f'Expected one id="{SEARCH_WIDGET_ID}"; found {count}.'
+        )
+
     updated_first = find_one(
         first_column_pattern(), updated, "updated search column"
     ).group(0)
-
     if original_first != updated_first:
         raise RuntimeError("Search column changed unexpectedly.")
 
     return updated
-
 
 def remove_old_site_credits(html):
     """Remove only the old WordPress/Book Lite attribution block."""
@@ -198,18 +212,31 @@ def main():
     if feed is None:
         raise RuntimeError(f"Feed configuration not found: {FEED_ID}")
 
+    quanta_feed = next(
+        (item for item in SCIENCE_FEEDS if item["id"] == QUANTA_FEED_ID),
+        None,
+    )
+    if quanta_feed is None:
+        raise RuntimeError(f"Quanta feed configuration not found: {QUANTA_FEED_ID}")
+
     try:
         items = load_items(feed)
+        quanta_items = load_items(quanta_feed)
     except Exception as exc:
         print(f"Feed retrieval failed: {type(exc).__name__}: {exc}")
         print("No files were changed.")
         sys.exit(1)
 
-    if not items:
-        print("The feed returned no items. No files were changed.")
+    if not items or not quanta_items:
+        print("A feed returned no items. No files were changed.")
         sys.exit(1)
 
-    new_widget = render_native_widget(feed, items[:FOOTER_FEED_LIMIT])
+    new_widget = render_native_widget(
+        feed, items[:FOOTER_FEED_LIMIT], FEED_WIDGET_ID
+    )
+    new_quanta_widget = render_native_widget(
+        quanta_feed, quanta_items[:QUANTA_FEED_LIMIT], QUANTA_WIDGET_ID
+    )
 
     files = sorted(ROOT.rglob("*.html"))
     prepared = []
@@ -239,27 +266,12 @@ def main():
                 'id="first"',
             )):
                 before = updated
-                updated = refresh_widget(updated, new_widget)
+                updated = refresh_widgets(updated, new_widget, new_quanta_widget)
                 feed_changed = updated != before
 
             updated, credits_changed = remove_old_site_credits(updated)
 
-            # Verify the new native widget structure if this page was updated.
-            if feed_changed:
-                widget = find_one(
-                    widget_pattern(FEED_WIDGET_ID),
-                    updated,
-                    "updated Arts & Letters Daily widget",
-                ).group(0)
-
-                if (
-                    'class="widget widget_rss"' not in widget
-                    or 'class="rsswidget"' not in widget
-                    or "<ul>" not in widget
-                ):
-                    raise RuntimeError(
-                        "New native RSS widget structure failed validation."
-                    )
+            # Both updated RSS widgets are validated in refresh_widgets().
 
             if credits_changed and (
                 "Proudly powered by WordPress" in updated
@@ -288,7 +300,8 @@ def main():
     print("Files ready to change:", len(prepared))
     print("Already unchanged:", unchanged)
     print("Validation errors:", len(failures))
-    print("Feed items fetched:", len(items))
+    print("Arts & Letters Daily items fetched:", len(items))
+    print("Quanta items fetched:", len(quanta_items))
 
     if failures:
         for path, error in failures[:30]:
@@ -331,8 +344,8 @@ def main():
 
     print("Files updated:", len(written))
     print("Backup location:", backup_dir)
-    print("Native Arts & Letters Daily widget generated.")
-    print("Quanta and search widget preservation validated.")
+    print("Native Arts & Letters Daily and Quanta widgets generated.")
+    print("Search column preservation validated.")
 
 
 if __name__ == "__main__":
