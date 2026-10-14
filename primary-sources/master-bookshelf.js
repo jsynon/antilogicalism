@@ -226,7 +226,7 @@
     const definitions = type === "collection" ? collections : categories;
     if (!definitions[key]) {
       type = "category";
-      key = "philosophy";
+      key = "all";
     }
     browseType = type;
     browseKey = key;
@@ -273,7 +273,7 @@
   };
 
   const initialParams = new URLSearchParams(window.location.search);
-  const initialCategory = categories[initialParams.get("category")] ? initialParams.get("category") : "philosophy";
+  const initialCategory = categories[initialParams.get("category")] ? initialParams.get("category") : "all";
   const initialCollection = collections[initialParams.get("collection")] ? initialParams.get("collection") : "";
   if (initialParams.has("q")) searchInput.value = initialParams.get("q");
 
