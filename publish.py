@@ -91,23 +91,26 @@ def nav_link(soup, direction, url, title):
 
 
 def sharing_html(title, permalink):
-    """Static sharing controls; no WordPress or Jetpack backend required."""
+    """Static links using the site's established Jetpack sharing-button appearance."""
     from html import escape
     from urllib.parse import quote
-    url = 'https://jsynon.github.io' + permalink
-    encoded_url = quote(url, safe='')
-    encoded_title = quote(title, safe='')
+
+    public_url = 'https://jsynon.github.io' + permalink
     email_subject = quote('[Shared Post] ' + title, safe='')
+    email_body = quote(public_url, safe='')
+    safe_title = escape(title, quote=True)
+    safe_permalink = escape(permalink, quote=True)
     return (
         '<div class="sharedaddy sd-sharing-enabled antilogicalism-static-sharing">'
-        '<div class="robots-nocontent sd-block sd-social sd-sharing">'
+        '<div class="robots-nocontent sd-block sd-social sd-social-official sd-sharing">'
         '<h3 class="sd-title">Share this:</h3><div class="sd-content"><ul>'
-        f'<li class="share-facebook"><a class="sd-button" href="https://www.facebook.com/sharer/sharer.php?u={encoded_url}" target="_blank" rel="noopener noreferrer" aria-label="Share on Facebook"><span>Facebook</span></a></li>'
-        f'<li class="share-twitter"><a class="sd-button" href="https://twitter.com/intent/tweet?url={encoded_url}&amp;text={encoded_title}" target="_blank" rel="noopener noreferrer" aria-label="Share on X"><span>Twitter</span></a></li>'
-        f'<li class="share-email"><a class="sd-button" href="mailto:?subject={email_subject}&amp;body={encoded_url}" aria-label="Share by email"><span>Email</span></a></li>'
-        '<li class="share-print"><button class="sd-button" type="button" onclick="window.print()" aria-label="Print this article"><span>Print</span></button></li>'
+        f'<li class="share-facebook"><div class="fb-share-button" data-href="{safe_permalink}" data-layout="button_count"></div></li>'
+        f'<li class="share-twitter"><a class="twitter-share-button" data-text="{safe_title}" data-url="{safe_permalink}" data-via="antilogicalism" href="https://twitter.com/share">Tweet</a></li>'
+        f'<li class="share-email"><a class="share-email sd-button" href="mailto:?subject={email_subject}&amp;body={email_body}" rel="nofollow noopener noreferrer" target="_blank" title="Click to email a link to a friend"><span>Email</span></a></li>'
+        f'<li class="share-print"><a class="share-print sd-button" href="{safe_permalink}#print" rel="nofollow noopener noreferrer" target="_blank" title="Click to print"><span>Print</span></a></li>'
         '<li class="share-end"></li></ul></div></div></div>'
     )
+
 
 def build_article(template_path, title, body, date, permalink, prior_url, prior_title):
     soup = soup_file(template_path)
