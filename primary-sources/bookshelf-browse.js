@@ -74,6 +74,7 @@
     if (entry.section) container.append(setText("p", "bookshelf-series", entry.section));
     container.append(renderBookLinks(entry.books));
     container.append(renderDescriptions(entry.descriptions));
+    if (entry.afterSection) container.append(setText("p", "bookshelf-series", entry.afterSection));
   };
 
   const renderAuthor = (item) => {
