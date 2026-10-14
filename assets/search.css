@@ -539,3 +539,14 @@ body.page-id-6350 #primary .entry-content [class*="collection-card"] p {
     margin-right: .8em !important;
   }
 }
+
+/* Match reading text to the site's default text color on the homepage. */
+:is(body.page-id-6350, body.parent-pageid-6350, body.ancestor-pageid-6350) #primary .entry-content,
+#digital-library .entry-content {
+  color: #111;
+}
+
+:is(body.page-id-6350, body.parent-pageid-6350, body.ancestor-pageid-6350) #primary .entry-content :not(a, a *, button, button *, input, select, textarea),
+#digital-library .entry-content :not(a, a *, button, button *, input, select, textarea) {
+  color: #111 !important;
+}
