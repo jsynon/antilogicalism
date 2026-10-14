@@ -12,8 +12,6 @@
   const pageLabel = root.querySelector(".master-page-label");
   const previous = root.querySelector(".master-previous");
   const next = root.querySelector(".master-next");
-  const resources = root.querySelector(".master-resources");
-  const notes = root.querySelector(".master-notes");
   const scriptUrl = document.currentScript && document.currentScript.src
     ? document.currentScript.src
     : window.location.href;
@@ -196,34 +194,6 @@
     next.disabled = currentPage >= pageCount;
   };
 
-  const renderExtras = () => {
-    resources.replaceChildren();
-    notes.replaceChildren();
-    (catalog.resources || []).forEach((resource) => {
-      const article = document.createElement("article");
-      article.className = "master-resource";
-      const heading = document.createElement("h3");
-      const link = document.createElement("a");
-      link.href = resource.url;
-      link.textContent = resource.title;
-      if (/^https?:\/\//i.test(resource.url)) {
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-      }
-      heading.append(link);
-      article.append(heading);
-      if (resource.section) article.append(textNode("p", "master-series", resource.section));
-      appendDescriptions(article, resource.descriptions || []);
-      resources.append(article);
-    });
-    (catalog.notes || []).forEach((markup) => {
-      const paragraph = document.createElement("p");
-      paragraph.innerHTML = markup;
-      notes.append(paragraph);
-    });
-    root.querySelector(".master-extras").hidden = !(resources.childElementCount || notes.childElementCount);
-  };
-
   const updateAddress = () => {
     const url = new URL(window.location.href);
     if (browseType === "collection") {
@@ -248,7 +218,6 @@
     collectionSelect.value = type === "collection" ? key : "";
     categoryIntro.innerHTML = catalog.introHtml || "";
     root.querySelector(".master-browse-heading").textContent = `Browse ${definition.name}`;
-    renderExtras();
     results.setAttribute("aria-busy", "false");
     renderResults();
   };
