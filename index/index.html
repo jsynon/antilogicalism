@@ -1154,9 +1154,9 @@ c0.091-0.647,0.349-1.086,0.635-1.337c-2.22-0.251-4.555-1.111-4.555-4.943c0-1.091
   }).map(function (item) {
     var link = item.querySelector('a[href]');
     var path = link ? new URL(link.getAttribute('href'), window.location.href).pathname : '';
-    var match = path.match(/\\/(\\d{4})\\/(\\d{2})\\/(\\d{2})\\//);
+    var match = path.match(/\/(\d{4})\/(\d{2})\/(\d{2})\//);
     var categories = categoriesByPath[path] || [];
-    var categoryYear = categories.find(function (category) { return /^\\d{4}$/.test(category); });
+    var categoryYear = categories.find(function (category) { return /^\d{4}$/.test(category); });
     return { item: item, categories: categories, year: categoryYear || (match ? match[1] : '') };
   });
   var years = Array.from(new Set(posts.map(function (post) { return post.year; }).filter(Boolean)))
