@@ -148,6 +148,38 @@
     // meaningful compounds, so leave them intact without dictionary evidence.
     return normalized(raw.replace(/\u00ad/g, ''));
   }
+  function formatOriginalText(raw) {
+    // PDF extraction often inserts a newline at the end of every printed line.
+    // Join those visual wraps for reading while retaining blank-line paragraph
+    // boundaries, headings, and list items. Search still uses the unchanged text.
+    const lines = raw.replace(/\r\n?/g, '\n').replace(/\u00ad/g, '').split('\n');
+    const blocks = [];
+    let current = [];
+    function flush() {
+      if (current.length) blocks.push(current.join(' '));
+      current = [];
+    }
+    function isHeading(line) {
+      const letters = line.match(/[A-Za-z]/g) || [];
+      const allCaps = letters.length >= 3 && line === line.toUpperCase();
+      return line.length <= 100 && (allCaps || /^(?:chapter|part|book|section|contents|preface|introduction|conclusion|appendix|bibliography|index)\b/i.test(line));
+    }
+    function isListItem(line) {
+      return /^(?:[•*▪‣]|[-–—]\s|\(?\d+[.)]\s|[a-z][.)]\s)/i.test(line);
+    }
+    for (const rawLine of lines) {
+      const line = rawLine.replace(/\s+/g, ' ').trim();
+      if (!line) { flush(); continue; }
+      if (isHeading(line) || isListItem(line)) {
+        flush();
+        blocks.push(line);
+      } else {
+        current.push(line);
+      }
+    }
+    flush();
+    return blocks.join('\n\n');
+  }
   function ocrPenalty(text) {
     const words = (text.match(/[a-z]+/gi) || []).length;
     const broken = (text.match(/[a-z][.,;:][a-z]/gi) || []).length;
@@ -288,9 +320,9 @@
       .map(range => ({start: starts[range.start], end: ends[range.end - 1]}))
       .sort((a,b) => a.start-b.start);
   }
-  function highlightOriginal(element, rawText, term, mode) {
+  function highlightOriginal(element, text, term, mode) {
     element.replaceChildren();
-    appendHighlighted(element, rawText, originalMatchRanges(rawText, term, mode));
+    highlight(element, text, term, mode);
   }
   function showMessage(text) {
     results.replaceChildren();
@@ -324,7 +356,7 @@
     const details = document.createElement('details');
     details.className = 'library-original';
     const summary = document.createElement('summary');
-    summary.textContent = 'View original page text';
+    summary.textContent = 'View cleaned page text';
     const originals = [];
     details.append(summary);
     for (const region of match.rawRegions || [{region:'whole', text:match.rawText}]) {
@@ -335,8 +367,9 @@
         details.append(label);
       }
       const original = document.createElement('p');
-      original.textContent = region.text;
-      originals.push({element:original, text:region.text});
+      const cleanedText = formatOriginalText(region.text);
+      original.textContent = cleanedText;
+      originals.push({element:original, text:cleanedText});
       details.append(original);
     }
     let originalHighlighted = false;
