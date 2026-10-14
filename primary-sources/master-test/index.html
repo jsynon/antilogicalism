@@ -319,51 +319,62 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content #library-search-instructions p{font-family:inherit!important;font-size:inherit!important}
 </style>
 <style id="master-bookshelf-test-styles">
-#primary .entry-content #master-bookshelf-test{line-height:1.65;color:#3e454a}
-#primary .entry-content #master-bookshelf-test .master-test-label{margin:0 0 .55rem;color:#626b70;font-size:.78em;letter-spacing:.08em;text-transform:uppercase}
-#primary .entry-content #master-bookshelf-test .bookshelf-intro{margin:0 0 1.6rem;line-height:1.7;color:#454c51}
-#primary .entry-content #master-bookshelf-test h2{margin:0 0 .75rem;color:#30363a;font-size:1.35em;line-height:1.4;text-align:left}
-#primary .entry-content #master-bookshelf-test .master-browse-section{padding-top:1.15rem;border-top:1px solid #e0e2e3}
-#primary .entry-content #master-bookshelf-test .master-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.85rem 1rem;margin:.7rem 0 1rem}
-#primary .entry-content #master-bookshelf-test label{display:block;color:#454c51;font-weight:600}
+/* Use the typography, colors, controls, and book-link treatment of the existing Bookshelf pages. */
+#primary .entry-content #master-bookshelf-test{line-height:1.65!important;color:#3e454a!important}
+#primary .entry-content #master-bookshelf-test .master-test-label{margin:0 0 .55rem;color:#626b70}
+#primary .entry-content #master-bookshelf-test .bookshelf-intro{margin:0 0 1.5rem;line-height:1.7;color:#454c51}
+#primary .entry-content #master-bookshelf-test h2{margin:0 0 .65rem;padding:0;text-align:left;line-height:1.35;font-style:normal;font-weight:600;color:#30363a}
+#primary .entry-content #master-bookshelf-test .master-browse-section{padding-top:1.2rem;border-top:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf-test .master-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.75rem 1rem;margin:0 0 1rem;padding:.9rem 0;border-bottom:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf-test .master-controls label,
+#primary .entry-content #master-bookshelf-test .master-search-row label{display:block;color:#454c51;font-weight:600}
 #primary .entry-content #master-bookshelf-test select,
-#primary .entry-content #master-bookshelf-test input{display:block;width:100%;min-height:44px;margin-top:.3rem;padding:8px 11px;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;box-sizing:border-box}
-#primary .entry-content #master-bookshelf-test .master-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:.65rem;margin:.5rem 0 1.1rem}
-#primary .entry-content #master-bookshelf-test .master-search-button{min-height:44px;padding:8px 14px;border:1px solid #262b2f;border-radius:2px;background:#262b2f;color:#fff;font:inherit;white-space:nowrap}
-#primary .entry-content #master-bookshelf-test .master-search-button:disabled{cursor:default;opacity:1}
-#primary .entry-content #master-bookshelf-test .master-category-intro{margin:.9rem 0 1.2rem;color:#454c51}
+#primary .entry-content #master-bookshelf-test input{display:block;width:100%;min-height:42px;margin-top:.3rem;padding:8px 11px;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;box-sizing:border-box}
+#primary .entry-content #master-bookshelf-test .master-period-note{display:block;margin-top:.3rem;color:#626b70;font-size:inherit;font-weight:400}
+#primary .entry-content #master-bookshelf-test select:disabled{color:#626b70;background:#f7f7f7}
+#primary .entry-content #master-bookshelf-test .master-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:.75rem;margin:0 0 1.2rem}
+#primary .entry-content #master-bookshelf-test .master-search-button{min-height:40px;padding:7px 13px;border:1px solid #262b2f;border-radius:2px;background:#262b2f;color:#fff;font:inherit}
+#primary .entry-content #master-bookshelf-test .master-search-button:hover{background:#111518}
+#primary .entry-content #master-bookshelf-test .master-category-intro{margin:0 0 1.3rem;line-height:1.7;color:#454c51}
 #primary .entry-content #master-bookshelf-test .master-category-intro:empty{display:none}
-#primary .entry-content #master-bookshelf-test .master-category-intro p{line-height:1.7}
 #primary .entry-content #master-bookshelf-test .master-category-intro p:first-of-type::first-letter{float:left;font-family:inherit;font-size:3.4em;line-height:.8;font-weight:400;padding:0 .1em 0 0}
 #primary .entry-content #master-bookshelf-test .master-category-intro p:first-of-type::first-line{font-variant:small-caps;letter-spacing:.02em}
-#primary .entry-content #master-bookshelf-test .master-results-heading{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;margin:1.15rem 0 .25rem}
-#primary .entry-content #master-bookshelf-test .master-results-heading h2{margin:0;font-size:1.2em}
-#primary .entry-content #master-bookshelf-test .master-count,#primary .entry-content #master-bookshelf-test .master-page-label{color:#626b70}
-#primary .entry-content #master-bookshelf-test .master-results[aria-busy="true"]{min-height:4rem}
-#primary .entry-content #master-bookshelf-test .master-result{margin:0;padding:1rem 0;border-bottom:1px solid #e0e2e3}
-#primary .entry-content #master-bookshelf-test .master-result h3{margin:0 0 .45rem;color:#30363a;font-size:1.12em;line-height:1.4;font-weight:600;text-align:left}
-#primary .entry-content #master-bookshelf-test .master-work-group+.master-work-group{margin-top:.85rem;padding-top:.8rem;border-top:1px solid #ece9e3}
-#primary .entry-content #master-bookshelf-test .master-book-links{list-style:none;margin:0;padding:0}
-#primary .entry-content #master-bookshelf-test .master-book-links li{margin:.35rem 0;padding:0}
-#primary .entry-content #master-bookshelf-test .master-book-links a{display:block;padding:.48rem .7rem;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111;text-decoration:none;font-weight:600;line-height:1.45}
-#primary .entry-content #master-bookshelf-test .master-book-links a:hover{background:#f1f1f1;text-decoration:underline}
-#primary .entry-content #master-bookshelf-test .master-descriptions{margin:.45rem 0 0;color:#50585e}
-#primary .entry-content #master-bookshelf-test .master-descriptions p{margin:0 0 .65rem;line-height:1.65}
-#primary .entry-content #master-bookshelf-test .master-series,#primary .entry-content #master-bookshelf-test .master-period-label{margin:0 0 .35rem;color:#626b70;font-size:.92em}
+#primary .entry-content #master-bookshelf-test .master-results-heading{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;margin:0 0 .25rem}
+#primary .entry-content #master-bookshelf-test .master-results-heading h2{margin:0}
+#primary .entry-content #master-bookshelf-test .master-count,
+#primary .entry-content #master-bookshelf-test .master-page-label{color:#626b70}
+#primary .entry-content #master-bookshelf-test .master-results{display:block}
+#primary .entry-content #master-bookshelf-test .master-result{margin:0;padding:1rem 0;border:0;border-bottom:1px solid #e0e2e3;border-radius:0;background:transparent;box-shadow:none}
+#primary .entry-content #master-bookshelf-test .master-result h3{margin:0 0 .35rem;line-height:1.4;font-style:normal;text-align:left;font-weight:600;color:#36566a}
+#primary .entry-content #master-bookshelf-test .master-work-group+.master-work-group{margin-top:.7rem;padding-top:.6rem;border-top:1px solid #e4e6e7}
+#primary .entry-content #master-bookshelf-test .master-book-links{list-style:none!important;margin:0!important;padding:0!important}
+#primary .entry-content #master-bookshelf-test .master-book-links li{margin:0!important;padding:0!important}
+#primary .entry-content #master-bookshelf-test .master-book-links a{display:block;padding:5px 0;line-height:1.5;font-weight:500;color:#111!important;text-decoration:underline!important;text-decoration-thickness:1px;text-underline-offset:.16em}
+#primary .entry-content #master-bookshelf-test .master-book-links a:hover{text-decoration-thickness:2px}
+#primary .entry-content #master-bookshelf-test .master-descriptions{margin-top:5px}
+#primary .entry-content #master-bookshelf-test .master-descriptions p{margin:0 0 .65rem;line-height:1.65;color:#50585e}
+#primary .entry-content #master-bookshelf-test .master-series,
+#primary .entry-content #master-bookshelf-test .master-period-label{margin:0 0 .3rem;color:#626b70}
+#primary .entry-content #master-bookshelf-test .master-category-label{margin:0 0 .3rem;color:#626b70;font-variant:small-caps;letter-spacing:.02em}
 #primary .entry-content #master-bookshelf-test .master-period-label{font-style:italic}
-#primary .entry-content #master-bookshelf-test .master-pagination{display:flex;align-items:center;justify-content:center;gap:.8rem;margin:1.1rem 0 0}
+#primary .entry-content #master-bookshelf-test .master-pagination{display:flex;align-items:center;justify-content:center;gap:.7rem;margin:1.2rem 0 0}
 #primary .entry-content #master-bookshelf-test .master-pagination button{min-height:40px;padding:7px 13px;border:1px solid #262b2f;border-radius:2px;background:#262b2f;color:#fff;font:inherit}
 #primary .entry-content #master-bookshelf-test .master-pagination button:hover:not(:disabled){background:#111518}
 #primary .entry-content #master-bookshelf-test .master-pagination button:disabled{opacity:.45}
-#primary .entry-content #master-bookshelf-test .master-loading,#primary .entry-content #master-bookshelf-test .master-empty{padding:.8rem 0;color:#50585e}
-#primary .entry-content #master-bookshelf-test .master-extras,#primary .entry-content #master-bookshelf-test .master-collections{margin-top:1.8rem;padding-top:1.2rem;border-top:1px solid #e0e2e3}
-#primary .entry-content #master-bookshelf-test .master-resource{padding:.75rem 0;border-bottom:1px solid #e0e2e3}
-#primary .entry-content #master-bookshelf-test .master-resource h3{margin:0 0 .3rem;font-weight:600}
-#primary .entry-content #master-bookshelf-test .master-collections>p{margin:.2rem 0 .8rem;color:#50585e}
+#primary .entry-content #master-bookshelf-test .master-loading,
+#primary .entry-content #master-bookshelf-test .master-empty{padding:1rem 0;border-bottom:1px solid #e0e2e3;background:transparent;color:#50585e}
+#primary .entry-content #master-bookshelf-test .master-extras,
+#primary .entry-content #master-bookshelf-test .master-collections{margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf-test .master-resource{padding:.8rem 0;border-bottom:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf-test .master-resource h3{margin:0 0 .35rem;color:#36566a;font-weight:600}
+#primary .entry-content #master-bookshelf-test .master-collections>p{margin:0 0 .8rem;line-height:1.65;color:#50585e}
 #primary .entry-content #master-bookshelf-test .master-collection-links{display:flex;flex-wrap:wrap;gap:.55rem}
-#primary .entry-content #master-bookshelf-test .master-collection-links a{display:inline-flex;align-items:center;min-height:40px;padding:.45rem .75rem;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111;text-decoration:none}
-#primary .entry-content #master-bookshelf-test .master-collection-links a:hover{background:#f1f1f1;text-decoration:underline}
-#primary .entry-content #master-bookshelf-test a:focus-visible,#primary .entry-content #master-bookshelf-test button:focus-visible,#primary .entry-content #master-bookshelf-test input:focus-visible,#primary .entry-content #master-bookshelf-test select:focus-visible{outline:2px solid #6b91a8;outline-offset:2px}
+#primary .entry-content #master-bookshelf-test .master-collection-links a{display:inline-flex;align-items:center;min-height:38px;padding:5px 10px;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111!important;line-height:1.4;text-decoration:none!important}
+#primary .entry-content #master-bookshelf-test .master-collection-links a:hover{background:#f1f1f1;text-decoration:underline!important}
+#primary .entry-content #master-bookshelf-test a:focus-visible,
+#primary .entry-content #master-bookshelf-test button:focus-visible,
+#primary .entry-content #master-bookshelf-test input:focus-visible,
+#primary .entry-content #master-bookshelf-test select:focus-visible{outline:2px solid #6b91a8;outline-offset:2px}
 @media(max-width:650px){#primary .entry-content #master-bookshelf-test .master-controls{grid-template-columns:1fr}#primary .entry-content #master-bookshelf-test .master-search-row{grid-template-columns:minmax(0,1fr)}#primary .entry-content #master-bookshelf-test .master-results-heading{align-items:flex-start;flex-direction:column;gap:.15rem}#primary .entry-content #master-bookshelf-test .master-search-button{width:100%}#primary .entry-content #master-bookshelf-test .master-pagination{gap:.5rem;flex-wrap:wrap}}
 </style>
 </head>
@@ -402,7 +413,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 
 	<div class="entry-content">
 <div id="master-bookshelf-test">
-  <div class="master-test-label">Experimental single-page bookshelf</div>
+  <p class="master-test-label">Experimental single-page bookshelf</p>
   <p class="bookshelf-intro">There are certain books that are essential to an education about the human condition of which I believe should be available for free and with easy access to everybody. I have gathered together some of the most influential writings of the world in an attempt to both preserve and foster easy access to these works. Each e-book on these lists is in PDF format. I have organized them by topic (many topics intersect) and the last name of the author.</p>
 
   <section class="master-browse-section" aria-labelledby="master-browse-heading">
@@ -411,6 +422,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
       <label for="master-category">Choose a category
         <select id="master-category">
           <optgroup label="Categories">
+            <option value="all">All Books</option>
             <option value="philosophy">Philosophy</option>
             <option value="science">Science</option>
             <option value="psychology">Psychology</option>
@@ -421,13 +433,14 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
           </optgroup>
         </select>
       </label>
-      <label class="master-period-wrap" for="master-period" hidden>Period
+      <label class="master-period-wrap" for="master-period">Period
         <select id="master-period">
           <option value="all">All Philosophy</option>
           <option value="ancient-medieval">Ancient &amp; Medieval</option>
           <option value="modern">Modern Period</option>
           <option value="20th-century-present">~20th Century</option>
         </select>
+        <span class="master-period-note" hidden>Available for Philosophy only</span>
       </label>
     </div>
     <div class="master-search-row">

@@ -3,8 +3,8 @@
   if (!root) return;
 
   const categorySelect = root.querySelector("#master-category");
-  const periodWrap = root.querySelector(".master-period-wrap");
   const periodSelect = root.querySelector("#master-period");
+  const periodNote = root.querySelector(".master-period-note");
   const searchInput = root.querySelector("#master-search");
   const searchButton = root.querySelector(".master-search-button");
   const categoryIntro = root.querySelector(".master-category-intro");
@@ -22,6 +22,7 @@
   let requestNumber = 0;
 
   const categories = {
+    all: { name: "All Books", all: true },
     philosophy: { name: "Philosophy", file: "philosophy/philosophy-browse-data.json", philosophy: true },
     science: { name: "Science", file: "science/bookshelf-browse-data.json" },
     psychology: { name: "Psychology", file: "psychology/bookshelf-browse-data.json" },
@@ -30,6 +31,7 @@
     literature: { name: "Literature", file: "literature/bookshelf-browse-data.json" },
     historical: { name: "Historical", file: "historical/bookshelf-browse-data.json" },
   };
+  const subjectCategoryKeys = ["philosophy", "science", "psychology", "religious", "political-cultural", "literature", "historical"];
 
   const normalize = (value) => String(value || "")
     .normalize("NFD")
@@ -101,6 +103,9 @@
   const renderEntry = (container, entry) => {
     const block = document.createElement("div");
     block.className = "master-work-group";
+    if (categorySelect.value === "all" && entry.sourceCategory) {
+      block.append(textNode("p", "master-category-label", entry.sourceCategory));
+    }
     if (entry.section) block.append(textNode("p", "master-series", entry.section));
     if (entry.periodLabel) block.append(textNode("p", "master-period-label", entry.periodLabel));
     block.append(makeBookLinks(entry.books || []));
@@ -200,7 +205,8 @@
     catalog = nextCatalog;
     const category = categories[key];
     categorySelect.value = key;
-    periodWrap.hidden = !category.philosophy;
+    periodSelect.disabled = !category.philosophy;
+    periodNote.hidden = category.philosophy;
     if (category.philosophy) {
       const valid = new Set(["all", ...(catalog.periods || []).map((period) => period.id)]);
       if (!valid.has(periodSelect.value)) periodSelect.value = "all";
@@ -217,23 +223,47 @@
   const loadCategory = async (key) => {
     if (!categories[key]) key = "philosophy";
     categorySelect.value = key;
-    periodWrap.hidden = !categories[key].philosophy;
-    if (!categories[key].philosophy) periodSelect.value = "all";
+    const isPhilosophy = categories[key].philosophy;
+    periodSelect.disabled = !isPhilosophy;
+    periodNote.hidden = isPhilosophy;
+    if (!isPhilosophy) periodSelect.value = "all";
     currentPage = 1;
     results.setAttribute("aria-busy", "true");
-    results.replaceChildren(textNode("p", "master-loading", `Loading ${categories[key].name}…`));
+    results.replaceChildren(textNode("p", "master-loading", key === "all"
+      ? "Loading books from all categories…"
+      : `Loading ${categories[key].name}…`));
     countLabel.textContent = "";
     pageLabel.textContent = "Loading…";
     previous.disabled = true;
     next.disabled = true;
     updateAddress();
 
-    if (cache.has(key)) {
-      displayCatalog(key, cache.get(key));
-      return;
-    }
     const thisRequest = ++requestNumber;
     try {
+      if (key === "all") {
+        const catalogs = await Promise.all(subjectCategoryKeys.map(async (categoryKey) => {
+          if (cache.has(categoryKey)) return [categoryKey, cache.get(categoryKey)];
+          const url = new URL(`../${categories[categoryKey].file}`, window.location.href);
+          const response = await fetch(url);
+          if (!response.ok) throw new Error("Catalog request failed");
+          const data = await response.json();
+          cache.set(categoryKey, data);
+          return [categoryKey, data];
+        }));
+        if (thisRequest !== requestNumber) return;
+        const entries = catalogs.flatMap(([categoryKey, data]) => data.entries.map((entry) => ({
+          ...entry,
+          sourceCategory: categories[categoryKey].name,
+          sourceCategoryKey: categoryKey,
+        })));
+        displayCatalog("all", { entries, resources: [], notes: [], periods: [] });
+        return;
+      }
+
+      if (cache.has(key)) {
+        displayCatalog(key, cache.get(key));
+        return;
+      }
       const url = new URL(`../${categories[key].file}`, window.location.href);
       const response = await fetch(url);
       if (!response.ok) throw new Error("Catalog request failed");
@@ -244,8 +274,8 @@
     } catch (error) {
       if (thisRequest !== requestNumber) return;
       results.setAttribute("aria-busy", "false");
-      results.replaceChildren(textNode("p", "master-empty", "This category could not be loaded. Please reload the page."));
-      countLabel.textContent = "Category unavailable";
+      results.replaceChildren(textNode("p", "master-empty", "The selected book list could not be loaded. Please reload the page."));
+      countLabel.textContent = "Book list unavailable";
       pageLabel.textContent = "Browse list unavailable";
     }
   };
