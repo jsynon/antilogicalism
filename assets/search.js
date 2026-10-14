@@ -4,6 +4,7 @@
   if (!forms.length) return;
 
   const SEARCH_PAGE = "/antilogicalism/search.html";
+  const BLOG_POST_URL = /^\/antilogicalism\/\d{4}\/\d{2}\/\d{2}\/[^/]+\/?$/;
 
   function tokenize(text) {
     return text.toLocaleLowerCase().match(
@@ -49,7 +50,7 @@
         score,
         matched: matchedTerms.get(docId) || 0
       }))
-      .filter((item) => item.document)
+      .filter((item) => item.document && BLOG_POST_URL.test(item.document.url))
       .sort((a, b) =>
         b.matched - a.matched || b.score - a.score
       )

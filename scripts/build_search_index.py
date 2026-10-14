@@ -69,6 +69,22 @@ def make_url(path):
     return f"{BASE_PATH}{encoded_path}/"
 
 
+def is_blog_post_path(path):
+    """Return whether an index.html path uses the site's dated post URL format."""
+    parts = path.relative_to(ROOT).parts[:-1]
+
+    if len(parts) != 4:
+        return False
+
+    year, month, day, slug = parts
+    return (
+        re.fullmatch(r"\d{4}", year) is not None
+        and re.fullmatch(r"\d{2}", month) is not None
+        and re.fullmatch(r"\d{2}", day) is not None
+        and bool(slug)
+    )
+
+
 def make_excerpt(body, limit=220):
     """Create a short, readable result excerpt."""
     body = normalize_text(body)
@@ -302,7 +318,7 @@ def main():
     too_short = 0
 
     for path in files:
-        if is_excluded_path(path):
+        if is_excluded_path(path) or not is_blog_post_path(path):
             excluded += 1
             continue
 
