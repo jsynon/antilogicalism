@@ -205,13 +205,13 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 		}
 
 			</style>
-<meta name="description" content="The Bookshelf section.">
+<meta name="description" content="Browse books by category and collection in the Antilogicalism master bookshelf.">
 <link rel="amphtml" href="/antilogicalism/primary-sources/?amp">
 <!-- Jetpack Open Graph Tags -->
 <meta property="og:type" content="article">
 <meta property="og:title" content="A History of Ideas">
 <meta property="og:url" content="/antilogicalism/primary-sources/">
-<meta property="og:description" content="The Bookshelf section.">
+<meta property="og:description" content="Browse books by category and collection in the Antilogicalism master bookshelf.">
 <meta property="article:published_time" content="2018-03-09T10:57:28+00:00">
 <meta property="article:modified_time" content="2022-03-07T17:29:57+00:00">
 <meta property="og:site_name" content="Antilogicalism">
@@ -318,6 +318,57 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content #library-search-instructions,
 #primary .entry-content #library-search-instructions p{font-family:inherit!important;font-size:inherit!important}
 </style>
+<style id="master-bookshelf-styles">
+/* Use the typography, colors, controls, and book-link treatment of the existing Bookshelf pages. */
+#primary .entry-content #master-bookshelf{line-height:1.65!important;color:#3e454a!important}
+#primary .entry-content #master-bookshelf .bookshelf-intro{margin:0 0 1.5rem;line-height:1.7;color:#454c51}
+#primary .entry-content #master-bookshelf h2{margin:0 0 .65rem;padding:0;text-align:left;line-height:1.35;font-style:normal;font-weight:600;color:#30363a}
+#primary .entry-content #master-bookshelf .master-browse-section{padding-top:1.2rem;border-top:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf .master-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem 1rem;margin:0 0 1rem;padding:.9rem 0;border-bottom:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf .master-controls label,
+#primary .entry-content #master-bookshelf .master-search-row label{display:block;color:#454c51;font-weight:600}
+#primary .entry-content #master-bookshelf select,
+#primary .entry-content #master-bookshelf input{display:block;width:100%;min-height:42px;margin-top:.3rem;padding:8px 11px;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;box-sizing:border-box}
+#primary .entry-content #master-bookshelf .master-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:.75rem;margin:0 0 1.2rem}
+#primary .entry-content #master-bookshelf .master-search-button{min-height:40px;padding:7px 13px;border:1px solid #262b2f;border-radius:2px;background:#262b2f;color:#fff;font:inherit}
+#primary .entry-content #master-bookshelf .master-search-button:hover{background:#111518}
+#primary .entry-content #master-bookshelf .master-category-intro{margin:0 0 1.3rem;line-height:1.7;color:#454c51}
+#primary .entry-content #master-bookshelf .master-category-intro:empty{display:none}
+#primary .entry-content #master-bookshelf .master-category-intro p:first-of-type::first-letter{float:left;font-family:inherit;font-size:3.4em;line-height:.8;font-weight:400;padding:0 .1em 0 0}
+#primary .entry-content #master-bookshelf .master-category-intro p:first-of-type::first-line{font-variant:small-caps;letter-spacing:.02em}
+#primary .entry-content #master-bookshelf .master-results-heading{display:flex;align-items:baseline;justify-content:space-between;gap:1rem;margin:0 0 .25rem}
+#primary .entry-content #master-bookshelf .master-results-heading h2{margin:0}
+#primary .entry-content #master-bookshelf .master-count,
+#primary .entry-content #master-bookshelf .master-page-label{color:#626b70}
+#primary .entry-content #master-bookshelf .master-results{display:block}
+#primary .entry-content #master-bookshelf .master-result{margin:0;padding:1rem 0;border:0;border-bottom:1px solid #e0e2e3;border-radius:0;background:transparent;box-shadow:none}
+#primary .entry-content #master-bookshelf .master-result h3{margin:0 0 .35rem;line-height:1.4;font-style:normal;text-align:left;font-weight:600;color:#36566a}
+#primary .entry-content #master-bookshelf .master-work-group+.master-work-group{margin-top:.7rem;padding-top:.6rem;border-top:1px solid #e4e6e7}
+#primary .entry-content #master-bookshelf .master-book-links{list-style:none!important;margin:0!important;padding:0!important}
+#primary .entry-content #master-bookshelf .master-book-links li{margin:0!important;padding:0!important}
+#primary .entry-content #master-bookshelf .master-book-links a{display:block;padding:5px 0;line-height:1.5;font-weight:500;color:#111!important;text-decoration:underline!important;text-decoration-thickness:1px;text-underline-offset:.16em}
+#primary .entry-content #master-bookshelf .master-book-links a:hover{text-decoration-thickness:2px}
+#primary .entry-content #master-bookshelf .master-descriptions{margin-top:5px}
+#primary .entry-content #master-bookshelf .master-descriptions p{margin:0 0 .65rem;line-height:1.65;color:#50585e}
+#primary .entry-content #master-bookshelf .master-series,
+#primary .entry-content #master-bookshelf .master-period-label{margin:0 0 .3rem;color:#626b70}
+#primary .entry-content #master-bookshelf .master-category-label{margin:0 0 .3rem;color:#626b70;font-variant:small-caps;letter-spacing:.02em}
+#primary .entry-content #master-bookshelf .master-period-label{font-style:italic}
+#primary .entry-content #master-bookshelf .master-pagination{display:flex;align-items:center;justify-content:center;gap:.7rem;margin:1.2rem 0 0}
+#primary .entry-content #master-bookshelf .master-pagination button{min-height:40px;padding:7px 13px;border:1px solid #262b2f;border-radius:2px;background:#262b2f;color:#fff;font:inherit}
+#primary .entry-content #master-bookshelf .master-pagination button:hover:not(:disabled){background:#111518}
+#primary .entry-content #master-bookshelf .master-pagination button:disabled{opacity:.45}
+#primary .entry-content #master-bookshelf .master-loading,
+#primary .entry-content #master-bookshelf .master-empty{padding:1rem 0;border-bottom:1px solid #e0e2e3;background:transparent;color:#50585e}
+#primary .entry-content #master-bookshelf .master-extras{margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf .master-resource{padding:.8rem 0;border-bottom:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf .master-resource h3{margin:0 0 .35rem;color:#36566a;font-weight:600}
+#primary .entry-content #master-bookshelf a:focus-visible,
+#primary .entry-content #master-bookshelf button:focus-visible,
+#primary .entry-content #master-bookshelf input:focus-visible,
+#primary .entry-content #master-bookshelf select:focus-visible{outline:2px solid #6b91a8;outline-offset:2px}
+@media(max-width:650px){#primary .entry-content #master-bookshelf .master-controls{grid-template-columns:minmax(0,1fr)}#primary .entry-content #master-bookshelf .master-search-row{grid-template-columns:minmax(0,1fr)}#primary .entry-content #master-bookshelf .master-results-heading{align-items:flex-start;flex-direction:column;gap:.15rem}#primary .entry-content #master-bookshelf .master-search-button{width:100%}#primary .entry-content #master-bookshelf .master-pagination{gap:.5rem;flex-wrap:wrap}}
+</style>
 </head>
 
 <body class="wp-singular page-template-default page page-id-6350 page-parent wp-theme-book-lite custom-header">
@@ -353,39 +404,57 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 	</header><!-- .entry-header -->
 
 	<div class="entry-content">
-<div class="bookshelf-guide">
+<div id="master-bookshelf">
   <p class="bookshelf-intro">There are certain books that are essential to an education about the human condition of which I believe should be available for free and with easy access to everybody. I have gathered together some of the most influential writings of the world in an attempt to both preserve and foster easy access to these works. Each e-book on these lists is in PDF format. I have organized them by topic (many topics intersect) and the last name of the author.</p>
 
-  <section class="bookshelf-section" aria-labelledby="bookshelf-subjects">
-    <h2 id="bookshelf-subjects">Browse by subject</h2>
-    <nav aria-label="Book categories">
-      <ul class="bookshelf-subjects">
-        <li><a href="/antilogicalism/primary-sources/philosophy/" style="display:block;min-height:38px;padding:5px 10px;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111;line-height:1.4;text-decoration:none;box-sizing:border-box;">Philosophy</a></li>
-        <li><a href="/antilogicalism/primary-sources/science/" style="display:block;min-height:38px;padding:5px 10px;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111;line-height:1.4;text-decoration:none;box-sizing:border-box;">Science</a></li>
-        <li><a href="/antilogicalism/primary-sources/psychology/" style="display:block;min-height:38px;padding:5px 10px;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111;line-height:1.4;text-decoration:none;box-sizing:border-box;">Psychology</a></li>
-        <li><a href="/antilogicalism/primary-sources/religious/" style="display:block;min-height:38px;padding:5px 10px;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111;line-height:1.4;text-decoration:none;box-sizing:border-box;">Religious</a></li>
-        <li><a href="/antilogicalism/primary-sources/political-cultural/" style="display:block;min-height:38px;padding:5px 10px;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111;line-height:1.4;text-decoration:none;box-sizing:border-box;">Political &amp; Cultural</a></li>
-        <li><a href="/antilogicalism/primary-sources/literature/" style="display:block;min-height:38px;padding:5px 10px;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111;line-height:1.4;text-decoration:none;box-sizing:border-box;">Literature</a></li>
-        <li><a href="/antilogicalism/primary-sources/historical/" style="display:block;min-height:38px;padding:5px 10px;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111;line-height:1.4;text-decoration:none;box-sizing:border-box;">Historical</a></li>
-      </ul>
+  <section class="master-browse-section" aria-labelledby="master-browse-heading">
+    <h2 id="master-browse-heading">Browse the Bookshelf</h2>
+    <div class="master-controls">
+      <label for="master-category">Choose a category
+        <select id="master-category">
+          <option value="">Choose a category…</option>
+          <option value="all">All Books</option>
+          <option value="philosophy">Philosophy</option>
+          <option value="science">Science</option>
+          <option value="psychology">Psychology</option>
+          <option value="religious">Religious</option>
+          <option value="political-cultural">Political &amp; Cultural</option>
+          <option value="literature">Literature</option>
+          <option value="historical">Historical</option>
+        </select>
+      </label>
+      <label for="master-collection">Choose a collection
+        <select id="master-collection">
+          <option value="" selected>Browse a collection…</option>
+          <option value="sacred-books-of-the-east">Sacred Books of the East</option>
+          <option value="harvard-classics">Harvard Classics</option>
+          <option value="church-fathers">Church Fathers</option>
+        </select>
+      </label>
+    </div>
+    <div class="master-search-row">
+      <label for="master-search">Search by title or author
+        <input id="master-search" type="search" placeholder="Type a title or author name" autocomplete="off">
+      </label>
+      <button class="master-search-button" type="button">Search</button>
+    </div>
+    <div class="master-category-intro" aria-live="polite"></div>
+    <div class="master-results-heading">
+      <h2 class="master-browse-heading">Browse Philosophy</h2>
+      <span class="master-count" aria-live="polite"></span>
+    </div>
+    <div class="master-results" aria-live="polite" aria-busy="true"><p>Loading Philosophy…</p></div>
+    <nav class="master-pagination" aria-label="Browse pages">
+      <button class="master-previous" type="button" disabled>Previous</button>
+      <span class="master-page-label" aria-live="polite">Loading…</span>
+      <button class="master-next" type="button" disabled>Next</button>
     </nav>
+    <section class="master-extras" aria-label="Additional resources">
+      <h2>Additional resources</h2>
+      <p>For more free reading and study, explore the <a href="http://www.sacred-texts.com/" target="_blank" rel="noopener noreferrer">Internet Sacred Text Archive</a>, the <a href="https://www.ccel.org/fathers.html" target="_blank" rel="noopener noreferrer">Christian Classics Ethereal Library</a>, <a href="http://www.planetpublish.com/" target="_blank" rel="noopener noreferrer">Planet Publish</a>, and <a href="https://www.planetebook.com/" target="_blank" rel="noopener noreferrer">Planet eBook</a>. <a href="http://www.openculture.com/" target="_blank" rel="noopener noreferrer">Open Culture</a> offers <a href="http://www.openculture.com/free_ebooks" target="_blank" rel="noopener noreferrer">free e-books</a>, <a href="http://www.openculture.com/freeaudiobooks" target="_blank" rel="noopener noreferrer">900 free audiobooks</a>, and <a href="http://www.openculture.com/freeonlinecourses" target="_blank" rel="noopener noreferrer">free online courses</a>; <a href="https://www.gutenberg.org/" target="_blank" rel="noopener noreferrer">Project Gutenberg</a> and the <a href="https://archive.org/" target="_blank" rel="noopener noreferrer">Internet Archive</a> also provide extensive digital collections.</p>
+    </section>
   </section>
 
-  <section class="bookshelf-section bookshelf-collections" aria-labelledby="bookshelf-collections">
-    <h2 id="bookshelf-collections">Collections</h2>
-    <article class="bookshelf-collection">
-      <h3><a href="/antilogicalism/primary-sources/sacred-books-of-the-east/">Sacred Books of the East</a></h3>
-      <p>The <em>Sacred Books of the East</em> is a monumental 50-volume set of English translations of Asian religious texts, edited by Max Müller and published by the Oxford University Press between 1879 and 1910. It incorporates the essential sacred texts of Hinduism, Buddhism, Taoism, Confucianism, Zoroastrianism, Jainism, and Islam.</p>
-    </article>
-    <article class="bookshelf-collection">
-      <h3><a href="/antilogicalism/primary-sources/church-fathers/">The Early Church Fathers</a></h3>
-      <p>The Early Church Fathers were ancient and influential Christian theologians and writers. There is no definitive list. The era of these scholars who set the theological and scholarly foundations of Christianity largely ended by AD 700. In the past, the Church Fathers were regarded as authoritative and more restrictive definitions were used which sought to limit the list to authors treated as such. However, the definition has widened as scholars of patristics, the study of the Church Fathers, have expanded their scope.</p>
-    </article>
-    <article class="bookshelf-collection">
-      <h3><a href="/antilogicalism/primary-sources/harvard-classics/">The Harvard Classics</a></h3>
-      <p>The <em>Harvard Classics</em>, originally known and marketed as Dr. Eliot’s <em>Five-Foot Shelf of Books</em>, is a 50-volume series of classic works from world literature, important speeches, and historical documents compiled and edited by Harvard University President Charles W. Eliot. Eliot believed that a careful reading of the series and by following the included 11 reading plans in Volume 50 would offer a reader, in the comfort of home, the benefits of a liberal education, entertainment, and counsel of history’s greatest creative minds. The 50 volumes were first printed in 1909 (first 25 volumes) and 1910 (next 25 volumes), and the collection was subsequently expanded when the <em>Lectures on The Harvard Classics</em> was added in 1914 and <em>Fifteen Minutes a Day – The Reading Guide</em> in 1916.</p>
-    </article>
-  </section>
 </div>
 <div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-official sd-sharing"><h3 class="sd-title">Share this:</h3><div class="sd-content"><ul><li class="share-facebook"><div class="fb-share-button" data-href="/antilogicalism/primary-sources/" data-layout="button_count"></div></li><li class="share-twitter"><a href="https://twitter.com/share" class="twitter-share-button" data-url="/antilogicalism/primary-sources/" data-text="A History of Ideas" data-via="antilogicalism">Tweet</a></li><li class="share-email"><a rel="nofollow noopener noreferrer" data-shared="" class="share-email sd-button" href="mailto:?subject=%5BShared%20Post%5D%20A%20History%20of%20Ideas&amp;body=http%3A%2F%2Fantilogicalism.test%2Fprimary-sources%2F&amp;share=email" target="_blank" title="Click to email a link to a friend" data-email-share-error-title="Do you have email set up?" data-email-share-error-text="If you're having problems sharing via email, you might not have email set up for your browser. You may need to create a new email yourself." data-email-share-nonce="91dac7f3ef" data-email-share-track-url="/antilogicalism/primary-sources/?share=email"><span>Email</span></a></li><li class="share-print"><a rel="nofollow noopener noreferrer" data-shared="" class="share-print sd-button" href="/antilogicalism/primary-sources/#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></ul></div></div></div>					</div><!-- .entry-content -->
 </article><!-- #post-6350 -->
@@ -698,5 +767,6 @@ c0.091-0.647,0.349-1.086,0.635-1.337c-2.22-0.251-4.555-1.111-4.555-4.943c0-1.091
 </svg>
 
 <script src="/antilogicalism/assets/search.js" defer></script>
+<script src="/antilogicalism/primary-sources/master-bookshelf.js?v=20261014-production-1" defer></script>
 </body>
 </html>
