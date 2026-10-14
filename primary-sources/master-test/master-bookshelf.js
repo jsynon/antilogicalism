@@ -34,7 +34,14 @@
     literature: { name: "Literature", file: "literature/bookshelf-browse-data.json" },
     historical: { name: "Historical", file: "historical/bookshelf-browse-data.json" },
   };
+  const collections = {
+    "sacred-books-of-the-east": { name: "Sacred Books of the East", file: "sacred-books-of-the-east/bookshelf-browse-data.json" },
+    "harvard-classics": { name: "Harvard Classics", file: "harvard-classics/bookshelf-browse-data.json" },
+    "church-fathers": { name: "Church Fathers", file: "church-fathers/bookshelf-browse-data.json" },
+  };
   const subjectCategoryKeys = ["philosophy", "science", "psychology", "religious", "political-cultural", "literature", "historical"];
+  let browseType = "category";
+  let browseKey = "philosophy";
 
   const normalize = (value) => String(value || "")
     .normalize("NFD")
@@ -53,13 +60,16 @@
     return catalog.entries;
   };
 
-  const fetchCatalog = async (key) => {
-    if (cache.has(key)) return cache.get(key);
-    const url = new URL(categories[key].file, catalogBase);
+  const fetchCatalog = async (key, type = "category") => {
+    const definition = type === "collection" ? collections[key] : categories[key];
+    const cacheKey = `${type}:${key}`;
+    if (!definition?.file) throw new Error(`No catalog is defined for ${key}`);
+    if (cache.has(cacheKey)) return cache.get(cacheKey);
+    const url = new URL(definition.file, catalogBase);
     const response = await fetch(url);
     if (!response.ok) throw new Error(`Catalog request failed for ${key}: ${response.status}`);
     const data = await response.json();
-    cache.set(key, data);
+    cache.set(cacheKey, data);
     return data;
   };
 
@@ -127,6 +137,20 @@
 
   const prepareMatches = () => {
     const query = normalize(searchInput.value.trim());
+    if (browseType === "collection") {
+      return catalog.entries
+        .map((entry, index) => ({ entry, index }))
+        .sort((a, b) => (a.entry.sourceOrder ?? a.index) - (b.entry.sourceOrder ?? b.index))
+        .map(({ entry }) => {
+          const author = entry.author || "Anonymous";
+          const authorMatch = query && normalize(author).includes(query);
+          const books = (entry.books || []).filter((book) =>
+            !query || authorMatch || normalize(book.title).includes(query) || normalize(book.author).includes(query)
+          );
+          return { author, entries: books.length ? [{ ...entry, books }] : [] };
+        })
+        .filter((item) => item.entries.length);
+    }
     const groups = groupByAuthor(visibleEntries());
     return groups.map((group) => {
       const authorMatch = query && (
@@ -164,7 +188,7 @@
     if (!matches.length) {
       results.append(textNode("p", "master-empty", searchInput.value.trim()
         ? "No matching books or authors found."
-        : "No books are listed in this category."));
+        : browseType === "collection" ? "No books are listed in this collection." : "No books are listed in this category."));
     }
     countLabel.textContent = `${bookCount} ${bookCount === 1 ? "book" : "books"} · ${matches.length} ${matches.length === 1 ? "author entry" : "author entries"}`;
     pageLabel.textContent = matches.length ? `Page ${currentPage} of ${pageCount}` : "No entries to display";
@@ -202,32 +226,49 @@
 
   const updateAddress = () => {
     const url = new URL(window.location.href);
-    url.searchParams.set("category", categorySelect.value);
+    if (browseType === "collection") {
+      url.searchParams.delete("category");
+      url.searchParams.set("collection", browseKey);
+    } else {
+      url.searchParams.set("category", browseKey);
+      url.searchParams.delete("collection");
+    }
     url.searchParams.delete("era");
     if (searchInput.value.trim()) url.searchParams.set("q", searchInput.value.trim());
     else url.searchParams.delete("q");
     window.history.replaceState({}, "", url);
   };
 
-  const displayCatalog = (key, nextCatalog) => {
+  const displayCatalog = (key, nextCatalog, type = "category") => {
     catalog = nextCatalog;
-    const category = categories[key];
-    categorySelect.value = key;
+    browseType = type;
+    browseKey = key;
+    const definition = type === "collection" ? collections[key] : categories[key];
+    categorySelect.value = type === "category" ? key : "";
+    collectionSelect.value = type === "collection" ? key : "";
     categoryIntro.innerHTML = catalog.introHtml || "";
-    root.querySelector(".master-browse-heading").textContent = `Browse ${category.name}`;
+    root.querySelector(".master-browse-heading").textContent = `Browse ${definition.name}`;
     renderExtras();
     results.setAttribute("aria-busy", "false");
     renderResults();
   };
 
-  const loadCategory = async (key) => {
-    if (!categories[key]) key = "philosophy";
-    categorySelect.value = key;
+  const loadBrowse = async (key, type = "category") => {
+    const definitions = type === "collection" ? collections : categories;
+    if (!definitions[key]) {
+      type = "category";
+      key = "philosophy";
+    }
+    browseType = type;
+    browseKey = key;
+    categorySelect.value = type === "category" ? key : "";
+    collectionSelect.value = type === "collection" ? key : "";
     currentPage = 1;
     results.setAttribute("aria-busy", "true");
-    results.replaceChildren(textNode("p", "master-loading", key === "all"
+    const name = definitions[key].name;
+    results.replaceChildren(textNode("p", "master-loading", type === "category" && key === "all"
       ? "Loading books from all categories…"
-      : `Loading ${categories[key].name}…`));
+      : `Loading ${name}…`));
     countLabel.textContent = "";
     pageLabel.textContent = "Loading…";
     previous.disabled = true;
@@ -236,7 +277,7 @@
 
     const thisRequest = ++requestNumber;
     try {
-      if (key === "all") {
+      if (type === "category" && key === "all") {
         const catalogs = await Promise.all(subjectCategoryKeys.map(async (categoryKey) =>
           [categoryKey, await fetchCatalog(categoryKey)]
         ));
@@ -246,13 +287,13 @@
           sourceCategory: categories[categoryKey].name,
           sourceCategoryKey: categoryKey,
         })));
-        displayCatalog("all", { entries, resources: [], notes: [], periods: [] });
+        displayCatalog("all", { entries, resources: [], notes: [], periods: [] }, "category");
         return;
       }
 
-      const data = await fetchCatalog(key);
+      const data = await fetchCatalog(key, type);
       if (thisRequest !== requestNumber) return;
-      displayCatalog(key, data);
+      displayCatalog(key, data, type);
     } catch (error) {
       if (thisRequest !== requestNumber) return;
       results.setAttribute("aria-busy", "false");
@@ -264,11 +305,14 @@
 
   const initialParams = new URLSearchParams(window.location.search);
   const initialCategory = categories[initialParams.get("category")] ? initialParams.get("category") : "philosophy";
+  const initialCollection = collections[initialParams.get("collection")] ? initialParams.get("collection") : "";
   if (initialParams.has("q")) searchInput.value = initialParams.get("q");
 
-  categorySelect.addEventListener("change", () => loadCategory(categorySelect.value));
+  categorySelect.addEventListener("change", () => {
+    if (categorySelect.value) loadBrowse(categorySelect.value, "category");
+  });
   collectionSelect.addEventListener("change", () => {
-    if (collectionSelect.value) window.location.assign(collectionSelect.value);
+    if (collectionSelect.value) loadBrowse(collectionSelect.value, "collection");
   });
   searchInput.addEventListener("input", () => {
     currentPage = 1;
@@ -291,5 +335,5 @@
     renderResults();
     results.scrollIntoView({ behavior: "smooth", block: "start" });
   });
-  loadCategory(initialCategory);
+  loadBrowse(initialCollection ? initialCollection : initialCategory, initialCollection ? "collection" : "category");
 })();
