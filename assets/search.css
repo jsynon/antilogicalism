@@ -48,6 +48,31 @@
   line-height: 1.4;
 }
 
+.antilogicalism-search-pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75em;
+  margin: 1.25em 0;
+}
+
+.antilogicalism-search-pagination button {
+  padding: 0.55em 0.85em;
+  cursor: pointer;
+}
+
+.antilogicalism-search-pagination button[hidden],
+.antilogicalism-search-pagination[hidden] {
+  display: none;
+}
+
+@media (max-width: 420px) {
+  .antilogicalism-search-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+}
+
 
 /* Antilogicalism shared page body style */
 /* Append this block to assets/search.css. The header, sidebar, and footer are untouched. */

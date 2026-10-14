@@ -5,6 +5,7 @@
 
   const SEARCH_PAGE = "/antilogicalism/search.html";
   const BLOG_POST_URL = /^\/antilogicalism\/\d{4}\/\d{2}\/\d{2}\/[^/]+\/?$/;
+  const PAGE_SIZE = 20;
 
   function tokenize(text) {
     return text.toLocaleLowerCase().match(
@@ -53,37 +54,125 @@
       .filter((item) => item.document && BLOG_POST_URL.test(item.document.url))
       .sort((a, b) =>
         b.matched - a.matched || b.score - a.score
-      )
-      .slice(0, 20);
+      );
 
     results.replaceChildren();
+    let pagination = results.nextElementSibling;
+
+    if (!pagination || !pagination.matches("[data-search-pagination]")) {
+      pagination = document.createElement("nav");
+      pagination.className = "antilogicalism-search-pagination";
+      pagination.dataset.searchPagination = "";
+      pagination.setAttribute("aria-label", "Search result pages");
+
+      const previous = document.createElement("button");
+      previous.type = "button";
+      previous.textContent = "Previous 20";
+      previous.dataset.searchPrevious = "";
+
+      const pageLabel = document.createElement("span");
+      pageLabel.dataset.searchPageLabel = "";
+      pageLabel.setAttribute("aria-live", "polite");
+
+      const next = document.createElement("button");
+      next.type = "button";
+      next.textContent = "Next 20";
+      next.dataset.searchNext = "";
+
+      pagination.append(previous, pageLabel, next);
+      results.insertAdjacentElement("afterend", pagination);
+    }
+
+    const previousButton = pagination.querySelector("[data-search-previous]");
+    const nextButton = pagination.querySelector("[data-search-next]");
+    const pageLabel = pagination.querySelector("[data-search-page-label]");
 
     if (!ranked.length) {
+      pagination.hidden = true;
       status.textContent =
         `No results found for “${query}”. Try different words.`;
       return;
     }
 
-    for (const item of ranked) {
-      const li = document.createElement("li");
-      const link = document.createElement("a");
-      const excerpt = document.createElement("p");
+    const totalPages = Math.ceil(ranked.length / PAGE_SIZE);
+    const params = new URLSearchParams(window.location.search);
+    let currentPage = Number.parseInt(params.get("page") || "1", 10);
 
-      link.href = item.document.url;
-      link.textContent = item.document.title || "Untitled page";
-      excerpt.textContent = item.document.excerpt || "";
+    if (!Number.isFinite(currentPage) || currentPage < 1) currentPage = 1;
+    currentPage = Math.min(currentPage, totalPages);
 
-      li.append(link);
+    function renderPage(shouldScroll = false) {
+      const start = (currentPage - 1) * PAGE_SIZE;
+      const pageResults = ranked.slice(start, start + PAGE_SIZE);
+      results.replaceChildren();
 
-      if (excerpt.textContent) {
-        li.append(excerpt);
+      for (const item of pageResults) {
+        const li = document.createElement("li");
+        const link = document.createElement("a");
+        const excerpt = document.createElement("p");
+
+        link.href = item.document.url;
+        link.textContent = item.document.title || "Untitled post";
+        excerpt.textContent = item.document.excerpt || "";
+
+        li.append(link);
+
+        if (excerpt.textContent) {
+          li.append(excerpt);
+        }
+
+        results.append(li);
       }
 
-      results.append(li);
+      const firstResult = start + 1;
+      const lastResult = start + pageResults.length;
+      status.textContent =
+        `Showing posts ${firstResult}–${lastResult} of ${ranked.length} for “${query}”.`;
+
+      pagination.hidden = totalPages <= 1;
+      previousButton.hidden = currentPage === 1;
+      nextButton.hidden = currentPage === totalPages;
+      pageLabel.textContent = `Page ${currentPage} of ${totalPages}`;
+
+      if (shouldScroll) {
+        results.setAttribute("tabindex", "-1");
+        results.focus({ preventScroll: true });
+        results.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     }
 
-    status.textContent =
-      `Showing ${ranked.length} results for “${query}”.`;
+    function changePage(nextPage, addHistoryEntry = true) {
+      currentPage = Math.max(1, Math.min(nextPage, totalPages));
+      const nextParams = new URLSearchParams(window.location.search);
+      nextParams.set("q", query);
+
+      if (currentPage === 1) {
+        nextParams.delete("page");
+      } else {
+        nextParams.set("page", String(currentPage));
+      }
+
+      const newUrl = `${window.location.pathname}?${nextParams.toString()}`;
+      if (addHistoryEntry) {
+        window.history.pushState({}, "", newUrl);
+      } else {
+        window.history.replaceState({}, "", newUrl);
+      }
+
+      renderPage(true);
+    }
+
+    previousButton.addEventListener("click", () => changePage(currentPage - 1));
+    nextButton.addEventListener("click", () => changePage(currentPage + 1));
+    window.addEventListener("popstate", () => {
+      const pageFromUrl = Number.parseInt(
+        new URLSearchParams(window.location.search).get("page") || "1",
+        10
+      );
+      changePage(Number.isFinite(pageFromUrl) ? pageFromUrl : 1, false);
+    });
+
+    renderPage();
   }
 
   // Every search form navigates to the dedicated results page.
