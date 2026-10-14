@@ -325,13 +325,11 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content #master-bookshelf-test .bookshelf-intro{margin:0 0 1.5rem;line-height:1.7;color:#454c51}
 #primary .entry-content #master-bookshelf-test h2{margin:0 0 .65rem;padding:0;text-align:left;line-height:1.35;font-style:normal;font-weight:600;color:#30363a}
 #primary .entry-content #master-bookshelf-test .master-browse-section{padding-top:1.2rem;border-top:1px solid #e0e2e3}
-#primary .entry-content #master-bookshelf-test .master-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:.75rem 1rem;margin:0 0 1rem;padding:.9rem 0;border-bottom:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf-test .master-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.75rem 1rem;margin:0 0 1rem;padding:.9rem 0;border-bottom:1px solid #e0e2e3}
 #primary .entry-content #master-bookshelf-test .master-controls label,
 #primary .entry-content #master-bookshelf-test .master-search-row label{display:block;color:#454c51;font-weight:600}
 #primary .entry-content #master-bookshelf-test select,
 #primary .entry-content #master-bookshelf-test input{display:block;width:100%;min-height:42px;margin-top:.3rem;padding:8px 11px;border:1px solid #c8cdd0;border-radius:2px;background:#fff;color:#333;font:inherit;box-sizing:border-box}
-#primary .entry-content #master-bookshelf-test .master-period-note{display:block;margin-top:.3rem;color:#626b70;font-size:inherit;font-weight:400}
-#primary .entry-content #master-bookshelf-test select:disabled{color:#626b70;background:#f7f7f7}
 #primary .entry-content #master-bookshelf-test .master-search-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:.75rem;margin:0 0 1.2rem}
 #primary .entry-content #master-bookshelf-test .master-search-button{min-height:40px;padding:7px 13px;border:1px solid #262b2f;border-radius:2px;background:#262b2f;color:#fff;font:inherit}
 #primary .entry-content #master-bookshelf-test .master-search-button:hover{background:#111518}
@@ -363,19 +361,14 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content #master-bookshelf-test .master-pagination button:disabled{opacity:.45}
 #primary .entry-content #master-bookshelf-test .master-loading,
 #primary .entry-content #master-bookshelf-test .master-empty{padding:1rem 0;border-bottom:1px solid #e0e2e3;background:transparent;color:#50585e}
-#primary .entry-content #master-bookshelf-test .master-extras,
-#primary .entry-content #master-bookshelf-test .master-collections{margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid #e0e2e3}
+#primary .entry-content #master-bookshelf-test .master-extras{margin-top:1.5rem;padding-top:1.2rem;border-top:1px solid #e0e2e3}
 #primary .entry-content #master-bookshelf-test .master-resource{padding:.8rem 0;border-bottom:1px solid #e0e2e3}
 #primary .entry-content #master-bookshelf-test .master-resource h3{margin:0 0 .35rem;color:#36566a;font-weight:600}
-#primary .entry-content #master-bookshelf-test .master-collections>p{margin:0 0 .8rem;line-height:1.65;color:#50585e}
-#primary .entry-content #master-bookshelf-test .master-collection-links{display:flex;flex-wrap:wrap;gap:.55rem}
-#primary .entry-content #master-bookshelf-test .master-collection-links a{display:inline-flex;align-items:center;min-height:38px;padding:5px 10px;border:1px solid #c8cdd0;border-radius:2px;background:#fafafa;color:#111!important;line-height:1.4;text-decoration:none!important}
-#primary .entry-content #master-bookshelf-test .master-collection-links a:hover{background:#f1f1f1;text-decoration:underline!important}
 #primary .entry-content #master-bookshelf-test a:focus-visible,
 #primary .entry-content #master-bookshelf-test button:focus-visible,
 #primary .entry-content #master-bookshelf-test input:focus-visible,
 #primary .entry-content #master-bookshelf-test select:focus-visible{outline:2px solid #6b91a8;outline-offset:2px}
-@media(max-width:650px){#primary .entry-content #master-bookshelf-test .master-controls{grid-template-columns:1fr}#primary .entry-content #master-bookshelf-test .master-search-row{grid-template-columns:minmax(0,1fr)}#primary .entry-content #master-bookshelf-test .master-results-heading{align-items:flex-start;flex-direction:column;gap:.15rem}#primary .entry-content #master-bookshelf-test .master-search-button{width:100%}#primary .entry-content #master-bookshelf-test .master-pagination{gap:.5rem;flex-wrap:wrap}}
+@media(max-width:650px){#primary .entry-content #master-bookshelf-test .master-controls{grid-template-columns:minmax(0,1fr)}#primary .entry-content #master-bookshelf-test .master-search-row{grid-template-columns:minmax(0,1fr)}#primary .entry-content #master-bookshelf-test .master-results-heading{align-items:flex-start;flex-direction:column;gap:.15rem}#primary .entry-content #master-bookshelf-test .master-search-button{width:100%}#primary .entry-content #master-bookshelf-test .master-pagination{gap:.5rem;flex-wrap:wrap}}
 </style>
 </head>
 
@@ -433,14 +426,13 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
           </optgroup>
         </select>
       </label>
-      <label class="master-period-wrap" for="master-period">Period
-        <select id="master-period">
-          <option value="all">All Philosophy</option>
-          <option value="ancient-medieval">Ancient &amp; Medieval</option>
-          <option value="modern">Modern Period</option>
-          <option value="20th-century-present">~20th Century</option>
+      <label for="master-collection">Choose a collection
+        <select id="master-collection">
+          <option value="" selected>Browse a collection…</option>
+          <option value="/antilogicalism/primary-sources/sacred-books-of-the-east/">Sacred Books of the East</option>
+          <option value="/antilogicalism/primary-sources/harvard-classics/">Harvard Classics</option>
+          <option value="/antilogicalism/primary-sources/church-fathers/">Church Fathers</option>
         </select>
-        <span class="master-period-note" hidden>Available for Philosophy only</span>
       </label>
     </div>
     <div class="master-search-row">
@@ -467,15 +459,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
     </section>
   </section>
 
-  <section class="master-collections" aria-labelledby="master-collections-heading">
-    <h2 id="master-collections-heading">Collections</h2>
-    <p>Explore curated reading lists.</p>
-    <div class="master-collection-links">
-      <a href="/antilogicalism/primary-sources/sacred-books-of-the-east/">Sacred Books of the East</a>
-      <a href="/antilogicalism/primary-sources/harvard-classics/">Harvard Classics</a>
-      <a href="/antilogicalism/primary-sources/church-fathers/">Church Fathers</a>
-    </div>
-  </section>
 </div>
 <div class="sharedaddy sd-sharing-enabled"><div class="robots-nocontent sd-block sd-social sd-social-official sd-sharing"><h3 class="sd-title">Share this:</h3><div class="sd-content"><ul><li class="share-facebook"><div class="fb-share-button" data-href="/antilogicalism/primary-sources/master-test/" data-layout="button_count"></div></li><li class="share-twitter"><a href="https://twitter.com/share" class="twitter-share-button" data-url="/antilogicalism/primary-sources/master-test/" data-text="A History of Ideas — Master Bookshelf Test" data-via="antilogicalism">Tweet</a></li><li class="share-email"><a rel="nofollow noopener noreferrer" data-shared="" class="share-email sd-button" href="mailto:?subject=%5BShared%20Post%5D%20A%20History%20of%20Ideas&amp;body=http%3A%2F%2Fantilogicalism.test%2Fprimary-sources%2F&amp;share=email" target="_blank" title="Click to email a link to a friend" data-email-share-error-title="Do you have email set up?" data-email-share-error-text="If you're having problems sharing via email, you might not have email set up for your browser. You may need to create a new email yourself." data-email-share-nonce="91dac7f3ef" data-email-share-track-url="/antilogicalism/primary-sources/master-test/?share=email"><span>Email</span></a></li><li class="share-print"><a rel="nofollow noopener noreferrer" data-shared="" class="share-print sd-button" href="/antilogicalism/primary-sources/master-test/#print" target="_blank" title="Click to print"><span>Print</span></a></li><li class="share-end"></ul></div></div></div>					</div><!-- .entry-content -->
 </article><!-- #post-6350 -->
@@ -788,6 +771,6 @@ c0.091-0.647,0.349-1.086,0.635-1.337c-2.22-0.251-4.555-1.111-4.555-4.943c0-1.091
 </svg>
 
 <script src="/antilogicalism/assets/search.js" defer></script>
-<script src="/antilogicalism/primary-sources/master-test/master-bookshelf.js" defer></script>
+<script src="/antilogicalism/primary-sources/master-test/master-bookshelf.js?v=20261013-master-collections-1" defer></script>
 </body>
 </html>
