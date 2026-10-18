@@ -269,7 +269,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <meta property="og:description" content="Explore verified source passages with the Antilogicalism Reading Companion pilot.">
 <meta name="twitter:text:title" content="Reading Companion | Antilogicalism">
 
-<script defer src="/antilogicalism/reading-companion/companion.js"></script>
+<script type="module" src="/antilogicalism/reading-companion/companion-v110.mjs"></script>
 
 <style id="antilogicalism-theme-typography">
 /* Let Book Lite set the font and scale throughout every edited page. */
@@ -327,6 +327,25 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot #companion-answer:not(:empty){border-top:1px solid #dfe2e3;border-bottom:1px solid #dfe2e3;margin:1.2rem 0;padding:.8rem 0 1.2rem}
 #companion-pilot .companion-answer-text{white-space:pre-wrap}
 @media(max-width:650px){#companion-pilot .companion-actions{display:block}#companion-pilot .companion-actions button{margin:0 .4rem .6rem 0}}
+
+#companion-pilot #companion-book-filter{display:block;width:100%;max-width:100%;margin:.4rem 0 1rem}
+#companion-pilot .companion-examples{margin:.8rem 0 1.4rem}
+#companion-pilot .companion-examples p{margin:.25rem 0 .6rem}
+#companion-pilot .companion-example-buttons,#companion-pilot .companion-follow-up-buttons{display:flex;gap:8px;flex-wrap:wrap}
+#companion-pilot .companion-example-buttons button,#companion-pilot .companion-follow-up-buttons button{background:#fff;color:#111;border:1px solid #333;border-radius:2px;font:inherit;font-size:.85em;line-height:1.45;padding:8px 12px;white-space:normal;text-align:left;max-width:100%}
+#companion-pilot .companion-example-buttons button:hover,#companion-pilot .companion-follow-up-buttons button:hover{background:#f5f5f5;color:#111}
+#companion-pilot .companion-follow-ups{margin:1.2rem 0}
+#companion-pilot .companion-follow-ups h3,#companion-pilot .companion-highlights h3,#companion-pilot .companion-citations h3{text-align:left;font-size:1.03em;margin:.65rem 0 .5rem;font-weight:600}
+#companion-pilot .companion-highlights{padding:.8rem 0;margin:.7rem 0;border-top:1px solid #dfe2e3}
+#companion-pilot .companion-highlights blockquote{position:static!important;text-indent:0!important;margin:.8rem 0!important;padding:8px 12px!important;border-left:2px solid #bbb!important;background:#fafafa!important;color:#333;line-height:1.6;font-size:.94em}
+#companion-pilot .companion-highlights blockquote::before,#companion-pilot .companion-highlights blockquote::after{display:none!important;content:none!important}
+#companion-pilot .companion-highlights blockquote a{font-style:normal;font-size:.83em;display:block;margin-top:.35rem}
+#companion-pilot .companion-citations{border-top:1px solid #dfe2e3;margin-top:1rem;padding-top:.5rem}
+#companion-pilot .companion-citations p{margin:.4rem 0}
+#companion-pilot .companion-inline-citation{white-space:nowrap;text-decoration:underline}
+#companion-pilot #companion-passage-browser h2{font-size:1.2em;text-align:left;margin:1.6rem 0 .6rem}
+#companion-pilot #companion-passage-browser .companion-source-heading{font-size:.92em}
+@media(max-width:650px){#companion-pilot .companion-example-buttons button,#companion-pilot .companion-follow-up-buttons button{width:100%}}
 </style>
 </head>
 
@@ -360,10 +379,21 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <article id="reading-companion" class="page type-page status-publish hentry">
 <header class="entry-header"><h1 class="entry-title">Reading Companion</h1></header>
 <div class="entry-content">
-<section id="companion-pilot" aria-label="Antilogicalism Reading Companion pilot">
-<p>Explore indexed passages from the books on Antilogicalism and ask questions with direct links to original PDF pages. The first verified-AI demonstration is limited to <em>History of the Peloponnesian War</em> by Thucydides, PDF pages 33–64. Broader library coverage is in development.</p>
+<section id="companion-pilot" aria-label="Antilogicalism Reading Companion">
+<p>Explore ideas across philosophy, history, science, and literature using the original indexed books. The verified-AI pilot currently covers a small interdisciplinary collection; the full 644-book library is still available through <a href="/antilogicalism/digital-library/">Library Search</a>.</p>
+<div id="companion-suggested-questions" class="companion-examples" aria-label="Example questions">
+<p><strong>Try a question</strong></p>
+<div class="companion-example-buttons">
+<button type="button">What caused the Peloponnesian War?</button>
+<button type="button">How do virtue and practical wisdom contribute to happiness in Aristotle's Nicomachean Ethics?</button>
+<button type="button">According to Darwin, how does natural selection operate?</button>
+<button type="button">How does Raskolnikov justify murder in Crime and Punishment?</button>
+</div><p class="companion-hint">Select an idea to fill the question box. Nothing is submitted until you click Ask.</p>
+</div>
 <form id="companion-question-form">
-<label for="companion-question"><strong>Ask a question about the text</strong></label>
+<label for="companion-book-filter"><strong>Search in a book</strong></label>
+<select id="companion-book-filter"><option value="">All available books</option></select>
+<label for="companion-question"><strong>Ask a question</strong></label>
 <textarea id="companion-question" maxlength="400" rows="3" required>What caused the Peloponnesian War?</textarea>
 <div class="companion-actions">
 <button id="companion-find-button" type="button">Find passages</button>
@@ -372,13 +402,15 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <p id="companion-challenge" role="status" class="companion-hint">Checking AI availability…</p>
 <div id="companion-turnstile" aria-label="Visitor verification"></div>
 </form>
-<p id="companion-scope" class="companion-hint"></p>
+<p id="companion-scope" class="companion-hint" role="status"></p>
 <p id="companion-status" aria-live="polite" role="status"></p>
 <section id="companion-answer" aria-live="polite" aria-label="Reading Companion response"></section>
-<h2>Sources</h2>
+<section aria-label="Retrieved source passages" id="companion-passage-browser">
+<h2>Retrieved passages</h2>
 <div id="companion-passage-list" aria-label="Relevant indexed passages"></div>
-<p class="companion-hint">The Reading Companion uses OCR text from original books. Page text is verified against owner-published SHA-256 fingerprints before any hosted AI answer is generated. Verification of source text does not guarantee the accuracy of every AI claim. For searches across the entire indexed collection, visit <a href="/antilogicalism/digital-library/">Library Search</a>.</p>
-<noscript><p>JavaScript is required for this demonstration. You can still <a href="/antilogicalism/digital-library/">search the digital library</a> or <a href="/antilogicalism/primary-sources/">browse the Bookshelf</a>.</p></noscript>
+</section>
+<p class="companion-hint">The system verifies the exact original OCR text against published SHA-256 fingerprints before sending passages to hosted AI. The citations are authentic PDF references, but interpretations can still contain errors. <a href="/antilogicalism/primary-sources/">Browse the full Bookshelf</a>.</p>
+<noscript><p>JavaScript is needed for the Reading Companion. <a href="/antilogicalism/digital-library/">Search the full digital library</a> instead.</p></noscript>
 </section>
 </div></article><!-- #reading-companion --><!-- #post-6350 -->
 
