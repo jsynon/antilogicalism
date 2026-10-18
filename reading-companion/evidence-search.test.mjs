@@ -35,3 +35,20 @@ test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  const out=mergeFacetSearches([{sources:[page(73),{bookId:'../../11',page:11},page(74)]}],2);
  assert.deepEqual(out.map(x=>x.page),[73,74]);
 });
+
+
+test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const js=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
+ assert.match(js,/API\+'\/api\/pilot-plan'/);
+ assert.match(js,/data\.searchPlanning===true/);
+ assert.match(js,/validSearchPlan\(data\.queries\)/);
+ assert.match(js,/const found=await searchPages\(queries\)/);
+ assert.match(js,/token=await nextTurnstileToken\(\)/);
+ assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
+ assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text\}\)=>\(\{bookId,page,text\}\)\)/);
+ assert.match(js,/MAX_SELECTED=2/);
+ assert.match(js,/const manual=lastSearch===q/);
+ assert.match(js,/data\.outcome==='insufficient-evidence'/);
+ assert.doesNotMatch(js,/innerHTML\s*=/);
+});
