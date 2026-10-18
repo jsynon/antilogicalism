@@ -36,3 +36,18 @@ for(const entry of checks) {
     'score',x.score.toFixed(1),':',preview);
  }
 }
+
+console.log('\n=== Reader-reference audit: published Dostoevsky pages ===');
+const novel=await library.jsonGzip('book-114.json');
+for(const [name,exp] of [
+ ['extraordinary',/\bextraordinary\b/i],
+ ['Napoleon',/\bNapoleon\b/i],
+ ['theory',/\btheory\b/i],
+ ['murder moral theory',/\bmurder\b[\s\S]{0,400}\b(?:theory|conscience|right)\b/i],
+ ['guilt',/\bguilt\b/i],
+ ['conscience',/\bconscience\b/i]
+]){
+ const hits=novel.pages.filter(p=>exp.test(p.text));
+ console.log('MATCH '+name+': '+hits.length+' pages');
+ console.log('PAGES '+name+':',hits.slice(0,16).map(x=>x.page));
+}
