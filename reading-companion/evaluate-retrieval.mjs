@@ -51,3 +51,17 @@ for(const [name,exp] of [
  console.log('MATCH '+name+': '+hits.length+' pages');
  console.log('PAGES '+name+':',hits.slice(0,16).map(x=>x.page));
 }
+
+console.log('\n=== Feasibility: concept-level search terms (manual eval, not hardcoded app rules) ===');
+for(const query of [
+ 'Raskolnikov extraordinary man theory article Napoleon right murder',
+ 'Raskolnikov conscience remorse suffering guilt confession Sonia',
+ 'natural selection inherited variation struggle existence',
+ 'Athenian power fear Sparta underlying cause war truce complaints'
+]){
+ const bookId=query.toLowerCase().includes('raskolnikov')?'114':
+   query.toLowerCase().includes('selection')?'529':'152';
+ const output=await library.search(query,{bookId,allowedBookIds:new Set([bookId]),maxBooks:1,pagesPerBook:3});
+ console.log('SEARCH',query,'PAGES',output.sources.map(x=>x.page));
+ for(const source of output.sources.slice(0,2))console.log(' ',source.preview.replace(/\s+/g,' ').slice(0,320));
+}
