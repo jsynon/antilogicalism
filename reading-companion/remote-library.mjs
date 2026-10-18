@@ -3,7 +3,22 @@
  * Original shard IDs, physical PDF pages and manifest PDF URLs are preserved.
  */
 export const DEFAULT_INDEX_ROOT = 'https://jsynon.github.io/antilogicalism-library-data/data-v47/';
-const STOP = new Set('a an and are as at be by can do does for from how i in is it of on or our the their these this to was were what when where who why with would'.split(' '));
+// Remove question framing and common function words before searching. These
+// terms describe what the reader wants the assistant to do, not what the
+// source passage is likely to say, and can otherwise reward incidental pages.
+const STOP = new Set(`
+  a about according after all also an and are as at be because been before being
+  between both but by can could did do does doing down during each either for
+  from further had has have he her hers him his how i if in into is it its
+  itself just may might more most must neither no nor not of off on once one
+  only or other our ours out over own same she should so some such than that
+  the their theirs them themselves then there these they this those through to
+  too under until up very was we were what when where which who whom why will
+  with would you your yours analyze analyzed analyzing book challenge challenges
+  challenged challenging describe described describing discuss discussed
+  discussing explain explains explained explaining novel novels relationship
+  relationships show shows showed showing work works
+`.trim().split(/\s+/));
 const PDF = /^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:view|preview)/;
 export function queryTerms(question) {
   return [...new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || [])]
@@ -61,14 +76,15 @@ function wordStem(word) {
   if (w.length > 4 && w.endsWith('e')) w = w.slice(0, -1);
   return w;
 }
-export function substantivePageEvidence(text, terms) {
+export function substantivePageEvidence(text, terms, headerTerms = new Set()) {
   if (isNavigationPage(text) || isPublicationPage(text)) return null;
   const words = String(text || '').toLowerCase().match(/[a-z0-9]+/g) || [];
   if (words.length < 10) return null;
   const roots = [...new Set(terms.map(wordStem))];
   const wanted = new Set(roots);
-  let hits = 0, best = {score:0, center:0}, unique = new Set();
-  const normalized = words.map(wordStem);
+  let hits = 0, best = {score:0, center:0, unique:0}, unique = new Set();
+  const normalized = words.map((word, index) =>
+    index < 24 && headerTerms.has(wordStem(word)) ? '' : wordStem(word));
   for (let i = 0; i < normalized.length; i++) {
     if (wanted.has(normalized[i])) { unique.add(normalized[i]); hits++; }
   }
@@ -81,14 +97,19 @@ export function substantivePageEvidence(text, terms) {
     const present = new Set(window.filter(word => wanted.has(word)));
     const matched = window.filter(word => wanted.has(word)).length;
     const score = 9 * present.size + Math.min(8, matched);
-    if (score > best.score) best = {score, center:Math.min(words.length-1, i+55)};
+    if (score > best.score) best = {
+      score, center:Math.min(words.length-1, i+55), unique:present.size
+    };
   }
-  let score = best.score + 6 * unique.size + Math.min(5, Math.log1p(hits));
+  // Prefer a compact passage where several topic terms meet over a page that
+  // mentions many query terms in unrelated paragraphs. Whole-page coverage is
+  // still useful, but should not outweigh local evidence concentration.
+  let score = best.score + 2 * unique.size + Math.min(5, Math.log1p(hits));
   const opening = String(text).trim().slice(0, 180);
   if (/^(?:(?:\d+|[ivxlc]+)\s+)?(?:introduction|preface|foreword|acknowledg(?:e)?ments)\b/i.test(opening)) {
     score -= 12; // A preference, not a ban; introductions can contain arguments.
   }
-  return {score, unique:unique.size, center:best.center};
+  return {score, unique:unique.size, localUnique:best.unique, center:best.center};
 }
 export function excerptAroundEvidence(text, terms, max = 1080) {
   const compact = String(text || '').replace(/\s+/g, ' ').trim();
@@ -170,9 +191,26 @@ export class RemoteLibrary {
   async search(question, {bookId = '', allowedBookIds = null, maxBooks = 2, pagesPerBook = 2} = {}) {
     const started = performance.now();
     const manifest = await this.manifest();
-    const terms = queryTerms(question).filter(t => manifest.partitions.includes(t.slice(0, 2)));
+    const selectedTitle = bookId ? String(manifest.books[String(bookId)]?.title || '') : '';
+    const titleTerms = new Set((selectedTitle.toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
+    // The catalog title puts the author's name after a dash. In a selected
+    // work, author names are scope metadata, not evidence for a page-level
+    // claim (and many digitized books repeat them in headers).
+    const authorTerms = new Set((selectedTitle.split(/\s+[—–-]\s+/).slice(1).join(' ')
+      .toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
+    // Selected-book headers often repeat the title, but the title can also
+    // name the reader's actual subject (for example, the Peloponnesian War).
+    // Keep those query terms and ignore title words only in page-header text.
+    const terms = queryTerms(question)
+      .filter(term => !authorTerms.has(wordStem(term)))
+      .filter(term => manifest.partitions.includes(term.slice(0, 2)));
     if (!terms.length) return {terms:[], sources:[], elapsedMs:Math.round(performance.now() - started)};
     const prefixes = [...new Set(terms.map(t => t.slice(0,2)))];
+    // A selected page must match more than one topic term for a compound
+    // query. This prevents a single incidental mention from filling the
+    // small citation budget while keeping short, focused searches usable.
+    const minimumEvidenceTerms = terms.length >= 2
+      ? Math.min(3, Math.floor(terms.length / 2) + 1) : 1;
     const data = new Map(await Promise.all(prefixes.map(async p => [p, await this.partition(p)])));
     const scores = new Map();
     let anchorTerm = '', anchorCount = Infinity, anchorPages = [];
@@ -259,8 +297,8 @@ export class RemoteLibrary {
         }
         if ((item.text.match(/[a-z]+/gi) || []).length >= 10 &&
             !proseByPage.has(item.page)) proseByPage.set(item.page, item);
-        const evidence = substantivePageEvidence(item.text, terms);
-        if (!evidence) continue;
+        const evidence = substantivePageEvidence(item.text, terms, titleTerms);
+        if (!evidence || evidence.localUnique < minimumEvidenceTerms) continue;
         const hit = relevant.get(item.id);
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
       }
