@@ -5,6 +5,7 @@
  */
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
+import {mergeFacetSearches,validSearchPlan} from './evidence-search.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -30,7 +31,8 @@ const sourceShards=new Map();
 const sourceReader=createSourceReader({getBook:id=>bookShard(id),
   getManifest:()=>library.manifest(),isAllowedBook:id=>allowed.has(id)});
 let bookList=[FALLBACK_BOOK], allowed=new Set(['152']), oldPilotFallback=true;
-let pilotEnabled=false, turnstileToken='', turnstileId=null;
+let pilotEnabled=false, searchPlanningEnabled=false, turnstileToken='', turnstileId=null;
+let pendingTurnstile=null;
 let candidates=[], selected=new Set(), lastSearch='', searching=false, answering=false;
 
 function node(tag,textValue,className){
@@ -84,6 +86,7 @@ async function loadStatus(){
     const response=await fetch(API+'/api/pilot-status',{cache:'no-store'});
     if(!response.ok)throw Error('Public pilot status unavailable');
     const data=await response.json();
+    searchPlanningEnabled=data.searchPlanning===true;
     pilotEnabled=data.enabled===true && typeof data.turnstileSiteKey==='string' &&
       data.turnstileSiteKey.length>10;
     if(!pilotEnabled){
@@ -98,7 +101,15 @@ async function loadStatus(){
       if(!window.turnstile){challenge.textContent='Visitor verification could not start.';return;}
       turnstileId=window.turnstile.render(challengeBox,{
         sitekey:data.turnstileSiteKey,action:'companion_ask',theme:'light',
-        callback:token=>{turnstileToken=token;updateButtons();},
+        callback:token=>{
+          turnstileToken=token;
+          if(pendingTurnstile){
+            const waiter=pendingTurnstile;
+            pendingTurnstile=null;clearTimeout(waiter.timeout);
+            waiter.resolve(token);
+          }
+          updateButtons();
+        },
         'expired-callback':()=>{turnstileToken='';updateButtons();},
         'error-callback':()=>{turnstileToken='';updateButtons();}
       });
@@ -122,7 +133,7 @@ async function bookShard(id){
   }
   return sourceShards.get(id);
 }
-async function searchPages(){
+async function searchPages(plannedQueries=null){
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   searching=true;updateButtons();setStatus('Searching the indexed books for relevant passages…');
@@ -152,14 +163,22 @@ async function searchPages(){
         }).filter(s=>new TextEncoder().encode(s.text).byteLength<=PDF_PAGE_LIMIT)
         .sort((a,b)=>b.score-a.score||a.page-b.page);
     }else{
-      const found=await library.search(q,{bookId:bookFilter.value,
-        allowedBookIds:allowed,maxBooks:2,pagesPerBook:3});
-      // Prefer one passage from each relevant book for comparative questions.
-      const results=found.sources.filter(allowedPage);
+      const searches=validSearchPlan(plannedQueries)?plannedQueries:[q];
+      const foundSets=await Promise.all(searches.map(term=>library.search(term,{
+        bookId:bookFilter.value,allowedBookIds:allowed,maxBooks:2,
+        pagesPerBook:3
+      })));
+      const results=foundSets.length>1?
+        mergeFacetSearches(foundSets,8).filter(allowedPage):
+        foundSets[0].sources.filter(allowedPage);
+      // Preserve one page for each distinct facet before filling from other
+      // candidates. If a reader searched manually, retain the previous
+      // book-diversity rule and allow them to change checkbox selections.
       const representatives=[],others=[],visited=new Set();
       for(const r of results){
-        if(visited.has(r.bookId))others.push(r);
-        else {visited.add(r.bookId);representatives.push(r);}
+        const group=plannedQueries?String(r.facet):r.bookId;
+        if(visited.has(group))others.push(r);
+        else {visited.add(group);representatives.push(r);}
       }
       const ordered=[...representatives,...others];
       for(const s of ordered){
