@@ -25,3 +25,5 @@ jobs:
           node --check reading-companion/source-reader.mjs
           node --check reading-companion/source-text-format.mjs
           node --test reading-companion/*.test.mjs
+      - name: Read-only interdisciplinary retrieval audit against published v47
+        run: node reading-companion/evaluate-retrieval.mjs
