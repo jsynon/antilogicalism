@@ -124,24 +124,49 @@ async function searchPages(){
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   searching=true;updateButtons();setStatus('Searching the indexed books for relevant passages…');
   try{
-    const found=await library.search(q,{bookId:bookFilter.value,
-      allowedBookIds:allowed,maxBooks:2,pagesPerBook:3});
-    // Prefer one passage from each relevant book for comparative questions.
-    const results=found.sources.filter(allowedPage);
-    const representatives=[],others=[],visited=new Set();
-    for(const r of results){
-      if(visited.has(r.bookId))others.push(r);
-      else {visited.add(r.bookId);representatives.push(r);}
-    }
-    const ordered=[...representatives,...others];
-    const populated=[];
-    for(const s of ordered){
-      const shard=await bookShard(s.bookId);
-      const original=shard.pages?.find(p=>p.id===s.globalPageId && p.page===s.page);
-      if(!original || typeof original.text!=='string')continue;
-      const byteLength=new TextEncoder().encode(original.text).byteLength;
-      if(byteLength<25||byteLength>PDF_PAGE_LIMIT)continue;
-      populated.push({...s,text:original.text,byteLength});
+    let populated=[];
+    if(oldPilotFallback){
+      // Until the four-book publication reaches GitHub Pages, search the
+      // previously proven 32-page Thucydides selection directly. Do not
+      // search the entire shard and accidentally offer unverified pages.
+      const book=await bookShard('152');
+      const stop=new Set(['what','when','where','why','does','was','were','the','and',
+         'from','about','that','this','with','they','have','which','could','should']);
+      const words=[...new Set((q.toLowerCase().match(/[a-z0-9]+/g)||[])
+        .filter(w=>w.length>2&&!stop.has(w)))];
+      const pdf='https://drive.google.com/file/d/1i78jRD5kH4-xs2l1TUtrp80olKQv8kRu/view?usp=sharing#page=';
+      populated=book.pages.filter(p=>p.page>=33&&p.page<=64 &&
+          typeof p.text==='string' && p.text.trim().length>=25)
+        .map(p=>{
+          const content=p.text.toLowerCase();
+          const hits=words.filter(w=>content.includes(w));
+          const points=hits.length*10+
+             Math.min(10,hits.reduce((v,w)=>v+content.split(w).length-1,0));
+          return {id:'S1',bookId:'152',title:FALLBACK_BOOK.title,
+            page:p.page,globalPageId:p.id,text:p.text,score:points,
+            url:pdf+p.page,
+            preview:p.text.replace(/\s+/g,' ').trim().slice(0,600)};
+        }).filter(s=>new TextEncoder().encode(s.text).byteLength<=PDF_PAGE_LIMIT)
+        .sort((a,b)=>b.score-a.score||a.page-b.page);
+    }else{
+      const found=await library.search(q,{bookId:bookFilter.value,
+        allowedBookIds:allowed,maxBooks:2,pagesPerBook:3});
+      // Prefer one passage from each relevant book for comparative questions.
+      const results=found.sources.filter(allowedPage);
+      const representatives=[],others=[],visited=new Set();
+      for(const r of results){
+        if(visited.has(r.bookId))others.push(r);
+        else {visited.add(r.bookId);representatives.push(r);}
+      }
+      const ordered=[...representatives,...others];
+      for(const s of ordered){
+        const shard=await bookShard(s.bookId);
+        const original=shard.pages?.find(p=>p.id===s.globalPageId && p.page===s.page);
+        if(!original || typeof original.text!=='string')continue;
+        const byteLength=new TextEncoder().encode(original.text).byteLength;
+        if(byteLength<25||byteLength>PDF_PAGE_LIMIT)continue;
+        populated.push({...s,text:original.text,byteLength});
+      }
     }
     candidates=populated.slice(0,8);
     lastSearch=q+'|'+bookFilter.value;
