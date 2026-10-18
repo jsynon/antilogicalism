@@ -27,3 +27,7 @@ jobs:
           node --test reading-companion/*.test.mjs
       - name: Read-only interdisciplinary retrieval audit against published v47
         run: node reading-companion/evaluate-retrieval.mjs
+      - name: Offline semantic feasibility against four indexed books (not deployed)
+        run: |
+          python -m pip install --quiet numpy scikit-learn
+          python reading-companion/evaluate-semantic.py
