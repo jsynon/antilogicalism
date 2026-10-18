@@ -7,6 +7,7 @@ publish_final.py
 complete_publication.py
 fix_article_navigation.py
 fix_previous_article.py
+generate_sitemap.py
 
 # Local HTML backups
 **/index.before-navigation.html
