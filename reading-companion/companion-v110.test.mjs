@@ -41,3 +41,15 @@ test('v1.10 never claims unsupported books are ready if fingerprint index missin
  assert.match(client,/bookList=\[FALLBACK_BOOK\]/);
  assert.match(client,/reader-fingerprints-v1\/coverage-v1\.json/);
 });
+
+
+test('Book Lite opening drop cap and small-caps apply only to the introductory paragraph',()=>{
+ const base='#primary .entry-content #companion-pilot > p:first-child';
+ assert(html.includes(base+'::first-line'));
+ assert(html.includes(base+'::first-letter'));
+ assert.match(html,/font-size:7\.03rem;/);
+ assert.match(html,/line-height:43px;/);
+ assert.match(html,/margin:9px 5px 0 0;/);
+ assert.match(html,/<section id="companion-pilot"[^>]*>\s*<p>Explore ideas/);
+ assert(!html.includes('#companion-pilot .companion-answer-text::first-letter'));
+});
