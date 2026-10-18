@@ -21,4 +21,7 @@ jobs:
       - run: |
           node --check reading-companion/companion-v110.mjs
           node --check reading-companion/remote-library.mjs
-          node --test reading-companion/companion-v110.test.mjs reading-companion/remote-library.scoped.test.mjs
+          node --check reading-companion/companion-v110.mjs
+          node --check reading-companion/source-reader.mjs
+          node --check reading-companion/source-text-format.mjs
+          node --test reading-companion/*.test.mjs
