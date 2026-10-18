@@ -5,6 +5,7 @@
  */
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
+import {mergeFacetSearches,validSearchPlan} from './evidence-search.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -30,7 +31,8 @@ const sourceShards=new Map();
 const sourceReader=createSourceReader({getBook:id=>bookShard(id),
   getManifest:()=>library.manifest(),isAllowedBook:id=>allowed.has(id)});
 let bookList=[FALLBACK_BOOK], allowed=new Set(['152']), oldPilotFallback=true;
-let pilotEnabled=false, turnstileToken='', turnstileId=null;
+let pilotEnabled=false, searchPlanningEnabled=false, turnstileToken='', turnstileId=null;
+let pendingTurnstile=null;
 let candidates=[], selected=new Set(), lastSearch='', searching=false, answering=false;
 
 function node(tag,textValue,className){
@@ -84,6 +86,7 @@ async function loadStatus(){
     const response=await fetch(API+'/api/pilot-status',{cache:'no-store'});
     if(!response.ok)throw Error('Public pilot status unavailable');
     const data=await response.json();
+    searchPlanningEnabled=data.searchPlanning===true;
     pilotEnabled=data.enabled===true && typeof data.turnstileSiteKey==='string' &&
       data.turnstileSiteKey.length>10;
     if(!pilotEnabled){
@@ -98,7 +101,15 @@ async function loadStatus(){
       if(!window.turnstile){challenge.textContent='Visitor verification could not start.';return;}
       turnstileId=window.turnstile.render(challengeBox,{
         sitekey:data.turnstileSiteKey,action:'companion_ask',theme:'light',
-        callback:token=>{turnstileToken=token;updateButtons();},
+        callback:token=>{
+          turnstileToken=token;
+          if(pendingTurnstile){
+            const waiter=pendingTurnstile;
+            pendingTurnstile=null;clearTimeout(waiter.timeout);
+            waiter.resolve(token);
+          }
+          updateButtons();
+        },
         'expired-callback':()=>{turnstileToken='';updateButtons();},
         'error-callback':()=>{turnstileToken='';updateButtons();}
       });
@@ -122,7 +133,7 @@ async function bookShard(id){
   }
   return sourceShards.get(id);
 }
-async function searchPages(){
+async function searchPages(plannedQueries=null){
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   searching=true;updateButtons();setStatus('Searching the indexed books for relevant passages…');
@@ -152,14 +163,22 @@ async function searchPages(){
         }).filter(s=>new TextEncoder().encode(s.text).byteLength<=PDF_PAGE_LIMIT)
         .sort((a,b)=>b.score-a.score||a.page-b.page);
     }else{
-      const found=await library.search(q,{bookId:bookFilter.value,
-        allowedBookIds:allowed,maxBooks:2,pagesPerBook:3});
-      // Prefer one passage from each relevant book for comparative questions.
-      const results=found.sources.filter(allowedPage);
+      const searches=validSearchPlan(plannedQueries)?plannedQueries:[q];
+      const foundSets=await Promise.all(searches.map(term=>library.search(term,{
+        bookId:bookFilter.value,allowedBookIds:allowed,maxBooks:2,
+        pagesPerBook:3
+      })));
+      const results=foundSets.length>1?
+        mergeFacetSearches(foundSets,8).filter(allowedPage):
+        foundSets[0].sources.filter(allowedPage);
+      // Preserve one page for each distinct facet before filling from other
+      // candidates. If a reader searched manually, retain the previous
+      // book-diversity rule and allow them to change checkbox selections.
       const representatives=[],others=[],visited=new Set();
       for(const r of results){
-        if(visited.has(r.bookId))others.push(r);
-        else {visited.add(r.bookId);representatives.push(r);}
+        const group=plannedQueries?String(r.facet):r.bookId;
+        if(visited.has(group))others.push(r);
+        else {visited.add(group);representatives.push(r);}
       }
       const ordered=[...representatives,...others];
       for(const s of ordered){
@@ -310,19 +329,67 @@ function renderResponse(data){
   }
   answerBox.append(node('p','Source text verified by SHA-256. AI interpretations still require critical reading.','companion-hint'));
 }
+async function requestSourcePlan(q,verificationToken){
+  const res=await fetch(API+'/api/pilot-plan',{
+    method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:q,bookId:bookFilter.value,
+      turnstileToken:verificationToken})
+  });
+  let data;
+  try{data=await res.json();}catch{throw Error('The evidence search service returned an invalid response.');}
+  if(!res.ok)throw Error(data.error||'Evidence search planning is unavailable');
+  if(!validSearchPlan(data.queries))throw Error('The evidence search plan was incomplete.');
+  return data.queries;
+}
+async function nextTurnstileToken(){
+  if(!window.turnstile||turnstileId===null)
+    throw Error('Visitor verification needs to be reloaded.');
+  if(pendingTurnstile)throw Error('Visitor verification is already in progress.');
+  turnstileToken='';
+  const pending=new Promise((resolve,reject)=>{
+    const waiter={resolve,reject,timeout:null};
+    waiter.timeout=setTimeout(()=>{
+      if(pendingTurnstile===waiter){
+        pendingTurnstile=null;
+        reject(Error('The second visitor verification timed out. Please try again.'));
+      }
+    },120000);
+    pendingTurnstile=waiter;
+  });
+  setStatus('Evidence found. Complete visitor verification again to generate the answer.');
+  window.turnstile.reset(turnstileId);
+  challengeBox.scrollIntoView({behavior:'smooth',block:'center'});
+  const token=await pending;
+  if(typeof token!=='string'||token.length<5)
+    throw Error('Visitor verification was incomplete.');
+  return token;
+}
 async function askQuestion(){
   const q=question.value.trim();
   if(!pilotEnabled){setStatus('Hosted AI answers are not currently enabled.');return;}
   if(!turnstileToken){setStatus('Complete visitor verification before asking.');return;}
   answering=true;updateButtons();sourceReader.reset();answerBox.replaceChildren();
   try{
-    if(lastSearch!==q+'|'+bookFilter.value || !selected.size){
+    const manual=lastSearch===q+'|'+bookFilter.value&&selected.size>0;
+    let token=turnstileToken;
+    if(!manual && searchPlanningEnabled && !oldPilotFallback){
+      // One extra bounded hosted AI call helps FIND source passages, not
+      // invent answers. It consumes a single-use Turnstile token. A SECOND
+      // fresh verification is required for the fingerprint-protected answer.
+      turnstileToken='';
+      setStatus('Planning searches for different parts of your question…');
+      const queries=await requestSourcePlan(q,token);
+      setStatus('Finding complementary passages in the indexed books…');
+      const found=await searchPages(queries);
+      if(!found)return;
+      token=await nextTurnstileToken();
+    }else if(!manual){
       const found=await searchPages();
       if(!found)return;
     }
     const chosen=candidates.filter(s=>selected.has(selectionKey(s))).slice(0,MAX_SELECTED);
     if(!chosen.length){setStatus('Select a relevant passage first.');return;}
-    const token=turnstileToken;turnstileToken='';
+    turnstileToken='';
     setStatus('Verifying original source pages and generating an explanation…');
     const response=await fetch(API+'/api/pilot-answer',{
       method:'POST',headers:{'Content-Type':'application/json'},
@@ -332,7 +399,9 @@ async function askQuestion(){
     const data=await response.json();
     if(!response.ok)throw Error(data.error||'Worker returned HTTP '+response.status);
     renderResponse(data);
-    setStatus('The verified answer is ready.');
+    setStatus(data.outcome==='insufficient-evidence'?
+      'The verified sources were insufficient for a complete answer. Try another wording or choose different passages.':
+      'The verified answer is ready.');
   }catch(error){
     setStatus('The answer could not be completed: '+error.message);
   }finally{
