@@ -42,6 +42,17 @@ test('v1.10 never claims unsupported books are ready if fingerprint index missin
  assert.match(client,/reader-fingerprints-v1\/coverage-v1\.json/);
 });
 
+test('public companion copy explains the pilot without exposing implementation jargon',()=>{
+ assert.match(html,/Answers draw on passages from the current pilot collection/);
+ assert.match(html,/Citations open original PDF pages/);
+ assert.match(html,/id="companion-passage-browser" hidden/);
+ assert.doesNotMatch(html,/SHA-256|v47 index|Automatic evidence planning|visitor verification/i);
+ assert.match(client,/Checked passages will guide the answer/);
+ assert.match(client,/aria-label','Include '\+s\.title\+', PDF page '\+s\.page\+' in the answer/);
+ assert.match(client,/Answer ready below\./);
+ assert.doesNotMatch(client,/The verified answer is ready/);
+});
+
 
 test('Book Lite opening drop cap and small-caps apply only to the introductory paragraph',()=>{
  const base='#primary .entry-content #companion-pilot > p:first-child';
@@ -50,6 +61,6 @@ test('Book Lite opening drop cap and small-caps apply only to the introductory p
  assert.match(html,/font-size:7\.03rem;/);
  assert.match(html,/line-height:43px;/);
  assert.match(html,/margin:9px 5px 0 0;/);
- assert.match(html,/<section id="companion-pilot"[^>]*>\s*<p>Explore ideas/);
+ assert.match(html,/<section id="companion-pilot"[^>]*>\s*<p>Ask questions/);
  assert(!html.includes('#companion-pilot .companion-answer-text::first-letter'));
 });
