@@ -4,6 +4,7 @@
  * fingerprints before any inference. This is a four-book release, not 644 yet.
  */
 import {RemoteLibrary} from './remote-library.mjs';
+import {createSourceReader} from './source-reader.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -26,6 +27,8 @@ const challengeBox=el('companion-turnstile');
 const examples=el('companion-suggested-questions');
 const library=new RemoteLibrary();
 const sourceShards=new Map();
+const sourceReader=createSourceReader({getBook:id=>bookShard(id),
+  getManifest:()=>library.manifest(),isAllowedBook:id=>allowed.has(id)});
 let bookList=[FALLBACK_BOOK], allowed=new Set(['152']), oldPilotFallback=true;
 let pilotEnabled=false, turnstileToken='', turnstileId=null;
 let candidates=[], selected=new Set(), lastSearch='', searching=false, answering=false;
@@ -228,6 +231,7 @@ function putCitationTokens(target,answer,citations){
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
 }
 function renderResponse(data){
+  sourceReader.reset();
   answerBox.replaceChildren();
   const citations=Array.isArray(data.citations)?data.citations:[];
   answerBox.append(node('h2',data.outcome==='insufficient-evidence'?
@@ -282,7 +286,25 @@ function renderResponse(data){
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
       link.textContent='['+source.id+'] '+source.title+' · PDF page '+source.page;
-      row.append(link);sources.append(row);
+      row.append(link);
+      // The original PDF link remains untouched. The new button opens a
+      // separate in-page reader using the same trusted v47 book shard.
+      const highlight=(Array.isArray(data.evidenceHighlights)?
+        data.evidenceHighlights:[]).find(h=>
+        h.source_id===source.id&&Number(h.page)===Number(source.page));
+      const original=candidates.find(p=>p.bookId===String(source.bookId) &&
+        p.page===Number(source.page));
+      const excerpt=(typeof highlight?.quote==='string'&&highlight.quote.trim())?
+        highlight.quote:(original?.preview||source.preview||'');
+      const read=node('button','Read passage here','companion-inline-read');
+      read.type='button';
+      read.addEventListener('click',async()=>{
+        try{
+          await sourceReader.open({...source,excerpt},read);
+        }catch(error){setStatus('Source reader: '+error.message);}
+      });
+      row.append(document.createTextNode(' '),read);
+      sources.append(row);
     }
     answerBox.append(sources);
   }
@@ -292,7 +314,7 @@ async function askQuestion(){
   const q=question.value.trim();
   if(!pilotEnabled){setStatus('Hosted AI answers are not currently enabled.');return;}
   if(!turnstileToken){setStatus('Complete visitor verification before asking.');return;}
-  answering=true;updateButtons();answerBox.replaceChildren();
+  answering=true;updateButtons();sourceReader.reset();answerBox.replaceChildren();
   try{
     if(lastSearch!==q+'|'+bookFilter.value || !selected.size){
       const found=await searchPages();
@@ -320,7 +342,7 @@ async function askQuestion(){
   }
 }
 findButton.addEventListener('click',async()=>{
-  answerBox.replaceChildren();
+  sourceReader.reset();answerBox.replaceChildren();
   try{await searchPages();}
   catch(error){setStatus('Passage search failed: '+error.message);}
 });
