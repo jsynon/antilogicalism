@@ -1,3 +1,23 @@
+// Add the Reading Companion to the existing Book Lite navigation without
+// rewriting 1,500+ independently exported static HTML pages.
+(() => {
+  const menu=document.getElementById('menu-primary');
+  if(!menu || menu.querySelector('a[href="/antilogicalism/reading-companion/"]'))return;
+  const item=document.createElement('li');
+  item.className='menu-item menu-item-reading-companion';
+  const link=document.createElement('a');
+  link.href='/antilogicalism/reading-companion/';
+  link.textContent='Reading Companion';
+  if(location.pathname.startsWith('/antilogicalism/reading-companion/')){
+    item.className+=' current-menu-item';
+    link.setAttribute('aria-current','page');
+  }
+  item.appendChild(link);
+  const after=menu.querySelector('.menu-item-library-search');
+  if(after)after.insertAdjacentElement('afterend',item);
+  else menu.appendChild(item);
+})();
+
 
 (() => {
   const forms = document.querySelectorAll("[data-antilogicalism-search]");
