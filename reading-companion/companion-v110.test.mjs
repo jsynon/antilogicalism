@@ -1,0 +1,43 @@
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {test} from 'node:test';
+import {RemoteLibrary} from './remote-library.mjs';
+
+const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
+const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
+
+test('v1.10 retains Book Lite and the site navigation',()=>{
+ assert.match(html,/wp-content\/themes\/book-lite/);
+ assert.match(html,/id="masthead"/);
+ assert.match(html,/id="secondary"/);
+ assert.match(html,/companion-v110\.mjs/);
+});
+test('v1.10 includes requested reader-mode presentation in order',()=>{
+ const answer=client.indexOf('Reading Companion answer');
+ const explore=client.indexOf('Explore further',answer);
+ const passages=client.indexOf('Key passages from the source books',explore);
+ const sources=client.indexOf("'Sources'",passages);
+ assert(answer>=0);
+ assert(explore>answer);
+ assert(passages>explore);
+ assert(sources>passages);
+ assert.match(html,/id="companion-suggested-questions"/);
+ assert.match(html,/id="companion-book-filter"/);
+ assert.match(html,/id="companion-question"/);
+ assert.match(html,/id="companion-passage-list"/);
+ assert.match(html,/background:#fff;color:#111;border:1px solid #333/);
+});
+test('v1.10 uses original v47 retrieval, verified pilot endpoint and text-only output',()=>{
+ assert.match(client,/new RemoteLibrary\(\)/);
+ assert.match(client,/allowedBookIds:allowed/);
+ assert.match(client,/\/api\/pilot-answer/);
+ assert.match(client,/\.textContent/);
+ assert.doesNotMatch(client,/innerHTML\s*=/);
+ assert.doesNotMatch(client,/SOURCE_PROBE_TOKEN|TURNSTILE_SECRET|TEST_TOKEN/);
+ assert.equal(typeof RemoteLibrary,'function');
+});
+test('v1.10 never claims unsupported books are ready if fingerprint index missing',()=>{
+ assert.match(client,/oldPilotFallback=true/);
+ assert.match(client,/bookList=\[FALLBACK_BOOK\]/);
+ assert.match(client,/reader-fingerprints-v1\/coverage-v1\.json/);
+});
