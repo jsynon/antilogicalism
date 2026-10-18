@@ -307,6 +307,21 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #primary .entry-content #library-search-instructions p{font-family:inherit!important;font-size:inherit!important}
 </style>
 <style id="reading-companion-pilot-styles">
+/* Book Lite ordinarily gives the first direct .entry-content paragraph a
+   drop cap and small-caps opening line. The Reading Companion intro is nested
+   in a section, so restore only that first opening paragraph—not model answers. */
+#primary .entry-content #companion-pilot > p:first-child::first-line{
+  letter-spacing:0.05em;
+  font-variant:small-caps;
+}
+#primary .entry-content #companion-pilot > p:first-child::first-letter{
+  color:#000;
+  float:left;
+  font-size:70.3px;
+  font-size:7.03rem;
+  line-height:43px;
+  margin:9px 5px 0 0;
+}
 #companion-pilot{max-width:100%;color:#3e454a}
 #companion-pilot form{margin:1.1rem 0 1.6rem}
 #companion-pilot textarea{display:block;box-sizing:border-box;width:100%;max-width:100%;min-height:94px;margin:.5rem 0 1rem;padding:10px 12px;color:#333;background:#fff;border:1px solid #c8cdd0;font:inherit}
