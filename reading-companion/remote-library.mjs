@@ -197,9 +197,13 @@ export class RemoteLibrary {
     const anchorSet = new Set(anchorPages);
     const ranked = new Map();
     for (const [pageId, score] of scores) {
-      // Do not fill scarce book slots with works that only happen to
-      // mention generic companion terms while omitting the topic anchor.
-      if (anchorTerm && !anchorSet.has(pageId)) continue;
+      // A globally rare term can occur exclusively in OTHER books. When a
+      // reader selects a particular work, don't require its pages to contain
+      // that global anchor: rank candidate passages WITHIN the chosen book
+      // using the matching terms and full-text evidence checks below.
+      // Keep the existing anchor filter for unrestricted discovery, where
+      // it helps suppress incidental mentions in unrelated works.
+      if (!bookId && anchorTerm && !anchorSet.has(pageId)) continue;
       const id = String(manifest.page_books[pageId]);
       if (bookId && id !== String(bookId)) continue;
       if (allowedBookIds && !allowedBookIds.has(id)) continue;
