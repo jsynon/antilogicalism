@@ -3,6 +3,7 @@
  * without sending any content to a model or changing public site data.
  */
 import {RemoteLibrary} from './remote-library.mjs';
+import {rankBookEvidence} from './evidence-planner.mjs';
 import {readFileSync} from 'node:fs';
 
 const root='https://jsynon.github.io/antilogicalism-library-data/data-v47/';
@@ -21,5 +22,17 @@ for(const entry of checks) {
  const result=await library.search(entry.question,{bookId:entry.bookId,allowedBookIds:new Set([entry.bookId]),maxBooks:1,pagesPerBook:3});
  console.log('\n=== '+entry.name+' ===');
  console.log('Query terms:',result.terms,'anchor:',result.anchorTerm);
- for(const x of result.sources)console.log('page',x.page,':',x.preview.replace(/\s+/g,' ').slice(0,380));
+ for(const x of result.sources)console.log('BASELINE page',x.page,':',x.preview.replace(/\s+/g,' ').slice(0,230));
+ const shard=await library.jsonGzip('book-'+entry.bookId+'.json');
+ const manifest=await library.manifest();
+ const evidence=rankBookEvidence({question:entry.question,
+   title:manifest.books[entry.bookId].title,
+   pages:shard.pages,maxCandidates:10});
+ console.log('Facet plan:',JSON.stringify(evidence.plan.facets));
+ console.log('Facets covered:',JSON.stringify(evidence.facetsCovered));
+ for(const x of evidence.ranked.slice(0,5)){
+  const preview=x.item.text.replace(/\s+/g,' ').slice(0,360);
+  console.log('PLANNED page',x.item.page,'facets',JSON.stringify(x.facets),
+    'score',x.score.toFixed(1),':',preview);
+ }
 }
