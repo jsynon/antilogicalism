@@ -262,11 +262,11 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 </style>
 <link rel="stylesheet" href="/antilogicalism/assets/search.css">
 <link rel="canonical" href="https://jsynon.github.io/antilogicalism/reading-companion/">
-<meta name="description" content="Explore verified source passages with the Antilogicalism Reading Companion pilot.">
+<meta name="description" content="Ask questions about books in the Antilogicalism collection and explore the cited source passages.">
 <meta property="og:type" content="website">
 <meta property="og:title" content="Reading Companion | Antilogicalism">
 <meta property="og:url" content="https://jsynon.github.io/antilogicalism/reading-companion/">
-<meta property="og:description" content="Explore verified source passages with the Antilogicalism Reading Companion pilot.">
+<meta property="og:description" content="Ask questions about books in the Antilogicalism collection and explore the cited source passages.">
 <meta name="twitter:text:title" content="Reading Companion | Antilogicalism">
 
 <script type="module" src="/antilogicalism/reading-companion/companion-v110.mjs"></script>
@@ -373,7 +373,8 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-citations .companion-inline-read{margin:.2em 0 .4em .55em;padding:5px 10px;min-height:36px;background:#fff;color:#111;border:1px solid #333;font-size:.89em;line-height:1.5;white-space:normal;text-align:left}
 #companion-pilot .companion-citations .companion-inline-read:hover{background:#f5f5f5;color:#111}
 #companion-pilot #companion-source-reader[hidden],
-#companion-pilot #companion-source-quote[hidden]{display:none!important}
+#companion-pilot #companion-source-quote[hidden],
+#companion-pilot #companion-passage-browser[hidden]{display:none!important}
 #companion-pilot .companion-source-reader{margin:1.6em 0;padding:1em;border:1px solid #d5d8da;border-top:3px solid #333;background:#fff}
 #companion-pilot .companion-source-reader h2{text-align:left;margin:.45em 0 .25em;font-size:1.58em;font-style:italic}
 #companion-pilot .companion-reader-meta{margin:.3em 0 .7em;font-size:.89em;color:#61696e}
@@ -423,7 +424,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <header class="entry-header"><h1 class="entry-title">Reading Companion</h1></header>
 <div class="entry-content">
 <section id="companion-pilot" aria-label="Antilogicalism Reading Companion">
-<p>Explore ideas across philosophy, history, science, and literature using the original indexed books. The verified-AI pilot currently covers a small interdisciplinary collection; the full 644-book library is still available through <a href="/antilogicalism/digital-library/">Library Search</a>.</p>
+<p>Ask questions about books in philosophy, history, science, and literature. Answers draw on passages from the current pilot collection, with citations you can follow to the original pages. The full 644-book library is available through <a href="/antilogicalism/digital-library/">Library Search</a>.</p>
 <div id="companion-suggested-questions" class="companion-examples" aria-label="Example questions">
 <p><strong>Try a question</strong></p>
 <div class="companion-example-buttons">
@@ -431,7 +432,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <button type="button">How do virtue and practical wisdom contribute to happiness in Aristotle's Nicomachean Ethics?</button>
 <button type="button">According to Darwin, how does natural selection operate?</button>
 <button type="button">How does Raskolnikov justify murder in Crime and Punishment?</button>
-</div><p class="companion-hint">Select an idea to fill the question box. Nothing is submitted until you click Ask.</p>
+</div><p class="companion-hint">Choose a suggested question or write your own.</p>
 </div>
 <form id="companion-question-form">
 <label for="companion-book-filter"><strong>Search in a book</strong></label>
@@ -439,12 +440,12 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <label for="companion-question"><strong>Ask a question</strong></label>
 <textarea id="companion-question" maxlength="400" rows="3" required>What caused the Peloponnesian War?</textarea>
 <div class="companion-actions">
-<button id="companion-find-button" type="button">Find passages</button>
+<button id="companion-find-button" type="button">Review passages</button>
 <button id="companion-ask-button" type="submit" disabled>Ask Reading Companion</button>
 </div>
 <p id="companion-challenge" role="status" class="companion-hint">Checking AI availability…</p>
-<p class="companion-hint">Automatic evidence planning searches for different parts of a question and requires a second visitor verification before generating an answer. You can instead click <strong>Find passages</strong> and select source pages yourself to skip planning.</p>
-<div id="companion-turnstile" aria-label="Visitor verification"></div>
+<p class="companion-hint">Ask for an answer, or review the passages first and choose up to two to guide it.</p>
+<div id="companion-turnstile" aria-label="Quick check"></div>
 </form>
 <p id="companion-scope" class="companion-hint" role="status"></p>
 <p id="companion-status" aria-live="polite" role="status"></p>
@@ -467,14 +468,14 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <option value="original">Original OCR layout</option>
 </select>
 </div>
-<div id="companion-source-text" class="companion-source-text" aria-label="Original indexed PDF page text"></div>
-<p class="companion-hint">Page numbers refer to physical PDF pages. OCR may contain errors. Readable mode joins visual line wrapping but does not modify the stored book text.</p>
+<div id="companion-source-text" class="companion-source-text" aria-label="Original PDF page text"></div>
+<p class="companion-hint">Page numbers refer to the PDF. Scanned text may contain errors; open the original page to compare it.</p>
 </section>
-<section aria-label="Retrieved source passages" id="companion-passage-browser">
-<h2>Retrieved passages</h2>
+<section aria-label="Review source passages" id="companion-passage-browser" hidden>
+<h2>Review source passages</h2>
 <div id="companion-passage-list" aria-label="Relevant indexed passages"></div>
 </section>
-<p class="companion-hint">The system verifies the exact original OCR text against published SHA-256 fingerprints before sending passages to hosted AI. The citations are authentic PDF references, but interpretations can still contain errors. <a href="/antilogicalism/primary-sources/">Browse the full Bookshelf</a>.</p>
+<p class="companion-hint">Citations open original PDF pages. Scanned text and AI interpretations can contain errors, so check the passages for yourself. <a href="/antilogicalism/primary-sources/">Browse the full Bookshelf</a>.</p>
 <noscript><p>JavaScript is needed for the Reading Companion. <a href="/antilogicalism/digital-library/">Search the full digital library</a> instead.</p></noscript>
 </section>
 </div></article><!-- #reading-companion --><!-- #post-6350 -->
