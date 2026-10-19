@@ -28,6 +28,14 @@ test('comparison queries can surface source pages from different books',()=>{
  ]);
  assert.deepEqual(out.map(x=>x.bookId),['7','529']);
 });
+test('stronger passage evidence outranks a higher-ranked but weaker work match',()=>{
+ const out=mergeFacetSearches([{sources:[
+  {...page(117,'12'),score:82.2},
+  {...page(124,'12'),score:70.7},
+  {...page(14,'7'),score:88.8}
+ ]}],2);
+ assert.deepEqual(out.map(x=>x.page),[14,117]);
+});
 test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.equal(validSearchPlan(['Raskolnikov extraordinary man theory','Raskolnikov conscience guilt Sonia']),true);
  assert.equal(validSearchPlan(['same search phrase','same search phrase']),false);
