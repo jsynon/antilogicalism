@@ -53,6 +53,7 @@ function refreshDiagnostic(){
 }
 function beginDiagnostic(questionText){
   diagnosticState={question:questionText,selectedBookId:'all',
+    plannerEnabled:searchPlanningEnabled,
     libraryVersion:47,fallbackMode:oldPilotFallback,stage:'planning',
     plannerQueries:[],searches:[],candidates:[],submittedSources:[],
     evidenceHighlights:[]};
