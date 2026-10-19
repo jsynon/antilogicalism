@@ -49,7 +49,7 @@ test('the reader question is retained as a third search facet for all-book and s
  const question='How does Aristotle explain becoming virtuous through repeated actions?';
  assert.deepEqual(buildSearchFacets(question,plan),[...plan,question]);
  assert.deepEqual(buildSearchFacets(question,plan,'7'),[...plan,question]);
- assert.deepEqual(buildSearchFacets(question,[...plan,question]),[...plan,question]);
+ assert.deepEqual(buildSearchFacets(question,[plan[0],question]),[plan[0],question]);
  assert.deepEqual(buildSearchFacets(question,null),[question]);
 });
 test('scripture references retain the exact question under the same general rule',()=>{
