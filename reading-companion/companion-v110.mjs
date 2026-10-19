@@ -463,6 +463,9 @@ function renderResponse(data,turnQuestion=''){
     refreshDiagnostic();
   }
   answerBox.append(turn);
+  const reduceMotion=window.matchMedia&&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  turn.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});
 }
 async function requestSourcePlan(q,verificationToken,history){
   if(diagnosticState)diagnosticState.stage='planning';
