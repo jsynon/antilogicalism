@@ -59,9 +59,9 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.doesNotMatch(source,/\/api\/(?:pilot-answer|chat)/);
  assert.doesNotMatch(source,/innerHTML\s*=/);
 });
-test('reader controls inherit Book Lite typography and follow-up prompts are not buttons',()=>{
+test('reader and follow-up controls inherit the Book Lite design',()=>{
  assert.match(html,/#companion-pilot\{font:inherit/);
  assert.match(html,/\.companion-inline-read\{font-family:inherit;font-size:\.89em/);
- assert.doesNotMatch(html,/companion-follow-up-buttons/);
+ assert.match(html,/\.companion-follow-up-buttons button\{background:#fff;color:#111/);
  assert.match(html,/mark\.cited-highlight/);
 });
