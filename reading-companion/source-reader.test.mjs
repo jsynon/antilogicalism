@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {readableParagraphs,locateCitedExcerpt} from './source-text-format.mjs';
+import {readableParagraphs,locateCitedExcerpt,readablePageWithHighlight} from './source-text-format.mjs';
 import {eligiblePages} from './source-reader.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
@@ -24,6 +24,17 @@ test('identifies an exact quoted evidence passage despite OCR line wrapping',()=
  const match=locateCitedExcerpt(readable,'…'+quote+'…');
  assert(match,'Cited passage must be located inside the source text');
  assert.equal(readable.slice(match.start,match.end),quote);
+});
+test('full-page text formatting returns a safe highlight range for the displayed text',()=>{
+ const raw='Opening sentence.\nThe nature of virtue and the role of practical wisdom\n'+
+  'in shaping good character and making our lives happy through the choices we make.';
+ const quote='The nature of virtue and the role of practical wisdom in shaping good character and making our lives happy';
+ const page=readablePageWithHighlight(raw,'…'+quote+'…');
+ assert.equal(page.displayText,'Opening sentence. '+
+  'The nature of virtue and the role of practical wisdom in shaping good character and making our lives happy through the choices we make.');
+ assert(page.match,'the cited passage should be located in the formatted display');
+ assert.equal(page.displayText.slice(page.match.start,page.match.end),quote);
+ assert.equal(readablePageWithHighlight(raw,'words not present in the source').match,null);
 });
 test('refuses to make up a highlight where the quoted words are absent',()=>{
  const raw='The city grew stronger from trade and alliances. Its leaders sought a new political order against their rivals.';
@@ -52,8 +63,8 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(html,/id="companion-source-reader"[^>]+hidden/);
  assert.match(client,/Read passage/);
  assert.match(client,/label\.append\(link\);row\.append\(label\)/);
- assert.match(client,/appendFullPage\(row,original\)/);
- assert.match(client,/appendFullPage\(card,original\)/);
+ assert.match(client,/appendFullPage\(row,original,highlight\?\.quote\|\|''\)/);
+ assert.match(client,/appendFullPage\(card,original,item\.quote\)/);
  assert.match(source,/isAllowedBook\(bookId\)/);
  assert.match(source,/getBook\(bookId\)/);
  assert.doesNotMatch(source,/\/api\/(?:pilot-answer|chat)/);

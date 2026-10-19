@@ -50,8 +50,8 @@ test('public companion copy explains the pilot and keeps source reading controls
  assert.match(html,/Citations open original PDF pages/);
  assert.match(client,/View full page text/);
  assert.match(client,/Read passage/);
- assert.match(client,/appendFullPage\(card,original\)/);
- assert.match(client,/appendFullPage\(row,original\)/);
+ assert.match(client,/appendFullPage\(card,original,item\.quote\)/);
+ assert.match(client,/appendFullPage\(row,original,highlight\?\.quote\|\|''\)/);
  assert.match(html,/id="companion-turnstile" aria-label="Quick check"/);
  assert.match(html,/Complete the quick check below before asking a question/);
  assert.match(client,/turnstile\.render\(challengeBox/);
@@ -70,7 +70,8 @@ test('answer citations open in the local page reader while Sources keeps the PDF
  assert.ok(client.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[])'));
  assert.ok(client.includes("sourceReader.open({...source,excerpt:evidence?.quote||''},a)"));
  assert.ok(client.includes('link.href=source.url'));
- assert.ok(client.includes("readableParagraphs(source.text).join('\\n\\n')"));
+ assert.ok(client.includes('readablePageWithHighlight(source.text,excerpt)'));
+ assert.ok(client.includes("node('mark',page.displayText.slice(start,end),'cited-highlight')"));
  assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
 });
 
