@@ -11,22 +11,18 @@ const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
 const FALLBACK_BOOK={id:'152',title:'History of the Peloponnesian War — Thucydides'};
 const PDF_PAGE_LIMIT=14000;
-const MAX_SELECTED=2;
+const MAX_ANSWER_SOURCES=2;
 const el=id=>document.getElementById(id);
 const question=el('companion-question');
 const form=el('companion-question-form');
 if(!form)throw Error('Reading Companion markup is missing');
 const bookFilter=el('companion-book-filter');
-const findButton=el('companion-find-button');
 const askButton=el('companion-ask-button');
 const answerBox=el('companion-answer');
-const passagesBox=el('companion-passage-list');
-const passageBrowser=el('companion-passage-browser');
 const status=el('companion-status');
 const scope=el('companion-scope');
 const challenge=el('companion-challenge');
 const challengeBox=el('companion-turnstile');
-const examples=el('companion-suggested-questions');
 const library=new RemoteLibrary();
 const sourceShards=new Map();
 const sourceReader=createSourceReader({getBook:id=>bookShard(id),
@@ -34,7 +30,7 @@ const sourceReader=createSourceReader({getBook:id=>bookShard(id),
 let bookList=[FALLBACK_BOOK], allowed=new Set(['152']), oldPilotFallback=true;
 let pilotEnabled=false, searchPlanningEnabled=false, turnstileToken='', turnstileId=null;
 let pendingTurnstile=null;
-let candidates=[], selected=new Set(), lastSearch='', searching=false, answering=false;
+let candidates=[], searching=false, answering=false;
 
 function node(tag,textValue,className){
   const e=document.createElement(tag);
@@ -43,7 +39,6 @@ function node(tag,textValue,className){
   return e;
 }
 function setStatus(message){status.textContent=message;}
-function selectionKey(s){return s.bookId+':'+s.page;}
 function showAvailability(){
   const title=oldPilotFallback?'a Thucydides sample':
     bookList.length+' books across philosophy, history, science, and literature';
@@ -51,7 +46,6 @@ function showAvailability(){
 }
 function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
-  findButton.disabled=searching||answering;
 }
 function populateBooks(){
   bookFilter.replaceChildren(new Option('All available books',''));
@@ -75,7 +69,7 @@ async function loadCoverage(){
     allowed=new Set(list.map(x=>x.id));
     oldPilotFallback=false;
   }catch{
-    // Preserve working v1.9.5 passage browser until GitHub Actions exports
+    // Preserve the previously verified sample until GitHub Actions exports
     // the complete data; do not pretend unavailable books have fingerprints.
     bookList=[FALLBACK_BOOK];allowed=new Set(['152']);
     oldPilotFallback=true;
@@ -134,10 +128,10 @@ async function bookShard(id){
   }
   return sourceShards.get(id);
 }
-async function searchPages(plannedQueries=null){
+async function retrieveSources(plannedQueries=null){
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
-  candidates=[];selected.clear();renderPassages();
+  candidates=[];
   searching=true;updateButtons();setStatus('Searching for relevant passages…');
   try{
     let populated=[];
@@ -174,8 +168,7 @@ async function searchPages(plannedQueries=null){
         mergeFacetSearches(foundSets,8).filter(allowedPage):
         foundSets[0].sources.filter(allowedPage);
       // Preserve one page for each distinct facet before filling from other
-      // candidates. If a reader searched manually, retain the previous
-      // book-diversity rule and allow them to change checkbox selections.
+      // candidates. The answer uses the strongest two verified full pages.
       const representatives=[],others=[],visited=new Set();
       for(const r of results){
         const group=plannedQueries?String(r.facet):r.bookId;
@@ -193,49 +186,26 @@ async function searchPages(plannedQueries=null){
       }
     }
     candidates=populated.slice(0,8);
-    lastSearch=q+'|'+bookFilter.value;
-    selected=new Set(candidates.slice(0,Math.min(MAX_SELECTED,candidates.length)).map(selectionKey));
-    renderPassages();
     if(!candidates.length){
       setStatus('No matching passages found. Try different wording or choose another book.');
       return false;
     }
-    setStatus('Found '+candidates.length+' passages. '+selected.size+
-      ' selected for your answer.');
+    setStatus('Checking the source passages…');
     return true;
   }finally{searching=false;updateButtons();}
 }
-function renderPassages(){
-  passagesBox.replaceChildren();
-  passageBrowser.hidden=!candidates.length;
-  if(!candidates.length)return;
-  passagesBox.append(node('p','Checked passages will guide the answer. Choose up to two.','companion-hint'));
-  for(const s of candidates){
-    const card=node('article',undefined,'companion-source');
-    const label=node('label',undefined,'companion-source-heading');
-    const check=document.createElement('input');
-    check.type='checkbox';check.checked=selected.has(selectionKey(s));
-    check.setAttribute('aria-label','Include '+s.title+', PDF page '+s.page+' in the answer');
-    check.addEventListener('change',()=>{
-      if(check.checked&&selected.size>=MAX_SELECTED){
-        check.checked=false;setStatus('Choose up to two passages for your answer.');return;
-      }
-      if(check.checked)selected.add(selectionKey(s));
-      else selected.delete(selectionKey(s));
-      updateButtons();
-    });
-    label.append(check,node('span',s.title+' · PDF page '+s.page));
-    const summary=node('p',s.preview,'companion-passage-preview');
-    const details=document.createElement('details');
-    details.append(node('summary','Read full page text'),node('pre',s.text,'companion-full-page'));
-    const link=document.createElement('a');link.href=s.url;
-    link.target='_blank';link.rel='noopener noreferrer';link.textContent='Open original PDF page';
-    card.append(label,summary,details,link);
-    passagesBox.append(card);
-  }
+function sourcePage(source){
+  if(!source)return null;
+  return candidates.find(page=>page.bookId===String(source.bookId) &&
+    page.page===Number(source.page))||null;
 }
-function clearPassages(){
-  candidates=[];selected.clear();passagesBox.replaceChildren();passageBrowser.hidden=true;
+function appendFullPage(parent,source){
+  if(!source||typeof source.text!=='string'||!source.text.trim())return;
+  const details=document.createElement('details');
+  details.className='companion-page-text';
+  details.append(node('summary','View full page text'),
+    node('pre',source.text,'companion-full-page'));
+  parent.append(details);
 }
 function putCitationTokens(target,answer,citations){
   const byId=new Map(citations.map(s=>[s.id,s]));
@@ -266,26 +236,17 @@ function renderResponse(data){
   answerBox.append(reply);
   if(data.missing)answerBox.append(node('p','What these passages don’t establish: '+data.missing,'companion-hint'));
 
-  // Preserve familiar v1.7 Reader Mode order: Explore further, Key passages,
-  // then Sources. Buttons populate the composer; no hidden AI calls.
+  // Keep the familiar Reader Mode order: Explore further, Key passages,
+  // then Sources. Follow-up prompts are readable text, not composer buttons.
   const followUps=Array.isArray(data.followUpQuestions)?data.followUpQuestions:[];
   const valid=followUps.filter(s=>typeof s==='string' && s.length<=180 &&
      s.endsWith('?')).slice(0,2);
   if(valid.length){
     const box=node('section',undefined,'companion-follow-ups');
     box.append(node('h3','Explore further'));
-    const buttons=node('div',undefined,'companion-follow-up-buttons');
-    for(const suggestion of valid){
-      const b=node('button',suggestion);
-      b.type='button';b.addEventListener('click',()=>{
-        question.value=suggestion;
-        lastSearch='';clearPassages();
-        question.focus();updateButtons();
-        setStatus('Question ready. Ask Reading Companion to find new supporting passages.');
-      });
-      buttons.append(b);
-    }
-    box.append(buttons);answerBox.append(box);
+    const list=node('ul',undefined,'companion-follow-up-list');
+    for(const suggestion of valid)list.append(node('li',suggestion));
+    box.append(list);answerBox.append(box);
   }
   const highlights=Array.isArray(data.evidenceHighlights)?data.evidenceHighlights:[];
   if(highlights.length){
@@ -294,12 +255,24 @@ function renderResponse(data){
     for(const item of highlights.slice(0,3)){
       if(typeof item.quote!=='string'||!item.quote.trim()||
         typeof item.url!=='string')continue;
-      const quote=node('blockquote',item.quote);
+      const citation=citations.find(source=>source.id===item.source_id&&
+        Number(source.page)===Number(item.page));
+      if(!citation)continue;
+      const original=sourcePage(citation);
+      const card=node('article',undefined,'companion-key-passage');
+      const quote=node('p',item.quote,'companion-key-quote');
       const a=document.createElement('a');a.href=item.url;
       a.target='_blank';a.rel='noopener noreferrer';
       a.textContent='['+item.source_id+'] '+item.title+' · PDF p. '+item.page;
-      quote.append(document.createTextNode(' '),a);
-      panel.append(quote);
+      const read=node('button','Read passage here','companion-inline-read');
+      read.type='button';
+      read.addEventListener('click',async()=>{
+        try{await sourceReader.open({...citation,excerpt:item.quote},read);}
+        catch(error){setStatus('Source reader: '+error.message);}
+      });
+      card.append(quote,a,read);
+      appendFullPage(card,original);
+      panel.append(card);
     }
     answerBox.append(panel);
   }
@@ -307,18 +280,18 @@ function renderResponse(data){
     const sources=node('section',undefined,'companion-citations');
     sources.append(node('h3','Sources'));
     for(const source of citations){
-      const row=node('p');
+      const row=node('article',undefined,'companion-source-entry');
+      const label=node('p');
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
       link.textContent='['+source.id+'] '+source.title+' · PDF page '+source.page;
-      row.append(link);
+      label.append(link);row.append(label);
       // The original PDF link remains untouched. The new button opens a
       // separate in-page reader using the same trusted v47 book shard.
       const highlight=(Array.isArray(data.evidenceHighlights)?
         data.evidenceHighlights:[]).find(h=>
         h.source_id===source.id&&Number(h.page)===Number(source.page));
-      const original=candidates.find(p=>p.bookId===String(source.bookId) &&
-        p.page===Number(source.page));
+      const original=sourcePage(source);
       const excerpt=(typeof highlight?.quote==='string'&&highlight.quote.trim())?
         highlight.quote:(original?.preview||source.preview||'');
       const read=node('button','Read passage here','companion-inline-read');
@@ -328,7 +301,8 @@ function renderResponse(data){
           await sourceReader.open({...source,excerpt},read);
         }catch(error){setStatus('Source reader: '+error.message);}
       });
-      row.append(document.createTextNode(' '),read);
+      row.append(read);
+      appendFullPage(row,original);
       sources.append(row);
     }
     answerBox.append(sources);
@@ -362,7 +336,7 @@ async function nextTurnstileToken(){
     },120000);
     pendingTurnstile=waiter;
   });
-  setStatus('Passages found. Complete one more quick check to continue.');
+  setStatus('Complete the quick check to continue.');
   window.turnstile.reset(turnstileId);
   challengeBox.scrollIntoView({behavior:'smooth',block:'center'});
   const token=await pending;
@@ -376,9 +350,8 @@ async function askQuestion(){
   if(!turnstileToken){setStatus('Complete the quick check before asking.');return;}
   answering=true;updateButtons();sourceReader.reset();answerBox.replaceChildren();
   try{
-    const manual=lastSearch===q+'|'+bookFilter.value&&selected.size>0;
     let token=turnstileToken;
-    if(!manual && searchPlanningEnabled && !oldPilotFallback){
+    if(searchPlanningEnabled && !oldPilotFallback){
       // One extra bounded hosted AI call helps FIND source passages, not
       // invent answers. It consumes a single-use Turnstile token. A SECOND
       // fresh verification is required for the fingerprint-protected answer.
@@ -386,15 +359,15 @@ async function askQuestion(){
       setStatus('Looking across the collection for useful passages…');
       const queries=await requestSourcePlan(q,token);
       setStatus('Gathering passages from across the collection…');
-      const found=await searchPages(queries);
+      const found=await retrieveSources(queries);
       if(!found)return;
       token=await nextTurnstileToken();
-    }else if(!manual){
-      const found=await searchPages();
+    }else{
+      const found=await retrieveSources();
       if(!found)return;
     }
-    const chosen=candidates.filter(s=>selected.has(selectionKey(s))).slice(0,MAX_SELECTED);
-    if(!chosen.length){setStatus('Choose at least one passage for your answer.');return;}
+    const chosen=candidates.slice(0,MAX_ANSWER_SOURCES);
+    if(!chosen.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
     turnstileToken='';
     setStatus('Checking the source passages and preparing your answer…');
     const response=await fetch(API+'/api/pilot-answer',{
@@ -406,8 +379,7 @@ async function askQuestion(){
     if(!response.ok)throw Error(data.error||'Worker returned HTTP '+response.status);
     renderResponse(data);
     setStatus(data.outcome==='insufficient-evidence'?
-      'These passages don’t provide enough evidence for a complete answer. Try different wording or choose other passages.':
-      'Answer ready below.');
+      'These passages don’t provide enough evidence for a complete answer. Try different wording or choose another book.':'');
   }catch(error){
     console.error('Reading Companion request failed:',error);
     setStatus('Could not prepare the answer. Please try again.');
@@ -417,18 +389,7 @@ async function askQuestion(){
     updateButtons();
   }
 }
-findButton.addEventListener('click',async()=>{
-  sourceReader.reset();answerBox.replaceChildren();
-  try{await searchPages();}
-  catch(error){setStatus('Could not find passages: '+error.message);}
-});
 form.addEventListener('submit',event=>{event.preventDefault();askQuestion();});
-bookFilter.addEventListener('change',()=>{lastSearch='';clearPassages();updateButtons();});
-question.addEventListener('input',()=>{lastSearch='';clearPassages();updateButtons();});
-for(const b of examples.querySelectorAll('button')){
-  b.addEventListener('click',()=>{question.value=b.textContent;
-    lastSearch='';clearPassages();
-    question.focus();setStatus('Question ready. Choose Review passages or Ask Reading Companion.');
-    updateButtons();});
-}
-(async()=>{await loadCoverage();await loadStatus();setStatus('Ready when you are.');})();
+bookFilter.addEventListener('change',updateButtons);
+question.addEventListener('input',updateButtons);
+(async()=>{await loadCoverage();await loadStatus();})();

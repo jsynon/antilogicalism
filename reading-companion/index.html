@@ -330,51 +330,38 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-actions button{font:inherit;min-height:42px;padding:7px 13px}
 #companion-pilot button:disabled{opacity:.55;cursor:not-allowed}
 #companion-pilot .companion-hint{color:#61696e;font-size:.87em;line-height:1.6}
-#companion-pilot #companion-status{margin:.7rem 0;min-height:1.6rem}
+#companion-pilot #companion-status{margin:.5rem 0}
 #companion-pilot #companion-turnstile{margin:1rem 0}
-#companion-pilot .companion-source,#companion-pilot .companion-citation{padding:1rem 0;border-bottom:1px solid #dfe2e3}
-#companion-pilot .companion-source-heading{display:flex;align-items:center;gap:.65rem;font-weight:600;cursor:pointer}
-#companion-pilot input[type="checkbox"]{width:17px;height:17px;min-width:17px;min-height:17px;margin:0;padding:0}
-#companion-pilot .companion-source p,#companion-pilot .companion-citation p{margin:.5rem 0 .65rem}
-#companion-pilot .companion-source details{margin:.6rem 0}
-#companion-pilot .companion-source summary{cursor:pointer}
+#companion-pilot .companion-source-entry,#companion-pilot .companion-key-passage{padding:.9rem 0;border-bottom:1px solid #dfe2e3}
+#companion-pilot .companion-source-entry p{margin:.3rem 0 .65rem}
+#companion-pilot .companion-page-text{margin:.7rem 0}
+#companion-pilot .companion-page-text summary{cursor:pointer;color:#333;text-decoration:underline;text-underline-offset:2px}
 #companion-pilot .companion-full-page{font-family:inherit;font-size:.91em;line-height:1.6;white-space:pre-wrap;overflow-wrap:anywhere;background:#f6f7f7;padding:12px;max-height:420px;overflow-y:auto}
 #companion-pilot #companion-answer:not(:empty){border-top:1px solid #dfe2e3;border-bottom:1px solid #dfe2e3;margin:1.2rem 0;padding:.8rem 0 1.2rem}
 #companion-pilot .companion-answer-text{white-space:pre-wrap}
 @media(max-width:650px){#companion-pilot .companion-actions{display:block}#companion-pilot .companion-actions button{margin:0 .4rem .6rem 0}}
 
 #companion-pilot #companion-book-filter{display:block;width:100%;max-width:100%;margin:.4rem 0 1rem}
-#companion-pilot .companion-examples{margin:.8rem 0 1.4rem}
-#companion-pilot .companion-examples p{margin:.25rem 0 .6rem}
-#companion-pilot .companion-example-buttons,#companion-pilot .companion-follow-up-buttons{display:flex;gap:8px;flex-wrap:wrap}
-#companion-pilot .companion-example-buttons button,#companion-pilot .companion-follow-up-buttons button{background:#fff;color:#111;border:1px solid #333;border-radius:2px;font:inherit;font-size:1em;line-height:1.5;padding:8px 12px;white-space:normal;text-align:left;max-width:100%}
-#companion-pilot .companion-example-buttons button:hover,#companion-pilot .companion-follow-up-buttons button:hover{background:#f5f5f5;color:#111}
 #companion-pilot .companion-follow-ups{margin:1.2rem 0}
 #companion-pilot .companion-follow-ups h3,#companion-pilot .companion-highlights h3,#companion-pilot .companion-citations h3{text-align:left;font-size:1.35em;margin:.65rem 0 .5rem;font-weight:600}
+#companion-pilot .companion-follow-up-list{margin:.45rem 0;padding-left:1.25em}
+#companion-pilot .companion-follow-up-list li{margin:.35em 0}
 #companion-pilot .companion-highlights{padding:.8rem 0;margin:.7rem 0;border-top:1px solid #dfe2e3}
-#companion-pilot .companion-highlights blockquote{position:static!important;text-indent:0!important;margin:.8rem 0!important;padding:8px 12px!important;border-left:2px solid #bbb!important;background:#fafafa!important;color:#333;line-height:1.8;font-size:1em}
-#companion-pilot .companion-highlights blockquote::before,#companion-pilot .companion-highlights blockquote::after{display:none!important;content:none!important}
-#companion-pilot .companion-highlights blockquote a{font-style:normal;font-size:.83em;display:block;margin-top:.35rem}
+#companion-pilot .companion-key-quote{margin:.3rem 0 .6rem;line-height:1.8}
+#companion-pilot .companion-key-passage>a{display:inline-block;margin:0 .8em .5em 0;font-size:.9em}
+#companion-pilot .companion-key-passage .companion-page-text{margin-top:.4em}
 #companion-pilot .companion-citations{border-top:1px solid #dfe2e3;margin-top:1rem;padding-top:.5rem}
-#companion-pilot .companion-citations p{margin:.4rem 0}
+#companion-pilot .companion-citations .companion-source-entry p{margin:.4rem 0 .65rem}
 #companion-pilot .companion-inline-citation{white-space:nowrap;text-decoration:underline}
-#companion-pilot #companion-passage-browser h2{font-size:1.58em;text-align:left;margin:1.6rem 0 .6rem}
-#companion-pilot #companion-passage-browser .companion-source-heading{font-size:1em}
-@media(max-width:650px){#companion-pilot .companion-example-buttons button,#companion-pilot .companion-follow-up-buttons button{width:100%}}
 
 /* Match the Book Lite typography used throughout the site: 19px Century
    Schoolbook body, 30px h2, 26px h3, and no reduced-size prompt buttons. */
 #companion-pilot{font:inherit;color:#3e454a}
-#companion-pilot .companion-answer-text,#companion-pilot .companion-source p,
-#companion-pilot .companion-citations p{font:inherit}
-#companion-pilot .companion-example-buttons button,
-#companion-pilot .companion-follow-up-buttons button,
-#companion-pilot .companion-inline-read{font-family:inherit;font-size:1em}
-#companion-pilot .companion-citations .companion-inline-read{margin:.2em 0 .4em .55em;padding:5px 10px;min-height:36px;background:#fff;color:#111;border:1px solid #333;font-size:.89em;line-height:1.5;white-space:normal;text-align:left}
-#companion-pilot .companion-citations .companion-inline-read:hover{background:#f5f5f5;color:#111}
+#companion-pilot .companion-answer-text,#companion-pilot .companion-source-entry p{font:inherit}
+#companion-pilot .companion-inline-read{font-family:inherit;font-size:.89em;margin:.15em .5em .4em 0;padding:5px 10px;min-height:36px;background:#fff;color:#111;border:1px solid #333;line-height:1.5;white-space:normal;text-align:left}
+#companion-pilot .companion-inline-read:hover{background:#f5f5f5;color:#111}
 #companion-pilot #companion-source-reader[hidden],
-#companion-pilot #companion-source-quote[hidden],
-#companion-pilot #companion-passage-browser[hidden]{display:none!important}
+#companion-pilot #companion-source-quote[hidden]{display:none!important}
 #companion-pilot .companion-source-reader{margin:1.6em 0;padding:1em;border:1px solid #d5d8da;border-top:3px solid #333;background:#fff}
 #companion-pilot .companion-source-reader h2{text-align:left;margin:.45em 0 .25em;font-size:1.58em;font-style:italic}
 #companion-pilot .companion-reader-meta{margin:.3em 0 .7em;font-size:.89em;color:#61696e}
@@ -389,7 +376,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-source-text mark.cited-highlight{background:#fff0a5;color:#111;box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:1px 0}
 #companion-pilot #companion-source-quote{position:static!important;padding:.6em .75em!important;margin:.7em 0!important;border-left:2px solid #aaa!important;background:#fafafa!important;text-indent:0!important;white-space:pre-wrap}
 #companion-pilot #companion-source-quote::before,#companion-pilot #companion-source-quote::after{display:none!important;content:none!important}
-@media(max-width:650px){#companion-pilot .companion-source-reader{padding:.7em}#companion-pilot .companion-source-text{max-height:55vh}#companion-pilot .companion-citations .companion-inline-read{margin-left:0}}
+@media(max-width:650px){#companion-pilot .companion-source-reader{padding:.7em}#companion-pilot .companion-source-text{max-height:55vh}}
 </style>
 </head>
 
@@ -425,26 +412,15 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <div class="entry-content">
 <section id="companion-pilot" aria-label="Antilogicalism Reading Companion">
 <p>Ask questions about books in philosophy, history, science, and literature. Answers draw on passages from the current pilot collection, with citations you can follow to the original pages. The full 644-book library is available through <a href="/antilogicalism/digital-library/">Library Search</a>.</p>
-<div id="companion-suggested-questions" class="companion-examples" aria-label="Example questions">
-<p><strong>Try a question</strong></p>
-<div class="companion-example-buttons">
-<button type="button">What caused the Peloponnesian War?</button>
-<button type="button">How do virtue and practical wisdom contribute to happiness in Aristotle's Nicomachean Ethics?</button>
-<button type="button">According to Darwin, how does natural selection operate?</button>
-<button type="button">How does Raskolnikov justify murder in Crime and Punishment?</button>
-</div><p class="companion-hint">Choose a suggested question or write your own.</p>
-</div>
 <form id="companion-question-form">
 <label for="companion-book-filter"><strong>Search in a book</strong></label>
 <select id="companion-book-filter"><option value="">All available books</option></select>
 <label for="companion-question"><strong>Ask a question</strong></label>
-<textarea id="companion-question" maxlength="400" rows="3" required>What caused the Peloponnesian War?</textarea>
+<textarea id="companion-question" maxlength="400" rows="3" required placeholder="Ask about an idea, argument, or relationship across books."></textarea>
 <div class="companion-actions">
-<button id="companion-find-button" type="button">Review passages</button>
 <button id="companion-ask-button" type="submit" disabled>Ask Reading Companion</button>
 </div>
-<p id="companion-challenge" role="status" class="companion-hint">Checking AI availability…</p>
-<p class="companion-hint">Ask for an answer, or review the passages first and choose up to two to guide it.</p>
+<p id="companion-challenge" role="status" class="companion-hint"></p>
 <div id="companion-turnstile" aria-label="Quick check"></div>
 </form>
 <p id="companion-scope" class="companion-hint" role="status"></p>
@@ -470,10 +446,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 </div>
 <div id="companion-source-text" class="companion-source-text" aria-label="Original PDF page text"></div>
 <p class="companion-hint">Page numbers refer to the PDF. Scanned text may contain errors; open the original page to compare it.</p>
-</section>
-<section aria-label="Review source passages" id="companion-passage-browser" hidden>
-<h2>Review source passages</h2>
-<div id="companion-passage-list" aria-label="Relevant indexed passages"></div>
 </section>
 <p class="companion-hint">Citations open original PDF pages. Scanned text and AI interpretations can contain errors, so check the passages for yourself. <a href="/antilogicalism/primary-sources/">Browse the full Bookshelf</a>.</p>
 <noscript><p>JavaScript is needed for the Reading Companion. <a href="/antilogicalism/digital-library/">Search the full digital library</a> instead.</p></noscript>
