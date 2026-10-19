@@ -237,16 +237,25 @@ function renderResponse(data){
   if(data.missing)answerBox.append(node('p','What these passages don’t establish: '+data.missing,'companion-hint'));
 
   // Keep the familiar Reader Mode order: Explore further, Key passages,
-  // then Sources. Follow-up prompts are readable text, not composer buttons.
+  // then Sources. These follow-up buttons are separate from the removed
+  // suggested-question buttons above the question form.
   const followUps=Array.isArray(data.followUpQuestions)?data.followUpQuestions:[];
   const valid=followUps.filter(s=>typeof s==='string' && s.length<=180 &&
      s.endsWith('?')).slice(0,2);
   if(valid.length){
     const box=node('section',undefined,'companion-follow-ups');
     box.append(node('h3','Explore further'));
-    const list=node('ul',undefined,'companion-follow-up-list');
-    for(const suggestion of valid)list.append(node('li',suggestion));
-    box.append(list);answerBox.append(box);
+    const buttons=node('div',undefined,'companion-follow-up-buttons');
+    for(const suggestion of valid){
+      const button=node('button',suggestion);
+      button.type='button';
+      button.addEventListener('click',()=>{
+        question.value=suggestion;
+        question.focus();updateButtons();
+      });
+      buttons.append(button);
+    }
+    box.append(buttons);answerBox.append(box);
   }
   const highlights=Array.isArray(data.evidenceHighlights)?data.evidenceHighlights:[];
   if(highlights.length){

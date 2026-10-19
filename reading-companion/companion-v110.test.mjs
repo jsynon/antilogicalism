@@ -25,6 +25,8 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(html,/id="companion-book-filter"/);
  assert.match(html,/id="companion-question"/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
+ assert.match(client,/companion-follow-up-buttons/);
+ assert.match(client,/question\.value=suggestion/);
  assert.match(html,/background:#fff;color:#111;border:1px solid #333/);
 });
 test('v1.10 uses original v47 retrieval, verified pilot endpoint and text-only output',()=>{
@@ -49,6 +51,10 @@ test('public companion copy explains the pilot and keeps source reading controls
  assert.match(client,/Read passage here/);
  assert.match(client,/appendFullPage\(card,original\)/);
  assert.match(client,/appendFullPage\(row,original\)/);
+ assert.match(html,/id="companion-turnstile" aria-label="Quick check"/);
+ assert.match(html,/Complete the quick check below before asking a question/);
+ assert.match(client,/turnstile\.render\(challengeBox/);
+ assert.match(client,/callback:token=>/);
  assert.doesNotMatch(client,/Checked passages will guide the answer/);
  assert.doesNotMatch(client,/Answer ready below\./);
  assert.doesNotMatch(client,/lastSearch|selected\.size|selectionKey/);
