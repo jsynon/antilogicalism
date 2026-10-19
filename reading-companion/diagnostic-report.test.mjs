@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
-import {auditCitationIds,createDiagnosticReport} from './diagnostic-report.mjs';
+import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode} from './diagnostic-report.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
@@ -17,7 +17,8 @@ test('audits citation markers against the sources returned by the server',()=>{
 test('diagnostic output is bounded and never includes source text or challenge data',()=>{
  const report=createDiagnosticReport({
   question:'How do Aristotle and Darwin explain change?',selectedBookId:'',
-  plannerQueries:['Aristotle virtue','Darwin evolution'],stage:'complete',
+  plannerQueries:['Aristotle virtue','Darwin evolution'],stage:'failed',
+  failureHttpStatus:502,failureCode:diagnosticFailureCode(502),
   candidates:[{id:'S1',bookId:'7',title:'Ethics',page:12,score:2.5,
     text:'PRIVATE FULL PAGE TEXT',preview:'PRIVATE PREVIEW',turnstileToken:'PRIVATE TOKEN'}],
   submittedSources:[{id:'S1',bookId:'7',title:'Ethics',page:12,text:'PRIVATE FULL PAGE TEXT'}],
@@ -30,6 +31,8 @@ test('diagnostic output is bounded and never includes source text or challenge d
  const serialized=JSON.stringify(report);
  assert.equal(report.schema,'antilogicalism-reading-companion-diagnostic-v1');
  assert.deepEqual(report.answer.inlineIdsWithoutSource,['S2']);
+ assert.equal(report.failureHttpStatus,502);
+ assert.equal(report.failureCode,'answer-generation-or-citation-failed');
  assert.equal(report.candidates[0].score,2.5);
  assert.equal(report.evidenceHighlights[0].quoteLocated,true);
  assert.equal(serialized.includes('PRIVATE FULL PAGE TEXT'),false);
@@ -37,6 +40,20 @@ test('diagnostic output is bounded and never includes source text or challenge d
  assert.equal(serialized.includes('PRIVATE TOKEN'),false);
  assert.equal(serialized.includes('PRIVATE QUOTE'),false);
  assert.equal(serialized.includes('The authors differ [S1, S2].'),false);
+});
+
+test('diagnostic failure codes preserve useful status categories without raw error text',()=>{
+ assert.equal(diagnosticFailureCode(403),'visitor-or-origin-rejected');
+ assert.equal(diagnosticFailureCode(422),'source-verification-rejected');
+ assert.equal(diagnosticFailureCode(429),'rate-limited');
+ assert.equal(diagnosticFailureCode(502),'answer-generation-or-citation-failed');
+ assert.equal(diagnosticFailureCode(502,'planner'),'search-planning-failed');
+ assert.equal(diagnosticFailureCode(503),'service-unavailable');
+ assert.equal(diagnosticFailureCode(null),'network-error');
+ const report=createDiagnosticReport({failureHttpStatus:999,
+   failureCode:'PRIVATE MODEL ERROR response contains secret'});
+ assert.equal(report.failureHttpStatus,null);
+ assert.equal(report.failureCode,'unclassified');
 });
 
 test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
@@ -48,5 +65,7 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(client,/navigator\.clipboard\.writeText\(diagnosticOutput\.textContent\)/);
  assert.match(client,/foundSets\.map\(\(set,index\)=>/);
  assert.match(client,/diagnosticState\.evidenceHighlights=highlights\.map/);
- assert.doesNotMatch(client,/JSON\.stringify\(\{question:q,turnstileToken:token,[\s\S]{0,160}diagnostic/);
+ assert.match(client,/diagnosticState\.failureHttpStatus=res\.status/);
+ assert.match(client,/diagnosticState\.failureHttpStatus=response\.status/);
+ assert.match(client,/body:JSON\.stringify\(\{question:q,turnstileToken:token,\s*sources:chosen\.map/);
 });
