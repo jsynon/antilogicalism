@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,selectLiveCases,evaluateLiveCase} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,selectLiveCases,evaluateLiveCase,runLiveCases} from './live-answer-evaluation.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
 
@@ -57,4 +57,32 @@ test('audit report preserves answer text, citation locations, and Worker quote h
  assert.deepEqual(result.evidenceHighlights,[{sourceId:'S1',title:'Bible',page:1821,
   quote:'A passage excerpt.',quoteLocated:null}]);
  assert.equal('evidenceHighlightsLocated' in result,false);
+});
+
+test('live runner records a failed Worker case and continues with checkpoint callbacks',async()=>{
+ const items=[{id:'a',question:'first',required_source_groups:[]},{id:'b',question:'second',required_source_groups:[]}];
+ const seen=[];let calls=0;
+ const run=await runLiveCases(items,{evaluateCase:async item=>{
+  calls++;
+  if(item.id==='a'){const error=new Error('HTTP 502');error.requestFailure={stage:'answer',httpStatus:502,failureCode:'evidence-review-truncated',message:'truncated',workerFailure:true};throw error;}
+  return {id:item.id,question:item.question,passed:true,outcome:'verified-source-draft',sourceGroups:[]};
+ },onResult:async(_item,results)=>seen.push(results.map(item=>item.id))});
+ assert.equal(calls,2);
+ assert.deepEqual(seen,[['a'],['a','b']]);
+ assert.equal(run.results[0].requestFailure.failureCode,'evidence-review-truncated');
+ assert.equal(run.results[1].passed,true);
+ assert.equal(run.stopReason,'');
+});
+test('live runner stops after two consecutive Worker failures and keeps prior results',async()=>{
+ const items=['a','b','c','d'].map(id=>({id,question:id,required_source_groups:[]}));
+ let calls=0;const run=await runLiveCases(items,{evaluateCase:async item=>{
+  calls++;
+  if(item.id==='a')return {id:'a',question:'a',passed:true,sourceGroups:[]};
+  const error=new Error('Worker unavailable');error.requestFailure={stage:'planner',httpStatus:502,failureCode:'http-error',message:'unavailable',workerFailure:true};throw error;
+ }});
+ assert.equal(calls,3);
+ assert.deepEqual(run.results.map(item=>item.id),['a','b','c']);
+ assert.equal(run.stopReason,'consecutive-worker-failures');
+ assert.equal(run.results[0].passed,true);
+ assert.equal(run.results[1].requestFailure.httpStatus,502);
 });
