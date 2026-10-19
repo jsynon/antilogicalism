@@ -569,6 +569,24 @@
         "Du Bois Souls of Black Folk double consciousness two souls",
         "Du Bois second sight veil American Negro identity"
       ]
+    },
+    {
+      "id": "religion-1-john-love",
+      "discipline": "religion",
+      "task": "scripture-passage",
+      "question": "According to 1 John 4:7–12, what does ‘God is love’ mean, and how does the passage connect God’s love with loving one another?",
+      "planner_queries": [
+        "exegesis of 1 John 4:7-12 definition of God is love",
+        "connection between God's love and commandment to love one another in 1 John"
+      ],
+      "required_source_groups": [
+        {
+          "label": "1 John 4:7–12",
+          "book_ids": [
+            "638"
+          ]
+        }
+      ]
     }
   ]
 }
