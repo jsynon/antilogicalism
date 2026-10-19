@@ -8,7 +8,6 @@ import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
 import {mergeFacetSearches,validSearchPlan} from './evidence-search.mjs';
 import {createDiagnosticReport} from './diagnostic-report.mjs';
-import {matchingBooks} from './book-filter.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -19,9 +18,6 @@ const el=id=>document.getElementById(id);
 const question=el('companion-question');
 const form=el('companion-question-form');
 if(!form)throw Error('Reading Companion markup is missing');
-const bookFilter=el('companion-book-filter');
-const bookFinder=el('companion-book-finder');
-const bookCount=el('companion-book-count');
 const askButton=el('companion-ask-button');
 const answerBox=el('companion-answer');
 const status=el('companion-status');
@@ -56,7 +52,7 @@ function refreshDiagnostic(){
   diagnosticOutput.textContent=JSON.stringify(createDiagnosticReport(diagnosticState),null,2);
 }
 function beginDiagnostic(questionText){
-  diagnosticState={question:questionText,selectedBookId:bookFilter.value||'all',
+  diagnosticState={question:questionText,selectedBookId:'all',
     libraryVersion:47,fallbackMode:oldPilotFallback,stage:'planning',
     plannerQueries:[],searches:[],candidates:[],submittedSources:[],
     evidenceHighlights:[]};
@@ -74,24 +70,6 @@ function showAvailability(){
 }
 function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
-}
-function populateBooks(){
-  const selected=bookFilter.value;
-  const matches=matchingBooks(bookList,bookFinder?.value||'');
-  bookFilter.replaceChildren(new Option('All pilot books',''));
-  if(selected&&!matches.some(book=>book.id===selected)){
-    const current=bookList.find(book=>book.id===selected);
-    if(current)bookFilter.append(new Option(current.title+' (selected)',current.id));
-  }
-  for(const book of matches)bookFilter.append(new Option(book.title,book.id));
-  if(selected)bookFilter.value=selected;
-  if(bookCount){
-    const query=bookFinder?.value.trim()||'';
-    bookCount.textContent=query?
-      'Showing '+matches.length+' of '+bookList.length+' pilot books.':
-      bookList.length+' pilot '+(bookList.length===1?'book':'books')+' available.';
-  }
-  showAvailability();
 }
 async function loadCoverage(){
   try{
@@ -115,7 +93,7 @@ async function loadCoverage(){
     bookList=[FALLBACK_BOOK];allowed=new Set(['152']);
     oldPilotFallback=true;
   }
-  populateBooks();
+  showAvailability();
 }
 async function loadStatus(){
   try{
@@ -205,7 +183,7 @@ async function retrieveSources(plannedQueries=null){
     }else{
       const searches=validSearchPlan(plannedQueries)?plannedQueries:[q];
       const foundSets=await Promise.all(searches.map(term=>library.search(term,{
-        bookId:bookFilter.value,allowedBookIds:allowed,maxBooks:2,
+        bookId:'',allowedBookIds:allowed,maxBooks:2,
         pagesPerBook:3
       })));
       if(diagnosticState)diagnosticState.searches=foundSets.map((set,index)=>({
@@ -241,7 +219,7 @@ async function retrieveSources(plannedQueries=null){
       refreshDiagnostic();
     }
     if(!candidates.length){
-      setStatus('No matching passages found. Try different wording or choose another book.');
+      setStatus('No matching passages found. Try different wording.');
       return false;
     }
     setStatus('Checking the source passages…');
@@ -421,7 +399,7 @@ async function requestSourcePlan(q,verificationToken){
   if(diagnosticState)diagnosticState.stage='planning';
   const res=await fetch(API+'/api/pilot-plan',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({question:q,bookId:bookFilter.value,
+    body:JSON.stringify({question:q,bookId:'',
       turnstileToken:verificationToken})
   });
   let data;
@@ -478,7 +456,7 @@ async function askQuestion(){
       if(!found)return;
     }
     const chosen=candidates.slice(0,MAX_ANSWER_SOURCES);
-    if(!chosen.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
+    if(!chosen.length){setStatus('No matching passages found. Try different wording.');return;}
     if(diagnosticState){
       diagnosticState.submittedSources=chosen.map((source,index)=>({...source,id:'S'+(index+1)}));
       diagnosticState.stage='answering';
@@ -495,7 +473,7 @@ async function askQuestion(){
     if(!response.ok)throw Error(data.error||'Worker returned HTTP '+response.status);
     renderResponse(data);
     setStatus(data.outcome==='insufficient-evidence'?
-      'These passages don’t provide enough evidence for a complete answer. Try different wording or choose another book.':'');
+      'These passages don’t provide enough evidence for a complete answer. Try different wording.':'');
   }catch(error){
     console.error('Reading Companion request failed:',error);
     if(diagnosticState){
@@ -525,7 +503,5 @@ diagnosticCopy.addEventListener('click',async()=>{
   }
 });
 form.addEventListener('submit',event=>{event.preventDefault();askQuestion();});
-bookFilter.addEventListener('change',updateButtons);
-bookFinder?.addEventListener('input',populateBooks);
 question.addEventListener('input',updateButtons);
 (async()=>{await loadCoverage();await loadStatus();})();
