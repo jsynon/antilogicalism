@@ -7,7 +7,7 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds} from './evidence-search.mjs';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -252,12 +252,20 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
         resultCount:populated.length,sources:populated.slice(0,8)}];
     }else{
       const searches=buildSearchFacets(q,plannedQueries,bookFilter.value);
-      const foundSets=await Promise.all(searches.map(term=>library.search(term,{
-        bookId:bookFilter.value,allowedBookIds:allowed,maxBooks:2,
-        pagesPerBook:3
-      })));
+      const namedBookIds=bookFilter.value?[bookFilter.value]:
+        matchExplicitBookIds(q,bookList);
+      const targetBookIds=namedBookIds.length?namedBookIds:[null];
+      const foundSets=await Promise.all(searches.map(async term=>{
+        const targeted=await Promise.all(targetBookIds.map(bookId=>
+          library.search(term,{...(bookId?{bookId}:{}),allowedBookIds:allowed,
+            maxBooks:2,pagesPerBook:3})));
+        return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])
+          .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
+      }));
+
       if(diagnosticState)diagnosticState.searches=foundSets.map((set,index)=>({
-        query:searches[index],resultCount:Array.isArray(set.sources)?set.sources.length:0,
+        query:searches[index]+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
+        resultCount:Array.isArray(set.sources)?set.sources.length:0,
         sources:(set.sources||[]).slice(0,8)
       }));
       const results=foundSets.length>1?

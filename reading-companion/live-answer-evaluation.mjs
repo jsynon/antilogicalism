@@ -6,7 +6,7 @@ import {readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,matchExplicitBookIds} from './evidence-search.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
@@ -87,7 +87,15 @@ async function fetchJson(url){const response=await fetch(url,{headers:{accept:'a
 async function loadSources(item,queries,{library,manifest,allowed}){
  if(!validSearchPlan(queries))throw Error('Planner returned an invalid two-query plan.');
  const searchQueries=buildSearchFacets(item.question,queries);
- const searchSets=await Promise.all(searchQueries.map(query=>library.search(query,{allowedBookIds:allowed,maxBooks:2,pagesPerBook:3})));
+ const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
+ const namedBookIds=matchExplicitBookIds(item.question,bookCatalog);
+ const targetBookIds=namedBookIds.length?namedBookIds:[null];
+ const searchSets=await Promise.all(searchQueries.map(async query=>{
+  const targeted=await Promise.all(targetBookIds.map(bookId=>
+   library.search(query,{...(bookId?{bookId}:{}),allowedBookIds:allowed,maxBooks:2,pagesPerBook:3})));
+  return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])
+   .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
+ }));
  const candidates=mergeFacetSearches(searchSets,8),populated=[];
  for(const source of candidates){
   if(!allowed.has(String(source.bookId)))continue;
@@ -105,7 +113,9 @@ async function loadSources(item,queries,{library,manifest,allowed}){
   const book=manifest.books[String(source.bookId)];
   if(!book)throw Error('A selected source is absent from the published manifest.');
  }
- return {selected,searches:searchSets.map((set,index)=>({query:searchQueries[index],resultCount:set.sources?.length||0}))};
+ return {selected,searches:searchSets.map((set,index)=>({query:searchQueries[index]+
+  (namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
+  resultCount:set.sources?.length||0}))};
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}){
  const startTime=Date.now();
