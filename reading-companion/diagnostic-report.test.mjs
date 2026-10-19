@@ -51,9 +51,20 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(diagnosticFailureCode(503),'service-unavailable');
  assert.equal(diagnosticFailureCode(null),'network-error');
  const report=createDiagnosticReport({failureHttpStatus:999,
-   failureCode:'PRIVATE MODEL ERROR response contains secret'});
+   stage:'failed',failureCode:'PRIVATE MODEL ERROR response contains secret'});
  assert.equal(report.failureHttpStatus,null);
  assert.equal(report.failureCode,'unclassified');
+ const successful=createDiagnosticReport({stage:'complete',failureCode:''});
+ assert.equal(successful.failureCode,'');
+});
+
+test('diagnostics retain all four submitted pages without exposing their text',()=>{
+ const report=createDiagnosticReport({stage:'complete',failureCode:'',
+   submittedSources:[1,2,3,4].map(page=>({id:'S'+page,bookId:'529',
+     title:'Origin of Species',page,text:'PRIVATE SOURCE TEXT'}))});
+ assert.deepEqual(report.submittedSources.map(source=>source.id),
+   ['S1','S2','S3','S4']);
+ assert.equal(JSON.stringify(report).includes('PRIVATE SOURCE TEXT'),false);
 });
 
 test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
