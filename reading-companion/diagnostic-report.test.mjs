@@ -47,6 +47,10 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(diagnosticFailureCode(422),'source-verification-rejected');
  assert.equal(diagnosticFailureCode(429),'rate-limited');
  assert.equal(diagnosticFailureCode(502),'answer-generation-or-citation-failed');
+ assert.equal(diagnosticFailureCode(502,'answer','evidence-review-request-failed'),
+   'evidence-review-request-failed');
+ assert.equal(diagnosticFailureCode(502,'answer','PRIVATE MODEL ERROR'),
+   'answer-generation-or-citation-failed');
  assert.equal(diagnosticFailureCode(502,'planner'),'search-planning-failed');
  assert.equal(diagnosticFailureCode(503),'service-unavailable');
  assert.equal(diagnosticFailureCode(null),'network-error');
@@ -54,6 +58,14 @@ test('diagnostic failure codes preserve useful status categories without raw err
    failureCode:'PRIVATE MODEL ERROR response contains secret'});
  assert.equal(report.failureHttpStatus,null);
  assert.equal(report.failureCode,'unclassified');
+});
+
+test('diagnostic reports all four source pages sent to the answer service',()=>{
+ const submittedSources=Array.from({length:4},(_,index)=>({id:'S'+(index+1),
+   bookId:'102',title:'A Brief History of Time',page:53+index,text:'PRIVATE TEXT'}));
+ const report=createDiagnosticReport({submittedSources});
+ assert.deepEqual(report.submittedSources.map(source=>source.page),[53,54,55,56]);
+ assert.equal(JSON.stringify(report).includes('PRIVATE TEXT'),false);
 });
 
 test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
