@@ -646,6 +646,11 @@ diagnosticCopy.addEventListener('click',async()=>{
 });
 newConversationButton.addEventListener('click',startNewConversation);
 form.addEventListener('submit',event=>{event.preventDefault();askQuestion();});
+question.addEventListener('keydown',event=>{
+  if(event.key!=='Enter'||event.shiftKey||event.isComposing)return;
+  event.preventDefault();
+  if(!askButton.disabled)form.requestSubmit(askButton);
+});
 bookSearch.addEventListener('input',updateBookOptions);
 bookFilter.addEventListener('change',()=>{
   if(bookFilter.value===''){
