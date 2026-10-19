@@ -1,16 +1,11 @@
 const string=(value,limit=180)=>typeof value==='string'?value.slice(0,limit):'';
-const FAILURE_CODES=new Set([
-  'network-error','request-rejected','authorization-rejected',
-  'visitor-or-origin-rejected','request-too-large',
-  'source-verification-rejected','rate-limited',
-  'answer-generation-or-citation-failed','search-planning-failed','service-unavailable',
-  'evidence-review-request-failed','evidence-review-truncated',
-  'evidence-review-invalid-response','answer-composition-request-failed',
-  'answer-composition-truncated','answer-composition-empty',
-  'answer-composition-too-long','answer-citations-missing',
-  'answer-citations-invalid','citation-source-mismatch','http-error',
-  'invalid-response','retrieval-error'
-]);
+// The Worker owns this field and emits stable, non-sensitive reason codes. Accept
+// newly introduced codes without requiring a synchronized frontend allowlist.
+// Reject free-form messages and cap length before including the value in reports.
+const SAFE_FAILURE_CODE=/^[a-z][a-z0-9-]{0,63}$/;
+function isSafeFailureCode(value){
+  return typeof value==='string'&&SAFE_FAILURE_CODE.test(value);
+}
 
 // Accept both a single marker ([S1]) and grouped markers ([S1, S3]) for
 // rendering. The audit below intentionally remains broader so malformed or
@@ -22,7 +17,7 @@ export function inlineCitationGroups(answer){
 }
 
 export function diagnosticFailureCode(status,requestStage='answer',serverCode=''){
-  if(FAILURE_CODES.has(serverCode))return serverCode;
+  if(isSafeFailureCode(serverCode))return serverCode;
   if(!Number.isInteger(status)||status<100||status>599)return 'network-error';
   if(status===400)return 'request-rejected';
   if(status===401)return 'authorization-rejected';
@@ -68,7 +63,7 @@ export function createDiagnosticReport(input={}){
   const audit=auditCitationIds(input.answer,input.citations);
   return {
     schema:'antilogicalism-reading-companion-diagnostic-v1',
-    clientBuild:'v1.11-diagnostics',
+    clientBuild:'v1.12-diagnostics',
     libraryVersion:Number.isSafeInteger(input.libraryVersion)?input.libraryVersion:null,
     question:string(input.question,400),
     selectedBookId:string(input.selectedBookId,12)||'all',
@@ -79,7 +74,7 @@ export function createDiagnosticReport(input={}){
       input.failureHttpStatus>=100&&input.failureHttpStatus<=599?
       input.failureHttpStatus:null,
       failureCode:input.stage==='complete'?'':(
-        FAILURE_CODES.has(input.failureCode)?input.failureCode:'unclassified'),
+        isSafeFailureCode(input.failureCode)?input.failureCode:'unclassified'),
     plannerQueries:Array.isArray(input.plannerQueries)?
       input.plannerQueries.filter(x=>typeof x==='string').slice(0,4).map(x=>x.slice(0,240)):[],
     searches:Array.isArray(input.searches)?input.searches.slice(0,4).map(search=>({
