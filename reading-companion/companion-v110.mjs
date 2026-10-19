@@ -8,7 +8,8 @@ import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
 import {mergeFacetSearches,validSearchPlan,selectAnswerSources,canFallbackToDirectSearch} from './evidence-search.mjs';
-import {createDiagnosticReport,diagnosticFailureCode} from './diagnostic-report.mjs';
+import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
+  inlineCitationGroups} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
@@ -330,17 +331,16 @@ function appendFullPage(parent,source,excerpt=''){
 }
 function putCitationTokens(target,answer,citations,evidenceHighlights=[]){
   const byId=new Map(citations.map(s=>[s.id,s]));
-  const pattern=/\[(S[1-9]\d*)\]/g;
-  let at=0,match;
-  while((match=pattern.exec(answer))!==null){
-    if(match.index>at)target.append(document.createTextNode(answer.slice(at,match.index)));
-    const source=byId.get(match[1]);
+  const groups=inlineCitationGroups(answer);
+  let at=0;
+  const appendCitation=(id)=>{
+    const source=byId.get(id);
     if(source){
       const a=document.createElement('button');
       a.type='button';
-      a.textContent=match[0];a.className='companion-inline-citation';
+      a.textContent=id;a.className='companion-inline-citation';
       a.title=source.title+' PDF page '+source.page;
-      a.setAttribute('aria-label','Open '+match[0]+' in the page reader: '+
+      a.setAttribute('aria-label','Open ['+id+'] in the page reader: '+
         source.title+', PDF page '+source.page);
       const evidence=evidenceHighlights.find(item=>item.source_id===source.id&&
         Number(item.page)===Number(source.page));
@@ -350,8 +350,17 @@ function putCitationTokens(target,answer,citations,evidenceHighlights=[]){
         }catch(error){setStatus('Source reader: '+error.message);}
       });
       target.append(a);
-    }else target.append(document.createTextNode(match[0]));
-    at=match.index+match[0].length;
+    }else target.append(document.createTextNode(id));
+  };
+  for(const group of groups){
+    if(group.start>at)target.append(document.createTextNode(answer.slice(at,group.start)));
+    target.append(document.createTextNode('['));
+    group.ids.forEach((id,index)=>{
+      if(index)target.append(document.createTextNode(', '));
+      appendCitation(id);
+    });
+    target.append(document.createTextNode(']'));
+    at=group.end;
   }
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
 }
@@ -580,6 +589,26 @@ async function askQuestion(questionText){
         diagnosticState.failureCode=diagnosticFailureCode(response.status,'answer',data.failureCode);
       }
       throw Error('The answer service could not prepare an answer.');
+    }
+    const responseCitations=Array.isArray(data.citations)?data.citations:[];
+    const citationAudit=auditCitationIds(data.answer,responseCitations);
+    if(citationAudit.inlineIdsWithoutSource.length){
+      if(diagnosticState){
+        diagnosticState.stage='failed';
+        diagnosticState.failureCategory='answer-integrity-failed';
+        diagnosticState.failureCode='citation-source-mismatch';
+        diagnosticState.outcome=data.outcome;
+        diagnosticState.coverage=data.coverage;
+        diagnosticState.reviewStatus=data.reviewStatus;
+        diagnosticState.answer=data.answer;
+        diagnosticState.citations=responseCitations;
+        diagnosticState.evidenceHighlights=Array.isArray(data.evidenceHighlights)?
+          data.evidenceHighlights.map(item=>({source_id:item.source_id,
+            page:Number(item.page),quoteLocated:false,partialMatch:false})):[];
+        refreshDiagnostic();
+      }
+      setStatus('The answer included citations without matching sources. Please try again.');
+      return;
     }
     renderResponse(data,q);
     rememberTurn(q,data.answer||'');
