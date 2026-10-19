@@ -19,7 +19,7 @@ const fixture={
  'book-7.json':{pages:[{id:0,page:13,text:passage}]}
 };
 function fakeFetch(url){
- const key=String(url).split('/').pop().replace(/\\.gz$/,'');
+ const key=String(url).split('/').pop().replace(/\.gz$/,'');
  return Promise.resolve(key in fixture?
   new Response(gzipSync(JSON.stringify(fixture[key])),{status:200}):
   new Response('Not found',{status:404}));
