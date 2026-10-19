@@ -68,7 +68,8 @@ export function createDiagnosticReport(input={}){
     failureHttpStatus:Number.isInteger(input.failureHttpStatus)&&
       input.failureHttpStatus>=100&&input.failureHttpStatus<=599?
       input.failureHttpStatus:null,
-      failureCode:FAILURE_CODES.has(input.failureCode)?input.failureCode:'unclassified',
+      failureCode:input.stage==='complete'?'':(
+        FAILURE_CODES.has(input.failureCode)?input.failureCode:'unclassified'),
     plannerQueries:Array.isArray(input.plannerQueries)?
       input.plannerQueries.filter(x=>typeof x==='string').slice(0,4).map(x=>x.slice(0,240)):[],
     searches:Array.isArray(input.searches)?input.searches.slice(0,4).map(search=>({
