@@ -88,8 +88,8 @@ function populateBooks(){
   if(bookCount){
     const query=bookFinder?.value.trim()||'';
     bookCount.textContent=query?
-      matches.length+' of '+bookList.length+' pilot books match.':
-      bookList.length+' pilot books available.';
+      'Showing '+matches.length+' of '+bookList.length+' pilot books.':
+      bookList.length+' pilot '+(bookList.length===1?'book':'books')+' available.';
   }
   showAvailability();
 }
