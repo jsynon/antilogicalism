@@ -76,7 +76,8 @@ function questionContainsPhrase(question,phrase){
 function catalogWorkTitles(title){
  const work=String(title||'').split(' — ')[0];
  const variants=[work,...work.split(':').slice(1)];
- return [...new Set(variants.map(value=>value.replace(/\([^)]*\)/g,' ').trim())
+ const cleaned=variants.map(value=>value.replace(/\([^)]*\)/g,' ').trim());
+ return [...new Set(cleaned.flatMap(value=>[value,value.replace(/^(the|a|an)\s+/i,'')])
   .filter(value=>normalizeCatalogText(value).length>=4))];
 }
 function catalogAuthor(title){
