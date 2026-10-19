@@ -65,6 +65,15 @@ test('public companion copy explains the pilot and keeps source reading controls
 });
 
 
+
+test('answer citations open in the local page reader while Sources keeps the PDF link',()=>{
+ assert.match(client,/function putCitationTokens\\(target,answer,citations,evidenceHighlights=\\[\\]\\)/);
+ assert.match(client,/sourceReader\\.open\\(\\{\\.\\.\\.source,excerpt:evidence\\?\\.quote\\|\\|''\\},a\\)/);
+ assert.match(client,/link\\.href=source\\.url/);
+ assert.match(client,/readableParagraphs\\(source\\.text\\)\\.join\\('\\\\n\\\\n'\\)/);
+ assert.match(html,/button\\.companion-inline-citation\\{-webkit-appearance:none;appearance:none/);
+});
+
 test('Book Lite opening drop cap and small-caps apply only to the introductory paragraph',()=>{
  const base='#primary .entry-content #companion-pilot > p:first-child';
  assert(html.includes(base+'::first-line'));

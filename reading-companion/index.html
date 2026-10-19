@@ -353,7 +353,9 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-key-passage .companion-page-text{margin-top:.4em}
 #companion-pilot .companion-citations{border-top:1px solid #dfe2e3;margin-top:1rem;padding-top:.5rem}
 #companion-pilot .companion-citations .companion-source-entry p{margin:.4rem 0 .65rem}
-#companion-pilot .companion-inline-citation{white-space:nowrap;text-decoration:underline}
+#companion-pilot button.companion-inline-citation{-webkit-appearance:none;appearance:none;border:0;padding:0;background:transparent;color:inherit;font:inherit;line-height:inherit;white-space:nowrap;text-decoration:underline;text-underline-offset:.12em;cursor:pointer}
+#companion-pilot button.companion-inline-citation:hover{background:transparent;color:#111}
+#companion-pilot button.companion-inline-citation:focus-visible{outline:2px solid #111;outline-offset:2px}
 @media(max-width:650px){#companion-pilot .companion-follow-up-buttons button{width:100%}}
 
 /* Match the Book Lite typography used throughout the site: 19px Century
