@@ -30,16 +30,22 @@ test('diagnostic output is bounded and never includes source text or challenge d
  });
  const serialized=JSON.stringify(report);
  assert.equal(report.schema,'antilogicalism-reading-companion-diagnostic-v1');
+ assert.equal(report.question,'How do Aristotle and Darwin explain change?');
  assert.deepEqual(report.answer.inlineIdsWithoutSource,['S2']);
  assert.equal(report.failureHttpStatus,502);
  assert.equal(report.failureCode,'answer-generation-or-citation-failed');
+ assert.equal(report.answer.text,'The authors differ [S1, S2].');
  assert.equal(report.candidates[0].score,2.5);
  assert.equal(report.evidenceHighlights[0].quoteLocated,true);
  assert.equal(serialized.includes('PRIVATE FULL PAGE TEXT'),false);
  assert.equal(serialized.includes('PRIVATE PREVIEW'),false);
  assert.equal(serialized.includes('PRIVATE TOKEN'),false);
  assert.equal(serialized.includes('PRIVATE QUOTE'),false);
- assert.equal(serialized.includes('The authors differ [S1, S2].'),false);
+});
+
+test('diagnostic answer text is bounded to the server answer limit',()=>{
+ const report=createDiagnosticReport({stage:'complete',answer:'A'.repeat(3000)});
+ assert.equal(report.answer.text.length,2400);
 });
 
 test('diagnostic failure codes preserve useful status categories without raw error text',()=>{
@@ -73,6 +79,7 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(html,/id="companion-diagnostic-details" hidden/);
  assert.match(html,/id="companion-diagnostic-copy" type="button">Copy diagnostic report/);
  assert.match(html,/shared only if you copy it/);
+ assert.match(html,/answer text \(up to 2,400 characters\)/i);
  assert.match(client,/navigator\.clipboard\.writeText\(diagnosticOutput\.textContent\)/);
  assert.match(client,/foundSets\.map\(\(set,index\)=>/);
  assert.match(client,/diagnosticState\.evidenceHighlights=highlights\.map/);
