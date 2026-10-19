@@ -76,6 +76,13 @@ function wordStem(word) {
   if (w.length > 4 && w.endsWith('e')) w = w.slice(0, -1);
   return w;
 }
+function titleTermStem(word) {
+  const stem=wordStem(word);
+  // Treat common adjective/noun pairs as a title match: "ethical" with
+  // "Ethics", or "political" with "Politics". This helps a topical query
+  // select the relevant work by an explicitly named author.
+  return stem.length>6&&stem.endsWith('ical')?stem.slice(0,-2):stem;
+}
 function termFamily(term, partition) {
   const vocabulary=partition||{};
   const variants=new Set([term]);
@@ -281,9 +288,9 @@ export class RemoteLibrary {
     }
     let books = [...ranked].map(([id, hits]) => {
       hits.sort((a,b) => b.matched - a.matched || b.score - a.score || a.id - b.id);
-      const titleTokens = new Set(String(manifest.books[id].title || '').split(/\s+[—–-]\s+/)[0]
-        .toLowerCase().match(/[a-z0-9]+/g) || []);
-      const overlap = terms.filter(term => titleTokens.has(term)).length;
+      const titleTokens = new Set((String(manifest.books[id].title || '').split(/\s+[—–-]\s+/)[0]
+        .toLowerCase().match(/[a-z0-9]+/g) || []).map(titleTermStem));
+      const overlap = terms.filter(term => titleTokens.has(titleTermStem(term))).length;
       return {id, hits, titleOverlap:overlap, score:hits[0].score + 3 * hits[0].matched +
         Math.log1p(hits.length) + 12 * overlap};
     });
@@ -299,6 +306,14 @@ export class RemoteLibrary {
     const directWorks = books.filter(book => book.titleOverlap >= 2);
     if (!bookId && !comparison && directWorks.length && directWorks.length <= Math.max(1,Math.min(maxBooks,3))) {
       books = directWorks;
+    }
+    // In an author-focused question, one distinctive work-title match is
+    // enough to disambiguate among that author's books (e.g. "ethical"
+    // identifies Nicomachean Ethics over Politics). Avoid applying this
+    // weaker signal to unscoped searches where a common title word can mislead.
+    const authorScopedTitleMatches = books.filter(book=>book.titleOverlap>=1);
+    if(!bookId&&!comparison&&namedAuthorBookIds.size&&authorScopedTitleMatches.length===1){
+      books=authorScopedTitleMatches;
     }
     const sources = [];
     let booksScanned = 0, discardedNavigation = 0;
