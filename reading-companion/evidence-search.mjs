@@ -59,6 +59,52 @@ export function buildSearchFacets(question,plannedQueries,bookId=''){
  return [...planned,direct];
 }
 
+/* Resolve explicit work names in the reader's question against the published
+ * catalog. Exact work titles take priority; when no title is named, author
+ * names can narrow a broad all-library search. This is deterministic and
+ * adds no model calls.
+ */
+function normalizeCatalogText(value){
+ return String(value||'').toLocaleLowerCase().normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]+/g,' ').trim();
+}
+function questionContainsPhrase(question,phrase){
+ const q=' '+normalizeCatalogText(question)+' ';
+ const p=normalizeCatalogText(phrase);
+ return p.length>=4&&q.includes(' '+p+' ');
+}
+function catalogWorkTitles(title){
+ const work=String(title||'').split(' — ')[0];
+ const variants=[work,...work.split(':').slice(1)];
+ return [...new Set(variants.map(value=>value.replace(/\([^)]*\)/g,' ').trim())
+  .filter(value=>normalizeCatalogText(value).length>=4))];
+}
+function catalogAuthor(title){
+ const parts=String(title||'').split(' — ');
+ if(parts.length<2)return '';
+ const author=parts.slice(1).join(' ').trim();
+ if(/\bedited by\b/i.test(author))return '';
+ return author;
+}
+export function matchExplicitBookIds(question,books){
+ if(typeof question!=='string'||!Array.isArray(books))return [];
+ const valid=books.filter(book=>/^[1-9]\d{0,3}$/.test(String(book?.id||''))&&
+  typeof book?.title==='string');
+ const titleMatches=valid.filter(book=>
+  catalogWorkTitles(book.title).some(title=>questionContainsPhrase(question,title)));
+ if(titleMatches.length)return [...new Set(titleMatches.map(book=>String(book.id)))];
+ const authorMatches=valid.filter(book=>{
+  const author=catalogAuthor(book.title);
+  if(!author)return false;
+  return author.split(/\s+and\s+/i).some(name=>{
+   const words=normalizeCatalogText(name).split(' ').filter(Boolean);
+   const surname=words.at(-1)||'';
+   return surname.length>=4&&questionContainsPhrase(question,surname);
+  });
+ });
+ return [...new Set(authorMatches.map(book=>String(book.id)))].slice(0,4);
+}
+
 /* Planning improves retrieval, but a temporary planner outage must not block
  * direct search with the reader's own wording. Keep explicit request denials
  * and rate limits fail-closed. */
@@ -77,8 +123,13 @@ export function selectAnswerSources(candidates,question,turnstileToken,
   {maxSources=4,maxBytes=30000,history=[]}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||
     typeof turnstileToken!=='string')return [];
- const chosen=[];
+ const chosen=[],firstPerBook=[],alternates=[],seenBooks=new Set();
  for(const candidate of candidates){
+   const key=String(candidate?.bookId||'');
+   if(key&&!seenBooks.has(key)){seenBooks.add(key);firstPerBook.push(candidate);}
+   else alternates.push(candidate);
+ }
+ for(const candidate of [...firstPerBook,...alternates]){
    if(chosen.length>=maxSources)break;
    if(!candidate||typeof candidate.text!=='string'||
       !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
