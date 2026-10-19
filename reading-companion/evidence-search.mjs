@@ -80,30 +80,39 @@ function catalogWorkTitles(title){
  return [...new Set(cleaned.flatMap(value=>[value,value.replace(/^(the|a|an)\s+/i,'')])
   .filter(value=>normalizeCatalogText(value).length>=4))];
 }
-function catalogAuthor(title){
+function catalogAuthorNames(title){
  const parts=String(title||'').split(' — ');
- if(parts.length<2)return '';
+ if(parts.length<2)return [];
  const author=parts.slice(1).join(' ').trim();
- if(/\bedited by\b/i.test(author))return '';
- return author;
+ if(/\\bedited by\\b/i.test(author))return [];
+ return author.split(/\\s+and\\s+/i).filter(Boolean);
 }
 export function matchExplicitBookIds(question,books){
  if(typeof question!=='string'||!Array.isArray(books))return [];
- const valid=books.filter(book=>/^[1-9]\d{0,3}$/.test(String(book?.id||''))&&
+ const valid=books.filter(book=>/^[1-9]\\d{0,3}$/.test(String(book?.id||''))&&
   typeof book?.title==='string');
  const titleMatches=valid.filter(book=>
   catalogWorkTitles(book.title).some(title=>questionContainsPhrase(question,title)));
- if(titleMatches.length)return [...new Set(titleMatches.map(book=>String(book.id)))];
- const authorMatches=valid.filter(book=>{
-  const author=catalogAuthor(book.title);
-  if(!author)return false;
-  return author.split(/\s+and\s+/i).some(name=>{
-   const words=normalizeCatalogText(name).split(' ').filter(Boolean);
-   const surname=words.at(-1)||'';
-   return surname.length>=4&&questionContainsPhrase(question,surname);
-  });
+ const authorGroups=new Map();
+ for(const book of valid){
+  for(const name of catalogAuthorNames(book.title)){
+   const surname=normalizeCatalogText(name).split(' ').filter(Boolean).at(-1)||'';
+   if(surname.length>=4&&questionContainsPhrase(question,surname)){
+    if(!authorGroups.has(surname))authorGroups.set(surname,[]);
+    authorGroups.get(surname).push(book);
+   }
+  }
+ }
+ if(!authorGroups.size)
+  return [...new Set(titleMatches.map(book=>String(book.id)))].slice(0,8);
+ const groups=[...authorGroups.values()].map(group=>{
+  const titleIds=new Set(titleMatches.map(book=>String(book.id)));
+  const exact=group.filter(book=>titleIds.has(String(book.id)));
+  return (exact.length?exact:group).slice(0,2);
  });
- return [...new Set(authorMatches.map(book=>String(book.id)))].slice(0,4);
+ const selected=[];
+ for(let i=0;i<2;i++)for(const group of groups)if(group[i])selected.push(String(group[i].id));
+ return [...new Set(selected)].slice(0,8);
 }
 
 /* Planning improves retrieval, but a temporary planner outage must not block
