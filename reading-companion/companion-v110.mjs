@@ -193,7 +193,8 @@ async function retrieveSources(plannedQueries=null){
         mergeFacetSearches(foundSets,8).filter(allowedPage):
         foundSets[0].sources.filter(allowedPage);
       // Preserve one page for each distinct facet before filling from other
-      // candidates. The answer uses the strongest two verified full pages.
+      // candidates. Up to four verified pages reach the evidence reviewer;
+      // it selects no more than three for the drafted answer.
       const representatives=[],others=[],visited=new Set();
       for(const r of results){
         const group=plannedQueries?String(r.facet):r.bookId;
