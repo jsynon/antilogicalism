@@ -77,21 +77,20 @@ function wordStem(word) {
   return w;
 }
 function termFamily(term, partition) {
-  const variants=new Set([term,wordStem(term)]);
-  // Convert common action nouns back to their lexical base (actions/action →
-  // act). This lets the index connect a question's wording to phrases such
-  // as Aristotle's "doing just acts" without a question-specific rule.
+  const vocabulary=partition||{};
+  const variants=new Set([term]);
+  const candidates=new Set([wordStem(term)]);
+  // Normalize common derivational forms without broad prefix matching. The
+  // index dictionary confirms each generated form is actually present.
+  if(term.length>7&&term.endsWith('uation')){
+    candidates.add(term.slice(0,-6));
+    candidates.add(term.slice(0,-6)+'uate');
+  }
+  if(term.endsWith('uous'))candidates.add(term.slice(0,-4)+'ue');
   const derivation=term.replace(/(?:ions|ion)$/,'');
-  if(derivation!==term&&derivation.length>=3)variants.add(derivation);
-  // Query and source wording often use close forms of the same indexed word,
-  // such as habituation/habit or virtuous/virtue. Only add vocabulary that
-  // actually exists in the already loaded index partition.
-  for(const candidate of Object.keys(partition||{})){
-    if(candidate.length<5||term.length<5||candidate===term)continue;
-    let common=0;
-    while(common<Math.min(candidate.length,term.length)&&candidate[common]===term[common])common++;
-    const closeFamily=common>=5&&Math.abs(candidate.length-term.length)<=3;
-    if(term.startsWith(candidate)||candidate.startsWith(term)||closeFamily)
+  if(derivation!==term) candidates.add(derivation);
+  for(const candidate of candidates){
+    if(candidate.length>=3&&Object.hasOwn(vocabulary,candidate))
       variants.add(candidate);
   }
   return [...variants];
