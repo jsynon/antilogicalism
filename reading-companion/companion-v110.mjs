@@ -7,7 +7,7 @@ import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
 import {mergeFacetSearches,validSearchPlan} from './evidence-search.mjs';
-import {createDiagnosticReport} from './diagnostic-report.mjs';
+import {createDiagnosticReport,diagnosticFailureCode} from './diagnostic-report.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -55,7 +55,7 @@ function beginDiagnostic(questionText){
   diagnosticState={question:questionText,selectedBookId:'all',
     libraryVersion:47,fallbackMode:oldPilotFallback,stage:'planning',
     plannerQueries:[],searches:[],candidates:[],submittedSources:[],
-    evidenceHighlights:[]};
+    evidenceHighlights:[],failureHttpStatus:null,failureCode:''};
   diagnosticPanel.hidden=false;
   diagnosticToggle.checked=false;
   diagnosticDetails.hidden=true;
@@ -402,8 +402,15 @@ async function requestSourcePlan(q,verificationToken){
     body:JSON.stringify({question:q,bookId:'',
       turnstileToken:verificationToken})
   });
+  if(diagnosticState&&!res.ok){
+    diagnosticState.failureHttpStatus=res.status;
+    diagnosticState.failureCode=diagnosticFailureCode(res.status,'planner');
+  }
   let data;
-  try{data=await res.json();}catch{throw Error('The evidence search service returned an invalid response.');}
+  try{data=await res.json();}catch{
+    if(diagnosticState)diagnosticState.failureCode='invalid-response';
+    throw Error('The evidence search service returned an invalid response.');
+  }
   if(!res.ok)throw Error(data.error||'Evidence search planning is unavailable');
   if(!validSearchPlan(data.queries))throw Error('The evidence search plan was incomplete.');
   if(diagnosticState){diagnosticState.plannerQueries=data.queries;refreshDiagnostic();}
@@ -469,7 +476,15 @@ async function askQuestion(){
       body:JSON.stringify({question:q,turnstileToken:token,
         sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))})
     });
-    const data=await response.json();
+    if(diagnosticState&&!response.ok){
+      diagnosticState.failureHttpStatus=response.status;
+      diagnosticState.failureCode=diagnosticFailureCode(response.status);
+    }
+    let data;
+    try{data=await response.json();}catch{
+      if(diagnosticState)diagnosticState.failureCode='invalid-response';
+      throw Error('The answer service returned an invalid response.');
+    }
     if(!response.ok)throw Error(data.error||'Worker returned HTTP '+response.status);
     renderResponse(data);
     setStatus(data.outcome==='insufficient-evidence'?
@@ -481,6 +496,8 @@ async function askQuestion(){
       diagnosticState.stage='failed';
       diagnosticState.failureCategory=stage==='planning'?'planner-request-failed':
         stage==='retrieving'?'retrieval-failed':'answer-request-failed';
+      if(!diagnosticState.failureCode)
+        diagnosticState.failureCode=stage==='retrieving'?'retrieval-error':'network-error';
       refreshDiagnostic();
     }
     setStatus('Could not prepare the answer. Please try again.');
