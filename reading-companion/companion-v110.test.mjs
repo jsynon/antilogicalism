@@ -5,6 +5,7 @@ import {RemoteLibrary} from './remote-library.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
+const bookOrder=await import('./book-order.mjs');
 
 test('v1.10 retains Book Lite and the site navigation',()=>{
  assert.match(html,/wp-content\/themes\/book-lite/);
@@ -27,7 +28,12 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/for\(const source of remainingCitations\)/);
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
- assert.ok(client.includes("new Option('All '+bookList.length+' verified books','')"));
+ assert.match(html,/id="companion-book-search" type="search"/);
+ assert.match(html,/Find a book by title or author/);
+ assert.match(html,/companion-book-controls/);
+ assert.ok(client.includes("new Option('All books','')"));
+ assert.match(client,/bookSearch\.addEventListener\('input',updateBookOptions\)/);
+ assert.match(client,/bookSearch\.value=''/);
  assert.match(html,/id="companion-question"/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
  assert.match(client,/companion-follow-up-buttons/);
@@ -39,6 +45,28 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(html,/id="companion-new-conversation" type="button" hidden/);
  assert.match(html,/background:#fff;color:#111;border:1px solid #333/);
 });
+test('book selector sorts by author surname and keeps numbered collections in natural order',()=>{
+ const books=[
+  {id:'10',title:'The Harvard Classics, Volume 10: Tenth — Zed Author'},
+  {id:'2',title:'The Harvard Classics, Volume 2: Second — Amy Author'},
+  {id:'1',title:'The Harvard Classics, Volume 1: First — Zed Author'},
+  {id:'3',title:'A Book — Aaron Aardvark'},
+  {id:'4',title:'Another Book — Zoe Zebra'}
+ ];
+ const sorted=bookOrder.sortBooksForSelector(books);
+ assert.deepEqual(sorted.map(book=>book.id),['3','1','2','10','4']);
+});
+test('book selector search matches title or author without changing source entries',()=>{
+ const books=[
+  {id:'1',title:'Nicomachean Ethics — Aristotle'},
+  {id:'2',title:'Crime and Punishment — Fyodor Dostoevsky'},
+  {id:'3',title:'A Treatise on Electricity — James Clerk Maxwell'}
+ ];
+ assert.deepEqual(bookOrder.filterBooksByText(books,'dostoevsky'),[books[1]]);
+ assert.deepEqual(bookOrder.filterBooksByText(books,'nicomachean'),[books[0]]);
+ assert.deepEqual(bookOrder.filterBooksByText(books,''),books);
+});
+
 test('v1.10 uses original v47 retrieval, verified pilot endpoint and text-only output',()=>{
  assert.match(client,/new RemoteLibrary\(\)/);
  assert.match(client,/allowedBookIds:allowed/);
