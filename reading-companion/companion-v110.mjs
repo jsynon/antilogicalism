@@ -402,16 +402,18 @@ async function requestSourcePlan(q,verificationToken){
     body:JSON.stringify({question:q,bookId:'',
       turnstileToken:verificationToken})
   });
-  if(diagnosticState&&!res.ok){
-    diagnosticState.failureHttpStatus=res.status;
-    diagnosticState.failureCode=diagnosticFailureCode(res.status,'planner');
-  }
   let data;
   try{data=await res.json();}catch{
     if(diagnosticState)diagnosticState.failureCode='invalid-response';
     throw Error('The evidence search service returned an invalid response.');
   }
-  if(!res.ok)throw Error(data.error||'Evidence search planning is unavailable');
+  if(!res.ok){
+    if(diagnosticState){
+      diagnosticState.failureHttpStatus=res.status;
+      diagnosticState.failureCode=diagnosticFailureCode(res.status,'planner',data.failureCode);
+    }
+    throw Error('Evidence search planning is unavailable');
+  }
   if(!validSearchPlan(data.queries))throw Error('The evidence search plan was incomplete.');
   if(diagnosticState){diagnosticState.plannerQueries=data.queries;refreshDiagnostic();}
   return data.queries;
@@ -476,16 +478,18 @@ async function askQuestion(){
       body:JSON.stringify({question:q,turnstileToken:token,
         sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))})
     });
-    if(diagnosticState&&!response.ok){
-      diagnosticState.failureHttpStatus=response.status;
-      diagnosticState.failureCode=diagnosticFailureCode(response.status);
-    }
     let data;
     try{data=await response.json();}catch{
       if(diagnosticState)diagnosticState.failureCode='invalid-response';
       throw Error('The answer service returned an invalid response.');
     }
-    if(!response.ok)throw Error(data.error||'Worker returned HTTP '+response.status);
+    if(!response.ok){
+      if(diagnosticState){
+        diagnosticState.failureHttpStatus=response.status;
+        diagnosticState.failureCode=diagnosticFailureCode(response.status,'answer',data.failureCode);
+      }
+      throw Error('The answer service could not prepare an answer.');
+    }
     renderResponse(data);
     setStatus(data.outcome==='insufficient-evidence'?
       'These passages don’t provide enough evidence for a complete answer. Try different wording.':'');
