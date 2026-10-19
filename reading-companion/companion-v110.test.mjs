@@ -13,6 +13,10 @@ test('v1.10 retains Book Lite and the site navigation',()=>{
  assert.match(html,/id="secondary"/);
  assert.match(html,/companion-v110\.mjs/);
 });
+test('companion names the same searchable title count as Library Search',()=>{
+ assert.match(html,/all 642 searchable titles/);
+ assert.doesNotMatch(html,/644-book library/);
+});
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');
  const explore=client.indexOf('Explore further',answer);
