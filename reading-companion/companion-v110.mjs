@@ -6,14 +6,13 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {mergeFacetSearches,validSearchPlan} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,selectAnswerSources} from './evidence-search.mjs';
 import {createDiagnosticReport,diagnosticFailureCode} from './diagnostic-report.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
 const FALLBACK_BOOK={id:'152',title:'History of the Peloponnesian War — Thucydides'};
 const PDF_PAGE_LIMIT=14000;
-const MAX_ANSWER_SOURCES=2;
 const el=id=>document.getElementById(id);
 const question=el('companion-question');
 const form=el('companion-question-form');
@@ -462,7 +461,7 @@ async function askQuestion(){
       const found=await retrieveSources();
       if(!found)return;
     }
-    const chosen=candidates.slice(0,MAX_ANSWER_SOURCES);
+    const chosen=selectAnswerSources(candidates,q,token);
     if(!chosen.length){setStatus('No matching passages found. Try different wording.');return;}
     if(diagnosticState){
       diagnosticState.submittedSources=chosen.map((source,index)=>({...source,id:'S'+(index+1)}));
