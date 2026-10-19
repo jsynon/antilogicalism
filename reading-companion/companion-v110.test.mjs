@@ -48,8 +48,8 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(html,/background:#fff;color:#111;border:1px solid #333/);
 });
 test('catalog loading passes all verified books to the whole-list sorter',()=>{
- assert.match(client,/const list=sortBooksForSelector\\(Object\\.entries\\(index\\.books\\)/);
- assert.doesNotMatch(client,/\\.sort\\(sortBooksForSelector\\)/);
+ assert.match(client,/const list=sortBooksForSelector\(Object\.entries\(index\.books\)/);
+ assert.doesNotMatch(client,/\.sort\(sortBooksForSelector\)/);
 });
 test('book selector sorts by author surname and keeps numbered collections in natural order',()=>{
  const books=[
