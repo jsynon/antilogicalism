@@ -27,7 +27,12 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(html,/id="companion-question"/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
  assert.match(client,/companion-follow-up-buttons/);
- assert.match(client,/question\.value=suggestion/);
+ assert.match(client,/button\.addEventListener\('click',\(\)=>\{void askQuestion\(suggestion\);\}\)/);
+ assert.match(client,/function rememberTurn\(questionText,answerText\)/);
+ assert.match(client,/conversationHistory\.slice\(-6\)/);
+ assert.match(client,/answerBox\.append\(turn\)/);
+ assert.match(client,/Recent conversation|history,/);
+ assert.match(html,/id="companion-new-conversation" type="button" hidden/);
  assert.match(html,/background:#fff;color:#111;border:1px solid #333/);
 });
 test('v1.10 uses original v47 retrieval, verified pilot endpoint and text-only output',()=>{

@@ -46,7 +46,7 @@ test('answer submissions include up to four facet-balanced pages within the exac
  const chosen=selectAnswerSources(candidates,question,token);
  assert.equal(chosen.length,4);
  assert.deepEqual(chosen.slice(0,2).map(x=>x.facet),[0,1]);
- const body=JSON.stringify({question,turnstileToken:token,
+ const body=JSON.stringify({question,turnstileToken:token,history:[],
   sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))});
  assert(new TextEncoder().encode(body).byteLength<=30000);
  assert(new TextEncoder().encode(body).byteLength>20000);
@@ -61,6 +61,18 @@ test('answer submission skips pages that do not fit and keeps later source candi
  assert.deepEqual(chosen.map(x=>x.page),[2]);
 });
 
+test('answer source byte budget includes recent conversation context',()=>{
+ const history=[{role:'user',content:'Previous question'},
+   {role:'assistant',content:'Previous answer '.repeat(90)}];
+ const candidates=[{...page(1),text:'source '.repeat(2500)}];
+ const chosen=selectAnswerSources(candidates,'Follow-up question','a token',
+   {history,maxBytes:10000});
+ const body=JSON.stringify({question:'Follow-up question',turnstileToken:'a token',
+   history,sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))});
+ assert.equal(new TextEncoder().encode(body).byteLength<=10000,true);
+ assert.equal(JSON.parse(body).history.length,2);
+});
+
 
 test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
  const {readFileSync}=await import('node:fs');
@@ -72,7 +84,7 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
  assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text\}\)=>\(\{bookId,page,text\}\)\)/);
- assert.match(js,/selectAnswerSources\(candidates,q,token\)/);
+ assert.match(js,/selectAnswerSources\(candidates,q,token,\{history\}\)/);
  assert.doesNotMatch(js,/searchPages\(|lastSearch|checked passages will guide/i);
  assert.match(js,/data\.outcome==='insufficient-evidence'/);
  assert.doesNotMatch(js,/innerHTML\s*=/);

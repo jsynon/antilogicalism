@@ -79,5 +79,5 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(client,/diagnosticState\.evidenceHighlights=highlights\.map/);
  assert.match(client,/diagnosticState\.failureHttpStatus=res\.status/);
  assert.match(client,/diagnosticState\.failureHttpStatus=response\.status/);
- assert.match(client,/body:JSON\.stringify\(\{question:q,turnstileToken:token,\s*sources:chosen\.map/);
+ assert.match(client,/body:JSON\.stringify\(\{question:q,turnstileToken:token,\s*history,\s*sources:chosen\.map/);
 });
