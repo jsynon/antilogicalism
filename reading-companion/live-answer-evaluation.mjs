@@ -54,11 +54,24 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
   passed:sourceGroups.every(group=>group.found)&&missingInline.length===0&&citations.length>0};
 }
 function safeHeaders(token){return {authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json',origin:'https://jsynon.github.io'};}
-async function callJson(fetcher,url,token,body,beforeCall=async()=>{}){
+function attachRequestFailure(error,stage,details={}){
+ const wrapped=error instanceof Error?error:new Error(String(error));
+ wrapped.requestFailure={stage,httpStatus:Number.isSafeInteger(details.httpStatus)?details.httpStatus:null,
+  failureCode:String(details.failureCode||'request-failed').slice(0,80),
+  message:String(details.message||wrapped.message||'Request failed').replace(/(?:bearer\s+)[^\s]+/ig,'Bearer [redacted]').slice(0,240),
+  workerFailure:details.workerFailure===true};
+ return wrapped;
+}
+async function callJson(fetcher,url,token,body,beforeCall=async()=>{},stage='worker-request'){
  await beforeCall();
- const response=await fetcher(url,{method:'POST',headers:safeHeaders(token),body:JSON.stringify(body)});
- let data;try{data=await response.json();}catch{throw Error(`${url} returned invalid JSON (HTTP ${response.status}).`);}
- if(!response.ok)throw Error(`${url} returned HTTP ${response.status}: ${String(data?.error||data?.failureCode||'request failed')}`);
+ let response;
+ try{response=await fetcher(url,{method:'POST',headers:safeHeaders(token),body:JSON.stringify(body)});}
+ catch(error){throw attachRequestFailure(error,stage,{failureCode:'network-error',workerFailure:true});}
+ let data;try{data=await response.json();}catch{
+  throw attachRequestFailure(new Error('Worker returned invalid JSON.'),stage,{httpStatus:response.status,failureCode:'invalid-json',workerFailure:true});
+ }
+ if(!response.ok)throw attachRequestFailure(new Error(String(data?.failureCode||data?.error||'Worker request failed').slice(0,240)),stage,{
+  httpStatus:response.status,failureCode:String(data?.failureCode||'http-error'),workerFailure:true});
  return data;
 }
 function makeCachedFetch(root){
@@ -95,16 +108,49 @@ async function loadSources(item,queries,{library,manifest,allowed}){
  return {selected,searches:searchSets.map((set,index)=>({query:searchQueries[index],resultCount:set.sources?.length||0}))};
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}){
- const start=Date.now();
- const plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:'',history:[],turnstileToken:'evaluation-runner-token'},beforeCall);
+ const startTime=Date.now();
+ let plan;
+ try{plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:'',history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner');}
+ catch(error){if(!error.requestFailure)error.requestFailure={stage:'planner',httpStatus:null,failureCode:'planner-failed',message:String(error.message||error).slice(0,240),workerFailure:false};throw error;}
  const queries=plan.queries;
- const {selected,searches}=await loadSources(item,queries,{library,manifest,allowed});
- const data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,history:[],turnstileToken:'evaluation-runner-token',
-  sources:selected.map(({bookId,page,text})=>({bookId,page,text}))},beforeCall);
+ let loaded;
+ try{loaded=await loadSources(item,queries,{library,manifest,allowed});}
+ catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};throw error;}
+ const {selected,searches}=loaded;
+ let data;
+ try{data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,history:[],turnstileToken:'evaluation-runner-token',
+  sources:selected.map(({bookId,page,text})=>({bookId,page,text}))},beforeCall,'answer');}
+ catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};throw error;}
  const audit=auditLiveAnswer(data,selected,item.required_source_groups);
  return {id:item.id,question:item.question,plannerQueries:queries,searches,
   submittedSources:selected.map(({bookId,title,page,globalPageId})=>({bookId,title,page,globalPageId})),
-  ...audit,elapsedMs:Date.now()-start};
+  ...audit,elapsedMs:Date.now()-startTime};
+}
+function failedCaseResult(item,error){
+ const failure=error?.requestFailure||{stage:'evaluation',httpStatus:null,failureCode:'evaluation-failed',
+  message:String(error?.message||error||'Evaluation failed').slice(0,240),workerFailure:false};
+ return {id:item.id,question:item.question,requestFailure:failure,plannerQueries:[],searches:[],
+  submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',
+  answerText:'',citationCount:0,citationBookIds:[],citationSources:[],inlineCitationCount:0,
+  inlineIdsWithoutSource:[],submittedSourceCount:0,
+  sourceGroups:(item.required_source_groups||[]).map(group=>({label:group.label,
+   expectedBookIds:group.book_ids.map(String),foundBookIds:[],found:false})),
+  evidenceHighlightCount:0,evidenceHighlights:[],passed:false,elapsedMs:0};
+}
+export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluateOptions={},onResult=async()=>{},maxConsecutiveWorkerFailures=2}={}){
+ const results=[];let consecutiveWorkerFailures=0,stopReason='';
+ for(const item of cases){
+  let result;
+  try{result=await evaluateCase(item,evaluateOptions);}
+  catch(error){result=failedCaseResult(item,error);}
+  results.push(result);
+  await onResult(result,results);
+  if(result.requestFailure?.workerFailure){
+   consecutiveWorkerFailures++;
+   if(consecutiveWorkerFailures>=maxConsecutiveWorkerFailures){stopReason='consecutive-worker-failures';break;}
+  }else consecutiveWorkerFailures=0;
+ }
+ return {results,stopReason};
 }
 function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
  for(let i=0;i<argv.length;i++){const [flag,inline]=argv[i].split('=',2),key=flag.replace(/^--/,'');if(flag==='--help'||flag==='-h'){out.help=true;continue;}
@@ -118,21 +164,45 @@ async function main(){
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
  const cases=selectLiveCases(suite,args.mode);
- const [coverage,manifest]=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v1.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
- if(coverage?.schema!=='antilogicalism-reader-coverage-v1'||coverage?.libraryVersion!==47||manifest.version!==47)throw Error('Published v47 coverage or corpus is incompatible.');
- const allowed=new Set(Object.keys(coverage.books));
- for(const item of cases)for(const group of item.required_source_groups)if(!group.book_ids.some(id=>allowed.has(String(id))))throw Error(`${item.id}: no expected source book is fingerprint-covered.`);
- const library=new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)),report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,caseCount:cases.length,estimatedWorkerAiCalls:cases.length*3,callsPerCase:'1 planner + 2 answer pipeline calls; verify configured Worker implementation before interpreting credit use',cases:[]};
- console.log(`Starting explicitly confirmed ${args.mode} live evaluation: ${cases.length} questions; estimated ~${report.estimatedWorkerAiCalls} Worker inference calls.`);
- let previousCall=0;
- const beforeCall=async()=>{if(previousCall){const due=Math.max(0,CALL_GAP_MS-(Date.now()-previousCall));if(due)await new Promise(resolve=>setTimeout(resolve,due));}previousCall=Date.now();};
- for(const item of cases){
-  const result=await evaluateLiveCase(item,{library,manifest,allowed,token,beforeCall});report.cases.push(result);
-  console.log(`${result.passed?'REVIEW-PASS':'REVIEW-MISS'} ${item.id}: ${result.outcome||'no outcome'}, ${result.citationCount} citations; source groups ${result.sourceGroups.filter(g=>g.found).length}/${result.sourceGroups.length}`);
+ const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,
+  caseCount:cases.length,estimatedWorkerAiCalls:cases.length*3,
+  callsPerCase:'1 planner + 2 answer pipeline calls; verify configured Worker implementation before interpreting credit use',
+  executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,stopReason:'',cases:[]};
+ const outputPath=args.output?resolve(args.output):'';
+ const saveReport=async()=>{if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');};
+ await saveReport();
+ try{
+  const results=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v1.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
+  const coverage=results[0],manifest=results[1];
+  if(coverage?.schema!=='antilogicalism-reader-coverage-v1'||coverage?.libraryVersion!==47||manifest.version!==47)throw Error('Published v47 coverage or corpus is incompatible.');
+  const allowed=new Set(Object.keys(coverage.books));
+  for(const item of cases)for(const group of item.required_source_groups)if(!group.book_ids.some(id=>allowed.has(String(id))))throw Error(item.id+': no expected source book is fingerprint-covered.');
+  const library=new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT));
+  console.log('Starting explicitly confirmed '+args.mode+' live evaluation: '+cases.length+' questions; estimated ~'+report.estimatedWorkerAiCalls+' Worker inference calls.');
+  report.executionStatus='running';await saveReport();
+  let previousCall=0;
+  const beforeCall=async()=>{if(previousCall){const due=Math.max(0,CALL_GAP_MS-(Date.now()-previousCall));if(due)await new Promise(resolve=>setTimeout(resolve,due));}previousCall=Date.now();};
+  const run=await runLiveCases(cases,{evaluateOptions:{library,manifest,allowed,token,beforeCall},onResult:async(result,results)=>{
+   report.cases=results;report.completedCases=results.length;
+   report.notRunCases=cases.length-results.length;
+   report.requestFailureCases=results.filter(item=>item.requestFailure).length;
+   await saveReport();
+   console.log((result.passed?'REVIEW-PASS':result.requestFailure?'REQUEST-FAIL':'REVIEW-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
+  }});
+  report.cases=run.results;report.stopReason=run.stopReason;
+  report.notRunCases=cases.length-run.results.length;
+  report.requestFailureCases=run.results.filter(item=>item.requestFailure).length;
+  report.executionStatus=report.requestFailureCases?'completed-with-request-failures':'completed';
+  report.summary={passedCases:report.cases.filter(item=>item.passed).length,
+   failedCases:report.cases.filter(item=>!item.passed).length,requestFailureCases:report.requestFailureCases};
+  await saveReport();
+  console.log('Done: '+report.summary.passedCases+'/'+report.caseCount+' cases met citation and expected-work checks; '+report.completedCases+' completed, '+report.notRunCases+' not run. This is a retrieval/citation review signal, not an AI truth grader.');
+  return report.requestFailureCases?1:0;
+ }catch(error){
+  report.executionStatus=report.cases.length?'interrupted':'setup-failed';
+  report.setupFailure={message:String(error?.message||error).slice(0,240)};
+  report.completedCases=report.cases.length;report.notRunCases=cases.length-report.cases.length;
+  await saveReport();throw error;
  }
- report.summary={passedCases:report.cases.filter(item=>item.passed).length,failedCases:report.cases.filter(item=>!item.passed).length};
- if(args.output)await writeFile(resolve(args.output),JSON.stringify(report,null,2)+'\n');
- console.log(`Done: ${report.summary.passedCases}/${report.caseCount} cases met citation and expected-work checks. This is a retrieval/citation review signal, not an AI truth grader.`);
- return 0;
 }
 if(import.meta.url===`file://${process.argv[1]}`)main().then(code=>{process.exitCode=code;}).catch(error=>{console.error(error.message);process.exitCode=1;});
