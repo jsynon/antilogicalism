@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,selectAnswerSources} from './evidence-search.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
  preview:'Authentic indexed excerpt',url:'https://drive.google.com/file/d/X/view#page='+page});
@@ -36,6 +36,31 @@ test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.deepEqual(out.map(x=>x.page),[73,74]);
 });
 
+test('answer submissions include up to four facet-balanced pages within the exact request byte budget',()=>{
+ const candidates=mergeFacetSearches([
+  {sources:[page(1,'7'),page(2,'7'),page(3,'7')]},
+  {sources:[page(4,'529'),page(5,'529'),page(6,'529')]}
+ ],8).map((source,index)=>({...source,text:'passage '+index+' '.repeat(5000)}));
+ const question='Compare these accounts';
+ const token='turnstile-token';
+ const chosen=selectAnswerSources(candidates,question,token);
+ assert.equal(chosen.length,4);
+ assert.deepEqual(chosen.slice(0,2).map(x=>x.facet),[0,1]);
+ const body=JSON.stringify({question,turnstileToken:token,
+  sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))});
+ assert(new TextEncoder().encode(body).byteLength<=30000);
+ assert(new TextEncoder().encode(body).byteLength>20000);
+});
+
+test('answer submission skips pages that do not fit and keeps later source candidates',()=>{
+ const candidates=[
+  {...page(1),text:'x'.repeat(31000)},
+  {...page(2,'529'),text:'useful smaller page'}
+ ];
+ const chosen=selectAnswerSources(candidates,'A question','a token');
+ assert.deepEqual(chosen.map(x=>x.page),[2]);
+});
+
 
 test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
  const {readFileSync}=await import('node:fs');
@@ -47,8 +72,7 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
  assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text\}\)=>\(\{bookId,page,text\}\)\)/);
- assert.match(js,/MAX_ANSWER_SOURCES=2/);
- assert.match(js,/const chosen=candidates\.slice\(0,MAX_ANSWER_SOURCES\)/);
+ assert.match(js,/selectAnswerSources\(candidates,q,token\)/);
  assert.doesNotMatch(js,/searchPages\(|lastSearch|checked passages will guide/i);
  assert.match(js,/data\.outcome==='insufficient-evidence'/);
  assert.doesNotMatch(js,/innerHTML\s*=/);
