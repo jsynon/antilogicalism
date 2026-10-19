@@ -42,3 +42,17 @@ test('case evaluation sends one plan and one answer request in order without log
  assert.equal(result.passed,true);
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
 });
+
+test('audit report preserves answer text, citation locations, and Worker quote highlights',()=>{
+ const result=auditLiveAnswer({answer:'Supported claim [S1].',citations:[{
+   id:'S1',bookId:'638',title:'Bible',page:1821,globalPageId:274264,
+   url:'https://drive.google.com/file/d/abcdefghijk/view#page=1821'
+  }],evidenceHighlights:[{source_id:'S1',title:'Bible',page:1821,quote:'A passage excerpt.'}]},
+  [{}],[{label:'Bible',book_ids:['638']}]);
+ assert.equal(result.answerText,'Supported claim [S1].');
+ assert.deepEqual(result.citationSources,[{id:'S1',bookId:'638',title:'Bible',page:1821,
+  globalPageId:274264,url:'https://drive.google.com/file/d/abcdefghijk/view#page=1821'}]);
+ assert.deepEqual(result.evidenceHighlights,[{sourceId:'S1',title:'Bible',page:1821,
+  quote:'A passage excerpt.',quoteLocated:null}]);
+ assert.equal('evidenceHighlightsLocated' in result,false);
+});
