@@ -1,0 +1,574 @@
+{
+  "schema_version": 1,
+  "suite_id": "antilogicalism-reading-companion-public-v1",
+  "purpose": "A read-only live-library evaluation using the public Reading Companion production retrieval and facet-merging modules. Each fixed two-query plan tests source discovery and page identity; it does not generate or grade AI answers.",
+  "corpus_version": 47,
+  "cases": [
+    {
+      "id": "science-hawking-black-holes",
+      "discipline": "science",
+      "task": "theory-and-observation",
+      "question": "In A Brief History of Time, how does Stephen Hawking explain black holes, and how does he distinguish observational knowledge from theoretical predictions?",
+      "required_source_groups": [
+        {
+          "label": "Hawking",
+          "book_ids": [
+            "102"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Hawking black hole event horizon collapse properties",
+        "Hawking observational evidence black holes versus theoretical predictions"
+      ]
+    },
+    {
+      "id": "science-darwin-selection",
+      "discipline": "science",
+      "task": "mechanism-explanation",
+      "question": "According to Darwin's On the Origin of Species, how does natural selection operate, and what roles do inherited variation and the struggle for existence play?",
+      "required_source_groups": [
+        {
+          "label": "Darwin",
+          "book_ids": [
+            "529"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Darwin natural selection preservation of beneficial variations survival reproduction",
+        "Origin of species variation inheritance struggle for existence Darwin"
+      ]
+    },
+    {
+      "id": "science-maxwell-potential-force",
+      "discipline": "science",
+      "task": "conceptual-relationship",
+      "question": "In Maxwell's A Treatise on Electricity and Magnetism, how are electric potential and electric force related?",
+      "required_source_groups": [
+        {
+          "label": "Maxwell",
+          "book_ids": [
+            "645"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Maxwell definition electric potential function force components",
+        "Maxwell electric force first derivatives of potential gradient"
+      ]
+    },
+    {
+      "id": "science-darwin-beagle-variation",
+      "discipline": "science",
+      "task": "observation-and-inference",
+      "question": "In The Voyage of the Beagle, what does Charles Darwin report observing about variation among species in the Galápagos Islands?",
+      "required_source_groups": [
+        {
+          "label": "Darwin",
+          "book_ids": [
+            "547"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Voyage of the Beagle Darwin observations Galapagos variation",
+        "Galapagos Islands Darwin finches species variation"
+      ]
+    },
+    {
+      "id": "science-natural-selection-cross-work",
+      "discipline": "science",
+      "task": "cross-work-comparison",
+      "question": "How do Darwin in On the Origin of Species and Hawking in A Brief History of Time distinguish observed evidence from explanations of change?",
+      "required_source_groups": [
+        {
+          "label": "Darwin",
+          "book_ids": [
+            "529"
+          ]
+        },
+        {
+          "label": "Hawking",
+          "book_ids": [
+            "102"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Darwin natural selection variation descent modification",
+        "Hawking black holes observational evidence theoretical prediction"
+      ]
+    },
+    {
+      "id": "history-thucydides-causes",
+      "discipline": "history",
+      "task": "causal-chronological-explanation",
+      "question": "According to Thucydides, what were the underlying causes of the Peloponnesian War, and how did they differ from the immediate disputes that preceded it?",
+      "required_source_groups": [
+        {
+          "label": "Thucydides",
+          "book_ids": [
+            "152"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Thucydides real cause growth of Athenian power fear Lacedaemon",
+        "Thucydides immediate disputes Corcyra Potidaea grievances"
+      ]
+    },
+    {
+      "id": "history-herodotus-reports",
+      "discipline": "history",
+      "task": "source-criticism",
+      "question": "In The Histories, how does Herodotus handle accounts he has heard from others, and how can a reader distinguish reported traditions from his own judgments?",
+      "required_source_groups": [
+        {
+          "label": "Herodotus",
+          "book_ids": [
+            "149"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Herodotus reports what he heard sources Histories",
+        "Herodotus own judgment reported tradition inquiry"
+      ]
+    },
+    {
+      "id": "history-machiavelli-power",
+      "discipline": "history",
+      "task": "political-analysis",
+      "question": "In The Prince, how does Machiavelli advise a ruler to balance appearing virtuous with preserving political power?",
+      "required_source_groups": [
+        {
+          "label": "Machiavelli",
+          "book_ids": [
+            "241"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Machiavelli Prince appearance virtue political power ruler",
+        "Machiavelli necessity reputation cruel generous state preservation"
+      ]
+    },
+    {
+      "id": "history-wealth-of-nations-division-labor",
+      "discipline": "history",
+      "task": "economic-explanation",
+      "question": "In The Wealth of Nations, how does Adam Smith explain the productivity gains associated with division of labor?",
+      "required_source_groups": [
+        {
+          "label": "Adam Smith",
+          "book_ids": [
+            "260",
+            "528"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Adam Smith Wealth of Nations division of labor productivity",
+        "Smith pin factory specialization exchange markets"
+      ]
+    },
+    {
+      "id": "history-thucydides-evidence",
+      "discipline": "history",
+      "task": "evidence-follow-up",
+      "question": "What passages in Thucydides support the distinction between the underlying cause of the war and its immediate disputes?",
+      "required_source_groups": [
+        {
+          "label": "Thucydides",
+          "book_ids": [
+            "152"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Thucydides real cause Athenian power Lacedaemon alarm",
+        "Thucydides Corcyra Potidaea immediate cause of war"
+      ]
+    },
+    {
+      "id": "literature-dostoevsky-raskolnikov",
+      "discipline": "literature",
+      "task": "character-versus-author",
+      "question": "In Crime and Punishment, how does Raskolnikov attempt to justify murder, and how does the novel challenge his reasoning?",
+      "required_source_groups": [
+        {
+          "label": "Dostoevsky",
+          "book_ids": [
+            "114"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Raskolnikov extraordinary men right to transgress law murder",
+        "Crime and Punishment Raskolnikov guilt suffering confession theory"
+      ]
+    },
+    {
+      "id": "literature-orwell-language",
+      "discipline": "literature",
+      "task": "theme-across-chapters",
+      "question": "In 1984, how does Orwell portray the connections between language, memory, and political power?",
+      "required_source_groups": [
+        {
+          "label": "Orwell",
+          "book_ids": [
+            "89"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Orwell 1984 Newspeak language vocabulary thought",
+        "1984 memory political power control of past truth"
+      ]
+    },
+    {
+      "id": "literature-iliad-wrath",
+      "discipline": "literature",
+      "task": "theme-and-narrative",
+      "question": "In Homer's Iliad, how does Achilles' anger shape the poem's account of honor, loss, and the course of the war?",
+      "required_source_groups": [
+        {
+          "label": "Homer",
+          "book_ids": [
+            "153"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Homer Iliad anger wrath Achilles honor loss",
+        "Iliad Patroclus death Achilles grief war consequences"
+      ]
+    },
+    {
+      "id": "literature-odyssey-homecoming",
+      "discipline": "literature",
+      "task": "theme-and-narrative",
+      "question": "In Homer's Odyssey, what obstacles and choices shape Odysseus' return home?",
+      "required_source_groups": [
+        {
+          "label": "Homer",
+          "book_ids": [
+            "186",
+            "540"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Odysseus return home Ithaca obstacles voyage",
+        "Odyssey choices temptations suitors homecoming"
+      ]
+    },
+    {
+      "id": "literature-shakespeare-hamlet",
+      "discipline": "literature",
+      "task": "character-and-motive",
+      "question": "In Shakespeare's Hamlet, how do reflection and uncertainty affect Hamlet's pursuit of revenge?",
+      "required_source_groups": [
+        {
+          "label": "Shakespeare",
+          "book_ids": [
+            "212",
+            "564"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Hamlet reflection uncertainty revenge action Shakespeare",
+        "Hamlet hesitation thought decision revenge Claudius"
+      ]
+    },
+    {
+      "id": "literature-tolstoy-confession",
+      "discipline": "literature",
+      "task": "existential-theme",
+      "question": "In A Confession, how does Tolstoy describe the crisis that led him to question the meaning of his life?",
+      "required_source_groups": [
+        {
+          "label": "Tolstoy",
+          "book_ids": [
+            "88"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Tolstoy A Confession crisis meaning of life death",
+        "Tolstoy Confession reason faith ordinary people answer to despair"
+      ]
+    },
+    {
+      "id": "literature-dostoevsky-brothers",
+      "discipline": "literature",
+      "task": "character-and-ideas",
+      "question": "In The Brothers Karamazov, how does Ivan's challenge to the moral order shape the novel's questions about suffering and responsibility?",
+      "required_source_groups": [
+        {
+          "label": "Dostoevsky",
+          "book_ids": [
+            "103"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Ivan Karamazov suffering children moral order God",
+        "Brothers Karamazov Ivan responsibility rebellion justice"
+      ]
+    },
+    {
+      "id": "philosophy-aristotle-habituation",
+      "discipline": "philosophy",
+      "task": "ethical-mechanism",
+      "question": "How does Aristotle explain becoming virtuous through repeated actions?",
+      "required_source_groups": [
+        {
+          "label": "Aristotle",
+          "book_ids": [
+            "7"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Aristotle Nicomachean Ethics virtue habit repeated actions",
+        "Aristotle become just by doing just acts brave by doing brave acts"
+      ]
+    },
+    {
+      "id": "philosophy-aristotle-synthesis",
+      "discipline": "philosophy",
+      "task": "conceptual-synthesis",
+      "question": "In Aristotle's Nicomachean Ethics, what is the relationship between moral virtue, practical wisdom (phronesis), and happiness (eudaimonia)? Explain how these concepts fit together, rather than simply defining each one separately.",
+      "required_source_groups": [
+        {
+          "label": "Aristotle",
+          "book_ids": [
+            "7"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Aristotle moral virtue practical wisdom right aim right means",
+        "Nicomachean Ethics happiness activity virtue contemplation"
+      ]
+    },
+    {
+      "id": "philosophy-aristotle-darwin-change",
+      "discipline": "philosophy",
+      "task": "cross-discipline-comparison",
+      "question": "How do Aristotle in Nicomachean Ethics and Darwin in On the Origin of Species explain how change occurs?",
+      "required_source_groups": [
+        {
+          "label": "Aristotle",
+          "book_ids": [
+            "7"
+          ]
+        },
+        {
+          "label": "Darwin",
+          "book_ids": [
+            "529"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Aristotle Nicomachean Ethics habituation virtue character actions",
+        "Darwin Origin of Species natural selection variations change"
+      ]
+    },
+    {
+      "id": "philosophy-anaxagoras-nous",
+      "discipline": "philosophy",
+      "task": "cosmology",
+      "question": "How does Anaxagoras describe Mind (Nous) setting the cosmos in motion?",
+      "required_source_groups": [
+        {
+          "label": "Anaxagoras",
+          "book_ids": [
+            "2"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Anaxagoras Nous Mind initiated rotation motion cosmos",
+        "Anaxagoras Mind separates mixed things sun moon stars"
+      ]
+    },
+    {
+      "id": "philosophy-aristotle-soul",
+      "discipline": "philosophy",
+      "task": "soul-and-life",
+      "question": "In De Anima, how does Aristotle describe the soul's role in living things?",
+      "required_source_groups": [
+        {
+          "label": "Aristotle",
+          "book_ids": [
+            "4"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Aristotle De Anima soul principle life nutrition sensation",
+        "De Anima powers of soul motion thinking living beings"
+      ]
+    },
+    {
+      "id": "philosophy-plato-justice",
+      "discipline": "philosophy",
+      "task": "political-philosophy",
+      "question": "In Plato's Republic, how does Socrates connect justice in the city with justice in the individual soul?",
+      "required_source_groups": [
+        {
+          "label": "Plato",
+          "book_ids": [
+            "74"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Plato Republic justice city soul parts harmony",
+        "Republic Socrates just person city guardians justice"
+      ]
+    },
+    {
+      "id": "philosophy-hobbes-state",
+      "discipline": "philosophy",
+      "task": "political-philosophy",
+      "question": "In Leviathan, how does Hobbes describe life in the state of nature and explain the need for a common power?",
+      "required_source_groups": [
+        {
+          "label": "Hobbes",
+          "book_ids": [
+            "163"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Hobbes Leviathan state of nature war of all against all",
+        "Hobbes common power social contract peace security"
+      ]
+    },
+    {
+      "id": "philosophy-hume-causation",
+      "discipline": "philosophy",
+      "task": "epistemology",
+      "question": "In An Enquiry Concerning Human Understanding, why does Hume argue that experience does not reveal a necessary connection between cause and effect?",
+      "required_source_groups": [
+        {
+          "label": "Hume",
+          "book_ids": [
+            "35"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Hume Enquiry cause effect necessary connection experience",
+        "Hume constant conjunction custom belief causation"
+      ]
+    },
+    {
+      "id": "philosophy-kant-knowledge",
+      "discipline": "philosophy",
+      "task": "epistemology",
+      "question": "In Critique of Pure Reason, how does Kant explain the role of a priori forms or categories in human knowledge?",
+      "required_source_groups": [
+        {
+          "label": "Kant",
+          "book_ids": [
+            "40"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Kant Critique Pure Reason categories a priori space time",
+        "Pure Reason transcendental categories experience understanding Kant"
+      ]
+    },
+    {
+      "id": "philosophy-nietzsche-kierkegaard",
+      "discipline": "philosophy",
+      "task": "qualified-hypothetical-comparison",
+      "question": "What would Nietzsche think about Kierkegaard's thought?",
+      "required_source_groups": [
+        {
+          "label": "Nietzsche",
+          "book_ids": [
+            "54",
+            "144",
+            "239"
+          ]
+        },
+        {
+          "label": "Kierkegaard",
+          "book_ids": [
+            "140",
+            "192",
+            "253",
+            "436"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Nietzsche morality faith Christianity truth values",
+        "Kierkegaard faith subjectivity existence individual"
+      ]
+    },
+    {
+      "id": "society-rousseau-general-will",
+      "discipline": "politics-society",
+      "task": "political-philosophy",
+      "question": "In The Social Contract, how does Rousseau explain the general will and its relationship to the common good?",
+      "required_source_groups": [
+        {
+          "label": "Rousseau",
+          "book_ids": [
+            "245"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Rousseau Social Contract general will common good",
+        "Rousseau sovereignty laws collective body political association"
+      ]
+    },
+    {
+      "id": "society-wollstonecraft-education",
+      "discipline": "politics-society",
+      "task": "social-argument",
+      "question": "In A Vindication of the Rights of Woman, how does Wollstonecraft connect women's education with reason and social equality?",
+      "required_source_groups": [
+        {
+          "label": "Wollstonecraft",
+          "book_ids": [
+            "87"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Wollstonecraft Vindication women education reason virtue",
+        "Rights of Woman dependence social equality education"
+      ]
+    },
+    {
+      "id": "society-dubois-double-consciousness",
+      "discipline": "politics-society",
+      "task": "conceptual-explanation",
+      "question": "In The Souls of Black Folk, how does W. E. B. Du Bois explain double consciousness?",
+      "required_source_groups": [
+        {
+          "label": "Du Bois",
+          "book_ids": [
+            "454"
+          ]
+        }
+      ],
+      "planner_queries": [
+        "Du Bois Souls of Black Folk double consciousness two souls",
+        "Du Bois second sight veil American Negro identity"
+      ]
+    }
+  ]
+}
