@@ -353,15 +353,18 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-key-passage .companion-page-text{margin-top:.4em}
 #companion-pilot .companion-citations{border-top:1px solid #dfe2e3;margin-top:1rem;padding-top:.5rem}
 #companion-pilot .companion-citations .companion-source-entry p{margin:.4rem 0 .65rem}
-#companion-pilot .companion-inline-citation{white-space:nowrap;text-decoration:underline}
+#companion-pilot button.companion-inline-citation{-webkit-appearance:none;appearance:none;border:0;padding:0;background:transparent;color:inherit;font:inherit;line-height:inherit;white-space:nowrap;text-decoration:underline;text-underline-offset:.12em;cursor:pointer}
+#companion-pilot button.companion-inline-citation:hover{background:transparent;color:#111}
+#companion-pilot button.companion-inline-citation:focus-visible{outline:2px solid #111;outline-offset:2px}
 @media(max-width:650px){#companion-pilot .companion-follow-up-buttons button{width:100%}}
 
 /* Match the Book Lite typography used throughout the site: 19px Century
    Schoolbook body, 30px h2, 26px h3, and no reduced-size prompt buttons. */
 #companion-pilot{font:inherit;color:#3e454a}
 #companion-pilot .companion-answer-text,#companion-pilot .companion-source-entry p{font:inherit}
-#companion-pilot .companion-inline-read{font-family:inherit;font-size:.89em;margin:.15em .5em .4em 0;padding:5px 10px;min-height:36px;background:#fff;color:#111;border:1px solid #333;line-height:1.5;white-space:normal;text-align:left}
-#companion-pilot .companion-inline-read:hover{background:#f5f5f5;color:#111}
+#companion-pilot button.companion-inline-read{-webkit-appearance:none;appearance:none;display:inline;min-height:0;margin:.15em .5em .4em 0;padding:0;border:0;border-radius:0;background:transparent;color:#111;font:inherit;font-size:.9em;line-height:inherit;text-align:left;text-decoration:underline;text-underline-offset:.12em;white-space:normal;cursor:pointer}
+#companion-pilot button.companion-inline-read:hover{background:transparent;color:#111}
+#companion-pilot button.companion-inline-read:focus-visible{outline:2px solid #111;outline-offset:2px}
 #companion-pilot #companion-source-reader[hidden],
 #companion-pilot #companion-source-quote[hidden]{display:none!important}
 #companion-pilot .companion-source-reader{margin:1.6em 0;padding:1em;border:1px solid #d5d8da;border-top:3px solid #333;background:#fff}
@@ -416,7 +419,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <p>Ask questions about books in philosophy, history, science, and literature. Answers draw on passages from the current pilot collection, with citations you can follow to the original pages. The full 644-book library is available through <a href="/antilogicalism/digital-library/">Library Search</a>.</p>
 <form id="companion-question-form">
 <label for="companion-book-filter"><strong>Search in a book</strong></label>
-<select id="companion-book-filter"><option value="">All available books</option></select>
+<select id="companion-book-filter"><option value="">All pilot books</option></select>
 <label for="companion-question"><strong>Ask a question</strong></label>
 <textarea id="companion-question" maxlength="400" rows="3" required placeholder="Ask about an idea, argument, or relationship across books."></textarea>
 <div class="companion-actions">

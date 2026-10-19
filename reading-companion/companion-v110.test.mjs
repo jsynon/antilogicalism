@@ -23,6 +23,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert(sources>passages);
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
+ assert.ok(client.includes("new Option('All pilot books','')"));
  assert.match(html,/id="companion-question"/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
  assert.match(client,/companion-follow-up-buttons/);
@@ -48,7 +49,7 @@ test('public companion copy explains the pilot and keeps source reading controls
  assert.match(html,/Answers draw on passages from the current pilot collection/);
  assert.match(html,/Citations open original PDF pages/);
  assert.match(client,/View full page text/);
- assert.match(client,/Read passage here/);
+ assert.match(client,/Read passage/);
  assert.match(client,/appendFullPage\(card,original\)/);
  assert.match(client,/appendFullPage\(row,original\)/);
  assert.match(html,/id="companion-turnstile" aria-label="Quick check"/);
@@ -63,6 +64,15 @@ test('public companion copy explains the pilot and keeps source reading controls
  assert.doesNotMatch(client,/The verified answer is ready/);
 });
 
+
+
+test('answer citations open in the local page reader while Sources keeps the PDF link',()=>{
+ assert.ok(client.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[])'));
+ assert.ok(client.includes("sourceReader.open({...source,excerpt:evidence?.quote||''},a)"));
+ assert.ok(client.includes('link.href=source.url'));
+ assert.ok(client.includes("readableParagraphs(source.text).join('\\n\\n')"));
+ assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
+});
 
 test('Book Lite opening drop cap and small-caps apply only to the introductory paragraph',()=>{
  const base='#primary .entry-content #companion-pilot > p:first-child';

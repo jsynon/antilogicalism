@@ -5,6 +5,7 @@
  */
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
+import {readableParagraphs} from './source-text-format.mjs';
 import {mergeFacetSearches,validSearchPlan} from './evidence-search.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
@@ -48,7 +49,7 @@ function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
 }
 function populateBooks(){
-  bookFilter.replaceChildren(new Option('All available books',''));
+  bookFilter.replaceChildren(new Option('All pilot books',''));
   for(const book of bookList)bookFilter.append(new Option(book.title,book.id));
   showAvailability();
 }
@@ -204,10 +205,10 @@ function appendFullPage(parent,source){
   const details=document.createElement('details');
   details.className='companion-page-text';
   details.append(node('summary','View full page text'),
-    node('pre',source.text,'companion-full-page'));
+    node('pre',readableParagraphs(source.text).join('\n\n'),'companion-full-page'));
   parent.append(details);
 }
-function putCitationTokens(target,answer,citations){
+function putCitationTokens(target,answer,citations,evidenceHighlights=[]){
   const byId=new Map(citations.map(s=>[s.id,s]));
   const pattern=/\[(S[1-9]\d*)\]/g;
   let at=0,match;
@@ -215,10 +216,19 @@ function putCitationTokens(target,answer,citations){
     if(match.index>at)target.append(document.createTextNode(answer.slice(at,match.index)));
     const source=byId.get(match[1]);
     if(source){
-      const a=document.createElement('a');
-      a.href=source.url;a.target='_blank';a.rel='noopener noreferrer';
+      const a=document.createElement('button');
+      a.type='button';
       a.textContent=match[0];a.className='companion-inline-citation';
       a.title=source.title+' PDF page '+source.page;
+      a.setAttribute('aria-label','Open '+match[0]+' in the page reader: '+
+        source.title+', PDF page '+source.page);
+      const evidence=evidenceHighlights.find(item=>item.source_id===source.id&&
+        Number(item.page)===Number(source.page));
+      a.addEventListener('click',async()=>{
+        try{
+          await sourceReader.open({...source,excerpt:evidence?.quote||''},a);
+        }catch(error){setStatus('Source reader: '+error.message);}
+      });
       target.append(a);
     }else target.append(document.createTextNode(match[0]));
     at=match.index+match[0].length;
@@ -229,10 +239,11 @@ function renderResponse(data){
   sourceReader.reset();
   answerBox.replaceChildren();
   const citations=Array.isArray(data.citations)?data.citations:[];
+  const highlights=Array.isArray(data.evidenceHighlights)?data.evidenceHighlights:[];
   answerBox.append(node('h2',data.outcome==='insufficient-evidence'?
     'Insufficient evidence':'Reading Companion answer'));
   const reply=node('div',undefined,'companion-answer-text');
-  putCitationTokens(reply,String(data.answer||''),citations);
+  putCitationTokens(reply,String(data.answer||''),citations,highlights);
   answerBox.append(reply);
   if(data.missing)answerBox.append(node('p','What these passages don’t establish: '+data.missing,'companion-hint'));
 
@@ -257,7 +268,6 @@ function renderResponse(data){
     }
     box.append(buttons);answerBox.append(box);
   }
-  const highlights=Array.isArray(data.evidenceHighlights)?data.evidenceHighlights:[];
   if(highlights.length){
     const panel=node('section',undefined,'companion-highlights');
     panel.append(node('h3','Key passages from the source books'));
@@ -273,7 +283,7 @@ function renderResponse(data){
       const a=document.createElement('a');a.href=item.url;
       a.target='_blank';a.rel='noopener noreferrer';
       a.textContent='['+item.source_id+'] '+item.title+' · PDF p. '+item.page;
-      const read=node('button','Read passage here','companion-inline-read');
+      const read=node('button','Read passage','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
         try{await sourceReader.open({...citation,excerpt:item.quote},read);}
@@ -303,7 +313,7 @@ function renderResponse(data){
       const original=sourcePage(source);
       const excerpt=(typeof highlight?.quote==='string'&&highlight.quote.trim())?
         highlight.quote:(original?.preview||source.preview||'');
-      const read=node('button','Read passage here','companion-inline-read');
+      const read=node('button','Read passage','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
         try{
