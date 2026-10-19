@@ -148,6 +148,37 @@ test('all-books comparison retrieves topical evidence for both named authors',as
  assert(result.sources.some(source=>source.bookId==='529'&&source.preview.includes('living populations')));
 });
 
+test('a neighboring page cannot displace a stronger direct evidence page',async()=>{
+ const corpus=structuredClone(fixture);
+ corpus['manifest.json']={
+  ...corpus['manifest.json'],pages:5,page_books:[7,7,7,7,7],
+  partitions:['te','hu','vi','ch','de']
+ };
+ corpus['terms-te.json']={teleology:[3]};
+ corpus['terms-hu.json']={human:[2,1]};
+ corpus['terms-vi.json']={virtue:[0,1,1,1]};
+ corpus['terms-ch.json']={character:[0,2,1]};
+ corpus['terms-de.json']={development:[3]};
+ corpus['book-7.json']={pages:[
+  {id:0,page:14,text:'Legislators make citizens good by forming habits in them. From the same causes and by the same means every virtue is produced or destroyed; by doing just acts we become just, and states of character arise from like activities.'},
+  {id:1,page:15,text:'Temperance and courage are formed by repeated practice and habituation in the appropriate actions.'},
+  {id:2,page:114,text:'Friendship and human companionship improve good men; they share life and approve characteristics in one another, and virtue is discussed in this account.'},
+  {id:3,page:122,text:'Human character, virtue, teleology, and development are all considered together in this long passage about the nature of the human good.'},
+  {id:4,page:123,text:'Human friendship is discussed in this nearby passage, with several observations about what people value in life and the activities they share.'}
+ ]};
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const result=await finder.search('Aristotle teleology human virtue and character development',{
+  allowedBookIds:new Set(['7']),maxBooks:1,pagesPerBook:3
+ });
+ assert.deepEqual(result.sources.map(source=>source.page),[122,114,14]);
+});
+
 test('all-books search honors an explicitly named author when limiting candidate sources',async()=>{
  const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
  const result=await finder.search('How did Aristotle describe virtue and the soul?',{
