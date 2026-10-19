@@ -37,7 +37,7 @@ export function validSearchPlan(value){
  * preserve it so the first options still cover each part of a comparison.
  */
 export function selectAnswerSources(candidates,question,turnstileToken,
-  {maxSources=4,maxBytes=30000}={}){
+  {maxSources=4,maxBytes=30000,history=[]}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||
     typeof turnstileToken!=='string')return [];
  const chosen=[];
@@ -47,7 +47,7 @@ export function selectAnswerSources(candidates,question,turnstileToken,
       !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
       !Number.isSafeInteger(candidate.page)||candidate.page<1)continue;
    const next=[...chosen,candidate];
-   const bytes=new TextEncoder().encode(JSON.stringify({question,turnstileToken,
+   const bytes=new TextEncoder().encode(JSON.stringify({question,turnstileToken,history,
      sources:next.map(({bookId,page,text})=>({bookId,page,text}))})).byteLength;
    if(bytes<=maxBytes)chosen.push(candidate);
  }
