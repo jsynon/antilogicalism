@@ -16,6 +16,15 @@ function readableParagraphs(text) {
   }).filter(Boolean);
 }
 
+// Use the same readable line-joining as the full-page dropdown before finding
+// the cited words. This keeps its highlight offsets aligned with what readers
+// actually see without changing the stored OCR text.
+function readablePageWithHighlight(text, excerptText) {
+  const displayText = readableParagraphs(text).join('\n\n');
+  const match = excerptText ? locateCitedExcerpt(displayText, excerptText) : null;
+  return {displayText, match};
+}
+
 // Preserve character offsets in the DISPLAYED source text. Ignoring spaces
 // and punctuation makes matching robust to OCR line wrapping without
 // modifying source text or inventing any wording.
@@ -101,4 +110,4 @@ function locateCitedExcerpt(displayText, excerptText) {
 }
 
 
-export {readableParagraphs, locateCitedExcerpt};
+export {readableParagraphs, locateCitedExcerpt, readablePageWithHighlight};
