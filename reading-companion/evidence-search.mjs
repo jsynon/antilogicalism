@@ -84,12 +84,12 @@ function catalogAuthorNames(title){
  const parts=String(title||'').split(' — ');
  if(parts.length<2)return [];
  const author=parts.slice(1).join(' ').trim();
- if(/\\bedited by\\b/i.test(author))return [];
- return author.split(/\\s+and\\s+/i).filter(Boolean);
+ if(/\bedited by\b/i.test(author))return [];
+ return author.split(/\s+and\s+/i).filter(Boolean);
 }
 export function matchExplicitBookIds(question,books){
  if(typeof question!=='string'||!Array.isArray(books))return [];
- const valid=books.filter(book=>/^[1-9]\\d{0,3}$/.test(String(book?.id||''))&&
+ const valid=books.filter(book=>/^[1-9]\d{0,3}$/.test(String(book?.id||''))&&
   typeof book?.title==='string');
  const titleMatches=valid.filter(book=>
   catalogWorkTitles(book.title).some(title=>questionContainsPhrase(question,title)));
