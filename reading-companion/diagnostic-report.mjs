@@ -1,4 +1,25 @@
 const string=(value,limit=180)=>typeof value==='string'?value.slice(0,limit):'';
+const FAILURE_CODES=new Set([
+  'network-error','request-rejected','authorization-rejected',
+  'visitor-or-origin-rejected','request-too-large',
+  'source-verification-rejected','rate-limited',
+  'answer-generation-or-citation-failed','search-planning-failed',
+  'service-unavailable','http-error','invalid-response','retrieval-error'
+]);
+
+export function diagnosticFailureCode(status,requestStage='answer'){
+  if(!Number.isInteger(status)||status<100||status>599)return 'network-error';
+  if(status===400)return 'request-rejected';
+  if(status===401)return 'authorization-rejected';
+  if(status===403)return 'visitor-or-origin-rejected';
+  if(status===413)return 'request-too-large';
+  if(status===422)return 'source-verification-rejected';
+  if(status===429)return 'rate-limited';
+  if(status===502)return requestStage==='planner'?
+    'search-planning-failed':'answer-generation-or-citation-failed';
+  if(status===503)return 'service-unavailable';
+  return 'http-error';
+}
 
 function sourceSummary(source){
   if(!source||typeof source!=='object')return null;
@@ -39,6 +60,10 @@ export function createDiagnosticReport(input={}){
     fallbackMode:input.fallbackMode===true,
     stage:string(input.stage,40)||'unknown',
     failureCategory:string(input.failureCategory,48),
+    failureHttpStatus:Number.isInteger(input.failureHttpStatus)&&
+      input.failureHttpStatus>=100&&input.failureHttpStatus<=599?
+      input.failureHttpStatus:null,
+    failureCode:FAILURE_CODES.has(input.failureCode)?input.failureCode:'unclassified',
     plannerQueries:Array.isArray(input.plannerQueries)?
       input.plannerQueries.filter(x=>typeof x==='string').slice(0,4).map(x=>x.slice(0,240)):[],
     searches:Array.isArray(input.searches)?input.searches.slice(0,4).map(search=>({
