@@ -41,6 +41,8 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/function rememberTurn\(questionText,answerText\)/);
  assert.match(client,/conversationHistory\.slice\(-6\)/);
  assert.match(client,/answerBox\.append\(turn\)/);
+ assert.match(client,/turn\.scrollIntoView\(\{behavior:reduceMotion\?'auto':'smooth',block:'start'\}\)/);
+ assert.match(client,/prefers-reduced-motion/);
  assert.match(client,/Recent conversation|history,/);
  assert.match(html,/id="companion-new-conversation" type="button" hidden/);
  assert.match(html,/background:#fff;color:#111;border:1px solid #333/);
