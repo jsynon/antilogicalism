@@ -205,7 +205,7 @@ function appendFullPage(parent,source){
   const details=document.createElement('details');
   details.className='companion-page-text';
   details.append(node('summary','View full page text'),
-    node('pre',readableParagraphs(source.text).join('\\n\\n'),'companion-full-page'));
+    node('pre',readableParagraphs(source.text).join('\n\n'),'companion-full-page'));
   parent.append(details);
 }
 function putCitationTokens(target,answer,citations,evidenceHighlights=[]){
