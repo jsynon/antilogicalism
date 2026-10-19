@@ -47,6 +47,16 @@ export function validSearchPlan(value){
    value[0].trim().toLowerCase()!==value[1].trim().toLowerCase();
 }
 
+/* Planning improves retrieval, but a temporary planner outage must not block
+ * direct search with the reader's own wording. Keep explicit request denials
+ * and rate limits fail-closed. */
+export function canFallbackToDirectSearch(status,code=''){
+ if(status===null||status===undefined)return true;
+ if(Number.isInteger(status)&&status>=500)return true;
+ if(Number.isInteger(status)&&status>=400)return false;
+ return ['invalid-response','search-planning-failed','network-error'].includes(code);
+}
+
 /* Send up to four full pages to the verifier while keeping the exact request
  * below the Worker body limit. The candidate order is already facet-balanced;
  * preserve it so the first options still cover each part of a comparison.

@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,selectAnswerSources} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,selectAnswerSources,canFallbackToDirectSearch} from './evidence-search.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
  preview:'Authentic indexed excerpt',url:'https://drive.google.com/file/d/X/view#page='+page});
@@ -42,6 +42,17 @@ test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.equal(validSearchPlan(['too short', 'other']),false);
  const out=mergeFacetSearches([{sources:[page(73),{bookId:'../../11',page:11},page(74)]}],2);
  assert.deepEqual(out.map(x=>x.page),[73,74]);
+});
+
+test('planner outages fall back to direct search while denials and rate limits remain blocked',()=>{
+ assert.equal(canFallbackToDirectSearch(null),true);
+ assert.equal(canFallbackToDirectSearch(502,'search-planning-failed'),true);
+ assert.equal(canFallbackToDirectSearch(503,'service-unavailable'),true);
+ assert.equal(canFallbackToDirectSearch(200,'invalid-response'),true);
+ assert.equal(canFallbackToDirectSearch(400,'request-rejected'),false);
+ assert.equal(canFallbackToDirectSearch(403,'visitor-or-origin-rejected'),false);
+ assert.equal(canFallbackToDirectSearch(403,'invalid-response'),false);
+ assert.equal(canFallbackToDirectSearch(429,'rate-limited'),false);
 });
 
 test('answer submissions include up to four facet-balanced pages within the exact request byte budget',()=>{
@@ -88,7 +99,10 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/API\+'\/api\/pilot-plan'/);
  assert.match(js,/data\.searchPlanning===true/);
  assert.match(js,/validSearchPlan\(data\.queries\)/);
- assert.match(js,/const found=await retrieveSources\(queries\)/);
+ assert.match(js,/const found=await retrieveSources\(queries,\{plannerFallback\}\)/);
+ assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
+ assert.match(js,/diagnosticState\.fallbackMode=true/);
+ assert.match(js,/Search planning is temporarily unavailable; searching directly with your question/);
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
  assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text\}\)=>\(\{bookId,page,text\}\)\)/);
