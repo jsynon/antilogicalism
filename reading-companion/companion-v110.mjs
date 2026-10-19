@@ -9,6 +9,7 @@ import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
 import {mergeFacetSearches,validSearchPlan,selectAnswerSources} from './evidence-search.mjs';
 import {createDiagnosticReport,diagnosticFailureCode} from './diagnostic-report.mjs';
+import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -20,6 +21,8 @@ const question=el('companion-question');
 const form=el('companion-question-form');
 if(!form)throw Error('Reading Companion markup is missing');
 const bookFilter=el('companion-book-filter');
+const bookSearch=el('companion-book-search');
+const bookSearchStatus=el('companion-book-search-status');
 const askButton=el('companion-ask-button');
 const answerBox=el('companion-answer');
 const status=el('companion-status');
@@ -108,9 +111,27 @@ function updateButtons(){
     button.disabled=answering;
   });
 }
+function updateBookOptions(){
+  const previous=bookFilter.value;
+  const query=bookSearch.value.trim();
+  const matches=filterBooksByText(bookList,query);
+  const selected=bookList.find(book=>book.id===previous);
+  bookFilter.replaceChildren(new Option('All books',''));
+  if(selected&&!matches.some(book=>book.id===selected.id))
+    bookFilter.append(new Option('Current selection: '+selected.title,selected.id));
+  for(const book of matches){
+    if(selected&&book.id===selected.id)continue;
+    bookFilter.append(new Option(book.title,book.id));
+  }
+  bookFilter.value=previous;
+  if(bookSearchStatus){
+    bookSearchStatus.textContent=query?
+      (matches.length?matches.length+' matching books.':'No matching books.'):
+      bookList.length+' books available.';
+  }
+}
 function populateBooks(){
-  bookFilter.replaceChildren(new Option('All '+bookList.length+' verified books',''));
-  for(const book of bookList)bookFilter.append(new Option(book.title,book.id));
+  updateBookOptions();
   showAvailability();
 }
 async function loadCoverage(){
@@ -127,7 +148,7 @@ async function loadCoverage(){
         Number.isSafeInteger(book.pages)&&book.pages>0&&
         Number.isSafeInteger(book.chunks)&&book.chunks>0)
       .map(([id,book])=>({id,title:book.title}))
-      .sort((a,b)=>a.title.localeCompare(b.title));
+      .sort(sortBooksForSelector);
     if(!list.length)throw Error('No verified books are published yet.');
     bookList=list;
     allowed=new Set(list.map(x=>x.id));
@@ -577,6 +598,13 @@ diagnosticCopy.addEventListener('click',async()=>{
 });
 newConversationButton.addEventListener('click',startNewConversation);
 form.addEventListener('submit',event=>{event.preventDefault();askQuestion();});
-bookFilter.addEventListener('change',updateButtons);
+bookSearch.addEventListener('input',updateBookOptions);
+bookFilter.addEventListener('change',()=>{
+  if(bookFilter.value===''){
+    bookSearch.value='';
+    updateBookOptions();
+  }
+  updateButtons();
+});
 question.addEventListener('input',updateButtons);
 (async()=>{await loadCoverage();await loadStatus();})();
