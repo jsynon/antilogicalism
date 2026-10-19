@@ -1,3 +1,5 @@
+import {hasExplicitScriptureReference} from './remote-library.mjs';
+
 /* Merge two independently retrieved question facets, retaining alternatives
  * for source selection and manual inspection.
  * No generated claim or PDF locator is trusted by this component.
@@ -45,6 +47,21 @@ export function validSearchPlan(value){
  return Array.isArray(value)&&value.length===2&&
    value.every(q=>typeof q==='string'&&q.trim().length>=12&&q.trim().length<=160)&&
    value[0].trim().toLowerCase()!==value[1].trim().toLowerCase();
+}
+
+/* Keep the reader's exact wording as an additional lexical facet when an
+ * explicit Bible chapter-and-verse citation appears. The planner can turn
+ * citation questions into abstract theology terms; this direct pass preserves
+ * the locator and wording while the retriever gives Bible editions a modest,
+ * reference-aware work-ranking preference. */
+export function buildSearchFacets(question,plannedQueries,bookId=''){
+ const planned=validSearchPlan(plannedQueries)?plannedQueries:[String(question||'')];
+ if(bookId||!validSearchPlan(plannedQueries)||
+    !hasExplicitScriptureReference(question))return [...planned];
+ const direct=String(question||'').trim();
+ if(!direct||planned.some(query=>query.trim().toLowerCase()===direct.toLowerCase()))
+  return [...planned];
+ return [...planned,direct];
 }
 
 /* Planning improves retrieval, but a temporary planner outage must not block

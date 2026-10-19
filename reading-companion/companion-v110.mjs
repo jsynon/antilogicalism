@@ -7,7 +7,7 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {mergeFacetSearches,validSearchPlan,selectAnswerSources,canFallbackToDirectSearch} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch} from './evidence-search.mjs';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -251,7 +251,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
       if(diagnosticState)diagnosticState.searches=[{query:q,
         resultCount:populated.length,sources:populated.slice(0,8)}];
     }else{
-      const searches=validSearchPlan(plannedQueries)?plannedQueries:[q];
+      const searches=buildSearchFacets(q,plannedQueries,bookFilter.value);
       const foundSets=await Promise.all(searches.map(term=>library.search(term,{
         bookId:bookFilter.value,allowedBookIds:allowed,maxBooks:2,
         pagesPerBook:3

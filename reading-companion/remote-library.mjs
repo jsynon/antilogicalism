@@ -3,6 +3,23 @@
  * Original shard IDs, physical PDF pages and manifest PDF URLs are preserved.
  */
 export const DEFAULT_INDEX_ROOT = 'https://jsynon.github.io/antilogicalism-library-data/data-v47/';
+const SCRIPTURE_BOOK_NAMES = [
+  'genesis','exodus','leviticus','numbers','deuteronomy','joshua','judges','ruth',
+  '1 samuel','2 samuel','1 kings','2 kings','1 chronicles','2 chronicles',
+  'ezra','nehemiah','esther','job','psalms','psalm','proverbs','ecclesiastes',
+  'song of songs','song of solomon','isaiah','jeremiah','lamentations','ezekiel',
+  'daniel','hosea','joel','amos','obadiah','jonah','micah','nahum','habakkuk',
+  'zephaniah','haggai','zechariah','malachi','matthew','mark','luke','john',
+  'acts','romans','1 corinthians','2 corinthians','galatians','ephesians',
+  'philippians','colossians','1 thessalonians','2 thessalonians','1 timothy',
+  '2 timothy','titus','philemon','hebrews','james','1 peter','2 peter',
+  '1 john','2 john','3 john','jude','revelation','wisdom','sirach',
+  'ecclesiasticus','1 maccabees','2 maccabees','baruch'
+];
+const scriptureBookPattern=SCRIPTURE_BOOK_NAMES
+  .map(name=>name.replace(/\s+/g,'\\s+')).join('|');
+const SCRIPTURE_REFERENCE=new RegExp(
+  `\\b(?:${scriptureBookPattern})\\s+\\d{1,3}\\s*[:.]\\s*\\d{1,3}(?:\\s*[-–—]\\s*\\d{1,3})?\\b`,'i');
 // Remove question framing and common function words before searching. These
 // terms describe what the reader wants the assistant to do, not what the
 // source passage is likely to say, and can otherwise reward incidental pages.
@@ -20,6 +37,9 @@ const STOP = new Set(`
   relationships show shows showed showing work works
 `.trim().split(/\s+/));
 const PDF = /^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:view|preview)/;
+export function hasExplicitScriptureReference(text) {
+  return SCRIPTURE_REFERENCE.test(String(text || ''));
+}
 export function queryTerms(question) {
   return [...new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || [])]
     .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 8);
@@ -291,8 +311,13 @@ export class RemoteLibrary {
       const titleTokens = new Set((String(manifest.books[id].title || '').split(/\s+[—–-]\s+/)[0]
         .toLowerCase().match(/[a-z0-9]+/g) || []).map(titleTermStem));
       const overlap = terms.filter(term => titleTokens.has(titleTermStem(term))).length;
+      // A named Bible book plus a chapter-and-verse locator is a precise
+      // source request. Prefer Bible editions among otherwise matching works;
+      // still rank their actual pages by the question terms below.
+      const scriptureBoost=hasExplicitScriptureReference(question) &&
+        /\bbible\b/i.test(manifest.books[id].title||'') ? 1000 : 0;
       return {id, hits, titleOverlap:overlap, score:hits[0].score + 3 * hits[0].matched +
-        Math.log1p(hits.length) + 12 * overlap};
+        Math.log1p(hits.length) + 12 * overlap + scriptureBoost};
     });
     // If some books have joint topic terms, don't force single-term
     // incidental mentions into the limited set of cited books.
