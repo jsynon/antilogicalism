@@ -46,7 +46,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
   evidenceHighlightsLocated:highlights.filter(item=>item?.quoteLocated===true).length,
   passed:sourceGroups.every(group=>group.found)&&missingInline.length===0&&citations.length>0};
 }
-function safeHeaders(token){return {authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'};}
+function safeHeaders(token){return {authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json',origin:'https://jsynon.github.io'};}
 async function callJson(fetcher,url,token,body,beforeCall=async()=>{}){
  await beforeCall();
  const response=await fetcher(url,{method:'POST',headers:safeHeaders(token),body:JSON.stringify(body)});
