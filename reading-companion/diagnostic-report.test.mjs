@@ -54,10 +54,13 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(diagnosticFailureCode(502,'planner'),'search-planning-failed');
  assert.equal(diagnosticFailureCode(503),'service-unavailable');
  assert.equal(diagnosticFailureCode(null),'network-error');
- const report=createDiagnosticReport({failureHttpStatus:999,
+ const report=createDiagnosticReport({stage:'failed',failureHttpStatus:999,
    failureCode:'PRIVATE MODEL ERROR response contains secret'});
  assert.equal(report.failureHttpStatus,null);
  assert.equal(report.failureCode,'unclassified');
+ const complete=createDiagnosticReport({stage:'complete',
+   failureCode:'unclassified'});
+ assert.equal(complete.failureCode,'');
 });
 
 test('diagnostic reports all four source pages sent to the answer service',()=>{

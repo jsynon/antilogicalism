@@ -362,6 +362,7 @@ function renderResponse(data,turnQuestion=''){
     }
     box.append(buttons);turn.append(box);
   }
+  const highlightedSourceKeys=new Set();
   if(highlights.length){
     const panel=node('section',undefined,'companion-highlights');
     panel.append(node('h3','Key passages from the source books'));
@@ -386,13 +387,16 @@ function renderResponse(data,turnQuestion=''){
       card.append(quote,a,read);
       appendFullPage(card,original,item.quote);
       panel.append(card);
+      highlightedSourceKeys.add(citation.id+'|'+Number(citation.page));
     }
     turn.append(panel);
   }
-  if(citations.length){
+  const remainingCitations=citations.filter(source=>
+    !highlightedSourceKeys.has(source.id+'|'+Number(source.page)));
+  if(remainingCitations.length){
     const sources=node('section',undefined,'companion-citations');
-    sources.append(node('h3','Sources'));
-    for(const source of citations){
+    sources.append(node('h3','Additional sources'));
+    for(const source of remainingCitations){
       const row=node('article',undefined,'companion-source-entry');
       const label=node('p');
       const link=document.createElement('a');link.href=source.url;

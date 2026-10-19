@@ -16,11 +16,15 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  const answer=client.indexOf('Reading Companion answer');
  const explore=client.indexOf('Explore further',answer);
  const passages=client.indexOf('Key passages from the source books',explore);
- const sources=client.indexOf("'Sources'",passages);
+ const sources=client.indexOf("'Additional sources'",passages);
  assert(answer>=0);
  assert(explore>answer);
  assert(passages>explore);
  assert(sources>passages);
+ assert.match(client,/highlightedSourceKeys\.add\(citation\.id\+'\|'\+Number\(citation\.page\)\)/);
+ assert.match(client,/const remainingCitations=citations\.filter\(source=>/);
+ assert.match(client,/if\(remainingCitations\.length\)/);
+ assert.match(client,/for\(const source of remainingCitations\)/);
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
  assert.ok(client.includes("new Option('All '+bookList.length+' verified books','')"));
