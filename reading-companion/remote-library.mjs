@@ -380,10 +380,12 @@ export class RemoteLibrary {
         if (selected.length >= pageLimit) break;
         if (!selected.some(existing => existing.item.id === entry.item.id)) selected.push(entry);
       }
-      for (const {item} of selected) {
+      for (const entry of selected) {
+        const {item}=entry;
         const url = 'https://drive.google.com/file/d/' + pdfId + '/view?usp=sharing#page=' + item.page;
         sources.push({bookId:book.id, title:meta.title, page:item.page, globalPageId:item.id,
-          url, preview:excerptAroundEvidence(item.text,bookEvidenceTerms), textLength:item.text.length});
+          url, preview:excerptAroundEvidence(item.text,bookEvidenceTerms), textLength:item.text.length,
+          score:entry.rank});
       }
     }
     return {terms, sources:sources.map((item,i) => ({id:'S'+(i+1),...item})),
