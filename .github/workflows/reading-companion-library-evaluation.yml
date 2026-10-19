@@ -27,7 +27,7 @@ jobs:
           node-version: 24
       - name: Test the production retrieval and evaluation contracts
         run: node --test reading-companion/public-library-evaluation.test.mjs reading-companion/evidence-search.test.mjs reading-companion/remote-library*.test.mjs
-      - name: Run all 30 global retrieval cases
+      - name: Run all global retrieval cases
         run: node reading-companion/public-library-evaluation.mjs --output "$RUNNER_TEMP/reading-companion-public-evaluation.json"
       - name: Save evaluation report
         uses: actions/upload-artifact@v4

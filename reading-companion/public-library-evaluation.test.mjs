@@ -11,10 +11,13 @@ const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
 const DRIVE='1XVInAFS2zutV8PDp8A3DirUrW6nLLfvY';
 
-test('benchmark covers 30 fixed global questions across five subject areas',async()=>{
+test('benchmark covers 31 fixed global questions across six subject areas, including scripture',async()=>{
  const suite=validateSuite(JSON.parse(await readFile(SUITE_PATH,'utf8')));
- assert.equal(suite.cases.length,30);
- assert.deepEqual(new Set(suite.cases.map(c=>c.discipline)),new Set(['science','history','literature','philosophy','politics-society']));
+ assert.equal(suite.cases.length,31);
+ const scripture=suite.cases.find(c=>c.id==='religion-1-john-love');
+ assert.ok(scripture,'the 1 John retrieval regression is present');
+ assert.deepEqual(scripture.required_source_groups,[{label:'1 John 4:7–12',book_ids:['638']}]);
+ assert.deepEqual(new Set(suite.cases.map(c=>c.discipline)),new Set(['science','history','literature','philosophy','politics-society','religion']));
  assert.ok(suite.cases.every(c=>c.planner_queries.length===2));
  assert.ok(suite.cases.every(c=>!('book_id' in c)), 'every search starts in all-books scope');
 });
