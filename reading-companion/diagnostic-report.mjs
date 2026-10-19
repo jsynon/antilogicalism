@@ -36,6 +36,7 @@ export function createDiagnosticReport(input={}){
     libraryVersion:Number.isSafeInteger(input.libraryVersion)?input.libraryVersion:null,
     question:string(input.question,400),
     selectedBookId:string(input.selectedBookId,12)||'all',
+    plannerEnabled:input.plannerEnabled===true,
     fallbackMode:input.fallbackMode===true,
     stage:string(input.stage,40)||'unknown',
     failureCategory:string(input.failureCategory,48),
