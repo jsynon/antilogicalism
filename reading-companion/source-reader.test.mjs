@@ -51,15 +51,17 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  for(const id of ids)assert(html.includes('id="'+id+'"'),id+' markup');
  assert.match(html,/id="companion-source-reader"[^>]+hidden/);
  assert.match(client,/Read passage here/);
- assert.match(client,/row\.append\(link\)/);
+ assert.match(client,/label\.append\(link\);row\.append\(label\)/);
+ assert.match(client,/appendFullPage\(row,original\)/);
+ assert.match(client,/appendFullPage\(card,original\)/);
  assert.match(source,/isAllowedBook\(bookId\)/);
  assert.match(source,/getBook\(bookId\)/);
  assert.doesNotMatch(source,/\/api\/(?:pilot-answer|chat)/);
  assert.doesNotMatch(source,/innerHTML\s*=/);
 });
-test('reader typography inherits the Book Lite font and avoids undersized suggestion buttons',()=>{
+test('reader controls inherit Book Lite typography and follow-up prompts are not buttons',()=>{
  assert.match(html,/#companion-pilot\{font:inherit/);
- assert.match(html,/font:inherit;font-size:1em;line-height:1\.5/);
- assert.doesNotMatch(html,/font:inherit;font-size:\.85em;line-height:1\.45/);
+ assert.match(html,/\.companion-inline-read\{font-family:inherit;font-size:\.89em/);
+ assert.doesNotMatch(html,/companion-follow-up-buttons/);
  assert.match(html,/mark\.cited-highlight/);
 });

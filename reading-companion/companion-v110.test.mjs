@@ -12,7 +12,7 @@ test('v1.10 retains Book Lite and the site navigation',()=>{
  assert.match(html,/id="secondary"/);
  assert.match(html,/companion-v110\.mjs/);
 });
-test('v1.10 includes requested reader-mode presentation in order',()=>{
+test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');
  const explore=client.indexOf('Explore further',answer);
  const passages=client.indexOf('Key passages from the source books',explore);
@@ -21,10 +21,10 @@ test('v1.10 includes requested reader-mode presentation in order',()=>{
  assert(explore>answer);
  assert(passages>explore);
  assert(sources>passages);
- assert.match(html,/id="companion-suggested-questions"/);
+ assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
  assert.match(html,/id="companion-question"/);
- assert.match(html,/id="companion-passage-list"/);
+ assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
  assert.match(html,/background:#fff;color:#111;border:1px solid #333/);
 });
 test('v1.10 uses original v47 retrieval, verified pilot endpoint and text-only output',()=>{
@@ -42,14 +42,18 @@ test('v1.10 never claims unsupported books are ready if fingerprint index missin
  assert.match(client,/reader-fingerprints-v1\/coverage-v1\.json/);
 });
 
-test('public companion copy explains the pilot without exposing implementation jargon',()=>{
+test('public companion copy explains the pilot and keeps source reading controls',()=>{
  assert.match(html,/Answers draw on passages from the current pilot collection/);
  assert.match(html,/Citations open original PDF pages/);
- assert.match(html,/id="companion-passage-browser" hidden/);
+ assert.match(client,/View full page text/);
+ assert.match(client,/Read passage here/);
+ assert.match(client,/appendFullPage\(card,original\)/);
+ assert.match(client,/appendFullPage\(row,original\)/);
+ assert.doesNotMatch(client,/Checked passages will guide the answer/);
+ assert.doesNotMatch(client,/Answer ready below\./);
+ assert.doesNotMatch(client,/lastSearch|selected\.size|selectionKey/);
+ assert.doesNotMatch(html,/Answer ready below|Checked passages will guide the answer/i);
  assert.doesNotMatch(html,/SHA-256|v47 index|Automatic evidence planning|visitor verification/i);
- assert.match(client,/Checked passages will guide the answer/);
- assert.match(client,/aria-label','Include '\+s\.title\+', PDF page '\+s\.page\+' in the answer/);
- assert.match(client,/Answer ready below\./);
  assert.doesNotMatch(client,/The verified answer is ready/);
 });
 

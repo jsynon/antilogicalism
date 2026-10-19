@@ -43,12 +43,13 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/API\+'\/api\/pilot-plan'/);
  assert.match(js,/data\.searchPlanning===true/);
  assert.match(js,/validSearchPlan\(data\.queries\)/);
- assert.match(js,/const found=await searchPages\(queries\)/);
+ assert.match(js,/const found=await retrieveSources\(queries\)/);
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
  assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text\}\)=>\(\{bookId,page,text\}\)\)/);
- assert.match(js,/MAX_SELECTED=2/);
- assert.match(js,/const manual=lastSearch===q/);
+ assert.match(js,/MAX_ANSWER_SOURCES=2/);
+ assert.match(js,/const chosen=candidates\.slice\(0,MAX_ANSWER_SOURCES\)/);
+ assert.doesNotMatch(js,/searchPages\(|lastSearch|checked passages will guide/i);
  assert.match(js,/data\.outcome==='insufficient-evidence'/);
  assert.doesNotMatch(js,/innerHTML\s*=/);
 });
