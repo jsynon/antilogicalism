@@ -39,11 +39,18 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
   expectedBookIds:group.book_ids.map(String),foundBookIds:citationBookIds.filter(id=>group.book_ids.map(String).includes(id)),
   found:citations.some(source=>group.book_ids.map(String).includes(String(source?.bookId||'')))}));
  const highlights=Array.isArray(data?.evidenceHighlights)?data.evidenceHighlights:[];
+ const citationSources=citations.map(source=>({id:String(source?.id||''),bookId:String(source?.bookId||''),
+  title:String(source?.title||''),page:Number.isSafeInteger(source?.page)?source.page:null,
+  globalPageId:Number.isSafeInteger(source?.globalPageId)?source.globalPageId:null,
+  url:typeof source?.url==='string'?source.url:''}));
+ const evidenceHighlights=highlights.map(item=>({sourceId:String(item?.source_id||item?.sourceId||''),
+  title:String(item?.title||''),page:Number.isSafeInteger(item?.page)?item.page:null,
+  quote:typeof item?.quote==='string'?item.quote:'',
+  quoteLocated:typeof item?.quoteLocated==='boolean'?item.quoteLocated:null}));
  return {outcome:String(data?.outcome||''),coverage:String(data?.coverage||''),reviewStatus:String(data?.reviewStatus||''),
-  citationCount:citations.length,citationBookIds,inlineCitationCount:inline.length,
+  answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
-  sourceGroups,evidenceHighlightCount:highlights.length,
-  evidenceHighlightsLocated:highlights.filter(item=>item?.quoteLocated===true).length,
+  sourceGroups,evidenceHighlightCount:highlights.length,evidenceHighlights,
   passed:sourceGroups.every(group=>group.found)&&missingInline.length===0&&citations.length>0};
 }
 function safeHeaders(token){return {authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json',origin:'https://jsynon.github.io'};}
