@@ -37,12 +37,13 @@ test('page ranking favors clustered topic evidence over scattered mentions',()=>
 const fixture={
  'manifest.json':{
   version:47,postings_encoding:'delta-json-v1',prefix_length:2,
-  pages:6,page_books:[7,7,89,89,114,114],
-  partitions:['mo','vi','pr','wi','ph','ha','eu','fi','ar','ni','et','ra','ex','ma','th','na','mu'],
+  pages:7,page_books:[7,7,89,89,114,114,529],
+  partitions:['mo','vi','pr','wi','ph','ha','eu','fi','ar','ni','et','ra','ex','ma','th','na','mu','da','ch','hu','li','po'],
   books:{
    '7':{title:'Nicomachean Ethics — Aristotle',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
    '89':{title:'Other Philosophy Anthology',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
-   '114':{title:'Crime and Punishment — Fyodor Dostoevsky',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
+   '114':{title:'Crime and Punishment — Fyodor Dostoevsky',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+   '529':{title:'On the Origin of Species — Charles Darwin',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
   }
  },
  'terms-mo.json':{moral:[0,1],morality:[4]},
@@ -63,8 +64,13 @@ const fixture={
  'terms-ma.json':{man:[4]},
  'terms-th.json':{theory:[4]},
  'terms-na.json':{napoleon:[4]},
+ 'terms-da.json':{darwin:[6]},
+ 'terms-ch.json':{change:[0,6],character:[0,6]},
+ 'terms-hu.json':{human:[0]},
+ 'terms-li.json':{living:[6]},
+ 'terms-po.json':{populations:[6]},
  'book-7.json':{pages:[
-   {id:0,page:12,text:'Nicomachean Ethics Aristotle. '+aristotleText},
+   {id:0,page:12,text:'Nicomachean Ethics Aristotle. Change in human character concerns the soul and moral development. '+aristotleText},
    {id:1,page:13,text:'Nicomachean Ethics Aristotle. Other philosophers mention happiness in an unrelated historical note about a different period of thought.'}
  ]},
  'book-89.json':{pages:[
@@ -74,6 +80,9 @@ const fixture={
  'book-114.json':{pages:[
    {id:4,page:465,text:'Raskolnikov argued that extraordinary men such as Napoleon might transgress ordinary moral law. His theory attempts to justify murder through a claim about historical greatness and individual permission.'},
    {id:5,page:317,text:'Raskolnikov stood beside the workmen. The murder was already over, and he listened in silence while they discussed the scene.'}
+ ]},
+ 'book-529.json':{pages:[
+   {id:6,page:200,text:'On the Origin of Species Charles Darwin. Change in living populations occurs as inherited character varies and some traits persist across generations.'}
  ]}
 };
 function fakeFetch(url) {
@@ -127,4 +136,23 @@ test('theory question excludes a plot page with only incidental character and ev
    bookId:'114',allowedBookIds:new Set(['114']),maxBooks:1,pagesPerBook:2
  });
  assert.deepEqual(result.sources.map(source=>source.page),[465]);
+});
+
+test('all-books comparison retrieves topical evidence for both named authors',async()=>{
+ const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const result=await finder.search('How do Aristotle and Darwin explain change in human character and living populations?',{
+   allowedBookIds:new Set(['7','89','114','529']),maxBooks:2,pagesPerBook:2
+ });
+ assert.deepEqual(new Set(result.sources.map(source=>source.bookId)),new Set(['7','529']));
+ assert(result.sources.some(source=>source.bookId==='7'&&source.preview.includes('human character')));
+ assert(result.sources.some(source=>source.bookId==='529'&&source.preview.includes('living populations')));
+});
+
+test('all-books search honors an explicitly named author when limiting candidate sources',async()=>{
+ const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const result=await finder.search('How did Aristotle describe virtue and the soul?',{
+   allowedBookIds:new Set(['7','89','114','529']),maxBooks:2,pagesPerBook:2
+ });
+ assert(result.sources.length>0);
+ assert(result.sources.every(source=>source.bookId==='7'));
 });
