@@ -48,7 +48,7 @@ test('public companion copy explains the pilot and keeps source reading controls
  assert.match(html,/Answers draw on passages from the current pilot collection/);
  assert.match(html,/Citations open original PDF pages/);
  assert.match(client,/View full page text/);
- assert.match(client,/Read passage here/);
+ assert.match(client,/Read passage/);
  assert.match(client,/appendFullPage\(card,original\)/);
  assert.match(client,/appendFullPage\(row,original\)/);
  assert.match(html,/id="companion-turnstile" aria-label="Quick check"/);

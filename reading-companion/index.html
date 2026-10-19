@@ -360,8 +360,9 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
    Schoolbook body, 30px h2, 26px h3, and no reduced-size prompt buttons. */
 #companion-pilot{font:inherit;color:#3e454a}
 #companion-pilot .companion-answer-text,#companion-pilot .companion-source-entry p{font:inherit}
-#companion-pilot .companion-inline-read{font-family:inherit;font-size:.89em;margin:.15em .5em .4em 0;padding:5px 10px;min-height:36px;background:#fff;color:#111;border:1px solid #333;line-height:1.5;white-space:normal;text-align:left}
-#companion-pilot .companion-inline-read:hover{background:#f5f5f5;color:#111}
+#companion-pilot button.companion-inline-read{-webkit-appearance:none;appearance:none;display:inline;min-height:0;margin:.15em .5em .4em 0;padding:0;border:0;border-radius:0;background:transparent;color:#111;font:inherit;font-size:.9em;line-height:inherit;text-align:left;text-decoration:underline;text-underline-offset:.12em;white-space:normal;cursor:pointer}
+#companion-pilot button.companion-inline-read:hover{background:transparent;color:#111}
+#companion-pilot button.companion-inline-read:focus-visible{outline:2px solid #111;outline-offset:2px}
 #companion-pilot #companion-source-reader[hidden],
 #companion-pilot #companion-source-quote[hidden]{display:none!important}
 #companion-pilot .companion-source-reader{margin:1.6em 0;padding:1em;border:1px solid #d5d8da;border-top:3px solid #333;background:#fff}

@@ -273,7 +273,7 @@ function renderResponse(data){
       const a=document.createElement('a');a.href=item.url;
       a.target='_blank';a.rel='noopener noreferrer';
       a.textContent='['+item.source_id+'] '+item.title+' · PDF p. '+item.page;
-      const read=node('button','Read passage here','companion-inline-read');
+      const read=node('button','Read passage','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
         try{await sourceReader.open({...citation,excerpt:item.quote},read);}
@@ -303,7 +303,7 @@ function renderResponse(data){
       const original=sourcePage(source);
       const excerpt=(typeof highlight?.quote==='string'&&highlight.quote.trim())?
         highlight.quote:(original?.preview||source.preview||'');
-      const read=node('button','Read passage here','companion-inline-read');
+      const read=node('button','Read passage','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
         try{

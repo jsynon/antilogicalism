@@ -50,7 +50,7 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
   'companion-source-pdf','companion-source-layout','companion-source-text'];
  for(const id of ids)assert(html.includes('id="'+id+'"'),id+' markup');
  assert.match(html,/id="companion-source-reader"[^>]+hidden/);
- assert.match(client,/Read passage here/);
+ assert.match(client,/Read passage/);
  assert.match(client,/label\.append\(link\);row\.append\(label\)/);
  assert.match(client,/appendFullPage\(row,original\)/);
  assert.match(client,/appendFullPage\(card,original\)/);
@@ -61,7 +61,8 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
 });
 test('reader and follow-up controls inherit the Book Lite design',()=>{
  assert.match(html,/#companion-pilot\{font:inherit/);
- assert.match(html,/\.companion-inline-read\{font-family:inherit;font-size:\.89em/);
+ assert.match(html,/button\.companion-inline-read\{-webkit-appearance:none;appearance:none;display:inline/);
+ assert.match(html,/button\.companion-inline-read:focus-visible\{outline:2px solid #111/);
  assert.match(html,/\.companion-follow-up-buttons button\{background:#fff;color:#111/);
  assert.match(html,/mark\.cited-highlight/);
 });
