@@ -316,12 +316,12 @@ export class RemoteLibrary {
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
       }
       candidates.sort((a,b) => b.rank - a.rank || a.item.page - b.item.page);
-      // When given a third page of budget, prefer the continuation of the
-      // strongest match to an unrelated distant keyword hit. This is generic
-      // paragraph continuity, not a book- or question-specific rule. Preserve
-      // the two best direct matches for relevance and source diversity.
-      const selected = candidates.slice(0, Math.min(pageLimit, 2));
-      if (pageLimit >= 3 && selected.length) {
+      // Fill the evidence budget with the strongest direct matches first.
+      // A nearby page can add useful context, but it must not displace a
+      // stronger independently relevant page (for example, a key definition
+      // earlier in a book). Add a neighbor only when direct matches leave room.
+      const selected = candidates.slice(0, pageLimit);
+      if (pageLimit >= 3 && selected.length < pageLimit && selected.length) {
         const topPage = selected[0].item.page;
         for (const adjacent of [topPage + 1, topPage - 1]) {
           const item = proseByPage.get(adjacent);
