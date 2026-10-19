@@ -48,7 +48,7 @@ function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
 }
 function populateBooks(){
-  bookFilter.replaceChildren(new Option('All available books',''));
+  bookFilter.replaceChildren(new Option('All pilot books',''));
   for(const book of bookList)bookFilter.append(new Option(book.title,book.id));
   showAvailability();
 }
