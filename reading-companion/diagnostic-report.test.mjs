@@ -61,6 +61,12 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(diagnosticFailureCode(502),'answer-generation-or-citation-failed');
  assert.equal(diagnosticFailureCode(502,'answer','evidence-review-request-failed'),
    'evidence-review-request-failed');
+ // New Worker reason codes should survive without a frontend allowlist update.
+ assert.equal(diagnosticFailureCode(502,'answer','answer-quotation-not-source-verified'),
+   'answer-quotation-not-source-verified');
+ const precise=createDiagnosticReport({stage:'failed',failureHttpStatus:502,
+   failureCode:'answer-quotation-not-source-verified'});
+ assert.equal(precise.failureCode,'answer-quotation-not-source-verified');
  assert.equal(diagnosticFailureCode(502,'answer','PRIVATE MODEL ERROR'),
    'answer-generation-or-citation-failed');
  assert.equal(diagnosticFailureCode(502,'planner'),'search-planning-failed');
