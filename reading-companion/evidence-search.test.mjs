@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,selectAnswerSources,canFallbackToDirectSearch} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch} from './evidence-search.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
  preview:'Authentic indexed excerpt',url:'https://drive.google.com/file/d/X/view#page='+page});
@@ -42,6 +42,15 @@ test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.equal(validSearchPlan(['too short', 'other']),false);
  const out=mergeFacetSearches([{sources:[page(73),{bookId:'../../11',page:11},page(74)]}],2);
  assert.deepEqual(out.map(x=>x.page),[73,74]);
+});
+
+test('global scripture questions retain the reader wording as a third search facet',()=>{
+ const plan=['1 John 4:7-12 God love theology','1 John commandment love one another'];
+ const question='According to 1 John 4:7–12, what does “God is love” say about loving one another?';
+ assert.deepEqual(buildSearchFacets(question,plan),[...plan,question]);
+ assert.deepEqual(buildSearchFacets(question,plan,'638'),plan);
+ assert.deepEqual(buildSearchFacets('What does God is love mean?',plan),plan);
+ assert.deepEqual(buildSearchFacets(question,null),[question]);
 });
 
 test('planner outages fall back to direct search while denials and rate limits remain blocked',()=>{
@@ -99,6 +108,7 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/API\+'\/api\/pilot-plan'/);
  assert.match(js,/data\.searchPlanning===true/);
  assert.match(js,/validSearchPlan\(data\.queries\)/);
+ assert.match(js,/buildSearchFacets\(q,plannedQueries,bookFilter\.value\)/);
  assert.match(js,/const found=await retrieveSources\(queries,\{plannerFallback\}\)/);
  assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
  assert.match(js,/diagnosticState\.fallbackMode=true/);
