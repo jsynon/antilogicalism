@@ -148,7 +148,7 @@ async function loadCoverage(){
         Number.isSafeInteger(book.pages)&&book.pages>0&&
         Number.isSafeInteger(book.chunks)&&book.chunks>0)
       .map(([id,book])=>({id,title:book.title}))
-      ));
+      );
     if(!list.length)throw Error('No verified books are published yet.');
     bookList=list;
     allowed=new Set(list.map(x=>x.id));
