@@ -4,10 +4,15 @@ const FAILURE_CODES=new Set([
   'visitor-or-origin-rejected','request-too-large',
   'source-verification-rejected','rate-limited',
   'answer-generation-or-citation-failed','search-planning-failed','service-unavailable',
-  'http-error','invalid-response','retrieval-error'
+  'evidence-review-request-failed','evidence-review-truncated',
+  'evidence-review-invalid-response','answer-composition-request-failed',
+  'answer-composition-truncated','answer-composition-empty',
+  'answer-composition-too-long','answer-citations-missing',
+  'answer-citations-invalid','http-error','invalid-response','retrieval-error'
 ]);
 
-export function diagnosticFailureCode(status,requestStage='answer'){
+export function diagnosticFailureCode(status,requestStage='answer',serverCode=''){
+  if(FAILURE_CODES.has(serverCode))return serverCode;
   if(!Number.isInteger(status)||status<100||status>599)return 'network-error';
   if(status===400)return 'request-rejected';
   if(status===401)return 'authorization-rejected';
@@ -73,7 +78,7 @@ export function createDiagnosticReport(input={}){
     })):[],
     candidates:Array.isArray(input.candidates)?input.candidates.slice(0,8).map(sourceSummary).filter(Boolean):[],
     submittedSources:Array.isArray(input.submittedSources)?
-      input.submittedSources.slice(0,2).map(sourceSummary).filter(Boolean):[],
+      input.submittedSources.slice(0,4).map(sourceSummary).filter(Boolean):[],
     answer:{
       outcome:string(input.outcome,48),
       coverage:string(input.coverage,24),
