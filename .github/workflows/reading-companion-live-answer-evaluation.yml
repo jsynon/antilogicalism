@@ -1,0 +1,66 @@
+name: Reading Companion live answer evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: Run the 3-question smoke set or all 30 benchmark questions
+        type: choice
+        options:
+          - smoke
+          - full
+        default: smoke
+        required: true
+      confirm_live_ai:
+        description: I understand this sends questions to the live Worker and uses Cloudflare AI
+        type: boolean
+        default: false
+        required: true
+      confirm_full_30:
+        description: I explicitly approve the full 30-question run (required only for full mode)
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reading-companion-live-answer-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: ${{ inputs.confirm_live_ai }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      LIVE_EVAL_MODE: ${{ inputs.mode }}
+      CONFIRM_LIVE_AI: ${{ inputs.confirm_live_ai }}
+      CONFIRM_FULL_30: ${{ inputs.confirm_full_30 }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate explicit cost confirmations
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          test "$CONFIRM_LIVE_AI" = "true"
+          if [ "$LIVE_EVAL_MODE" = "full" ]; then test "$CONFIRM_FULL_30" = "true"; fi
+          test -n "$PILOT_EVALUATION_TOKEN"
+      - name: Test evaluation guards and report checks
+        run: node --test reading-companion/live-answer-evaluation.test.mjs
+      - name: Run confirmed live evaluation
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+          LIVE_EVAL_OUTPUT: ${{ runner.temp }}/reading-companion-live-answer-evaluation.json
+        run: node reading-companion/live-answer-evaluation.mjs --mode "$LIVE_EVAL_MODE" --confirm-live-ai true --output "$LIVE_EVAL_OUTPUT"
+      - name: Save live evaluation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-companion-live-answer-evaluation-${{ inputs.mode }}
+          path: ${{ runner.temp }}/reading-companion-live-answer-evaluation.json
+          if-no-files-found: error
+          retention-days: 14
