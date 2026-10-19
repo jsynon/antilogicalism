@@ -44,13 +44,19 @@ test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.deepEqual(out.map(x=>x.page),[73,74]);
 });
 
-test('global scripture questions retain the reader wording as a third search facet',()=>{
+test('the reader question is retained as a third search facet for all-book and selected-book searches',()=>{
+ const plan=['Aristotle virtue formation through habituation','Aristotle repeated actions and moral character'];
+ const question='How does Aristotle explain becoming virtuous through repeated actions?';
+ assert.deepEqual(buildSearchFacets(question,plan),[...plan,question]);
+ assert.deepEqual(buildSearchFacets(question,plan,'7'),[...plan,question]);
+ assert.deepEqual(buildSearchFacets(question,[...plan,question]),[...plan,question]);
+ assert.deepEqual(buildSearchFacets(question,null),[question]);
+});
+test('scripture references retain the exact question under the same general rule',()=>{
  const plan=['1 John 4:7-12 God love theology','1 John commandment love one another'];
  const question='According to 1 John 4:7–12, what does “God is love” say about loving one another?';
  assert.deepEqual(buildSearchFacets(question,plan),[...plan,question]);
- assert.deepEqual(buildSearchFacets(question,plan,'638'),plan);
- assert.deepEqual(buildSearchFacets('What does God is love mean?',plan),plan);
- assert.deepEqual(buildSearchFacets(question,null),[question]);
+ assert.deepEqual(buildSearchFacets(question,plan,'638'),[...plan,question]);
 });
 
 test('planner outages fall back to direct search while denials and rate limits remain blocked',()=>{
