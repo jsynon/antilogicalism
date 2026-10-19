@@ -28,6 +28,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.doesNotMatch(client,/bookFinder|bookCount|bookFilter|matchingBooks|populateBooks/);
  assert.match(client,/bookId:'',allowedBookIds:allowed/);
  assert.match(client,/selectedBookId:'all'/);
+ assert.match(client,/plannerEnabled:searchPlanningEnabled/);
  assert.match(html,/id="companion-question"/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
  assert.match(client,/companion-follow-up-buttons/);
