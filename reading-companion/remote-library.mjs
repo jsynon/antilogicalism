@@ -192,7 +192,6 @@ export class RemoteLibrary {
     const started = performance.now();
     const manifest = await this.manifest();
     const selectedTitle = bookId ? String(manifest.books[String(bookId)]?.title || '') : '';
-    const titleTerms = new Set((selectedTitle.toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
     // The catalog title puts the author's name after a dash. In a selected
     // work, author names are scope metadata, not evidence for a page-level
     // claim (and many digitized books repeat them in headers).
@@ -205,53 +204,58 @@ export class RemoteLibrary {
       .filter(term => !authorTerms.has(wordStem(term)))
       .filter(term => manifest.partitions.includes(term.slice(0, 2)));
     if (!terms.length) return {terms:[], sources:[], elapsedMs:Math.round(performance.now() - started)};
+    const questionWords = new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || []);
+    const mentionedAuthors = new Set();
+    const namedAuthorBookIds = new Set();
+    for (const [id, meta] of Object.entries(manifest.books)) {
+      const byline = String(meta.title || '').split(/\s+[—–-]\s+/).slice(1).join(' ');
+      const authorWords = byline.toLowerCase().match(/[a-z0-9]+/g) || [];
+      const surname = authorWords.at(-1);
+      const fullNameMentioned = authorWords.length > 1 && authorWords.every(word => questionWords.has(word));
+      if ((surname && surname.length >= 3 && questionWords.has(surname)) || fullNameMentioned) {
+        mentionedAuthors.add(surname);
+        namedAuthorBookIds.add(id);
+      }
+    }
+    const comparison = /\b(?:compare|contrast|versus|vs\.?|between)\b/i.test(question) || mentionedAuthors.size >= 2;
     const prefixes = [...new Set(terms.map(t => t.slice(0,2)))];
-    // A selected page must match more than one topic term for a compound
-    // query. This prevents a single incidental mention from filling the
-    // small citation budget while keeping short, focused searches usable.
-    const minimumEvidenceTerms = terms.length >= 2
-      ? Math.min(3, Math.floor(terms.length / 2) + 1) : 1;
+    // Keep indexed term matches available for candidate generation; relevance
+    // is evaluated per book after separating author metadata from topic terms.
     const data = new Map(await Promise.all(prefixes.map(async p => [p, await this.partition(p)])));
     const scores = new Map();
-    let anchorTerm = '', anchorCount = Infinity, anchorPages = [];
     for (const term of terms) {
       const list = decodeDeltas(data.get(term.slice(0, 2))[term] || [], manifest.page_books.length);
       if (!list.length) continue;
-      // Most distinctive actually indexed query term, not general "war"
-      // or "life". Prefer the longer term for equally frequent postings.
-      if (list.length < anchorCount || (list.length === anchorCount && term.length > anchorTerm.length)) {
-        anchorCount = list.length;
-        anchorTerm = term;
-        anchorPages = list;
-      }
-      const idf = Math.log1p(manifest.page_books.length / (list.length + 1));
       for (const id of list) {
-        const record = scores.get(id) || {score:0, matched:0};
-        record.score += idf;
-        record.matched++;
+        const record = scores.get(id) || {matchedTerms:new Set()};
+        record.matchedTerms.add(term);
         scores.set(id, record);
       }
     }
-    const anchorSet = new Set(anchorPages);
     const ranked = new Map();
     for (const [pageId, score] of scores) {
-      // A globally rare term can occur exclusively in OTHER books. When a
-      // reader selects a particular work, don't require its pages to contain
-      // that global anchor: rank candidate passages WITHIN the chosen book
-      // using the matching terms and full-text evidence checks below.
-      // Keep the existing anchor filter for unrestricted discovery, where
-      // it helps suppress incidental mentions in unrelated works.
-      if (!bookId && anchorTerm && !anchorSet.has(pageId)) continue;
+      // Author mentions can identify relevant books, but must not count as
+      // page-level evidence. Explicit author queries are limited to those
+      // authors' indexed works before topic matches are scored.
       const id = String(manifest.page_books[pageId]);
       if (bookId && id !== String(bookId)) continue;
       if (allowedBookIds && !allowedBookIds.has(id)) continue;
+      if (!bookId && namedAuthorBookIds.size && !namedAuthorBookIds.has(id)) continue;
       if (!manifest.books[id] || !PDF.test(manifest.books[id].drive_url || '')) continue;
+      const authorTerms = new Set((String(manifest.books[id].title || '').split(/\s+[—–-]\s+/).slice(1).join(' ')
+        .toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
+      const topicalTerms = [...score.matchedTerms].filter(term => !authorTerms.has(wordStem(term)));
+      const topicalScore = topicalTerms.reduce((sum, term) => {
+        const posting = data.get(term.slice(0,2))[term] || [];
+        return sum + Math.log1p(manifest.page_books.length / (posting.length + 1));
+      }, 0);
       if (!ranked.has(id)) ranked.set(id, []);
-      ranked.get(id).push({id:pageId, ...score});
+      ranked.get(id).push({id:pageId, score:topicalScore, matched:topicalTerms.length});
     }
     let books = [...ranked].map(([id, hits]) => {
       hits.sort((a,b) => b.matched - a.matched || b.score - a.score || a.id - b.id);
-      const titleTokens = new Set(String(manifest.books[id].title || '').toLowerCase().match(/[a-z0-9]+/g) || []);
+      const titleTokens = new Set(String(manifest.books[id].title || '').split(/\s+[—–-]\s+/)[0]
+        .toLowerCase().match(/[a-z0-9]+/g) || []);
       const overlap = terms.filter(term => titleTokens.has(term)).length;
       return {id, hits, titleOverlap:overlap, score:hits[0].score + 3 * hits[0].matched +
         Math.log1p(hits.length) + 12 * overlap};
@@ -265,7 +269,6 @@ export class RemoteLibrary {
     // A query that strongly matches a work's own title should not spend
     // its small evidence budget on a tangential survey, unless readers are
     // explicitly asking for a comparison across authors or works.
-    const comparison = /\b(?:compare|contrast|versus|vs\.?|between)\b/i.test(question);
     const directWorks = books.filter(book => book.titleOverlap >= 2);
     if (!bookId && !comparison && directWorks.length && directWorks.length <= Math.max(1,Math.min(maxBooks,3))) {
       books = directWorks;
@@ -280,6 +283,16 @@ export class RemoteLibrary {
       if (new Set(sources.map(source => source.bookId)).size >= bookLimit) break;
       const meta = manifest.books[book.id];
       const pdfId = PDF.exec(meta.drive_url)[1];
+      const bookTitleTerms = new Set((String(meta.title || '').toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
+      const bookAuthorTerms = new Set((String(meta.title || '').split(/\s+[—–-]\s+/).slice(1).join(' ')
+        .toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
+      const bookTerms = terms.filter(term => !bookAuthorTerms.has(wordStem(term)));
+      // Author-focused facets and comparisons need to establish relevance
+      // from a couple of local concepts. Longer unscoped questions retain the
+      // stricter threshold that filters incidental character/event overlap.
+      const minimumEvidenceTerms = bookTerms.length >= 2
+        ? (comparison || namedAuthorBookIds.size ? 2 : Math.min(3, Math.floor(bookTerms.length / 2) + 1)) : 1;
+      if (!bookTerms.length) continue;
       const shard = await this.jsonGzip('book-' + book.id + '.json');
       booksScanned++;
       if (!Array.isArray(shard.pages)) throw new Error('Invalid source shard for ' + book.id);
@@ -297,7 +310,7 @@ export class RemoteLibrary {
         }
         if ((item.text.match(/[a-z]+/gi) || []).length >= 10 &&
             !proseByPage.has(item.page)) proseByPage.set(item.page, item);
-        const evidence = substantivePageEvidence(item.text, terms, titleTerms);
+        const evidence = substantivePageEvidence(item.text, bookTerms, bookTitleTerms);
         if (!evidence || evidence.localUnique < minimumEvidenceTerms) continue;
         const hit = relevant.get(item.id);
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
@@ -325,10 +338,10 @@ export class RemoteLibrary {
       for (const {item} of selected) {
         const url = 'https://drive.google.com/file/d/' + pdfId + '/view?usp=sharing#page=' + item.page;
         sources.push({bookId:book.id, title:meta.title, page:item.page, globalPageId:item.id,
-          url, preview:excerptAroundEvidence(item.text,terms), textLength:item.text.length});
+          url, preview:excerptAroundEvidence(item.text,bookTerms), textLength:item.text.length});
       }
     }
-    return {terms, anchorTerm, sources:sources.map((item,i) => ({id:'S'+(i+1),...item})),
+    return {terms, sources:sources.map((item,i) => ({id:'S'+(i+1),...item})),
       booksScanned, discardedNavigation, elapsedMs:Math.round(performance.now() - started)};
   }
 }
