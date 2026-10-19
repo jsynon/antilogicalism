@@ -1,6 +1,42 @@
+test('source budget prioritizes distinct books before same-book alternatives',()=>{
+ const candidates=[
+  {...page(1,'7'),text:'first book'},
+  {...page(2,'7'),text:'same book alternate'},
+  {...page(3,'529'),text:'second book'},
+ ];
+ const chosen=selectAnswerSources(candidates,'Compare','token',{maxSources:2});
+ assert.deepEqual(chosen.map(item=>item.bookId),['7','529']);
+});
+test('explicit work titles narrow searches to matching catalog books',()=>{
+ const books=[
+  {id:'7',title:'Nicomachean Ethics — Aristotle'},
+  {id:'529',title:'The Harvard Classics, Volume 11: On the Origin of Species — Charles Darwin'},
+  {id:'102',title:'A Brief History of Time — Stephen Hawking'},
+  {id:'153',title:'The Iliad — Homer'},
+  {id:'186',title:'The Odyssey — Homer'},
+  {id:'540',title:'The Harvard Classics, Volume 22: The Odyssey — Homer'},
+ ];
+ assert.deepEqual(matchExplicitBookIds(
+  'How do Aristotle in Nicomachean Ethics and Darwin in On the Origin of Species explain change?',books),
+  ['7','529']);
+ assert.deepEqual(matchExplicitBookIds(
+  "In Homer's Odyssey, what shapes Odysseus' return home?",books),['186','540']);
+});
+test('author names narrow searches when the question does not name a work',()=>{
+ const books=[
+  {id:'149',title:'The Histories — Herodotus'},
+  {id:'152',title:'History of the Peloponnesian War — Thucydides'},
+  {id:'163',title:'Leviathan — Thomas Hobbes'},
+ ];
+ assert.deepEqual(matchExplicitBookIds(
+  'How does Herodotus handle accounts heard from others?',books),['149']);
+ assert.deepEqual(matchExplicitBookIds(
+  'In Leviathan, how does Hobbes describe the state of nature?',books),['163']);
+});
+
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds} from './evidence-search.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
  preview:'Authentic indexed excerpt',url:'https://drive.google.com/file/d/X/view#page='+page});
