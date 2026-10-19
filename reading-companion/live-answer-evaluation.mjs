@@ -88,7 +88,7 @@ async function loadSources(item,queries,{library,manifest,allowed}){
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}){
  const start=Date.now();
- const plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:'all',history:[],turnstileToken:'evaluation-runner-token'},beforeCall);
+ const plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:'',history:[],turnstileToken:'evaluation-runner-token'},beforeCall);
  const queries=plan.queries;
  const {selected,searches}=await loadSources(item,queries,{library,manifest,allowed});
  const data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,history:[],turnstileToken:'evaluation-runner-token',
