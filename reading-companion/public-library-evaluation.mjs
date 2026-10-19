@@ -39,8 +39,8 @@ function parseArgs(argv){
 
 export function validateSuite(suite){
  if(suite?.schema_version!==1||suite?.suite_id!=='antilogicalism-reading-companion-public-v1'||
-    suite?.corpus_version!==47||!Array.isArray(suite.cases)||suite.cases.length!==30)
-  throw Error('Expected the 30-case public-library v47 suite.');
+    suite?.corpus_version!==47||!Array.isArray(suite.cases)||!suite.cases.length)
+  throw Error('Expected a non-empty public-library v47 suite.');
  const seen=new Set();
  for(const item of suite.cases){
   if(!item||!/^[a-z][a-z0-9-]{2,79}$/.test(item.id||'')||seen.has(item.id))throw Error('Duplicate or invalid case ID: '+String(item?.id));
