@@ -350,8 +350,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot #companion-diagnostic-details button{font:inherit;margin:.7em 0;padding:6px 10px}
 #companion-pilot #companion-diagnostic-output{max-height:28em;overflow:auto;padding:.8em;border:1px solid #dfe2e3;background:#f6f7f7;color:#333;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
 #companion-pilot .companion-diagnostics[hidden],#companion-pilot #companion-diagnostic-details[hidden]{display:none!important}
-#companion-pilot #companion-book-finder,#companion-pilot #companion-book-filter{display:block;box-sizing:border-box;width:100%;max-width:100%;min-height:2.65em;margin:.4rem 0 .35rem;padding:.48em .62em;border:1px solid #aeb7bd;border-radius:2px;background:#fff;color:#20252a;font:inherit}
-#companion-pilot #companion-book-count{display:block;min-height:1.4em;margin:0 0 .75rem;color:#61696e;font-size:.87em}
 #companion-pilot .companion-follow-ups{margin:1.2rem 0}
 #companion-pilot #companion-answer h2{text-align:left;font-size:1.58em;margin:.65rem 0 .5rem;font-style:normal;font-weight:600}
 #companion-pilot .companion-follow-ups h3,#companion-pilot .companion-highlights h3,#companion-pilot .companion-citations h3{text-align:left;font-size:1.35em;margin:.65rem 0 .5rem;font-style:normal;font-weight:600}
@@ -429,11 +427,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <section id="companion-pilot" aria-label="Antilogicalism Reading Companion">
 <p>Ask questions about books in philosophy, history, science, and literature. Answers draw on passages from the current pilot collection, with citations you can follow to the original pages. The full 644-book library is available through <a href="/antilogicalism/digital-library/">Library Search</a>.</p>
 <form id="companion-question-form">
-<label for="companion-book-finder"><strong>Find a book</strong></label>
-<input id="companion-book-finder" type="search" placeholder="Title or author (e.g., Aristotle)" aria-describedby="companion-book-count" autocomplete="off">
-<small id="companion-book-count" role="status" aria-live="polite">Loading available books…</small>
-<label for="companion-book-filter"><strong>Choose a book (optional)</strong></label>
-<select id="companion-book-filter"><option value="">All pilot books</option></select>
 <label for="companion-question"><strong>Ask a question</strong></label>
 <textarea id="companion-question" maxlength="400" rows="3" required placeholder="Ask about an idea, argument, or relationship across books."></textarea>
 <div class="companion-actions">
