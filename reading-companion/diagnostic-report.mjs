@@ -63,7 +63,8 @@ export function createDiagnosticReport(input={}){
     failureHttpStatus:Number.isInteger(input.failureHttpStatus)&&
       input.failureHttpStatus>=100&&input.failureHttpStatus<=599?
       input.failureHttpStatus:null,
-    failureCode:FAILURE_CODES.has(input.failureCode)?input.failureCode:'unclassified',
+    failureCode:FAILURE_CODES.has(input.failureCode)?input.failureCode:
+      (input.stage==='failed'||input.failureCategory?'unclassified':''),
     plannerQueries:Array.isArray(input.plannerQueries)?
       input.plannerQueries.filter(x=>typeof x==='string').slice(0,4).map(x=>x.slice(0,240)):[],
     searches:Array.isArray(input.searches)?input.searches.slice(0,4).map(search=>({
@@ -73,7 +74,7 @@ export function createDiagnosticReport(input={}){
     })):[],
     candidates:Array.isArray(input.candidates)?input.candidates.slice(0,8).map(sourceSummary).filter(Boolean):[],
     submittedSources:Array.isArray(input.submittedSources)?
-      input.submittedSources.slice(0,2).map(sourceSummary).filter(Boolean):[],
+      input.submittedSources.slice(0,4).map(sourceSummary).filter(Boolean):[],
     answer:{
       outcome:string(input.outcome,48),
       coverage:string(input.coverage,24),
