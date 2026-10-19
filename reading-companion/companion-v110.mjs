@@ -32,6 +32,7 @@ const diagnosticDetails=el('companion-diagnostic-details');
 const diagnosticOutput=el('companion-diagnostic-output');
 const diagnosticCopy=el('companion-diagnostic-copy');
 const diagnosticCopyStatus=el('companion-diagnostic-copy-status');
+const newConversationButton=el('companion-new-conversation');
 const library=new RemoteLibrary();
 const sourceShards=new Map();
 const sourceReader=createSourceReader({getBook:id=>bookShard(id),
@@ -41,6 +42,36 @@ let pilotEnabled=false, searchPlanningEnabled=false, turnstileToken='', turnstil
 let pendingTurnstile=null;
 let candidates=[], searching=false, answering=false;
 let diagnosticState=null;
+let conversationHistory=[];
+
+function boundedHistoryMessage(role,content){
+  let text=String(content||'').trim();
+  if(text.length>700){
+    text=text.slice(0,700);
+    const end=Math.max(text.lastIndexOf('. '),text.lastIndexOf('? '),text.lastIndexOf('! '));
+    if(end>250)text=text.slice(0,end+1);
+    else text=text.slice(0,text.lastIndexOf(' ')).trim();
+  }
+  return {role,content:text};
+}
+function recentConversation(){return conversationHistory.slice(-6);}
+function rememberTurn(questionText,answerText){
+  conversationHistory.push(boundedHistoryMessage('user',questionText),
+    boundedHistoryMessage('assistant',answerText));
+  conversationHistory=conversationHistory.slice(-6);
+  if(newConversationButton)newConversationButton.hidden=false;
+}
+function startNewConversation(){
+  if(answering)return;
+  conversationHistory=[];
+  answerBox.replaceChildren();
+  question.value='';
+  newConversationButton.hidden=true;
+  diagnosticPanel.hidden=true;
+  sourceReader.reset();
+  setStatus('New conversation started.');
+  updateButtons();
+}
 
 function node(tag,textValue,className){
   const e=document.createElement(tag);
@@ -72,6 +103,10 @@ function showAvailability(){
 }
 function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
+  if(newConversationButton)newConversationButton.disabled=answering;
+  answerBox.querySelectorAll('.companion-follow-up-buttons button').forEach(button=>{
+    button.disabled=answering;
+  });
 }
 function populateBooks(){
   bookFilter.replaceChildren(new Option('All '+bookList.length+' verified books',''));
@@ -297,17 +332,17 @@ function putCitationTokens(target,answer,citations,evidenceHighlights=[]){
   }
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
 }
-function renderResponse(data){
-  sourceReader.reset();
-  answerBox.replaceChildren();
+function renderResponse(data,turnQuestion=''){
+  const turn=node('article',undefined,'companion-turn');
+  if(turnQuestion)turn.append(node('p','Question: '+turnQuestion,'companion-turn-question'));
   const citations=Array.isArray(data.citations)?data.citations:[];
   const highlights=Array.isArray(data.evidenceHighlights)?data.evidenceHighlights:[];
-  answerBox.append(node('h2',data.outcome==='insufficient-evidence'?
+  turn.append(node('h2',data.outcome==='insufficient-evidence'?
     'Insufficient evidence':'Reading Companion answer'));
   const reply=node('div',undefined,'companion-answer-text');
   putCitationTokens(reply,String(data.answer||''),citations,highlights);
-  answerBox.append(reply);
-  if(data.missing)answerBox.append(node('p','What these passages don’t establish: '+data.missing,'companion-hint'));
+  turn.append(reply);
+  if(data.missing)turn.append(node('p','What these passages don’t establish: '+data.missing,'companion-hint'));
 
   // Keep the familiar Reader Mode order: Explore further, Key passages,
   // then Sources. These follow-up buttons are separate from the removed
@@ -322,13 +357,10 @@ function renderResponse(data){
     for(const suggestion of valid){
       const button=node('button',suggestion);
       button.type='button';
-      button.addEventListener('click',()=>{
-        question.value=suggestion;
-        question.focus();updateButtons();
-      });
+      button.addEventListener('click',()=>{void askQuestion(suggestion);});
       buttons.append(button);
     }
-    box.append(buttons);answerBox.append(box);
+    box.append(buttons);turn.append(box);
   }
   if(highlights.length){
     const panel=node('section',undefined,'companion-highlights');
@@ -355,7 +387,7 @@ function renderResponse(data){
       appendFullPage(card,original,item.quote);
       panel.append(card);
     }
-    answerBox.append(panel);
+    turn.append(panel);
   }
   if(citations.length){
     const sources=node('section',undefined,'companion-citations');
@@ -386,9 +418,9 @@ function renderResponse(data){
       appendFullPage(row,original,highlight?.quote||'');
       sources.append(row);
     }
-    answerBox.append(sources);
+    turn.append(sources);
   }
-  answerBox.append(node('p','Citations link to the original PDF pages. Scanned text and interpretations can contain errors.','companion-hint'));
+  turn.append(node('p','Citations link to the original PDF pages. Scanned text and interpretations can contain errors.','companion-hint'));
   if(diagnosticState){
     diagnosticState.stage='complete';
     diagnosticState.outcome=data.outcome;
@@ -405,12 +437,13 @@ function renderResponse(data){
     });
     refreshDiagnostic();
   }
+  answerBox.append(turn);
 }
-async function requestSourcePlan(q,verificationToken){
+async function requestSourcePlan(q,verificationToken,history){
   if(diagnosticState)diagnosticState.stage='planning';
   const res=await fetch(API+'/api/pilot-plan',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({question:q,bookId:bookFilter.value,
+    body:JSON.stringify({question:q,bookId:bookFilter.value,history,
       turnstileToken:verificationToken})
   });
   if(diagnosticState&& !res.ok){
@@ -450,21 +483,25 @@ async function nextTurnstileToken(){
     throw Error('Please complete the quick check.');
   return token;
 }
-async function askQuestion(){
-  const q=question.value.trim();
+async function askQuestion(questionText){
+  const q=String(questionText??question.value).trim();
+  if(answering)return;
+  if(questionText!==undefined)question.value=q;
   if(!pilotEnabled){setStatus('Answering is temporarily unavailable.');return;}
-  if(!turnstileToken){setStatus('Complete the quick check before asking.');return;}
+  if(q.length<5||q.length>400){setStatus('Please enter a question of 5–400 characters.');return;}
   beginDiagnostic(q);
-  answering=true;updateButtons();sourceReader.reset();answerBox.replaceChildren();
+  answering=true;updateButtons();sourceReader.reset();
   try{
     let token=turnstileToken;
+    if(!token)token=await nextTurnstileToken();
+    const history=recentConversation();
     if(searchPlanningEnabled && !oldPilotFallback){
       // One extra bounded hosted AI call helps FIND source passages, not
       // invent answers. It consumes a single-use Turnstile token. A SECOND
       // fresh verification is required for the fingerprint-protected answer.
       turnstileToken='';
       setStatus('Looking across the collection for useful passages…');
-      const queries=await requestSourcePlan(q,token);
+      const queries=await requestSourcePlan(q,token,history);
       setStatus('Gathering passages from across the collection…');
       const found=await retrieveSources(queries);
       if(!found)return;
@@ -473,7 +510,7 @@ async function askQuestion(){
       const found=await retrieveSources();
       if(!found)return;
     }
-    const chosen=selectAnswerSources(candidates,q,token);
+    const chosen=selectAnswerSources(candidates,q,token,{history});
     if(!chosen.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
     if(diagnosticState){
       diagnosticState.submittedSources=chosen.map((source,index)=>({...source,id:'S'+(index+1)}));
@@ -485,6 +522,7 @@ async function askQuestion(){
     const response=await fetch(API+'/api/pilot-answer',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
+        history,
         sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))})
     });
     let data;
@@ -499,7 +537,8 @@ async function askQuestion(){
       }
       throw Error('The answer service could not prepare an answer.');
     }
-    renderResponse(data);
+    renderResponse(data,q);
+    rememberTurn(q,data.answer||'');
     setStatus(data.outcome==='insufficient-evidence'?
       'These passages don’t provide enough evidence for a complete answer. Try different wording or choose another book.':'');
   }catch(error){
@@ -532,6 +571,7 @@ diagnosticCopy.addEventListener('click',async()=>{
     diagnosticCopyStatus.textContent='Copy is unavailable here. You can select and copy the report text below.';
   }
 });
+newConversationButton.addEventListener('click',startNewConversation);
 form.addEventListener('submit',event=>{event.preventDefault();askQuestion();});
 bookFilter.addEventListener('change',updateButtons);
 question.addEventListener('input',updateButtons);
