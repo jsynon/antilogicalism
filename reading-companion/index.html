@@ -448,7 +448,8 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <p id="companion-book-search-status" role="status" aria-live="polite">Books are loading…</p>
 </div>
 <label for="companion-question"><strong>Ask a question</strong></label>
-<textarea id="companion-question" maxlength="400" rows="3" required placeholder="Ask about an idea, argument, or relationship across books."></textarea>
+<textarea id="companion-question" maxlength="400" rows="3" required aria-describedby="companion-question-help" placeholder="Ask about an idea, argument, or relationship across books."></textarea>
+<p id="companion-question-help" class="companion-hint">Press Enter to ask; Shift+Enter adds a new line.</p>
 <div class="companion-actions">
 <button id="companion-ask-button" type="submit" disabled>Ask Reading Companion</button>
 <button id="companion-new-conversation" type="button" hidden>New conversation</button>

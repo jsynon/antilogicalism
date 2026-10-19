@@ -39,6 +39,11 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/bookSearch\.addEventListener\('input',updateBookOptions\)/);
  assert.match(client,/bookSearch\.value=''/);
  assert.match(html,/id="companion-question"/);
+ assert.match(html,/Press Enter to ask; Shift\+Enter adds a new line\./);
+ assert.match(html,/aria-describedby="companion-question-help"/);
+ assert.match(client,/question\.addEventListener\('keydown',event=>\{/);
+ assert.match(client,/event\.key!=='Enter'\|\|event\.shiftKey\|\|event\.isComposing/);
+ assert.match(client,/if\(!askButton\.disabled\)form\.requestSubmit\(askButton\)/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
  assert.match(client,/companion-follow-up-buttons/);
  assert.match(client,/button\.addEventListener\('click',\(\)=>\{void askQuestion\(suggestion\);\}\)/);
