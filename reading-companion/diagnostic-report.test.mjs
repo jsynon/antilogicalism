@@ -16,7 +16,7 @@ test('audits citation markers against the sources returned by the server',()=>{
 
 test('diagnostic output is bounded and never includes source text or challenge data',()=>{
  const report=createDiagnosticReport({
-  question:'How do Aristotle and Darwin explain change?',selectedBookId:'',
+  question:'How do Aristotle and Darwin explain change?',selectedBookId:'',plannerEnabled:false,
   plannerQueries:['Aristotle virtue','Darwin evolution'],stage:'complete',
   candidates:[{id:'S1',bookId:'7',title:'Ethics',page:12,score:2.5,
     text:'PRIVATE FULL PAGE TEXT',preview:'PRIVATE PREVIEW',turnstileToken:'PRIVATE TOKEN'}],
@@ -29,6 +29,7 @@ test('diagnostic output is bounded and never includes source text or challenge d
  });
  const serialized=JSON.stringify(report);
  assert.equal(report.schema,'antilogicalism-reading-companion-diagnostic-v1');
+ assert.equal(report.plannerEnabled,false);
  assert.deepEqual(report.answer.inlineIdsWithoutSource,['S2']);
  assert.equal(report.candidates[0].score,2.5);
  assert.equal(report.evidenceHighlights[0].quoteLocated,true);
