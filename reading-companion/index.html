@@ -344,7 +344,12 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-turn-question{font-weight:600;margin:.4rem 0}
 @media(max-width:650px){#companion-pilot .companion-actions{display:block}#companion-pilot .companion-actions button{margin:0 .4rem .6rem 0}}
 
-#companion-pilot #companion-book-filter{display:block;box-sizing:border-box;width:100%;max-width:100%;min-height:2.65em;margin:.4rem 0 1rem;padding:.48em .62em;border:1px solid #aeb7bd;border-radius:2px;background:#fff;color:#20252a;font:inherit}
+#companion-pilot .companion-book-controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.7fr);gap:.35rem 1rem;align-items:end;margin:.35rem 0 1rem}
+#companion-pilot .companion-book-control{min-width:0}
+#companion-pilot .companion-book-control label{display:block;margin:0 0 .25rem}
+#companion-pilot #companion-book-search,#companion-pilot #companion-book-filter{display:block;box-sizing:border-box;width:100%;max-width:100%;min-width:0;min-height:2.65em;margin:0;padding:.48em .62em;border:1px solid #aeb7bd;border-radius:2px;background:#fff;color:#20252a;font:inherit}
+#companion-pilot #companion-book-search-status{grid-column:1/-1;margin:0;color:#4e555b;font-size:.9em}
+@media(max-width:650px){#companion-pilot .companion-book-controls{grid-template-columns:minmax(0,1fr);gap:.7rem}#companion-pilot #companion-book-search-status{grid-column:auto}}
 #companion-pilot .companion-follow-ups{margin:1.2rem 0}
 #companion-pilot #companion-answer h2{text-align:left;font-size:1.58em;margin:.65rem 0 .5rem;font-style:normal;font-weight:600}
 #companion-pilot .companion-follow-ups h3,#companion-pilot .companion-highlights h3,#companion-pilot .companion-citations h3{text-align:left;font-size:1.35em;margin:.65rem 0 .5rem;font-style:normal;font-weight:600}
@@ -430,8 +435,17 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <section id="companion-pilot" aria-label="Antilogicalism Reading Companion">
 <p>Ask questions about books in philosophy, history, science, and literature. Answers draw on passages from the current pilot collection, with citations you can follow to the original pages. The full 644-book library is available through <a href="/antilogicalism/digital-library/">Library Search</a>.</p>
 <form id="companion-question-form">
+<div class="companion-book-controls">
+<div class="companion-book-control">
+<label for="companion-book-search"><strong>Find a book by title or author</strong></label>
+<input id="companion-book-search" type="search" autocomplete="off" placeholder="Type a title or author">
+</div>
+<div class="companion-book-control">
 <label for="companion-book-filter"><strong>Search in a book</strong></label>
-<select id="companion-book-filter"><option value="">All verified books</option></select>
+<select id="companion-book-filter"><option value="">All books</option></select>
+</div>
+<p id="companion-book-search-status" role="status" aria-live="polite">Books are loading…</p>
+</div>
 <label for="companion-question"><strong>Ask a question</strong></label>
 <textarea id="companion-question" maxlength="400" rows="3" required placeholder="Ask about an idea, argument, or relationship across books."></textarea>
 <div class="companion-actions">
