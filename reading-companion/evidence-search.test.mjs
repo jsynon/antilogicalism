@@ -22,6 +22,16 @@ test('explicit work titles narrow searches to matching catalog books',()=>{
  assert.deepEqual(matchExplicitBookIds(
   "In Homer's Odyssey, what shapes Odysseus' return home?",books),['186','540']);
 });
+test('comparison author targeting retains a work for each named author',()=>{
+ const books=[
+  {id:'7',title:'Nicomachean Ethics — Aristotle'},
+  {id:'9',title:'Metaphysics — Aristotle'},
+  {id:'529',title:'The Harvard Classics, Volume 11: On the Origin of Species — Charles Darwin'},
+  {id:'547',title:'The Voyage of the Beagle (Harvard Classics, Vol. 29) — Charles Darwin'},
+ ];
+ assert.deepEqual(matchExplicitBookIds(
+  'How do Aristotle in Nicomachean Ethics and Darwin explain change?',books),['7','529','547']);
+});
 test('author names narrow searches when the question does not name a work',()=>{
  const books=[
   {id:'149',title:'The Histories — Herodotus'},
