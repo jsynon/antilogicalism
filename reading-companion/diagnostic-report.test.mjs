@@ -54,6 +54,10 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(diagnosticFailureCode(429),'rate-limited');
  assert.equal(diagnosticFailureCode(502),'answer-generation-or-citation-failed');
  assert.equal(diagnosticFailureCode(502,'planner'),'search-planning-failed');
+ assert.equal(diagnosticFailureCode(502,'answer','evidence-review-truncated'),
+   'evidence-review-truncated');
+ assert.equal(diagnosticFailureCode(502,'answer','PRIVATE provider error'),
+   'answer-generation-or-citation-failed');
  assert.equal(diagnosticFailureCode(503),'service-unavailable');
  assert.equal(diagnosticFailureCode(null),'network-error');
  const report=createDiagnosticReport({failureHttpStatus:999,
@@ -62,6 +66,15 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(report.failureCode,'unclassified');
  const successful=createDiagnosticReport({stage:'complete',failureCode:''});
  assert.equal(successful.failureCode,'');
+});
+
+test('safe backend failure code is retained in the diagnostic report',()=>{
+ const report=createDiagnosticReport({stage:'failed',failureCategory:'answer-request-failed',
+   failureHttpStatus:502,failureCode:diagnosticFailureCode(502,'answer',
+     'answer-citations-invalid')});
+ assert.equal(report.failureCode,'answer-citations-invalid');
+ const unsafe=createDiagnosticReport({stage:'failed',failureCode:'PRIVATE provider response'});
+ assert.equal(unsafe.failureCode,'unclassified');
 });
 
 test('diagnostics retain all four submitted pages without exposing their text',()=>{
@@ -81,6 +94,8 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(html,/shared only if you copy it/);
  assert.match(html,/answer text \(up to 2,400 characters\)/i);
  assert.match(client,/navigator\.clipboard\.writeText\(diagnosticOutput\.textContent\)/);
+ assert.match(client,/diagnosticFailureCode\(response\.status,'answer',data\.failureCode\)/);
+ assert.match(client,/diagnosticFailureCode\(res\.status,'planner',data\.failureCode\)/);
  assert.match(client,/foundSets\.map\(\(set,index\)=>/);
  assert.match(client,/diagnosticState\.evidenceHighlights=highlights\.map/);
  assert.match(client,/diagnosticState\.failureHttpStatus=res\.status/);

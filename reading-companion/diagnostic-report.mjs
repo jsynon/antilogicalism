@@ -4,10 +4,15 @@ const FAILURE_CODES=new Set([
   'visitor-or-origin-rejected','request-too-large',
   'source-verification-rejected','rate-limited',
   'answer-generation-or-citation-failed','search-planning-failed',
-  'service-unavailable','http-error','invalid-response','retrieval-error'
+  'service-unavailable','http-error','invalid-response','retrieval-error',
+  'evidence-review-request-failed','evidence-review-truncated',
+  'evidence-review-invalid-response','answer-composition-request-failed',
+  'answer-composition-truncated','answer-composition-empty',
+  'answer-composition-too-long','answer-citations-missing','answer-citations-invalid'
 ]);
 
-export function diagnosticFailureCode(status,requestStage='answer'){
+export function diagnosticFailureCode(status,requestStage='answer',serverCode=''){
+  if(FAILURE_CODES.has(serverCode))return serverCode;
   if(!Number.isInteger(status)||status<100||status>599)return 'network-error';
   if(status===400)return 'request-rejected';
   if(status===401)return 'authorization-rejected';
