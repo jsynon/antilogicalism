@@ -142,13 +142,13 @@ async function loadCoverage(){
     if(index.schema!=='antilogicalism-reader-coverage-v1'||
        index.libraryVersion!==47||!index.books||typeof index.books!=='object')
       throw Error('Unexpected fingerprint coverage index');
-    const list=Object.entries(index.books)
+    const list=sortBooksForSelector(Object.entries(index.books)
       .filter(([id,book])=>/^[1-9]\d{0,3}$/.test(id)&&book&&
         typeof book.title==='string'&&book.title.trim()&&
         Number.isSafeInteger(book.pages)&&book.pages>0&&
         Number.isSafeInteger(book.chunks)&&book.chunks>0)
       .map(([id,book])=>({id,title:book.title}))
-      .sort(sortBooksForSelector);
+      );
     if(!list.length)throw Error('No verified books are published yet.');
     bookList=list;
     allowed=new Set(list.map(x=>x.id));
