@@ -76,6 +76,7 @@ export function createDiagnosticReport(input={}){
     submittedSources:Array.isArray(input.submittedSources)?
       input.submittedSources.slice(0,4).map(sourceSummary).filter(Boolean):[],
     answer:{
+      text:string(input.answer,2400),
       outcome:string(input.outcome,48),
       coverage:string(input.coverage,24),
       reviewStatus:string(input.reviewStatus,48),
