@@ -4,7 +4,22 @@
  */
 export function mergeFacetSearches(results,limit=8){
  if(!Array.isArray(results))return [];
- const groups=results.map(r=>Array.isArray(r?.sources)?r.sources:[]);
+ const groups=results.map(r=>{
+   const sources=Array.isArray(r?.sources)?r.sources:[];
+   // Search ranks each passage within its book. Compare those passage scores
+   // across the query facet before consuming the limited answer-source budget,
+   // so a weak hit from a high-ranking book cannot hide stronger evidence in
+   // another work by the same author. Keep the original order when scores are
+   // absent (for older indexes and hand-built callers).
+   return sources.map((entry,index)=>({entry,index})).sort((a,b)=>{
+     const aScore=Number.isFinite(a.entry?.score)?a.entry.score:null;
+     const bScore=Number.isFinite(b.entry?.score)?b.entry.score:null;
+     if(aScore===null&&bScore===null)return a.index-b.index;
+     if(aScore===null)return 1;
+     if(bScore===null)return -1;
+     return bScore-aScore||a.index-b.index;
+   }).map(({entry})=>entry);
+ });
  const seen=new Set(),out=[];
  function add(entry,facet){
    if(!entry||!Number.isSafeInteger(entry.page)||entry.page<1||
