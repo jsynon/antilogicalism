@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {mergeFacetSearches} from './evidence-search.mjs';
-import {sourceIdentityIssues,summarize,validateSuite,verifyFingerprint} from './public-library-evaluation.mjs';
+import {evaluateCase,sourceIdentityIssues,summarize,validateSuite,verifyFingerprint} from './public-library-evaluation.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
@@ -38,6 +38,29 @@ test('the production facet merger preserves both facets and ranks stronger evide
  assert.deepEqual(result.slice(0,2).map(x=>x.facet),[0,1]);
 });
 
+test('public retrieval evaluation searches both planner facets and exact question',async()=>{
+ const text='Virtue is produced through habit; by doing just acts we become just.';
+ const url=`https://drive.google.com/file/d/${DRIVE}/view?usp=sharing#page=14`;
+ const manifest={page_books:['7'],books:{'7':{title:'Nicomachean Ethics — Aristotle',
+  drive_url:`https://drive.google.com/file/d/${DRIVE}/view`}}};
+ const source={id:'S1',bookId:'7',title:manifest.books['7'].title,page:14,globalPageId:0,
+  url,preview:text,score:10};
+ const plan=['Aristotle virtue habituation','Aristotle moral character actions'];
+ const question='How does Aristotle explain becoming virtuous through repeated actions?';
+ const searched=[];
+ const library={search:async(query)=>{searched.push(query);return {sources:[source],booksScanned:1};},
+  jsonGzip:async()=>({pages:[{id:0,page:14,text}]})};
+ const sha256=createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
+ const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
+  libraryVersion:47,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
+ const item={id:'aristotle-habituation',discipline:'philosophy',task:'mechanism-explanation',
+  question,planner_queries:plan,required_source_groups:[{label:'Aristotle',book_ids:['7']}]};
+ const result=await evaluateCase(item,{library,manifest,allowedBookIds:new Set(['7']),
+  fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
+ assert.deepEqual(searched,[...plan,question]);
+ assert.deepEqual(result.searchQueries,[...plan,question]);
+ assert.equal(result.retrievalPass,true);
+});
 test('source identity audit checks global ID, title, PDF ID and page anchor',()=>{
  const manifest={page_books:['7'],books:{'7':{title:'Nicomachean Ethics — Aristotle',drive_url:`https://drive.google.com/file/d/${DRIVE}/view`}}};
  const source={bookId:'7',title:manifest.books['7'].title,page:14,globalPageId:0,

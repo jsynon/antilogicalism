@@ -9,7 +9,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {mergeFacetSearches,validSearchPlan} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets} from './evidence-search.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
@@ -120,7 +120,8 @@ async function sourcePageIsUsable(source,library){
 
 export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher}){
  const start=performance.now();
- const foundSets=await Promise.all(item.planner_queries.map(query=>library.search(query,{
+ const searchQueries=buildSearchFacets(item.question,item.planner_queries);
+ const foundSets=await Promise.all(searchQueries.map(query=>library.search(query,{
   allowedBookIds,maxBooks:2,pagesPerBook:3
  })));
  const merged=mergeFacetSearches(foundSets,8);
@@ -149,7 +150,7 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
    retrieved:found.length>0,defaultSelected:defaultFound.length>0,sourceVerified:verified.length>0,defaultSourceVerified:defaultVerifiedFound.length>0};
  });
  return {id:item.id,discipline:item.discipline,task:item.task,question:item.question,plannerQueries:item.planner_queries,
-  requiredSourceGroups:groups,candidates:candidates.map(({id,bookId,title,page,globalPageId,url,preview,score,facet})=>({id,bookId,title,page,globalPageId,url,preview,score,facet})),
+  searchQueries,requiredSourceGroups:groups,candidates:candidates.map(({id,bookId,title,page,globalPageId,url,preview,score,facet})=>({id,bookId,title,page,globalPageId,url,preview,score,facet})),
   fingerprintChecks,excludedCandidates,booksScanned:foundSets.reduce((n,r)=>n+(Number(r.booksScanned)||0),0),
   elapsedMs:Math.round(performance.now()-start),retrievalPass:groups.every(g=>g.retrieved),
   defaultSelectionPass:groups.every(g=>g.defaultSelected),candidateSourcesVerified:groups.every(g=>g.sourceVerified),

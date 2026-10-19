@@ -28,8 +28,8 @@ test('audit requires expected-source coverage and citations with no orphan marke
 });
 
 test('case evaluation sends one plan and one answer request in order without logging the token',async()=>{
- const calls=[];
- const library={search:async()=>({sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]}),
+ const calls=[],searched=[];
+ const library={search:async(query)=>{searched.push(query);return {sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]};},
   jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
  const item={question:'Explain the source question with enough detail.',required_source_groups:[{label:'Bible',book_ids:['638']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
@@ -40,6 +40,8 @@ test('case evaluation sends one plan and one answer request in order without log
  assert.match(calls[0].url,/pilot-plan$/);assert.match(calls[1].url,/pilot-answer$/);
  assert.equal(calls[0].authorization,'Bearer '+'x'.repeat(40));
  assert.equal(result.passed,true);
+ assert.deepEqual(searched,['first distinct search concept','second distinct search concept',item.question]);
+ assert.equal(result.searches[2].query,item.question);
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
 });
 
