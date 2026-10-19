@@ -23,6 +23,10 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert(sources>passages);
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
+ assert.ok(html.includes('<label for="companion-book-filter"><strong>Choose a book (optional)</strong></label>'));
+ assert.ok(!html.includes('<label for="companion-book-filter"><strong>Search in a book</strong></label>'));
+ assert.ok(!html.includes('Warning: truncated output'));
+ assert.ok(!html.includes('Total output lines:'));
  assert.ok(client.includes("new Option('All pilot books','')"));
  assert.match(html,/id="companion-question"/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
