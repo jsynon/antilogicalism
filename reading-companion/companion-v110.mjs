@@ -7,7 +7,7 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {mergeFacetSearches,validSearchPlan,selectAnswerSources} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,selectAnswerSources,canFallbackToDirectSearch} from './evidence-search.mjs';
 import {createDiagnosticReport,diagnosticFailureCode} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
 
@@ -214,12 +214,14 @@ async function bookShard(id){
   }
   return sourceShards.get(id);
 }
-async function retrieveSources(plannedQueries=null){
+async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   candidates=[];
   if(diagnosticState)diagnosticState.stage='retrieving';
-  searching=true;updateButtons();setStatus('Searching for relevant passages…');
+  searching=true;updateButtons();setStatus(plannerFallback?
+    'Search planning is temporarily unavailable; searching directly with your question…':
+    'Searching for relevant passages…');
   try{
     let populated=[];
     if(oldPilotFallback){
@@ -484,7 +486,10 @@ async function requestSourcePlan(q,verificationToken,history){
     throw Error('The evidence search service returned an invalid response.');
   }
   if(!res.ok)throw Error(data.error||'Evidence search planning is unavailable');
-  if(!validSearchPlan(data.queries))throw Error('The evidence search plan was incomplete.');
+  if(!validSearchPlan(data.queries)){
+    if(diagnosticState)diagnosticState.failureCode='search-planning-failed';
+    throw Error('The evidence search plan was incomplete.');
+  }
   if(diagnosticState){diagnosticState.plannerQueries=data.queries;refreshDiagnostic();}
   return data.queries;
 }
@@ -529,9 +534,20 @@ async function askQuestion(questionText){
       // fresh verification is required for the fingerprint-protected answer.
       turnstileToken='';
       setStatus('Looking across the collection for useful passages…');
-      const queries=await requestSourcePlan(q,token,history);
-      setStatus('Gathering passages from across the collection…');
-      const found=await retrieveSources(queries);
+      let queries=null,plannerFallback=false;
+      try{queries=await requestSourcePlan(q,token,history);}
+      catch(error){
+        if(!canFallbackToDirectSearch(diagnosticState?.failureHttpStatus,
+          diagnosticState?.failureCode))throw error;
+        plannerFallback=true;
+        if(diagnosticState){
+          diagnosticState.fallbackMode=true;
+          diagnosticState.failureHttpStatus=null;
+          diagnosticState.failureCode='';
+        }
+      }
+      if(queries)setStatus('Gathering passages from across the collection…');
+      const found=await retrieveSources(queries,{plannerFallback});
       if(!found)return;
       token=await nextTurnstileToken();
     }else{
