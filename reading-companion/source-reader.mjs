@@ -95,7 +95,7 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     }
   }
   async function open(source,trigger=null){
-    // Only expose books in the verified four-book collection. The text is
+    // Only expose books in the owner-published verified collection. The text is
     // published v47 data, not a generated model quote or a fabricated page.
     const bookId=String(source?.bookId??'');
     if(!/^[1-9]\d{0,3}$/.test(bookId)||!isAllowedBook(bookId)||

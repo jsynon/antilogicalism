@@ -1,7 +1,8 @@
-/* Antilogicalism Reading Companion v1.10.0 — browser retrieval only.
+/* Antilogicalism Reading Companion v1.11.0 — staged verified-library alpha.
  * Real indexed v47 passages; no secrets, model keys or paid APIs in this file.
  * The Worker independently validates every submitted source page against v47
- * fingerprints before any inference. This is a four-book release, not 644 yet.
+ * fingerprints before any inference. The verified scope comes from the
+ * owner-published cohort manifest; expanding it does not change v47 OCR.
  */
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
@@ -13,10 +14,12 @@ const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
 const FALLBACK_BOOK={id:'152',title:'History of the Peloponnesian War — Thucydides'};
 const PDF_PAGE_LIMIT=14000;
+const MAX_ANSWER_SOURCES=2;
 const el=id=>document.getElementById(id);
 const question=el('companion-question');
 const form=el('companion-question-form');
 if(!form)throw Error('Reading Companion markup is missing');
+const bookFilter=el('companion-book-filter');
 const askButton=el('companion-ask-button');
 const answerBox=el('companion-answer');
 const status=el('companion-status');
@@ -51,7 +54,7 @@ function refreshDiagnostic(){
   diagnosticOutput.textContent=JSON.stringify(createDiagnosticReport(diagnosticState),null,2);
 }
 function beginDiagnostic(questionText){
-  diagnosticState={question:questionText,selectedBookId:'all',
+  diagnosticState={question:questionText,selectedBookId:bookFilter.value||'all',
     libraryVersion:47,fallbackMode:oldPilotFallback,stage:'planning',
     plannerQueries:[],searches:[],candidates:[],submittedSources:[],
     evidenceHighlights:[],failureHttpStatus:null,failureCode:''};
@@ -65,10 +68,15 @@ function beginDiagnostic(questionText){
 function showAvailability(){
   const title=oldPilotFallback?'a Thucydides sample':
     bookList.length+' books across philosophy, history, science, and literature';
-  scope.textContent='Pilot collection: '+title+'.';
+  scope.textContent='Verified search scope: '+title+'.';
 }
 function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
+}
+function populateBooks(){
+  bookFilter.replaceChildren(new Option('All '+bookList.length+' verified books',''));
+  for(const book of bookList)bookFilter.append(new Option(book.title,book.id));
+  showAvailability();
 }
 async function loadCoverage(){
   try{
@@ -78,21 +86,25 @@ async function loadCoverage(){
     if(index.schema!=='antilogicalism-reader-coverage-v1'||
        index.libraryVersion!==47||!index.books||typeof index.books!=='object')
       throw Error('Unexpected fingerprint coverage index');
-    const desired=['7','114','152','529'];
-    const list=desired.filter(id=>index.books[id]&&
-      typeof index.books[id].title==='string'&&index.books[id].pages>0)
-      .map(id=>({id,title:index.books[id].title}));
-    if(list.length!==4)throw Error('The four-book collection is not published yet.');
+    const list=Object.entries(index.books)
+      .filter(([id,book])=>/^[1-9]\d{0,3}$/.test(id)&&book&&
+        typeof book.title==='string'&&book.title.trim()&&
+        Number.isSafeInteger(book.pages)&&book.pages>0&&
+        Number.isSafeInteger(book.chunks)&&book.chunks>0)
+      .map(([id,book])=>({id,title:book.title}))
+      .sort((a,b)=>a.title.localeCompare(b.title));
+    if(!list.length)throw Error('No verified books are published yet.');
     bookList=list;
     allowed=new Set(list.map(x=>x.id));
     oldPilotFallback=false;
   }catch{
-    // Preserve the previously verified sample until GitHub Actions exports
-    // the complete data; do not pretend unavailable books have fingerprints.
+    // Preserve the previously verified sample until a valid owner-published
+    // coverage manifest is available; do not pretend unlisted books have
+    // fingerprints.
     bookList=[FALLBACK_BOOK];allowed=new Set(['152']);
     oldPilotFallback=true;
   }
-  showAvailability();
+  populateBooks();
 }
 async function loadStatus(){
   try{
@@ -155,7 +167,7 @@ async function retrieveSources(plannedQueries=null){
   try{
     let populated=[];
     if(oldPilotFallback){
-      // Until the four-book publication reaches GitHub Pages, search the
+      // Until the expanded fingerprint publication reaches GitHub Pages, search the
       // previously proven 32-page Thucydides selection directly. Do not
       // search the entire shard and accidentally offer unverified pages.
       const book=await bookShard('152');
@@ -182,7 +194,7 @@ async function retrieveSources(plannedQueries=null){
     }else{
       const searches=validSearchPlan(plannedQueries)?plannedQueries:[q];
       const foundSets=await Promise.all(searches.map(term=>library.search(term,{
-        bookId:'',allowedBookIds:allowed,maxBooks:2,
+        bookId:bookFilter.value,allowedBookIds:allowed,maxBooks:2,
         pagesPerBook:3
       })));
       if(diagnosticState)diagnosticState.searches=foundSets.map((set,index)=>({
@@ -193,8 +205,7 @@ async function retrieveSources(plannedQueries=null){
         mergeFacetSearches(foundSets,8).filter(allowedPage):
         foundSets[0].sources.filter(allowedPage);
       // Preserve one page for each distinct facet before filling from other
-      // candidates. Up to four verified pages reach the evidence reviewer;
-      // it selects no more than three for the drafted answer.
+      // candidates. The answer uses the strongest two verified full pages.
       const representatives=[],others=[],visited=new Set();
       for(const r of results){
         const group=plannedQueries?String(r.facet):r.bookId;
@@ -219,7 +230,7 @@ async function retrieveSources(plannedQueries=null){
       refreshDiagnostic();
     }
     if(!candidates.length){
-      setStatus('No matching passages found. Try different wording.');
+      setStatus('No matching passages found. Try different wording or choose another book.');
       return false;
     }
     setStatus('Checking the source passages…');
@@ -399,21 +410,19 @@ async function requestSourcePlan(q,verificationToken){
   if(diagnosticState)diagnosticState.stage='planning';
   const res=await fetch(API+'/api/pilot-plan',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({question:q,bookId:'',
+    body:JSON.stringify({question:q,bookId:bookFilter.value,
       turnstileToken:verificationToken})
   });
+  if(diagnosticState&& !res.ok){
+    diagnosticState.failureHttpStatus=res.status;
+    diagnosticState.failureCode=diagnosticFailureCode(res.status,'planner');
+  }
   let data;
   try{data=await res.json();}catch{
     if(diagnosticState)diagnosticState.failureCode='invalid-response';
     throw Error('The evidence search service returned an invalid response.');
   }
-  if(!res.ok){
-    if(diagnosticState){
-      diagnosticState.failureHttpStatus=res.status;
-      diagnosticState.failureCode=diagnosticFailureCode(res.status,'planner',data.failureCode);
-    }
-    throw Error('Evidence search planning is unavailable');
-  }
+  if(!res.ok)throw Error(data.error||'Evidence search planning is unavailable');
   if(!validSearchPlan(data.queries))throw Error('The evidence search plan was incomplete.');
   if(diagnosticState){diagnosticState.plannerQueries=data.queries;refreshDiagnostic();}
   return data.queries;
@@ -465,7 +474,7 @@ async function askQuestion(){
       if(!found)return;
     }
     const chosen=selectAnswerSources(candidates,q,token);
-    if(!chosen.length){setStatus('No matching passages found. Try different wording.');return;}
+    if(!chosen.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
     if(diagnosticState){
       diagnosticState.submittedSources=chosen.map((source,index)=>({...source,id:'S'+(index+1)}));
       diagnosticState.stage='answering';
@@ -492,7 +501,7 @@ async function askQuestion(){
     }
     renderResponse(data);
     setStatus(data.outcome==='insufficient-evidence'?
-      'These passages don’t provide enough evidence for a complete answer. Try different wording.':'');
+      'These passages don’t provide enough evidence for a complete answer. Try different wording or choose another book.':'');
   }catch(error){
     console.error('Reading Companion request failed:',error);
     if(diagnosticState){
@@ -524,5 +533,6 @@ diagnosticCopy.addEventListener('click',async()=>{
   }
 });
 form.addEventListener('submit',event=>{event.preventDefault();askQuestion();});
+bookFilter.addEventListener('change',updateButtons);
 question.addEventListener('input',updateButtons);
 (async()=>{await loadCoverage();await loadStatus();})();

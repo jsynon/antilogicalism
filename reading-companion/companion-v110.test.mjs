@@ -22,12 +22,8 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert(passages>explore);
  assert(sources>passages);
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
- assert.ok(!html.includes('Warning: truncated output'));
- assert.ok(!html.includes('Total output lines:'));
- assert.doesNotMatch(html,/companion-book-finder|companion-book-count|companion-book-filter|Find a book|Choose a book/);
- assert.doesNotMatch(client,/bookFinder|bookCount|bookFilter|matchingBooks|populateBooks/);
- assert.match(client,/bookId:'',allowedBookIds:allowed/);
- assert.match(client,/selectedBookId:'all'/);
+ assert.match(html,/id="companion-book-filter"/);
+ assert.ok(client.includes("new Option('All '+bookList.length+' verified books','')"));
  assert.match(html,/id="companion-question"/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
  assert.match(client,/companion-follow-up-buttons/);

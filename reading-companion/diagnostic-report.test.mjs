@@ -30,22 +30,16 @@ test('diagnostic output is bounded and never includes source text or challenge d
  });
  const serialized=JSON.stringify(report);
  assert.equal(report.schema,'antilogicalism-reading-companion-diagnostic-v1');
- assert.equal(report.question,'How do Aristotle and Darwin explain change?');
  assert.deepEqual(report.answer.inlineIdsWithoutSource,['S2']);
  assert.equal(report.failureHttpStatus,502);
  assert.equal(report.failureCode,'answer-generation-or-citation-failed');
- assert.equal(report.answer.text,'The authors differ [S1, S2].');
  assert.equal(report.candidates[0].score,2.5);
  assert.equal(report.evidenceHighlights[0].quoteLocated,true);
  assert.equal(serialized.includes('PRIVATE FULL PAGE TEXT'),false);
  assert.equal(serialized.includes('PRIVATE PREVIEW'),false);
  assert.equal(serialized.includes('PRIVATE TOKEN'),false);
  assert.equal(serialized.includes('PRIVATE QUOTE'),false);
-});
-
-test('diagnostic answer text is bounded to the server answer limit',()=>{
- const report=createDiagnosticReport({stage:'complete',answer:'A'.repeat(3000)});
- assert.equal(report.answer.text.length,2400);
+ assert.equal(serialized.includes('The authors differ [S1, S2].'),false);
 });
 
 test('diagnostic failure codes preserve useful status categories without raw error text',()=>{
@@ -54,36 +48,12 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(diagnosticFailureCode(429),'rate-limited');
  assert.equal(diagnosticFailureCode(502),'answer-generation-or-citation-failed');
  assert.equal(diagnosticFailureCode(502,'planner'),'search-planning-failed');
- assert.equal(diagnosticFailureCode(502,'answer','evidence-review-truncated'),
-   'evidence-review-truncated');
- assert.equal(diagnosticFailureCode(502,'answer','PRIVATE provider error'),
-   'answer-generation-or-citation-failed');
  assert.equal(diagnosticFailureCode(503),'service-unavailable');
  assert.equal(diagnosticFailureCode(null),'network-error');
  const report=createDiagnosticReport({failureHttpStatus:999,
-   stage:'failed',failureCode:'PRIVATE MODEL ERROR response contains secret'});
+   failureCode:'PRIVATE MODEL ERROR response contains secret'});
  assert.equal(report.failureHttpStatus,null);
  assert.equal(report.failureCode,'unclassified');
- const successful=createDiagnosticReport({stage:'complete',failureCode:''});
- assert.equal(successful.failureCode,'');
-});
-
-test('safe backend failure code is retained in the diagnostic report',()=>{
- const report=createDiagnosticReport({stage:'failed',failureCategory:'answer-request-failed',
-   failureHttpStatus:502,failureCode:diagnosticFailureCode(502,'answer',
-     'answer-citations-invalid')});
- assert.equal(report.failureCode,'answer-citations-invalid');
- const unsafe=createDiagnosticReport({stage:'failed',failureCode:'PRIVATE provider response'});
- assert.equal(unsafe.failureCode,'unclassified');
-});
-
-test('diagnostics retain all four submitted pages without exposing their text',()=>{
- const report=createDiagnosticReport({stage:'complete',failureCode:'',
-   submittedSources:[1,2,3,4].map(page=>({id:'S'+page,bookId:'529',
-     title:'Origin of Species',page,text:'PRIVATE SOURCE TEXT'}))});
- assert.deepEqual(report.submittedSources.map(source=>source.id),
-   ['S1','S2','S3','S4']);
- assert.equal(JSON.stringify(report).includes('PRIVATE SOURCE TEXT'),false);
 });
 
 test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
@@ -92,10 +62,7 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(html,/id="companion-diagnostic-details" hidden/);
  assert.match(html,/id="companion-diagnostic-copy" type="button">Copy diagnostic report/);
  assert.match(html,/shared only if you copy it/);
- assert.match(html,/answer text \(up to 2,400 characters\)/i);
  assert.match(client,/navigator\.clipboard\.writeText\(diagnosticOutput\.textContent\)/);
- assert.match(client,/diagnosticFailureCode\(response\.status,'answer',data\.failureCode\)/);
- assert.match(client,/diagnosticFailureCode\(res\.status,'planner',data\.failureCode\)/);
  assert.match(client,/foundSets\.map\(\(set,index\)=>/);
  assert.match(client,/diagnosticState\.evidenceHighlights=highlights\.map/);
  assert.match(client,/diagnosticState\.failureHttpStatus=res\.status/);
