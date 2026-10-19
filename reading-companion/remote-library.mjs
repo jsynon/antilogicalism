@@ -76,6 +76,26 @@ function wordStem(word) {
   if (w.length > 4 && w.endsWith('e')) w = w.slice(0, -1);
   return w;
 }
+function termFamily(term, partition) {
+  const variants=new Set([term,wordStem(term)]);
+  // Convert common action nouns back to their lexical base (actions/action →
+  // act). This lets the index connect a question's wording to phrases such
+  // as Aristotle's "doing just acts" without a question-specific rule.
+  const derivation=term.replace(/(?:ions|ion)$/,'');
+  if(derivation!==term&&derivation.length>=3)variants.add(derivation);
+  // Query and source wording often use close forms of the same indexed word,
+  // such as habituation/habit or virtuous/virtue. Only add vocabulary that
+  // actually exists in the already loaded index partition.
+  for(const candidate of Object.keys(partition||{})){
+    if(candidate.length<5||term.length<5||candidate===term)continue;
+    let common=0;
+    while(common<Math.min(candidate.length,term.length)&&candidate[common]===term[common])common++;
+    const closeFamily=common>=5&&Math.abs(candidate.length-term.length)<=3;
+    if(term.startsWith(candidate)||candidate.startsWith(term)||closeFamily)
+      variants.add(candidate);
+  }
+  return [...variants];
+}
 export function substantivePageEvidence(text, terms, headerTerms = new Set()) {
   if (isNavigationPage(text) || isPublicationPage(text)) return null;
   const words = String(text || '').toLowerCase().match(/[a-z0-9]+/g) || [];
@@ -222,14 +242,18 @@ export class RemoteLibrary {
     // Keep indexed term matches available for candidate generation; relevance
     // is evaluated per book after separating author metadata from topic terms.
     const data = new Map(await Promise.all(prefixes.map(async p => [p, await this.partition(p)])));
+    const termGroups=terms.map(term=>termFamily(term,data.get(term.slice(0,2))));
+    const evidenceTerms=[...new Set(termGroups.flat())];
     const scores = new Map();
-    for (const term of terms) {
-      const list = decodeDeltas(data.get(term.slice(0, 2))[term] || [], manifest.page_books.length);
-      if (!list.length) continue;
-      for (const id of list) {
-        const record = scores.get(id) || {matchedTerms:new Set()};
-        record.matchedTerms.add(term);
-        scores.set(id, record);
+    for (const group of termGroups) {
+      for (const term of group) {
+        const list = decodeDeltas(data.get(term.slice(0, 2))[term] || [], manifest.page_books.length);
+        for (const id of list) {
+          const record = scores.get(id) || {matchedTerms:new Map()};
+          if(!record.matchedTerms.has(group[0]))record.matchedTerms.set(group[0],new Set());
+          record.matchedTerms.get(group[0]).add(term);
+          scores.set(id, record);
+        }
       }
     }
     const ranked = new Map();
@@ -244,11 +268,15 @@ export class RemoteLibrary {
       if (!manifest.books[id] || !PDF.test(manifest.books[id].drive_url || '')) continue;
       const authorTerms = new Set((String(manifest.books[id].title || '').split(/\s+[—–-]\s+/).slice(1).join(' ')
         .toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
-      const topicalTerms = [...score.matchedTerms].filter(term => !authorTerms.has(wordStem(term)));
-      const topicalScore = topicalTerms.reduce((sum, term) => {
-        const posting = data.get(term.slice(0,2))[term] || [];
-        return sum + Math.log1p(manifest.page_books.length / (posting.length + 1));
-      }, 0);
+      const topicalTerms = [...score.matchedTerms.entries()]
+        .filter(([term]) => !authorTerms.has(wordStem(term)));
+      const topicalScore = topicalTerms.reduce((sum, [,variants]) => {
+        const idfs=[...variants].map(term=>{
+          const posting=data.get(term.slice(0,2))[term]||[];
+          return Math.log1p(manifest.page_books.length/(posting.length+1));
+        });
+        return sum+Math.max(...idfs);
+      },0);
       if (!ranked.has(id)) ranked.set(id, []);
       ranked.get(id).push({id:pageId, score:topicalScore, matched:topicalTerms.length});
     }
@@ -287,6 +315,9 @@ export class RemoteLibrary {
       const bookAuthorTerms = new Set((String(meta.title || '').split(/\s+[—–-]\s+/).slice(1).join(' ')
         .toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
       const bookTerms = terms.filter(term => !bookAuthorTerms.has(wordStem(term)));
+      const bookEvidenceTerms=termGroups
+        .filter((_,index)=>!bookAuthorTerms.has(wordStem(terms[index])))
+        .flat();
       // Author-focused facets and comparisons need to establish relevance
       // from a couple of local concepts. Longer unscoped questions retain the
       // stricter threshold that filters incidental character/event overlap.
@@ -310,7 +341,7 @@ export class RemoteLibrary {
         }
         if ((item.text.match(/[a-z]+/gi) || []).length >= 10 &&
             !proseByPage.has(item.page)) proseByPage.set(item.page, item);
-        const evidence = substantivePageEvidence(item.text, bookTerms, bookTitleTerms);
+        const evidence = substantivePageEvidence(item.text, bookEvidenceTerms, bookTitleTerms);
         if (!evidence || evidence.localUnique < minimumEvidenceTerms) continue;
         const hit = relevant.get(item.id);
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
@@ -338,7 +369,7 @@ export class RemoteLibrary {
       for (const {item} of selected) {
         const url = 'https://drive.google.com/file/d/' + pdfId + '/view?usp=sharing#page=' + item.page;
         sources.push({bookId:book.id, title:meta.title, page:item.page, globalPageId:item.id,
-          url, preview:excerptAroundEvidence(item.text,bookTerms), textLength:item.text.length});
+          url, preview:excerptAroundEvidence(item.text,bookEvidenceTerms), textLength:item.text.length});
       }
     }
     return {terms, sources:sources.map((item,i) => ({id:'S'+(i+1),...item})),
