@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
-import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode} from './diagnostic-report.mjs';
+import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
+  inlineCitationGroups} from './diagnostic-report.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
@@ -12,6 +13,17 @@ test('audits citation markers against the sources returned by the server',()=>{
  assert.deepEqual(audit.returnedIds,['S1']);
  assert.deepEqual(audit.inlineIdsWithoutSource,['S2']);
  assert.deepEqual(audit.sourcesNotCited,[]);
+});
+
+test('parses grouped citation markers and the UI renders each source link',()=>{
+ const answer='The passages support this claim [S1, S3].';
+ assert.deepEqual(inlineCitationGroups(answer).map(group=>group.ids),[['S1','S3']]);
+ assert.match(client,/const citationAudit=auditCitationIds\(data\.answer,responseCitations\)/);
+ assert.match(client,/citationAudit\.inlineIdsWithoutSource\.length/);
+ assert.match(client,/const groups=inlineCitationGroups\(answer\)/);
+ assert.match(client,/appendCitation\(id\)/);
+ const audit=auditCitationIds(answer,[{id:'S1'},{id:'S3'}]);
+ assert.deepEqual(audit.inlineIdsWithoutSource,[]);
 });
 
 test('diagnostic output is bounded and never includes source text or challenge data',()=>{

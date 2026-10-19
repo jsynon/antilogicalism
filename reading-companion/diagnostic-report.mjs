@@ -8,8 +8,18 @@ const FAILURE_CODES=new Set([
   'evidence-review-invalid-response','answer-composition-request-failed',
   'answer-composition-truncated','answer-composition-empty',
   'answer-composition-too-long','answer-citations-missing',
-  'answer-citations-invalid','http-error','invalid-response','retrieval-error'
+  'answer-citations-invalid','citation-source-mismatch','http-error',
+  'invalid-response','retrieval-error'
 ]);
+
+// Accept both a single marker ([S1]) and grouped markers ([S1, S3]) for
+// rendering. The audit below intentionally remains broader so malformed or
+// unmatched markers still appear in diagnostics.
+export function inlineCitationGroups(answer){
+  return [...String(answer||'').matchAll(/\[((?:S[1-9]\d*)(?:\s*,\s*S[1-9]\d*)*)\]/g)]
+    .map(match=>({start:match.index,end:match.index+match[0].length,
+      ids:match[1].split(/\s*,\s*/)}));
+}
 
 export function diagnosticFailureCode(status,requestStage='answer',serverCode=''){
   if(FAILURE_CODES.has(serverCode))return serverCode;
