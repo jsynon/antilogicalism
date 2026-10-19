@@ -38,7 +38,6 @@ jobs:
       LIVE_EVAL_MODE: ${{ inputs.mode }}
       CONFIRM_LIVE_AI: ${{ inputs.confirm_live_ai }}
       CONFIRM_FULL_30: ${{ inputs.confirm_full_30 }}
-      LIVE_EVAL_OUTPUT: ${{ runner.temp }}/reading-companion-live-answer-evaluation.json
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -56,6 +55,7 @@ jobs:
       - name: Run confirmed live evaluation
         env:
           PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+          LIVE_EVAL_OUTPUT: ${{ runner.temp }}/reading-companion-live-answer-evaluation.json
         run: node reading-companion/live-answer-evaluation.mjs --mode "$LIVE_EVAL_MODE" --confirm-live-ai true --output "$LIVE_EVAL_OUTPUT"
       - name: Save live evaluation report
         uses: actions/upload-artifact@v4
