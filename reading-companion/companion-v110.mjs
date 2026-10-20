@@ -309,34 +309,6 @@ function sourcePage(source){
   return candidates.find(page=>page.bookId===String(source.bookId) &&
     page.page===Number(source.page))||null;
 }
-function appendFullPage(parent,source,excerpt=''){
-  if(!source||typeof source.text!=='string'||!source.text.trim())return;
-  const details=document.createElement('details');
-  details.className='companion-page-text';
-  const summary=node('summary','View full page text');
-  const full=node('pre',undefined,'companion-full-page');
-  const page=readablePageWithHighlight(source.text,excerpt);
-  let note=null;
-  if(page.match){
-    const {start,end}=page.match;
-    if(start>0)full.append(document.createTextNode(page.displayText.slice(0,start)));
-    const mark=node('mark',page.displayText.slice(start,end),'cited-highlight');
-    full.append(mark);
-    if(end<page.displayText.length)
-      full.append(document.createTextNode(page.displayText.slice(end)));
-  }else{
-    full.textContent=page.displayText;
-    if(excerpt.trim())note=node('p',
-      'The cited words could not be matched confidently in this page text, so no highlight is shown.',
-      'companion-hint');
-  }
-  if(page.match?.partial)note=node('p',
-    'Only the matching part of the cited passage appears on this page.',
-    'companion-hint');
-  details.append(summary,full);
-  if(note)details.append(note);
-  parent.append(details);
-}
 function putCitationTokens(target,answer,citations,evidenceHighlights=[]){
   const byId=new Map(citations.map(s=>[s.id,s]));
   const groups=inlineCitationGroups(answer);
@@ -425,7 +397,6 @@ function renderResponse(data,turnQuestion=''){
         catch(error){setStatus('Source reader: '+error.message);}
       });
       card.append(quote,a,read);
-      appendFullPage(card,original,item.quote);
       panel.append(card);
       highlightedSourceKeys.add(citation.id+'|'+Number(citation.page));
     }
@@ -459,7 +430,6 @@ function renderResponse(data,turnQuestion=''){
         }catch(error){setStatus('Source reader: '+error.message);}
       });
       row.append(read);
-      appendFullPage(row,original,highlight?.quote||'');
       sources.append(row);
     }
     turn.append(sources);
