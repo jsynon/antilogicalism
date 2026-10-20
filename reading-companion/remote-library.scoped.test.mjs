@@ -34,6 +34,17 @@ test('page ranking favors clustered topic evidence over scattered mentions',()=>
  assert(focusedEvidence.score>scatteredEvidence.score);
 });
 
+test('an explicitly requested phrase boosts pages containing it in the source text',()=>{
+ const terms=['god','love','biblical','meaning','scripture'];
+ const exact='Beloved, let us love one another, because love is from God. God is love.';
+ const commentary='The biblical meaning of scripture concerns divine love and the nature of God.';
+ const direct=substantivePageEvidence(exact,terms,new Set(),'God is love');
+ const topical=substantivePageEvidence(commentary,terms,new Set(),'God is love');
+ assert.equal(direct.phraseMatches,1);
+ assert.equal(topical.phraseMatches,0);
+ assert(direct.score>topical.score);
+});
+
 const fixture={
  'manifest.json':{
   version:47,postings_encoding:'delta-json-v1',prefix_length:2,
