@@ -68,6 +68,46 @@ export function queryTerms(question) {
   return [...new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || [])]
     .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 8);
 }
+
+// Correct a single-character typo only when it uniquely matches a catalog
+// author's surname. Keep this metadata correction separate from page evidence.
+function editDistanceOne(left,right){
+  const a=String(left||''),b=String(right||'');
+  if(Math.abs(a.length-b.length)>1)return false;
+  let i=0,j=0,differences=0;
+  while(i<a.length&&j<b.length){
+    if(a[i]===b[j]){i++;j++;continue;}
+    if(++differences>1)return false;
+    if(a.length>b.length)i++;
+    else if(b.length>a.length)j++;
+    else{i++;j++;}
+  }
+  return differences+(i<a.length||j<b.length?1:0)<=1;
+}
+function fuzzyAuthorMentions(queryTokens,books){
+  const bySurname=new Map();
+  for(const [id,meta] of Object.entries(books||{})){
+    const byline=String(meta?.title||'').split(/\s+[—–-]\s+/).slice(1).join(' ');
+    const authorWords=byline.toLowerCase().match(/[a-z0-9]+/g)||[];
+    const surname=authorWords.at(-1)||'';
+    if(surname.length<7)continue;
+    if(!bySurname.has(surname))bySurname.set(surname,new Set());
+    bySurname.get(surname).add(String(id));
+  }
+  const matches=new Map();
+  for(const token of queryTokens){
+    if(token.length<7||bySurname.has(token))continue;
+    let best='',tied=false;
+    for(const surname of bySurname.keys()){
+      if(!editDistanceOne(token,surname))continue;
+      if(!best)best=surname;
+      else if(best!==surname)tied=true;
+    }
+    if(best&&!tied)matches.set(token,{surname:best,bookIds:bySurname.get(best)});
+  }
+  return matches;
+}
+
 export function decodeDeltas(deltas, total) {
   if (!Array.isArray(deltas)) throw new Error('Invalid term postings.');
   const ids = []; let current = 0;
@@ -276,9 +316,17 @@ export class RemoteLibrary {
     // Selected-book headers often repeat the title, but the title can also
     // name the reader's actual subject (for example, the Peloponnesian War).
     // Keep those query terms and ignore title words only in page-header text.
-    const terms = queryTerms(question)
-      .filter(term => !authorTerms.has(wordStem(term)))
-      .filter(term => manifest.partitions.includes(term.slice(0, 2)));
+    const queryTokens=queryTerms(question);
+    const fuzzyAuthorCandidates=fuzzyAuthorMentions(queryTokens,manifest.books);
+    // Apply fuzzy author scoping only when the question also has at least one
+    // indexed non-author topic term; a surname alone is not enough evidence.
+    const hasTopicTerm=queryTokens.some(term=>!fuzzyAuthorCandidates.has(term)&&
+      !authorTerms.has(wordStem(term))&&manifest.partitions.includes(term.slice(0,2)));
+    const fuzzyAuthorMatches=hasTopicTerm?fuzzyAuthorCandidates:new Map();
+    const terms=queryTokens
+      .filter(term=>!fuzzyAuthorMatches.has(term))
+      .filter(term=>!authorTerms.has(wordStem(term)))
+      .filter(term=>manifest.partitions.includes(term.slice(0,2)));
     const phrase=requestedPhrase(question);
     if (!terms.length) return {terms:[], sources:[], elapsedMs:Math.round(performance.now() - started)};
     const questionWords = new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || []);
@@ -293,6 +341,10 @@ export class RemoteLibrary {
         mentionedAuthors.add(surname);
         namedAuthorBookIds.add(id);
       }
+    }
+    for(const {surname,bookIds} of fuzzyAuthorMatches.values()){
+      mentionedAuthors.add(surname);
+      for(const id of bookIds)namedAuthorBookIds.add(id);
     }
     const comparison = /\b(?:compare|contrast|versus|vs\.?|between)\b/i.test(question) || mentionedAuthors.size >= 2;
     const prefixes = [...new Set(terms.map(t => t.slice(0,2)))];
