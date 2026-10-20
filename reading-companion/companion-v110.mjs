@@ -263,7 +263,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
       const foundSets=await Promise.all(searches.map(async term=>{
         const targeted=await Promise.all(targetBookIds.map(bookId=>
           library.search(term,{...(bookId?{bookId}:{}),allowedBookIds:allowed,
-            maxBooks:2,pagesPerBook:PRODUCTION_PAGES_PER_BOOK})));
+            maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK})));
         return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])
           .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
       }));

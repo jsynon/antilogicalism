@@ -144,7 +144,7 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
  const selectedBookId=item.selected_book_id===undefined?'':String(item.selected_book_id);
  const searchAllowedBookIds=selectedBookId?new Set([selectedBookId]):allowedBookIds;
  const foundSets=await Promise.all(searchQueries.map(query=>library.search(query,{
-  allowedBookIds:searchAllowedBookIds,maxBooks:2,pagesPerBook:PRODUCTION_PAGES_PER_BOOK
+  allowedBookIds:searchAllowedBookIds,maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK
  })));
  const merged=mergeFacetSearches(foundSets,8);
  const issues=merged.flatMap((source,index)=>sourceIdentityIssues(source,manifest).map(code=>({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code})));

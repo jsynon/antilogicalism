@@ -304,7 +304,7 @@ export class RemoteLibrary {
     }
     return this.partitions.get(prefix);
   }
-  async search(question, {bookId = '', allowedBookIds = null, maxBooks = 2, pagesPerBook = PRODUCTION_PAGES_PER_BOOK} = {}) {
+  async search(question, {bookId = '', allowedBookIds = null, maxBooks = 3, pagesPerBook = PRODUCTION_PAGES_PER_BOOK} = {}) {
     const started = performance.now();
     const manifest = await this.manifest();
     const selectedTitle = bookId ? String(manifest.books[String(bookId)]?.title || '') : '';
