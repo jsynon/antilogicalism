@@ -16,6 +16,15 @@ export function inlineCitationGroups(answer){
       ids:match[1].split(/\s*,\s*/)}));
 }
 
+export function userFailureMessage(code=''){
+  if(code==='ai-daily-limit-reached')
+    return 'The chatbot has reached its daily AI usage limit. Please try again after the daily reset.';
+  if(code==='ai-capacity-unavailable')
+    return 'The AI service is temporarily at capacity. Please wait a moment and try again.';
+  if(code==='ai-rate-limited')
+    return 'The AI service is handling too many requests right now. Please wait a moment and try again.';
+  return 'Could not prepare the answer. Please try again.';
+}
 export function diagnosticFailureCode(status,requestStage='answer',serverCode=''){
   if(isSafeFailureCode(serverCode))return serverCode;
   if(!Number.isInteger(status)||status<100||status>599)return 'network-error';
