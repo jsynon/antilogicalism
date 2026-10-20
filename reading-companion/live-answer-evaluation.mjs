@@ -16,17 +16,27 @@ const LIVE_CASES=[
  {id:'live-scripture-god-is-love',question:'According to 1 John 4:7–12, what does “God is love” mean, and how does the passage connect God’s love with loving one another?',planner_queries:['1 John 4:7–12 text God is love and love one another','1 John 4:7–12 God sent his Son love one another'],required_source_groups:[{label:'1 John Bible passage',book_ids:['638','646']}]},
 ];
 const SMOKE_CASE_IDS=['science-hawking-black-holes','philosophy-aristotle-habituation'];
+const QUALITY_CASES=[
+ {id:'quality-science-darwin-selection',discipline:'science',question:"According to Darwin's On the Origin of Species, how does natural selection operate, and what roles do inherited variation and the struggle for existence play?",selected_book_ids:['529'],planner_queries:['Darwin natural selection preservation beneficial variations survival reproduction','Origin of species variation inheritance struggle for existence Darwin'],required_source_groups:[{label:'Darwin, On the Origin of Species',book_ids:['529']}],review_focus:['Explain the mechanism linking inherited variation to differential survival and reproduction.','Distinguish Darwin’s account from a claim that organisms consciously adapt.']},
+ {id:'quality-history-thucydides-causes',discipline:'history',question:'According to Thucydides, what were the underlying causes of the Peloponnesian War, and how did they differ from the immediate disputes that preceded it?',selected_book_ids:['152'],planner_queries:['Thucydides real cause growth Athenian power fear Lacedaemon','Thucydides immediate disputes Corcyra Potidaea grievances'],required_source_groups:[{label:'Thucydides',book_ids:['152']}],review_focus:['Separate the underlying cause from the immediate disputes.','Support both parts with passages from Thucydides, without treating them as interchangeable.']},
+ {id:'quality-literature-dostoevsky-raskolnikov',discipline:'literature',question:'In Crime and Punishment, how does Raskolnikov try to justify murder, and how does the novel test or undermine his reasoning?',selected_book_ids:['114'],planner_queries:['Raskolnikov extraordinary men right to transgress law murder','Crime and Punishment Raskolnikov guilt suffering confession theory'],required_source_groups:[{label:'Dostoevsky, Crime and Punishment',book_ids:['114']}],review_focus:['Describe Raskolnikov’s theory as the character’s argument, not as Dostoevsky’s endorsed view.','Explain how later events in the novel complicate that theory.']},
+ {id:'quality-philosophy-aristotle-practical-wisdom',discipline:'philosophy',question:"According to Aristotle's Nicomachean Ethics, what is practical wisdom, and how does it differ from scientific knowledge and skill?",selected_book_ids:['7'],planner_queries:['Aristotle Nicomachean Ethics definition phronesis practical wisdom deliberation human good','Aristotle Nicomachean Ethics phronesis episteme techne variable action making'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']}],review_focus:['Define practical wisdom as a reasoned capacity concerned with human good and action.','Explain why it is not science (variable, deliberable matters rather than necessary demonstrations) or craft (action differs from making).']},
+ {id:'quality-all-books-cross-work-science',discipline:'science',question:'How do Darwin in On the Origin of Species and Hawking in A Brief History of Time distinguish observations from explanations of change?',selected_book_ids:[],planner_queries:['Darwin Origin of Species observations variation natural selection explanation change','Hawking Brief History of Time observations evidence theoretical explanation black holes'],required_source_groups:[{label:'Darwin',book_ids:['529']},{label:'Hawking',book_ids:['102']}],review_focus:['Compare each author’s use of observation and explanation.','Cite evidence from both named works; avoid implying the authors use identical methods.']},
+ {id:'quality-all-books-cross-discipline-order',discipline:'philosophy',question:'How do Aristotle in the Nicomachean Ethics and Hobbes in Leviathan explain the basis of political order, and where do their accounts differ?',selected_book_ids:[],planner_queries:['Aristotle Nicomachean Ethics political community human good polis nature','Hobbes Leviathan common power covenant state of nature political order'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']},{label:'Hobbes, Leviathan',book_ids:['163']}],review_focus:['Represent each author’s account in its own terms and identify a meaningful difference.','Ground the comparison in both works instead of importing unsupported modern claims.']},
+ {id:'quality-all-books-religion-scripture',discipline:'religion',question:'According to 1 John 4:7–12, what does “God is love” mean, and how does the passage connect God’s love with loving one another?',selected_book_ids:[],planner_queries:['1 John 4:7-12 God is love sent Son love one another passage','1 John 4:7-12 love of God revealed in Christ command love one another'],required_source_groups:[{label:'1 John 4:7–12',book_ids:['638']}],review_focus:['Explain the passage’s connection between God’s prior love and the command to love one another.','Stay close to the passage and distinguish its claims from later theological interpretation.']},
+];
 const CALL_GAP_MS=16_000;
 const MAX_PAGE_BYTES=14_000;
 
 export function selectLiveCases(suite,mode='smoke'){
+ if(mode==='quality')return QUALITY_CASES.map(item=>({...item,selected_book_ids:[...item.selected_book_ids],planner_queries:[...item.planner_queries],required_source_groups:item.required_source_groups.map(group=>({...group,book_ids:[...group.book_ids]})),review_focus:[...item.review_focus]}));
  if(mode==='smoke'){
   const selected=SMOKE_CASE_IDS.map(id=>suite.cases.find(item=>item.id===id));
   if(selected.some(item=>!item))throw Error('The live smoke cases are missing from the retrieval suite.');
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke or full.');
+ throw Error('Mode must be smoke, quality, or full.');
 }
 export function auditLiveAnswer(data,submitted,requiredGroups){
  const citations=Array.isArray(data?.citations)?data.citations:[];
@@ -91,17 +101,22 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
  }else if(!validSearchPlan(queries))throw Error('Planner returned an invalid two-query plan.');
  const searchQueries=buildSearchFacets(item.question,queries);
  const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
+ const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
+ const selectedAllowed=new Set(selectedBookIds.filter(id=>allowed.has(id)));
+ if(selectedBookIds.length&&selectedAllowed.size!==selectedBookIds.length)
+  throw Error('The selected-book scope contains a book absent from the published corpus.');
  const namedBookIds=matchExplicitBookIds(item.question,bookCatalog);
- const targetBookIds=namedBookIds.length?namedBookIds:[null];
+ const targetBookIds=selectedBookIds.length?selectedBookIds:(namedBookIds.length?namedBookIds:[null]);
+ const retrievalAllowed=selectedBookIds.length?selectedAllowed:allowed;
  const searchSets=await Promise.all(searchQueries.map(async query=>{
   const targeted=await Promise.all(targetBookIds.map(bookId=>
-   library.search(query,{...(bookId?{bookId}:{}),allowedBookIds:allowed,maxBooks:2,pagesPerBook:3})));
+   library.search(query,{...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks:2,pagesPerBook:3})));
   return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])
    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
  }));
  const candidates=mergeFacetSearches(searchSets,8),populated=[];
  for(const source of candidates){
-  if(!allowed.has(String(source.bookId)))continue;
+  if(!retrievalAllowed.has(String(source.bookId)))continue;
   const shard=await library.jsonGzip('book-'+String(source.bookId)+'.json');
   const pages=shard.pages?.filter(page=>page.id===source.globalPageId&&page.page===source.page)||[];
   if(pages.length!==1||typeof pages[0].text!=='string')continue;
@@ -120,10 +135,13 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   (namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
   resultCount:set.sources?.length||0}))};
 }
-export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}){
+export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false}){
  const startTime=Date.now();
- let plan,queries,plannerFallback=false,plannerFailure=null;
- try{
+ let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false;
+ if(useFixedQueries&&validSearchPlan(item.planner_queries)){
+  queries=item.planner_queries;
+  plannerSkipped=true;
+ }else try{
   plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:'',history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner');
   if(!validSearchPlan(plan?.queries)){
    const error=attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{httpStatus:200,failureCode:'invalid-response',workerFailure:false});
@@ -149,7 +167,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   error.requestFailure.plannerFallback=plannerFallback;if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const audit=auditLiveAnswer(data,selected,item.required_source_groups);
- return {id:item.id,question:item.question,plannerQueries:plannerFallback?[]:queries,plannerFallback,
+ return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
+  reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerQueries:plannerFallback?[]:queries,plannerFallback,
   ...(plannerFailure?{plannerFailure}:{}),searches,
   submittedSources:selected.map(({bookId,title,page,globalPageId})=>({bookId,title,page,globalPageId})),
   ...audit,elapsedMs:Date.now()-startTime};
@@ -157,7 +176,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
 function failedCaseResult(item,error){
  const failure=error?.requestFailure||{stage:'evaluation',httpStatus:null,failureCode:'evaluation-failed',
   message:String(error?.message||error||'Evaluation failed').slice(0,240),workerFailure:false};
- return {id:item.id,question:item.question,requestFailure:failure,plannerQueries:[],
+ return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
+  reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],requestFailure:failure,plannerQueries:[],plannerSkipped:false,
   plannerFallback:failure.plannerFallback===true,...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),searches:[],
   submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',
   answerText:'',citationCount:0,citationBookIds:[],citationSources:[],inlineCitationCount:0,
@@ -194,15 +214,17 @@ function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',out
   if(key==='mode')out.mode=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode smoke|full] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode smoke|quality|full] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
  const cases=selectLiveCases(suite,args.mode);
+ const plannerCalls=args.mode==='quality'?0:cases.length;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,
-  caseCount:cases.length,estimatedWorkerAiCalls:cases.length*3,
-  callsPerCase:'1 planner + 2 answer pipeline calls; verify configured Worker implementation before interpreting credit use',
+  caseCount:cases.length,estimatedWorkerAiCalls:plannerCalls+cases.length*2,
+  callsPerCase:args.mode==='quality'?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
+  answerQualityNote:'Answer text and review_focus are provided for human assessment. Automated pass checks retrieval/citation structure, not factual or interpretive truth.',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  const saveReport=async()=>{if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');};
@@ -214,11 +236,11 @@ async function main(){
   const allowed=new Set(Object.keys(coverage.books));
   for(const item of cases)for(const group of item.required_source_groups)if(!group.book_ids.some(id=>allowed.has(String(id))))throw Error(item.id+': no expected source book is fingerprint-covered.');
   const library=new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT));
-  console.log('Starting explicitly confirmed '+args.mode+' live evaluation: '+cases.length+' questions; estimated ~'+report.estimatedWorkerAiCalls+' Worker inference calls.');
+  console.log('Starting explicitly confirmed '+args.mode+' live evaluation: '+cases.length+' questions; estimated at least '+report.estimatedWorkerAiCalls+' Worker inference calls, plus conditional repairs.');
   report.executionStatus='running';await saveReport();
   let previousCall=0;
   const beforeCall=async()=>{if(previousCall){const due=Math.max(0,CALL_GAP_MS-(Date.now()-previousCall));if(due)await new Promise(resolve=>setTimeout(resolve,due));}previousCall=Date.now();};
-  const run=await runLiveCases(cases,{evaluateOptions:{library,manifest,allowed,token,beforeCall},onResult:async(result,results)=>{
+  const run=await runLiveCases(cases,{evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:args.mode==='quality'},onResult:async(result,results)=>{
    report.cases=results;report.completedCases=results.length;
    report.notRunCases=cases.length-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
