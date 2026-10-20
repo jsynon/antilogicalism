@@ -111,3 +111,21 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(client,/diagnosticState\.failureHttpStatus=response\.status/);
  assert.match(client,/body:JSON\.stringify\(\{question:q,turnstileToken:token,\s*history,\s*sources:chosen\.map/);
 });
+
+
+test('diagnostics expose only bounded reviewed points tied to submitted sources',()=>{
+ const report=createDiagnosticReport({
+  submittedSources:[{id:'S1'},{id:'S2'}],
+  reviewedEvidence:[
+   {id:'S1',point:'Directly supported summary.'},
+   {id:'S2',point:'x'.repeat(300)},
+   {id:'S9',point:'Invented source must be excluded.'},
+   {id:'S1',point:'Duplicate source must be excluded.'},
+   {id:'S2',point:' '}
+  ]
+ });
+ assert.deepEqual(report.answer.reviewedEvidence,[
+  {id:'S1',point:'Directly supported summary.'},
+  {id:'S2',point:'x'.repeat(220)}
+ ]);
+});
