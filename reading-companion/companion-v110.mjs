@@ -434,6 +434,7 @@ function renderResponse(data,turnQuestion=''){
     diagnosticState.outcome=data.outcome;
     diagnosticState.coverage=data.coverage;
     diagnosticState.reviewStatus=data.reviewStatus;
+    diagnosticState.reviewedEvidence=data.evidenceMap;
     diagnosticState.answer=data.answer;
     diagnosticState.citations=citations;
     diagnosticState.evidenceHighlights=highlights.map(item=>{
@@ -574,6 +575,7 @@ async function askQuestion(questionText){
         diagnosticState.outcome=data.outcome;
         diagnosticState.coverage=data.coverage;
         diagnosticState.reviewStatus=data.reviewStatus;
+        diagnosticState.reviewedEvidence=data.evidenceMap;
         diagnosticState.answer=data.answer;
         diagnosticState.citations=responseCitations;
         diagnosticState.evidenceHighlights=Array.isArray(data.evidenceHighlights)?
