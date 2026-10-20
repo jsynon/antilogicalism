@@ -7,6 +7,14 @@ const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
 const bookOrder=await import('./book-order.mjs');
 
+test('response citation labels are plain ordered numbers while IDs stay internal',()=>{
+ assert.match(client,/buildCitationNumbering\(answer,citations\)/);
+ assert.match(client,/sortCitationsByNumber\(citations,numbering\)/);
+ assert.match(client,/citationDisplayLabel\(item\.source_id,numbering\)/);
+ assert.match(client,/citationDisplayLabel\(source\.id,numbering\)/);
+ assert.match(client,/putCitationTokens\(reply,answer,citations,highlights,numbering\)/);
+});
+
 test('v1.10 retains Book Lite and the site navigation',()=>{
  assert.match(html,/wp-content\/themes\/book-lite/);
  assert.match(html,/id="masthead"/);
