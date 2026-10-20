@@ -3,6 +3,7 @@
  * Original shard IDs, physical PDF pages and manifest PDF URLs are preserved.
  */
 export const DEFAULT_INDEX_ROOT = 'https://jsynon.github.io/antilogicalism-library-data/data-v47/';
+export const PRODUCTION_PAGES_PER_BOOK = 4;
 const SCRIPTURE_BOOK_NAMES = [
   'genesis','exodus','leviticus','numbers','deuteronomy','joshua','judges','ruth',
   '1 samuel','2 samuel','1 kings','2 kings','1 chronicles','2 chronicles',
@@ -263,7 +264,7 @@ export class RemoteLibrary {
     }
     return this.partitions.get(prefix);
   }
-  async search(question, {bookId = '', allowedBookIds = null, maxBooks = 2, pagesPerBook = 2} = {}) {
+  async search(question, {bookId = '', allowedBookIds = null, maxBooks = 2, pagesPerBook = PRODUCTION_PAGES_PER_BOOK} = {}) {
     const started = performance.now();
     const manifest = await this.manifest();
     const selectedTitle = bookId ? String(manifest.books[String(bookId)]?.title || '') : '';
@@ -373,7 +374,7 @@ export class RemoteLibrary {
     const sources = [];
     let booksScanned = 0, discardedNavigation = 0;
     const bookLimit = Math.max(1, Math.min(maxBooks, 3));
-    const pageLimit = Math.max(1, Math.min(pagesPerBook, 3));
+    const pageLimit = Math.max(1, Math.min(pagesPerBook, PRODUCTION_PAGES_PER_BOOK));
     // A small reserve of candidate works allows replacement of an index-
     // only book, without downloading all 644 book shards.
     for (const book of books.slice(0, Math.max(bookLimit, Math.min(6, books.length)))) {
