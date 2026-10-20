@@ -135,10 +135,10 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   (namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
   resultCount:set.sources?.length||0}))};
 }
-export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}){
+export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false}){
  const startTime=Date.now();
  let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false;
- if(validSearchPlan(item.planner_queries)){
+ if(useFixedQueries&&validSearchPlan(item.planner_queries)){
   queries=item.planner_queries;
   plannerSkipped=true;
  }else try{
@@ -220,7 +220,7 @@ async function main(){
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
  const cases=selectLiveCases(suite,args.mode);
- const plannerCalls=cases.filter(item=>!validSearchPlan(item.planner_queries)).length;
+ const plannerCalls=args.mode==='quality'?0:cases.length;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,
   caseCount:cases.length,estimatedWorkerAiCalls:plannerCalls+cases.length*2,
   callsPerCase:args.mode==='quality'?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
@@ -240,7 +240,7 @@ async function main(){
   report.executionStatus='running';await saveReport();
   let previousCall=0;
   const beforeCall=async()=>{if(previousCall){const due=Math.max(0,CALL_GAP_MS-(Date.now()-previousCall));if(due)await new Promise(resolve=>setTimeout(resolve,due));}previousCall=Date.now();};
-  const run=await runLiveCases(cases,{evaluateOptions:{library,manifest,allowed,token,beforeCall},onResult:async(result,results)=>{
+  const run=await runLiveCases(cases,{evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:args.mode==='quality'},onResult:async(result,results)=>{
    report.cases=results;report.completedCases=results.length;
    report.notRunCases=cases.length-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
