@@ -114,9 +114,6 @@ function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
   askButton.textContent=searching||answering?'Working…':'Ask Reading Companion';
   if(newConversationButton)newConversationButton.disabled=answering;
-  answerBox.querySelectorAll('.companion-follow-up-buttons button').forEach(button=>{
-    button.disabled=answering;
-  });
   refreshStatusState();
 }
 function updateBookOptions(){
@@ -363,24 +360,6 @@ function renderResponse(data,turnQuestion=''){
   turn.append(reply);
   if(data.missing)turn.append(node('p','What these passages don’t establish: '+data.missing,'companion-hint'));
 
-  // Keep the familiar Reader Mode order: Explore further, Key passages,
-  // then Sources. These follow-up buttons are separate from the removed
-  // suggested-question buttons above the question form.
-  const followUps=Array.isArray(data.followUpQuestions)?data.followUpQuestions:[];
-  const valid=followUps.filter(s=>typeof s==='string' && s.length<=180 &&
-     s.endsWith('?')).slice(0,2);
-  if(valid.length){
-    const box=node('section',undefined,'companion-follow-ups');
-    box.append(node('h3','Explore further'));
-    const buttons=node('div',undefined,'companion-follow-up-buttons');
-    for(const suggestion of valid){
-      const button=node('button',suggestion);
-      button.type='button';
-      button.addEventListener('click',()=>{void askQuestion(suggestion);});
-      buttons.append(button);
-    }
-    box.append(buttons);turn.append(box);
-  }
   const highlightedSourceKeys=new Set();
   if(highlights.length){
     const panel=node('section',undefined,'companion-highlights');
