@@ -8,7 +8,7 @@ import {createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
+import {RemoteLibrary,DEFAULT_INDEX_ROOT,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources} from './evidence-search.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -144,7 +144,7 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
  const selectedBookId=item.selected_book_id===undefined?'':String(item.selected_book_id);
  const searchAllowedBookIds=selectedBookId?new Set([selectedBookId]):allowedBookIds;
  const foundSets=await Promise.all(searchQueries.map(query=>library.search(query,{
-  allowedBookIds:searchAllowedBookIds,maxBooks:2,pagesPerBook:3
+  allowedBookIds:searchAllowedBookIds,maxBooks:2,pagesPerBook:PRODUCTION_PAGES_PER_BOOK
  })));
  const merged=mergeFacetSearches(foundSets,8);
  const issues=merged.flatMap((source,index)=>sourceIdentityIssues(source,manifest).map(code=>({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code})));
