@@ -40,6 +40,29 @@ const PDF = /^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:vi
 export function hasExplicitScriptureReference(text) {
   return SCRIPTURE_REFERENCE.test(String(text || ''));
 }
+function requestedPhrase(text) {
+  const value=String(text||'').trim();
+  const quoted=[...value.matchAll(/[\"“]([^\"”]{2,120})[\"”]/g)]
+    .map(match=>match[1].trim()).find(Boolean);
+  if(quoted)return quoted;
+  const patterns=[
+    /^(?:what\s+does|what\s+do)\s+(.+?)\s+mean\s*[?.!]*$/i,
+    /^(?:what\s+is|what\s+are)\s+(?:the\s+)?meaning\s+of\s+(.+?)\s*[?.!]*$/i,
+    /^meaning\s+of\s+(.+?)\s*[?.!]*$/i,
+  ];
+  const match=patterns.map(pattern=>value.match(pattern)).find(Boolean);
+  return match?.[1]?.trim().replace(/^[\s'“”‘’]+|[\s'“”‘’]+$/g,'')||'';
+}
+function exactPhraseMatchCount(text,phrase) {
+  const target=String(phrase||'').toLowerCase().match(/[a-z0-9]+/g)||[];
+  if(target.length<2)return 0;
+  const words=String(text||'').toLowerCase().match(/[a-z0-9]+/g)||[];
+  let count=0;
+  for(let i=0;i<=words.length-target.length;i++){
+    if(target.every((word,index)=>words[i+index]===word))count++;
+  }
+  return count;
+}
 export function queryTerms(question) {
   return [...new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || [])]
     .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 8);
@@ -122,7 +145,7 @@ function termFamily(term, partition) {
   }
   return [...variants];
 }
-export function substantivePageEvidence(text, terms, headerTerms = new Set()) {
+export function substantivePageEvidence(text, terms, headerTerms = new Set(), phrase = '') {
   if (isNavigationPage(text) || isPublicationPage(text)) return null;
   const words = String(text || '').toLowerCase().match(/[a-z0-9]+/g) || [];
   if (words.length < 10) return null;
@@ -150,12 +173,18 @@ export function substantivePageEvidence(text, terms, headerTerms = new Set()) {
   // Prefer a compact passage where several topic terms meet over a page that
   // mentions many query terms in unrelated paragraphs. Whole-page coverage is
   // still useful, but should not outweigh local evidence concentration.
-  let score = best.score + 2 * unique.size + Math.min(5, Math.log1p(hits));
+  const phraseMatches=exactPhraseMatchCount(text,phrase);
+  // A directly requested expression can be strong evidence even when its
+  // page has fewer surrounding topic words than a commentary page. Reward
+  // exact occurrence and modestly favor pages where it appears in context.
+  const phraseBoost=phraseMatches?48+8*Math.min(3,phraseMatches-1):0;
+  let score = best.score + 2 * unique.size + Math.min(5, Math.log1p(hits)) + phraseBoost;
   const opening = String(text).trim().slice(0, 180);
   if (/^(?:(?:\d+|[ivxlc]+)\s+)?(?:introduction|preface|foreword|acknowledg(?:e)?ments)\b/i.test(opening)) {
     score -= 12; // A preference, not a ban; introductions can contain arguments.
   }
-  return {score, unique:unique.size, localUnique:best.unique, center:best.center};
+  return {score, unique:unique.size, localUnique:best.unique, center:best.center,
+    phraseMatches};
 }
 export function excerptAroundEvidence(text, terms, max = 1080) {
   const compact = String(text || '').replace(/\s+/g, ' ').trim();
@@ -249,6 +278,7 @@ export class RemoteLibrary {
     const terms = queryTerms(question)
       .filter(term => !authorTerms.has(wordStem(term)))
       .filter(term => manifest.partitions.includes(term.slice(0, 2)));
+    const phrase=requestedPhrase(question);
     if (!terms.length) return {terms:[], sources:[], elapsedMs:Math.round(performance.now() - started)};
     const questionWords = new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || []);
     const mentionedAuthors = new Set();
@@ -380,8 +410,8 @@ export class RemoteLibrary {
         }
         if ((item.text.match(/[a-z]+/gi) || []).length >= 10 &&
             !proseByPage.has(item.page)) proseByPage.set(item.page, item);
-        const evidence = substantivePageEvidence(item.text, bookEvidenceTerms, bookTitleTerms);
-        if (!evidence || evidence.localUnique < minimumEvidenceTerms) continue;
+        const evidence = substantivePageEvidence(item.text, bookEvidenceTerms, bookTitleTerms,phrase);
+        if (!evidence || (evidence.localUnique < minimumEvidenceTerms&&!evidence.phraseMatches)) continue;
         const hit = relevant.get(item.id);
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
       }
