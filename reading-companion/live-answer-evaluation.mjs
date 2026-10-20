@@ -6,7 +6,7 @@ import {readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,matchExplicitBookIds} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds} from './evidence-search.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
@@ -84,8 +84,11 @@ function makeCachedFetch(root){
  };
 }
 async function fetchJson(url){const response=await fetch(url,{headers:{accept:'application/json'},cache:'no-store'});if(!response.ok)throw Error(url+' returned HTTP '+response.status);return response.json();}
-async function loadSources(item,queries,{library,manifest,allowed}){
- if(!validSearchPlan(queries))throw Error('Planner returned an invalid two-query plan.');
+async function loadSources(item,queries,{library,manifest,allowed,directFallback=false}){
+ if(directFallback){
+  if(!Array.isArray(queries)||queries.length!==1||typeof queries[0]!=='string'||queries[0].trim().length<5||queries[0].trim().length>400)
+   throw Error('Direct fallback requires the original 5–400 character question.');
+ }else if(!validSearchPlan(queries))throw Error('Planner returned an invalid two-query plan.');
  const searchQueries=buildSearchFacets(item.question,queries);
  const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
  const namedBookIds=matchExplicitBookIds(item.question,bookCatalog);
@@ -119,12 +122,24 @@ async function loadSources(item,queries,{library,manifest,allowed}){
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}){
  const startTime=Date.now();
- let plan;
- try{plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:'',history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner');}
- catch(error){if(!error.requestFailure)error.requestFailure={stage:'planner',httpStatus:null,failureCode:'planner-failed',message:String(error.message||error).slice(0,240),workerFailure:false};throw error;}
- const queries=plan.queries;
+ let plan,queries,plannerFallback=false,plannerFailure=null;
+ try{
+  plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:'',history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner');
+  if(!validSearchPlan(plan?.queries)){
+   const error=attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{httpStatus:200,failureCode:'invalid-response',workerFailure:false});
+   throw error;
+  }
+  queries=plan.queries;
+ }catch(error){
+  if(!error.requestFailure)error.requestFailure={stage:'planner',httpStatus:null,failureCode:'planner-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
+  const failure=error.requestFailure;
+  if(!canFallbackToDirectSearch(failure.httpStatus,failure.failureCode))throw error;
+  plannerFallback=true;
+  plannerFailure={httpStatus:failure.httpStatus,failureCode:failure.failureCode};
+  queries=[item.question];
+ }
  let loaded;
- try{loaded=await loadSources(item,queries,{library,manifest,allowed});}
+ try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback});}
  catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};throw error;}
  const {selected,searches}=loaded;
  let data;
@@ -132,14 +147,15 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   sources:selected.map(({bookId,page,text})=>({bookId,page,text}))},beforeCall,'answer');}
  catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};throw error;}
  const audit=auditLiveAnswer(data,selected,item.required_source_groups);
- return {id:item.id,question:item.question,plannerQueries:queries,searches,
+ return {id:item.id,question:item.question,plannerQueries:plannerFallback?[]:queries,plannerFallback,
+  ...(plannerFailure?{plannerFailure}:{}),searches,
   submittedSources:selected.map(({bookId,title,page,globalPageId})=>({bookId,title,page,globalPageId})),
   ...audit,elapsedMs:Date.now()-startTime};
 }
 function failedCaseResult(item,error){
  const failure=error?.requestFailure||{stage:'evaluation',httpStatus:null,failureCode:'evaluation-failed',
   message:String(error?.message||error||'Evaluation failed').slice(0,240),workerFailure:false};
- return {id:item.id,question:item.question,requestFailure:failure,plannerQueries:[],searches:[],
+ return {id:item.id,question:item.question,requestFailure:failure,plannerQueries:[],plannerFallback:false,searches:[],
   submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',
   answerText:'',citationCount:0,citationBookIds:[],citationSources:[],inlineCitationCount:0,
   inlineIdsWithoutSource:[],submittedSourceCount:0,
@@ -177,7 +193,7 @@ async function main(){
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,
   caseCount:cases.length,estimatedWorkerAiCalls:cases.length*3,
   callsPerCase:'1 planner + 2 answer pipeline calls; verify configured Worker implementation before interpreting credit use',
-  executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,stopReason:'',cases:[]};
+  executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  const saveReport=async()=>{if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');};
  await saveReport();
@@ -196,15 +212,18 @@ async function main(){
    report.cases=results;report.completedCases=results.length;
    report.notRunCases=cases.length-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
+   report.plannerFallbackCases=results.filter(item=>item.plannerFallback).length;
    await saveReport();
    console.log((result.passed?'REVIEW-PASS':result.requestFailure?'REQUEST-FAIL':'REVIEW-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
   }});
   report.cases=run.results;report.stopReason=run.stopReason;
   report.notRunCases=cases.length-run.results.length;
   report.requestFailureCases=run.results.filter(item=>item.requestFailure).length;
+  report.plannerFallbackCases=run.results.filter(item=>item.plannerFallback).length;
   report.executionStatus=report.requestFailureCases?'completed-with-request-failures':'completed';
   report.summary={passedCases:report.cases.filter(item=>item.passed).length,
-   failedCases:report.cases.filter(item=>!item.passed).length,requestFailureCases:report.requestFailureCases};
+   failedCases:report.cases.filter(item=>!item.passed).length,requestFailureCases:report.requestFailureCases,
+   plannerFallbackCases:report.plannerFallbackCases};
   await saveReport();
   console.log('Done: '+report.summary.passedCases+'/'+report.caseCount+' cases met citation and expected-work checks; '+report.completedCases+' completed, '+report.notRunCases+' not run. This is a retrieval/citation review signal, not an AI truth grader.');
   return report.requestFailureCases?1:0;
