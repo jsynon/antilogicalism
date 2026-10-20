@@ -74,3 +74,61 @@ test('passage evidence ranks Nicomachean Ethics ahead of Politics without a titl
  assert.match(best?.preview||'',/result of habit/i);
  assert(Number.isFinite(best?.score));
 });
+
+test('all-books search recovers a uniquely misspelled author surname',async()=>{
+ const corpus={
+  'manifest.json':{
+   version:47,postings_encoding:'delta-json-v1',prefix_length:2,
+   pages:2,page_books:[140,223],partitions:['fa'],
+   books:{
+    '140':{title:'Fear and Trembling — Søren Kierkegaard',
+      drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+    '223':{title:'Summa Theologica — Thomas Aquinas',
+      drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
+   }
+  },
+  'terms-fa.json':{faith:[0,1]},
+  'book-140.json':{pages:[{id:0,page:21,text:'Kierkegaard describes faith as a movement beyond resignation, made by virtue of the absurd.'}]},
+  'book-223.json':{pages:[{id:1,page:4147,text:'Faith is a theological virtue directed toward God and taught in sacred doctrine.'}]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const result=await finder.search('what does kierkgaard have to say about faith?',{
+  maxBooks:2,pagesPerBook:2
+ });
+ assert.equal(result.sources.length,1);
+ assert.equal(result.sources[0]?.bookId,'140');
+ assert.equal(result.sources[0]?.page,21);
+});
+
+test('fuzzy author scoping requires a distinct indexed topic term',async()=>{
+ const corpus={
+  'manifest.json':{
+   version:47,postings_encoding:'delta-json-v1',prefix_length:2,
+   pages:2,page_books:[140,223],partitions:['fa'],
+   books:{
+    '140':{title:'Fear and Trembling — Søren Kierkegaard',
+      drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+    '223':{title:'Summa Theologica — Thomas Aquinas',
+      drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
+   }
+  },
+  'terms-fa.json':{faith:[0,1]},
+  'book-140.json':{pages:[{id:0,page:21,text:'Kierkegaard describes faith as a movement beyond resignation.'}]},
+  'book-223.json':{pages:[{id:1,page:4147,text:'Faith is a theological virtue directed toward God.'}]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const result=await finder.search('kierkgaard?',{maxBooks:2,pagesPerBook:2});
+ assert.equal(result.sources.length,2);
+});
