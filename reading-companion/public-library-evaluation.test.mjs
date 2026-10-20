@@ -9,6 +9,7 @@ import {evaluateCase,sourceIdentityIssues,summarize,validateSuite,verifyFingerpr
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
+const SELECTED_SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-selected-book-v1.json');
 const DRIVE='1XVInAFS2zutV8PDp8A3DirUrW6nLLfvY';
 
 test('benchmark covers 31 fixed global questions across six subject areas, including scripture',async()=>{
@@ -29,6 +30,62 @@ test('benchmark validation rejects duplicate IDs and incomplete two-facet plans'
  const cases=suite.cases.map(c=>({...c,planner_queries:[...c.planner_queries]}));
  cases[0].planner_queries[1]=cases[0].planner_queries[0];
  assert.throws(()=>validateSuite({...suite,cases}),/two valid planned searches/);
+});
+
+test('selected-book benchmark covers all six subject areas without changing all-books cases',async()=>{
+ const suite=validateSuite(JSON.parse(await readFile(SELECTED_SUITE_PATH,'utf8')));
+ assert.equal(suite.suite_id,'antilogicalism-reading-companion-selected-book-v1');
+ assert.equal(suite.cases.length,7);
+ assert.deepEqual(new Set(suite.cases.map(item=>item.discipline)),new Set(['science','history','literature','philosophy','politics-society','religion']));
+ assert.ok(suite.cases.every(item=>/^[1-9]\d{0,3}$/.test(item.selected_book_id)));
+ assert.ok(suite.cases.every(item=>item.required_source_groups.some(group=>
+  group.book_ids.map(String).includes(String(item.selected_book_id)))));
+ assert.ok(suite.cases.some(item=>item.id==='selected-philosophy-aristotle-habituation'));
+});
+
+test('selected-book evaluation constrains every search facet to the requested book',async()=>{
+ const text='Virtue is produced and destroyed by the same means, habituation.';
+ const drive=`https://drive.google.com/file/d/${DRIVE}/view`;
+ const source={id:'S1',bookId:'7',title:'Nicomachean Ethics — Aristotle',page:14,globalPageId:0,
+  url:drive+'?usp=sharing#page=14',preview:text,score:10};
+ const manifest={page_books:['7'],books:{'7':{title:source.title,drive_url:drive}}};
+ const sha256=createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
+ const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
+  libraryVersion:47,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
+ const scopeArgs=[];
+ const library={search:async(query,options)=>{scopeArgs.push(options.allowedBookIds);return {sources:[source],booksScanned:1};},
+  jsonGzip:async()=>({pages:[{id:0,page:14,text}]})};
+ const item={id:'selected-aristotle-test',discipline:'philosophy',task:'mechanism-explanation',
+  selected_book_id:'7',question:'How does Aristotle explain becoming virtuous through repeated actions?',
+  planner_queries:['Aristotle virtue habituation','Aristotle moral character actions'],
+  required_source_groups:[{label:'Nicomachean Ethics',book_ids:['7']}]};
+ const result=await evaluateCase(item,{library,manifest,allowedBookIds:new Set(['7']),
+  fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
+ assert.equal(scopeArgs.length,3);
+ assert.ok(scopeArgs.every(ids=>ids.size===1&&ids.has('7')));
+ assert.equal(result.retrievalPass,true);
+ assert.equal(result.candidateSourcesVerified,true);
+ assert.equal(result.sourceIdentityIssues.length,0);
+});
+
+test('selected-book evaluation fails if retrieval leaks a passage from another book',async()=>{
+ const text='A passage returned from an unrelated work must fail selected-book scope.';
+ const drive=`https://drive.google.com/file/d/${DRIVE}/view`;
+ const source={id:'S1',bookId:'12',title:'Politics — Aristotle',page:14,globalPageId:0,
+  url:drive+'?usp=sharing#page=14',preview:text,score:10};
+ const manifest={page_books:['12'],books:{'12':{title:source.title,drive_url:drive}}};
+ const sha256=createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
+ const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
+  libraryVersion:47,bookId:'12',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
+ const library={search:async()=>({sources:[source],booksScanned:1}),jsonGzip:async()=>({pages:[{id:0,page:14,text}]})};
+ const item={id:'selected-book-scope-leak',discipline:'philosophy',task:'scope-check',
+  selected_book_id:'7',question:'How does Aristotle explain becoming virtuous through repeated actions?',
+  planner_queries:['Aristotle virtue habituation','Aristotle moral character actions'],
+  required_source_groups:[{label:'Nicomachean Ethics',book_ids:['7','12']}]};
+ const result=await evaluateCase(item,{library,manifest,allowedBookIds:new Set(['12']),
+  fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
+ assert.equal(result.retrievalPass,false);
+ assert.ok(result.sourceIdentityIssues.some(issue=>issue.code==='selected_book_scope_leak'));
 });
 
 test('the production facet merger preserves both facets and ranks stronger passage evidence first',()=>{
