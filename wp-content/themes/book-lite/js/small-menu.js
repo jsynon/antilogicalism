@@ -2,6 +2,40 @@
  * Handles toggling the main navigation menu for small screens.
  */
 jQuery( document ).ready( function( $ ) {
+	var $primaryMenu = $( '#menu-primary' );
+	if ( ! $primaryMenu.length )
+		$primaryMenu = $( '.site-navigation .menu' ).first();
+
+	if ( $primaryMenu.length ) {
+		var companionPath = '/antilogicalism/reading-companion/';
+		var $companionLink = $primaryMenu.find( 'a[href="' + companionPath + '"]' );
+		var $companionItem = $companionLink.closest( 'li' );
+
+		if ( ! $companionItem.length ) {
+			$companionItem = $( '<li>', {
+				'class': 'menu-item menu-item-type-custom menu-item-object-custom menu-item-reading-companion'
+			} );
+			$companionLink = $( '<a>', {
+				href: companionPath,
+				text: 'Reading Companion'
+			} );
+			$companionItem.append( $companionLink );
+
+			var $librarySearchItem = $primaryMenu.find( 'a[href="/antilogicalism/digital-library/"]' ).closest( 'li' );
+			if ( $librarySearchItem.length )
+				$librarySearchItem.after( $companionItem );
+			else
+				$primaryMenu.append( $companionItem );
+		}
+
+		if ( window.location.pathname.replace( /\/+$/, '/' ) === companionPath ) {
+			$primaryMenu.children( '.current-menu-item, .current_page_item' )
+				.removeClass( 'current-menu-item current_page_item page_item' );
+			$primaryMenu.find( 'a[aria-current="page"]' ).removeAttr( 'aria-current' );
+			$companionItem.addClass( 'current-menu-item page_item current_page_item' );
+			$companionLink.attr( 'aria-current', 'page' );
+		}
+	}
 	var $masthead = $( '#masthead' ),
 	    timeout = false;
 
