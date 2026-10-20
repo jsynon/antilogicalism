@@ -51,6 +51,12 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
 });
 
+test('partial Worker coverage is an evaluation miss even when citations and expected books are present',()=>{
+ const result=auditLiveAnswer({coverage:'partial',answer:'Supported claim [S1].',citations:[{id:'S1',bookId:'638'}]},[{}],[{label:'Bible',book_ids:['638']}]);
+ assert.equal(result.sourceGroups[0].found,true);
+ assert.equal(result.passed,false);
+});
+
 test('case evaluation sends one plan and one answer request in order without logging the token',async()=>{
  const calls=[],searched=[];
  const library={search:async(query)=>{searched.push(query);return {sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]};},
