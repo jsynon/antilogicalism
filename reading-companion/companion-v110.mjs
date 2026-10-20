@@ -83,7 +83,12 @@ function node(tag,textValue,className){
   if(className)e.className=className;
   return e;
 }
-function setStatus(message){status.textContent=message;}
+function refreshStatusState(){
+  const busy=Boolean(status.textContent.trim())&&(searching||answering);
+  status.classList.toggle('is-busy',busy);
+  status.setAttribute('aria-busy',String(busy));
+}
+function setStatus(message){status.textContent=message;refreshStatusState();}
 function refreshDiagnostic(){
   if(!diagnosticState)return;
   diagnosticOutput.textContent=JSON.stringify(createDiagnosticReport(diagnosticState),null,2);
@@ -107,10 +112,12 @@ function showAvailability(){
 }
 function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
+  askButton.textContent=searching||answering?'Working…':'Ask Reading Companion';
   if(newConversationButton)newConversationButton.disabled=answering;
   answerBox.querySelectorAll('.companion-follow-up-buttons button').forEach(button=>{
     button.disabled=answering;
   });
+  refreshStatusState();
 }
 function updateBookOptions(){
   const previous=bookFilter.value;
@@ -549,7 +556,7 @@ async function askQuestion(questionText){
       refreshDiagnostic();
     }
     turnstileToken='';
-    setStatus('Checking the source passages and preparing your answer…');
+    setStatus('Preparing an answer from the selected passages… This can take a little while.');
     const response=await fetch(API+'/api/pilot-answer',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
