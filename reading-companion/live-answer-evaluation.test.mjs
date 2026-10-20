@@ -77,6 +77,19 @@ test('planner rate limit remains fail-closed and skips answer generation',async(
    });
 });
 
+test('evaluation report preserves planner fallback when the later answer request fails',async()=>{
+ const item={id:'planner-fallback-answer-failure',question:'Explain the source question with enough detail.',required_source_groups:[]};
+ const library={search:async()=>({sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,preview:'A sufficiently long preview passage for testing.',score:4}]}),
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
+ const result=await runLiveCases([item],{evaluateOptions:{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
+  beforeCall:async()=>{},fetcher:async url=>url.endsWith('pilot-plan')?
+   new Response(JSON.stringify({failureCode:'search-planning-failed'}),{status:502,headers:{'content-type':'application/json'}}):
+   new Response(JSON.stringify({failureCode:'evidence-review-request-failed'}),{status:502,headers:{'content-type':'application/json'}})}});
+ assert.equal(result.results[0].requestFailure.stage,'answer');
+ assert.equal(result.results[0].plannerFallback,true);
+ assert.deepEqual(result.results[0].plannerFailure,{httpStatus:502,failureCode:'search-planning-failed'});
+});
+
 test('audit report preserves answer text, citation locations, and Worker quote highlights',()=>{
  const result=auditLiveAnswer({answer:'Supported claim [S1].',citations:[{
    id:'S1',bookId:'638',title:'Bible',page:1821,globalPageId:274264,
