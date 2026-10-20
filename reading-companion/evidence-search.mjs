@@ -160,6 +160,7 @@ export function matchExplicitBookIds(question,books){
  * direct search with the reader's own wording. Keep explicit request denials
  * and rate limits fail-closed. */
 export function canFallbackToDirectSearch(status,code=''){
+ if(['ai-daily-limit-reached','ai-capacity-unavailable','ai-rate-limited'].includes(code))return false;
  if(status===null||status===undefined)return true;
  if(Number.isInteger(status)&&status>=500)return true;
  if(Number.isInteger(status)&&status>=400)return false;
