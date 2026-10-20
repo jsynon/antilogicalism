@@ -18,6 +18,7 @@ test('benchmark covers 31 fixed global questions across six subject areas, inclu
  const scripture=suite.cases.find(c=>c.id==='religion-1-john-love');
  assert.ok(scripture,'the 1 John retrieval regression is present');
  assert.deepEqual(scripture.required_source_groups,[{label:'1 John 4:7–12',book_ids:['638']}]);
+ assert.deepEqual(scripture.evidence_targets,[{label:'1 John 4:7–12',book_id:'638',pages:[1821]}]);
  assert.deepEqual(new Set(suite.cases.map(c=>c.discipline)),new Set(['science','history','literature','philosophy','politics-society','religion']));
  assert.ok(suite.cases.every(c=>c.planner_queries.length===2));
  assert.ok(suite.cases.every(c=>!('book_id' in c)), 'every search starts in all-books scope');
@@ -30,6 +31,9 @@ test('benchmark validation rejects duplicate IDs and incomplete two-facet plans'
  const cases=suite.cases.map(c=>({...c,planner_queries:[...c.planner_queries]}));
  cases[0].planner_queries[1]=cases[0].planner_queries[0];
  assert.throws(()=>validateSuite({...suite,cases}),/two valid planned searches/);
+ const invalidTargets=suite.cases.map(c=>({...c}));
+ invalidTargets[0]={...invalidTargets[0],evidence_targets:[{label:'wrong book',book_id:'7',pages:[14]}]};
+ assert.throws(()=>validateSuite({...suite,cases:invalidTargets}),/must belong to a required source group/);
 });
 
 test('selected-book benchmark covers all six subject areas without changing all-books cases',async()=>{
@@ -114,12 +118,18 @@ test('public retrieval evaluation searches both planner facets and exact questio
  const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
   libraryVersion:47,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
  const item={id:'aristotle-habituation',discipline:'philosophy',task:'mechanism-explanation',
-  question,planner_queries:plan,required_source_groups:[{label:'Aristotle',book_ids:['7']}]};
+  question,planner_queries:plan,required_source_groups:[{label:'Aristotle',book_ids:['7']}],
+  evidence_targets:[{label:'Habituation passage',book_id:'7',pages:[14]}]};
  const result=await evaluateCase(item,{library,manifest,allowedBookIds:new Set(['7']),
   fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
  assert.deepEqual(searched,[...plan,question]);
  assert.deepEqual(result.searchQueries,[...plan,question]);
  assert.equal(result.retrievalPass,true);
+ assert.equal(result.candidateEvidenceTargetRecallPercent,100);
+ assert.equal(result.selectedEvidenceTargetRecallPercent,100);
+ assert.equal(result.selectedExactTargetMatchPercent,100);
+ assert.deepEqual(result.submittedSources.map(source=>source.page),[14]);
+ assert.equal(result.unannotatedSubmittedSourceCount,0);
 });
 test('source identity audit checks global ID, title, PDF ID and page anchor',()=>{
  const manifest={page_books:['7'],books:{'7':{title:'Nicomachean Ethics — Aristotle',drive_url:`https://drive.google.com/file/d/${DRIVE}/view`}}};
@@ -161,6 +171,19 @@ test('summary reports retrieval, default-selection, and verified-source coverage
  assert.equal(result.defaultSelectedGroupRecallPercent,0);
  assert.equal(result.verifiedCandidateGroupRecallPercent,100);
  assert.equal(result.verifiedDefaultGroupRecallPercent,0);
+});
+
+test('summary distinguishes exact annotated-page matches from submitted pages without annotations',()=>{
+ const result=summarize([
+  {elapsedMs:1,sourceIdentityIssues:[],fingerprintChecks:[],requiredSourceGroups:[],
+   evidenceTargets:[{candidateHit:true,selectedHit:true,bookId:'7',pages:[14]}],
+   submittedSources:[{bookId:'7',page:14},{bookId:'7',page:15}]},
+ ]);
+ assert.equal(result.evidenceTargetCount,1);
+ assert.equal(result.candidateEvidenceTargetRecallPercent,100);
+ assert.equal(result.selectedEvidenceTargetRecallPercent,100);
+ assert.equal(result.selectedExactTargetMatchPercent,50);
+ assert.equal(result.unannotatedSubmittedSourceCount,1);
 });
 
 test('evaluation mirrors production source selection and covers distinct works before alternate pages',()=>{

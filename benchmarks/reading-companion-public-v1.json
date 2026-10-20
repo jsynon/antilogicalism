@@ -20,6 +20,15 @@
       "planner_queries": [
         "Hawking black hole event horizon collapse properties",
         "Hawking observational evidence black holes versus theoretical predictions"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Event horizon definition",
+          "book_id": "102",
+          "pages": [
+            53
+          ]
+        }
       ]
     },
     {
@@ -38,6 +47,15 @@
       "planner_queries": [
         "Darwin natural selection preservation of beneficial variations survival reproduction",
         "Origin of species variation inheritance struggle for existence Darwin"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Natural selection and variation",
+          "book_id": "529",
+          "pages": [
+            495
+          ]
+        }
       ]
     },
     {
@@ -56,6 +74,15 @@
       "planner_queries": [
         "Maxwell definition electric potential function force components",
         "Maxwell electric force first derivatives of potential gradient"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Potential function and force",
+          "book_id": "645",
+          "pages": [
+            110
+          ]
+        }
       ]
     },
     {
@@ -116,6 +143,23 @@
       "planner_queries": [
         "Thucydides real cause growth of Athenian power fear Lacedaemon",
         "Thucydides immediate disputes Corcyra Potidaea grievances"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Underlying cause",
+          "book_id": "152",
+          "pages": [
+            38
+          ]
+        },
+        {
+          "label": "Immediate disputes",
+          "book_id": "152",
+          "pages": [
+            59,
+            94
+          ]
+        }
       ]
     },
     {
@@ -189,6 +233,23 @@
       "planner_queries": [
         "Thucydides real cause Athenian power Lacedaemon alarm",
         "Thucydides Corcyra Potidaea immediate cause of war"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Underlying cause",
+          "book_id": "152",
+          "pages": [
+            38
+          ]
+        },
+        {
+          "label": "Immediate disputes",
+          "book_id": "152",
+          "pages": [
+            59,
+            94
+          ]
+        }
       ]
     },
     {
@@ -335,6 +396,15 @@
       "planner_queries": [
         "Aristotle Nicomachean Ethics virtue habit repeated actions",
         "Aristotle become just by doing just acts brave by doing brave acts"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Habituation and repeated actions",
+          "book_id": "7",
+          "pages": [
+            14
+          ]
+        }
       ]
     },
     {
@@ -395,6 +465,15 @@
       "planner_queries": [
         "Anaxagoras Nous Mind initiated rotation motion cosmos",
         "Anaxagoras Mind separates mixed things sun moon stars"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Nous initiating motion",
+          "book_id": "2",
+          "pages": [
+            3
+          ]
+        }
       ]
     },
     {
@@ -413,6 +492,16 @@
       "planner_queries": [
         "Aristotle De Anima soul principle life nutrition sensation",
         "De Anima powers of soul motion thinking living beings"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Soul and powers of living things",
+          "book_id": "4",
+          "pages": [
+            17,
+            18
+          ]
+        }
       ]
     },
     {
@@ -584,6 +673,15 @@
           "label": "1 John 4:7–12",
           "book_ids": [
             "638"
+          ]
+        }
+      ],
+      "evidence_targets": [
+        {
+          "label": "1 John 4:7–12",
+          "book_id": "638",
+          "pages": [
+            1821
           ]
         }
       ]

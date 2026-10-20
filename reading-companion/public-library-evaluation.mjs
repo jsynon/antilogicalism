@@ -50,6 +50,17 @@ export function validateSuite(suite){
   if(typeof item.question!=='string'||item.question.length<25||!validSearchPlan(item.planner_queries))throw Error(item.id+': question needs two valid planned searches.');
   if(!Array.isArray(item.required_source_groups)||!item.required_source_groups.length)throw Error(item.id+': expected source groups are required.');
   for(const group of item.required_source_groups)if(!group||typeof group.label!=='string'||!Array.isArray(group.book_ids)||!group.book_ids.length||group.book_ids.some(id=>!/^[1-9]\d{0,3}$/.test(String(id))))throw Error(item.id+': invalid expected source group.');
+  if(item.evidence_targets!==undefined){
+   if(!Array.isArray(item.evidence_targets))throw Error(item.id+': evidence_targets must be an array.');
+   for(const target of item.evidence_targets){
+    const bookId=String(target?.book_id||'');
+    if(typeof target?.label!=='string'||!target.label.trim()||!/^\d{1,4}$/.test(bookId)||
+       !Array.isArray(target.pages)||!target.pages.length||target.pages.some(page=>!Number.isSafeInteger(page)||page<1))
+     throw Error(item.id+': invalid evidence target.');
+    if(!item.required_source_groups.some(group=>group.book_ids.map(String).includes(bookId)))
+     throw Error(item.id+': evidence target book must belong to a required source group.');
+   }
+  }
   if(item.selected_book_id!==undefined&&(!/^[1-9]\d{0,3}$/.test(String(item.selected_book_id))||
     item.required_source_groups.some(group=>!group.book_ids.map(String).includes(String(item.selected_book_id)))))
    throw Error(item.id+': selected book must be valid and included in an expected source group.');
@@ -167,9 +178,25 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
    defaultSelectedBookIds:[...new Set(defaultFound.map(s=>String(s.bookId)))],fingerprintedCandidateBookIds:[...new Set(verified.map(s=>String(s.bookId)))],
    retrieved:found.length>0,defaultSelected:defaultFound.length>0,sourceVerified:verified.length>0,defaultSourceVerified:defaultVerifiedFound.length>0};
  });
+ const evidenceTargets=(item.evidence_targets||[]).map(target=>{
+  const bookId=String(target.book_id),pages=[...new Set(target.pages)];
+  const candidateMatches=candidates.filter(source=>String(source.bookId)===bookId&&pages.includes(source.page));
+  const selectedMatches=defaultSelection.filter(source=>String(source.bookId)===bookId&&pages.includes(source.page));
+  return {label:target.label,bookId,pages,candidatePages:[...new Set(candidateMatches.map(source=>source.page))],
+   selectedPages:[...new Set(selectedMatches.map(source=>source.page))],candidateHit:candidateMatches.length>0,selectedHit:selectedMatches.length>0};
+ });
+ const targetedPageKeys=new Set(evidenceTargets.flatMap(target=>target.pages.map(page=>target.bookId+':'+page)));
+ const unannotatedSubmittedSources=defaultSelection.filter(source=>!targetedPageKeys.has(String(source.bookId)+':'+source.page))
+  .map(source=>({bookId:String(source.bookId),page:source.page,title:source.title}));
  return {id:item.id,discipline:item.discipline,task:item.task,question:item.question,selectedBookId:selectedBookId||null,plannerQueries:item.planner_queries,
-  searchQueries,requiredSourceGroups:groups,candidates:candidates.map(({id,bookId,title,page,globalPageId,url,preview,score,facet})=>({id,bookId,title,page,globalPageId,url,preview,score,facet})),
+  searchQueries,requiredSourceGroups:groups,evidenceTargets,candidates:candidates.map(({id,bookId,title,page,globalPageId,url,preview,score,facet})=>({id,bookId,title,page,globalPageId,url,preview,score,facet})),
   fingerprintChecks,excludedCandidates,submittedSourceCount:defaultSelection.length,
+  submittedSources:defaultSelection.map(({id,bookId,title,page,globalPageId,url})=>({id,bookId:String(bookId),title,page,globalPageId,url})),
+  unannotatedSubmittedSources,
+  candidateEvidenceTargetRecallPercent:evidenceTargets.length?Number((evidenceTargets.filter(target=>target.candidateHit).length/evidenceTargets.length*100).toFixed(1)):null,
+  selectedEvidenceTargetRecallPercent:evidenceTargets.length?Number((evidenceTargets.filter(target=>target.selectedHit).length/evidenceTargets.length*100).toFixed(1)):null,
+  selectedExactTargetMatchPercent:defaultSelection.length?Number((defaultSelection.filter(source=>targetedPageKeys.has(String(source.bookId)+':'+source.page)).length/defaultSelection.length*100).toFixed(1)):null,
+  unannotatedSubmittedSourceCount:unannotatedSubmittedSources.length,
   booksScanned:foundSets.reduce((n,r)=>n+(Number(r.booksScanned)||0),0),
   elapsedMs:Math.round(performance.now()-start),retrievalPass:groups.every(g=>g.retrieved)&&!issues.some(issue=>issue.code==='selected_book_scope_leak'),
   defaultSelectionPass:groups.every(g=>g.defaultSelected),candidateSourcesVerified:groups.every(g=>g.sourceVerified),
@@ -178,6 +205,13 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
 
 export function summarize(cases){
  const groups=cases.flatMap(c=>c.requiredSourceGroups),sum=(key)=>groups.filter(g=>g[key]).length;
+ const annotatedCases=cases.filter(c=>c.evidenceTargets?.length);
+ const evidenceTargets=annotatedCases.flatMap(c=>c.evidenceTargets);
+ const submitted=annotatedCases.flatMap(c=>c.submittedSources||[]);
+ const annotatedSubmitted=annotatedCases.reduce((count,c)=>{
+  const keys=new Set(c.evidenceTargets.flatMap(target=>target.pages.map(page=>target.bookId+':'+page)));
+  return count+(c.submittedSources||[]).filter(source=>keys.has(String(source.bookId)+':'+source.page)).length;
+ },0);
  const errors=cases.flatMap(c=>c.fingerprintChecks.filter(f=>f.status==='fingerprint-fetch-failed'||f.status==='fingerprint-mismatch'||f.status==='invalid-fingerprint-packet'));
  const executionErrors=cases.filter(c=>c.executionError).length;
  const identity=cases.reduce((n,c)=>n+c.sourceIdentityIssues.length,0);
@@ -190,6 +224,11 @@ export function summarize(cases){
   defaultSelectedGroupRecallPercent:Number((sum('defaultSelected')/groups.length*100).toFixed(1)),
   verifiedCandidateGroupRecallPercent:Number((sum('sourceVerified')/groups.length*100).toFixed(1)),
   verifiedDefaultGroupRecallPercent:Number((sum('defaultSourceVerified')/groups.length*100).toFixed(1)),
+  evidenceTargetCount:evidenceTargets.length,
+  candidateEvidenceTargetRecallPercent:evidenceTargets.length?Number((evidenceTargets.filter(target=>target.candidateHit).length/evidenceTargets.length*100).toFixed(1)):null,
+  selectedEvidenceTargetRecallPercent:evidenceTargets.length?Number((evidenceTargets.filter(target=>target.selectedHit).length/evidenceTargets.length*100).toFixed(1)):null,
+  selectedExactTargetMatchPercent:submitted.length?Number((annotatedSubmitted/submitted.length*100).toFixed(1)):null,
+  unannotatedSubmittedSourceCount:submitted.length-annotatedSubmitted,
   sourceIdentityIssueCount:identity,fingerprintErrors:errors.length,executionErrorCount:executionErrors,oversizedPageCount,
   meanSearchMs:Math.round(cases.reduce((n,c)=>n+c.elapsedMs,0)/cases.length)};
 }
@@ -202,14 +241,16 @@ function markdown(report){
   const got=[...new Set(c.candidates.map(x=>report.titles[x.bookId]||x.bookId))].join('; ')||'—';
   const result=c.retrievalPass?'PASS':'MISS';
   const ready=c.defaultSelectionVerified?'yes':c.candidateSourcesVerified?'candidate only':'no';
-  return `| ${result} | ${scope} | ${c.discipline} | ${c.id} | ${expected} | ${got} | ${ready} | ${c.elapsedMs} ms |`;
+  const evidence=c.evidenceTargets?.length?`${c.evidenceTargets.filter(t=>t.selectedHit).length}/${c.evidenceTargets.length} targets; ${c.unannotatedSubmittedSourceCount} unannotated`:'not annotated';
+  return `| ${result} | ${scope} | ${c.discipline} | ${c.id} | ${expected} | ${got} | ${ready} | ${evidence} | ${c.elapsedMs} ms |`;
  }).join('\n');
  return `## Reading Companion public-library evaluation\n\n`+
  `v${m.version}: ${m.indexedBookRecords} indexed records / ${m.indexedPages.toLocaleString()} pages; ${m.catalogTitles} distinct catalog titles; ${m.fingerprintedBooks}/${m.indexedBookRecords} books fingerprinted.\n\n`+
  `Expected-source recall: ${s.candidateGroupRecallPercent}% across merged candidates; ${s.defaultSelectedGroupRecallPercent}% in the production answer-source set (up to four passages, preferring distinct works). `+
  `Fingerprint-verified recall: ${s.verifiedCandidateGroupRecallPercent}% across candidates and ${s.verifiedDefaultGroupRecallPercent}% in the submitted source set. `+
+ (s.evidenceTargetCount?`Annotated page targets: ${s.evidenceTargetCount}; candidate target recall ${s.candidateEvidenceTargetRecallPercent}%; submitted-source target recall ${s.selectedEvidenceTargetRecallPercent}%; exact annotated-page match rate ${s.selectedExactTargetMatchPercent}% (${s.unannotatedSubmittedSourceCount} submitted pages lack an exact target annotation). `:'')+
  `Cases passing retrieval: ${s.retrievalPassCases}/${s.caseCount}; identity issues: ${s.sourceIdentityIssueCount}; fingerprint errors: ${s.fingerprintErrors}; execution errors: ${s.executionErrorCount}; excluded oversized pages: ${s.oversizedPageCount}; mean search ${s.meanSearchMs} ms.\n\n`+
-  `| Result | Search scope | Area | Case | Expected source groups | Retrieved works | Submitted answer sources verified | Time |\n|---|---|---|---|---|---|---|---:|\n${rows}\n\n`+
+  `| Result | Search scope | Area | Case | Expected source groups | Retrieved works | Submitted answer sources verified | Passage targets | Time |\n|---|---|---|---|---|---|---|---|---:|\n${rows}\n\n`+
  `Retrieval and exact page fingerprints are automated. This workflow makes no model calls and does not claim to grade the truth of generated interpretations.`;
 }
 
