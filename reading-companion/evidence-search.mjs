@@ -186,11 +186,18 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    if(key&&!seenBooks.has(key)){seenBooks.add(key);firstPerBook.push(candidate);}
    else alternates.push(candidate);
  }
- // Preserve the rank- and facet-balanced retrieval order for ordinary questions.
- // Promote one result per book only when the question explicitly asks for a
- // comparison, where source diversity is part of the answer.
+ // Preserve passage ranking for ordinary questions. Comparison questions
+ // need different works by design. Author-wide questions also benefit from
+ // coverage across the author's works, so long as the question does not name
+ // one specific work. matchExplicitBookIds resolves this from the candidates'
+ // trusted catalog titles and does not add a model call.
  const comparisonIntent=/\b(?:compare|contrast|versus|vs\.?|differences?|similarities?)\b/i.test(question);
- const ordered=comparisonIntent?[...firstPerBook,...alternates]:candidates;
+ const authorWideBooks=matchExplicitBookIds(question,candidates.map(candidate=>({
+   id:String(candidate?.bookId||''),title:String(candidate?.title||'')
+ })));
+ const authorWideIntent=authorWideBooks.length>1;
+ const ordered=(comparisonIntent||authorWideIntent)?
+   [...firstPerBook,...alternates]:candidates;
  for(const candidate of ordered){
    if(chosen.length>=maxSources)break;
    if(!candidate||typeof candidate.text!=='string'||
