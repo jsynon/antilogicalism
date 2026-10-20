@@ -379,7 +379,9 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-source-actions button{font:inherit;font-size:.89em;padding:6px 10px;min-height:38px}
 #companion-pilot .companion-source-actions a{font-size:.89em}
 #companion-pilot .companion-layout-picker{display:flex;align-items:center;flex-wrap:wrap;gap:.6em;margin:1em 0}
-#companion-pilot .companion-layout-picker select{width:auto;max-width:100%;font:inherit;font-size:.89em}
+#companion-pilot select,
+#companion-pilot select option{font-weight:600}
+#companion-pilot .companion-layout-picker select{width:auto;max-width:100%;font:inherit;font-weight:600;font-size:.89em}
 #companion-pilot .companion-source-text{max-height:65vh;overflow-y:auto;overflow-wrap:anywhere;border-top:1px solid #dfe2e3;padding-top:.8em;line-height:1.8;font-size:1em}
 #companion-pilot .companion-source-text p{margin:0 0 1em;text-indent:0;white-space:normal}
 #companion-pilot .companion-source-text.original-ocr p{white-space:pre-wrap}
