@@ -11,6 +11,7 @@ import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
+import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber} from './citation-numbering.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -313,7 +314,7 @@ function sourcePage(source){
   return candidates.find(page=>page.bookId===String(source.bookId) &&
     page.page===Number(source.page))||null;
 }
-function putCitationTokens(target,answer,citations,evidenceHighlights=[]){
+function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
   const byId=new Map(citations.map(s=>[s.id,s]));
   const groups=inlineCitationGroups(answer);
   let at=0;
@@ -322,9 +323,10 @@ function putCitationTokens(target,answer,citations,evidenceHighlights=[]){
     if(source){
       const a=document.createElement('button');
       a.type='button';
-      a.textContent=id;a.className='companion-inline-citation';
+      const label=citationDisplayLabel(id,numbering);
+      a.textContent=label;a.className='companion-inline-citation';
       a.title=source.title+' PDF page '+source.page;
-      a.setAttribute('aria-label','Open ['+id+'] in the page reader: '+
+      a.setAttribute('aria-label','Open ['+label+'] in the page reader: '+
         source.title+', PDF page '+source.page);
       const evidence=evidenceHighlights.find(item=>item.source_id===source.id&&
         Number(item.page)===Number(source.page));
@@ -334,7 +336,7 @@ function putCitationTokens(target,answer,citations,evidenceHighlights=[]){
         }catch(error){setStatus('Source reader: '+error.message);}
       });
       target.append(a);
-    }else target.append(document.createTextNode(id));
+    }else target.append(document.createTextNode(citationDisplayLabel(id,numbering)));
   };
   for(const group of groups){
     if(group.start>at)target.append(document.createTextNode(answer.slice(at,group.start)));
@@ -352,11 +354,14 @@ function renderResponse(data,turnQuestion=''){
   const turn=node('article',undefined,'companion-turn');
   if(turnQuestion)turn.append(node('p','Question: '+turnQuestion,'companion-turn-question'));
   const citations=Array.isArray(data.citations)?data.citations:[];
+  const answer=String(data.answer||'');
+  const numbering=buildCitationNumbering(answer,citations);
+  const orderedCitations=sortCitationsByNumber(citations,numbering);
   const highlights=Array.isArray(data.evidenceHighlights)?data.evidenceHighlights:[];
   turn.append(node('h2',data.outcome==='insufficient-evidence'?
     'Insufficient evidence':'Reading Companion answer'));
   const reply=node('div',undefined,'companion-answer-text');
-  putCitationTokens(reply,String(data.answer||''),citations,highlights);
+  putCitationTokens(reply,answer,citations,highlights,numbering);
   turn.append(reply);
   if(data.missing)turn.append(node('p','What these passages don’t establish: '+data.missing,'companion-hint'));
 
@@ -364,7 +369,10 @@ function renderResponse(data,turnQuestion=''){
   if(highlights.length){
     const panel=node('section',undefined,'companion-highlights');
     panel.append(node('h3','Key passages from the source books'));
-    for(const item of highlights.slice(0,3)){
+    const orderedHighlights=highlights.slice(0,3).sort((a,b)=>
+      (numbering.get(String(a.source_id))||Number.MAX_SAFE_INTEGER)-
+      (numbering.get(String(b.source_id))||Number.MAX_SAFE_INTEGER));
+    for(const item of orderedHighlights){
       if(typeof item.quote!=='string'||!item.quote.trim()||
         typeof item.url!=='string')continue;
       const citation=citations.find(source=>source.id===item.source_id&&
@@ -375,7 +383,7 @@ function renderResponse(data,turnQuestion=''){
       const quote=node('p',item.quote,'companion-key-quote');
       const a=document.createElement('a');a.href=item.url;
       a.target='_blank';a.rel='noopener noreferrer';
-      a.textContent='['+item.source_id+'] '+item.title+' · PDF p. '+item.page;
+      a.textContent='['+citationDisplayLabel(item.source_id,numbering)+'] '+item.title+' · PDF p. '+item.page;
       const read=node('button','Read passage','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
@@ -388,7 +396,7 @@ function renderResponse(data,turnQuestion=''){
     }
     turn.append(panel);
   }
-  const remainingCitations=citations.filter(source=>
+  const remainingCitations=orderedCitations.filter(source=>
     !highlightedSourceKeys.has(source.id+'|'+Number(source.page)));
   if(remainingCitations.length){
     const sources=node('section',undefined,'companion-citations');
@@ -398,7 +406,7 @@ function renderResponse(data,turnQuestion=''){
       const label=node('p');
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
-      link.textContent='['+source.id+'] '+source.title+' · PDF page '+source.page;
+      link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · PDF page '+source.page;
       label.append(link);row.append(label);
       // The original PDF link remains untouched. The new button opens a
       // separate in-page reader using the same trusted v47 book shard.
