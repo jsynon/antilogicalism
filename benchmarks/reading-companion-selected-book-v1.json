@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "suite_id": "antilogicalism-reading-companion-selected-book-v1",
+  "purpose": "A read-only, no-AI evaluation of selected-book retrieval. Each case constrains passage search to one named work and verifies the selected work's indexed pages against published fingerprints.",
+  "corpus_version": 47,
+  "cases": [
+    {
+      "id": "selected-philosophy-aristotle-habituation",
+      "discipline": "philosophy",
+      "task": "mechanism-explanation",
+      "selected_book_id": "7",
+      "question": "How does Aristotle explain becoming virtuous through repeated actions?",
+      "required_source_groups": [{"label":"Nicomachean Ethics","book_ids":["7"]}],
+      "planner_queries": [
+        "Aristotle Nicomachean Ethics habituation through repeated bodily actions",
+        "forming virtuous character by performing virtuous deeds repeatedly"
+      ]
+    },
+    {
+      "id": "selected-science-darwin-selection",
+      "discipline": "science",
+      "task": "mechanism-explanation",
+      "selected_book_id": "529",
+      "question": "According to Darwin's On the Origin of Species, how does natural selection preserve beneficial variations?",
+      "required_source_groups": [{"label":"On the Origin of Species","book_ids":["529"]}],
+      "planner_queries": [
+        "Darwin natural selection preserve accumulate beneficial individual variations",
+        "Origin of Species survival reproduction inheritance useful variations"
+      ]
+    },
+    {
+      "id": "selected-science-hawking-black-holes",
+      "discipline": "science",
+      "task": "concept-explanation",
+      "selected_book_id": "102",
+      "question": "In A Brief History of Time, how does Hawking define a black hole's event horizon?",
+      "required_source_groups": [{"label":"A Brief History of Time","book_ids":["102"]}],
+      "planner_queries": [
+        "Hawking event horizon boundary light cannot escape black hole",
+        "A Brief History of Time definition black hole event horizon"
+      ]
+    },
+    {
+      "id": "selected-history-thucydides-causes",
+      "discipline": "history",
+      "task": "causal-explanation",
+      "selected_book_id": "152",
+      "question": "According to Thucydides, what was the underlying cause of the Peloponnesian War, and how did it differ from its immediate disputes?",
+      "required_source_groups": [{"label":"History of the Peloponnesian War","book_ids":["152"]}],
+      "planner_queries": [
+        "Thucydides growth of Athenian power alarm at Sparta real cause of war",
+        "Thucydides immediate disputes Corcyra Potidaea pretext for Peloponnesian War"
+      ]
+    },
+    {
+      "id": "selected-literature-dostoevsky-theory",
+      "discipline": "literature",
+      "task": "argument-and-character",
+      "selected_book_id": "114",
+      "question": "In Crime and Punishment, how does Raskolnikov's theory of extraordinary people attempt to justify murder?",
+      "required_source_groups": [{"label":"Crime and Punishment","book_ids":["114"]}],
+      "planner_queries": [
+        "Raskolnikov extraordinary people right to transgress law theory",
+        "Crime and Punishment Raskolnikov extraordinary man murder justification"
+      ]
+    },
+    {
+      "id": "selected-society-rousseau-general-will",
+      "discipline": "politics-society",
+      "task": "conceptual-relationship",
+      "selected_book_id": "245",
+      "question": "In The Social Contract, how does Rousseau explain the general will and its relationship to the common good?",
+      "required_source_groups": [{"label":"The Social Contract","book_ids":["245"]}],
+      "planner_queries": [
+        "Rousseau Social Contract general will common good",
+        "Rousseau sovereignty laws collective body political association"
+      ]
+    },
+    {
+      "id": "selected-religion-first-john-love",
+      "discipline": "religion",
+      "task": "textual-interpretation",
+      "selected_book_id": "638",
+      "question": "What does 1 John 4:7–12 say about God's love and loving one another?",
+      "required_source_groups": [{"label":"1 John 4:7–12","book_ids":["638"]}],
+      "planner_queries": [
+        "1 John 4:7-12 God is love sent his Son love one another",
+        "1 John 4:7-12 born of God atoning sacrifice love one another"
+      ]
+    }
+  ]
+}

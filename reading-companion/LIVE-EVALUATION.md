@@ -1,6 +1,6 @@
 # Live answer evaluation
 
-The 30-case `Reading Companion library evaluation` remains the normal PR and scheduled check. It searches the published index and verifies source-page identity/fingerprints; it makes **zero Cloudflare AI calls**.
+The normal PR and scheduled `Reading Companion library evaluation` runs two retrieval-only suites: 31 all-books questions and 6 selected-book questions spanning philosophy, science, history, literature, and religion. Both search the published index and verify source-page identity/fingerprints; they make **zero Cloudflare AI calls**. The selected-book suite also checks that retrieval stays inside the chosen book. It does not add cases to the metered live-AI benchmark.
 
 `Reading Companion live answer evaluation` is a separate, manually dispatched workflow. It requires a live-AI confirmation checkbox. The default smoke run asks three questions: the 1 John 4:7–12 retrieval case, the Hawking black-hole case, and Aristotle on habituation. Choose `full` only when you want the complete 30-question benchmark; the full mode has a second confirmation checkbox. Runs are serialized and API requests are spaced at least 16 seconds apart to stay within the pilot's rate limits.
 
