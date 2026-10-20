@@ -57,7 +57,7 @@ export function auditCitationIds(answer,citations=[]){
   const inlineIds=[...new Set([...String(answer||'').matchAll(/\[([^\]]+)\]/g)]
     .flatMap(match=>match[1].match(/\bS[1-9]\d*\b/g)||[]))];
   const returnedIds=[...new Set(citations.map(source=>source?.id)
-    .filter(id=>typeof id==='string'&&/^S[1-9]\d*$/.test(id)))];
+    .map(source=>source?.id).filter(id=>typeof id==='string'&&/^S[1-9][0-9]*$/.test(id)))
   return {
     inlineIds,
     returnedIds,
