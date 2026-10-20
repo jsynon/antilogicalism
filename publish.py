@@ -285,6 +285,9 @@ def publish(source):
     if not INDEXER.is_file():
         raise FileNotFoundError(f'Search index builder not found: {INDEXER}')
     old_index = ROOT / 'search-index.json'
+    sitemap = ROOT / 'sitemap.xml'
+    if not sitemap.is_file():
+        raise FileNotFoundError('Existing sitemap.xml missing')
     if not old_index.is_file():
         raise FileNotFoundError('Existing search-index.json missing')
     old_docs = json.loads(read(old_index))
@@ -296,7 +299,8 @@ def publish(source):
     backup = ROOT.parent / ('antilogicalism-publication-backup-' + datetime.now().strftime('%Y%m%d-%H%M%S-%f'))
     backup.mkdir(parents=True, exist_ok=False)
     originals = {BLOG: BLOG.read_bytes(), UNCATEGORIZED: UNCATEGORIZED.read_bytes(),
-                 previous: previous.read_bytes(), old_index: old_index.read_bytes()}
+                 previous: previous.read_bytes(), old_index: old_index.read_bytes(),
+                 sitemap: sitemap.read_bytes()}
     for path, content in originals.items():
         copy_path = backup / path.relative_to(ROOT)
         copy_path.parent.mkdir(parents=True, exist_ok=True)
@@ -312,6 +316,7 @@ def publish(source):
         new_count = len(new_docs['documents'])
         if new_count < old_count + 1:
             raise RuntimeError(f'Search index count did not increase: {old_count} -> {new_count}')
+        update_sitemap_for_post(result['permalink'])
     except Exception:
         for path, content in originals.items():
             path.write_bytes(content)
@@ -329,6 +334,33 @@ def publish(source):
 
 
 
+
+
+def update_sitemap_for_post(permalink):
+    """Add the new article URL to the existing sitemap without disturbing older URLs."""
+    from xml.etree import ElementTree as ET
+
+    sitemap = ROOT / 'sitemap.xml'
+    namespace = 'http://www.sitemaps.org/schemas/sitemap/0.9'
+    ET.register_namespace('', namespace)
+    tree = ET.parse(sitemap)
+    root = tree.getroot()
+    if root.tag != f'{{{namespace}}}urlset':
+        raise RuntimeError('Unexpected sitemap structure; sitemap unchanged')
+    url = 'https://jsynon.github.io' + permalink
+    existing = {node.text for node in root.findall(f'.//{{{namespace}}}loc')}
+    if url in existing:
+        print('Sitemap already includes:', url)
+        return
+    item = ET.SubElement(root, f'{{{namespace}}}url')
+    ET.SubElement(item, f'{{{namespace}}}loc').text = url
+    ET.indent(tree, space='  ')
+    tree.write(sitemap, encoding='utf-8', xml_declaration=True)
+    # Make sure the newly written file is still parseable and contains the URL.
+    checked = ET.parse(sitemap)
+    if url not in {n.text for n in checked.findall(f'.//{{{namespace}}}loc')}:
+        raise RuntimeError('Sitemap validation failed')
+    print('Sitemap updated:', url)
 
 def sync_excerpt(article_path):
     """Refresh existing Blog and Uncategorized excerpts from a published HTML article."""
