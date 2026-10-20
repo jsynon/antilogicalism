@@ -1,3 +1,13 @@
+test('ordinary questions preserve passage ranking instead of promoting weaker books',()=>{
+ const candidates=[
+  {...page(1,'7'),score:90,text:'strong primary passage'},
+  {...page(2,'7'),score:80,text:'second primary passage'},
+  {...page(3,'529'),score:40,text:'weaker passage from another book'},
+ ];
+ const chosen=selectAnswerSources(candidates,'What does Aristotle say about virtue?','token',{maxSources:2});
+ assert.deepEqual(chosen.map(item=>item.page),[1,2]);
+});
+
 test('source budget prioritizes distinct books before same-book alternatives',()=>{
  const candidates=[
   {...page(1,'7'),text:'first book'},
