@@ -43,7 +43,7 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  const item={id:'selected-book-test',question:'Explain Darwin in a named book with enough detail.',discipline:'science',selected_book_ids:['529'],
   planner_queries:['first distinct fixed search concept','second distinct fixed search concept'],review_focus:['Check causal explanation.'],
   required_source_groups:[{label:'Darwin',book_ids:['529']}]};
- const result=await evaluateLiveCase(item,{library,manifest:{books:{529:{title:'On the Origin of Species'}}},allowed:new Set(['529','102']),token:'x'.repeat(40),beforeCall:async()=>{},
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{529:{title:'On the Origin of Species'}}},allowed:new Set(['529','102']),token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,
   fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'529'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(calls.length,1);assert.match(calls[0].url,/pilot-answer$/);
  assert.equal(result.plannerSkipped,true);assert.deepEqual(result.plannerQueries,item.planner_queries);
