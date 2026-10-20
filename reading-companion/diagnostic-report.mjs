@@ -68,6 +68,21 @@ export function auditCitationIds(answer,citations=[]){
 
 // Intentionally whitelist fields: never serialize full page text, previews,
 // request bodies, CAPTCHA tokens, or arbitrary error messages.
+function reviewedEvidenceSummary(value,submittedSources=[]){
+  if(!Array.isArray(value))return [];
+  const allowed=new Set((Array.isArray(submittedSources)?submittedSources:[])
+    .map(source=>source?.id).filter(id=>typeof id==='string'&&/^S[1-9]\\d*$/.test(id)));
+  const out=[],seen=new Set();
+  for(const item of value.slice(0,6)){
+    const id=typeof item?.id==='string'?item.id:'';
+    const point=typeof item?.point==='string'?item.point.trim().slice(0,220):'';
+    if(!allowed.has(id)||seen.has(id)||!point)continue;
+    seen.add(id);out.push({id,point});
+    if(out.length===4)break;
+  }
+  return out;
+}
+
 export function createDiagnosticReport(input={}){
   const audit=auditCitationIds(input.answer,input.citations);
   return {
@@ -102,7 +117,8 @@ export function createDiagnosticReport(input={}){
       inlineCitationIds:audit.inlineIds,
       inlineIdsWithoutSource:audit.inlineIdsWithoutSource,
       sourcesNotCited:audit.sourcesNotCited,
-      citations:Array.isArray(input.citations)?input.citations.slice(0,4).map(sourceSummary).filter(Boolean):[]
+      citations:Array.isArray(input.citations)?input.citations.slice(0,4).map(sourceSummary).filter(Boolean):[],
+      reviewedEvidence:reviewedEvidenceSummary(input.reviewedEvidence,input.submittedSources)
     },
     evidenceHighlights:Array.isArray(input.evidenceHighlights)?
       input.evidenceHighlights.slice(0,3).map(item=>({
