@@ -20,6 +20,22 @@ test('author-wide concept questions include evidence from distinct works when av
  assert.deepEqual(chosen.map(item=>item.bookId),['140','253','192']);
 });
 
+test('author-wide selection skips weak marginal works when stronger pages are available',()=>{
+ const candidates=[
+  {...page(25,'140'),title:'Fear and Trembling — Søren Kierkegaard',score:51.9,text:'faith passage'},
+  {...page(17,'140'),title:'Fear and Trembling — Søren Kierkegaard',score:45.9,text:'faith passage two'},
+  {...page(32,'140'),title:'Fear and Trembling — Søren Kierkegaard',score:37.0,text:'faith passage three'},
+  {...page(134,'253'),title:'The Sickness Unto Death — Søren Kierkegaard',score:48.2,text:'offense and faith'},
+  {...page(107,'253'),title:'The Sickness Unto Death — Søren Kierkegaard',score:59.9,text:'strong faith passage'},
+  {...page(49,'436'),title:'Kierkegaard’s Attack Upon “Christendom,” 1854–1855 — Søren Kierkegaard',score:33.5,text:'marginal faith reference'},
+  {...page(31,'140'),title:'Fear and Trembling — Søren Kierkegaard',score:50.3,text:'stronger related passage'},
+ ];
+ const chosen=selectAnswerSources(candidates,
+   'What did Kierkegaard have to say about faith?','token',{maxSources:4});
+ assert(chosen.some(item=>item.bookId==='253'&&item.page===107));
+ assert(!chosen.some(item=>item.bookId==='436'));
+});
+
 test('questions naming a specific work keep the strongest passages from that work',()=>{
  const candidates=[
   {...page(32,'140'),title:'Fear and Trembling — Søren Kierkegaard',text:'strong passage'},
