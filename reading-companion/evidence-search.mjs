@@ -20,26 +20,63 @@ export function mergeFacetSearches(results,limit=8){
      return bScore-aScore||a.index-b.index;
    }).map(({entry})=>entry);
  });
- const seen=new Set(),out=[];
- function add(entry,facet){
-   if(!entry||!Number.isSafeInteger(entry.page)||entry.page<1||
-       !/^[1-9]\d{0,3}$/.test(String(entry.bookId)))return false;
-   const key=String(entry.bookId)+':'+entry.page;
-   if(seen.has(key))return false;
-   seen.add(key);out.push({...entry,facet});return true;
+ const valid=(entry)=>entry&&Number.isSafeInteger(entry.page)&&entry.page>=1&&
+   /^[1-9]\d{0,3}$/.test(String(entry.bookId));
+ const hasScores=groups.some(group=>group.some(entry=>Number.isFinite(entry?.score)));
+ if(!hasScores){
+   // Retain deterministic round-robin behavior for legacy callers without
+   // evidence scores. Live retrieval results use the passage-level ranking
+   // below so a strong hit later in one facet is not crowded out by weak
+   // first hits from every other facet.
+   const seen=new Set(),out=[];
+   function add(entry,facet){
+     if(!valid(entry))return false;
+     const key=String(entry.bookId)+':'+entry.page;
+     if(seen.has(key))return false;
+     seen.add(key);out.push({...entry,facet});return true;
+   }
+   for(let facet=0;facet<groups.length;facet++){
+     for(const entry of groups[facet])if(add(entry,facet))break;
+   }
+   for(let i=0;i<15&&out.length<limit;i++){
+     for(let f=0;f<groups.length&&out.length<limit;f++)
+       if(groups[f][i])add(groups[f][i],f);
+   }
+   return out.slice(0,limit);
  }
- // One source from each facet first — only then use alternates. This avoids
- // the old behavior of automatically sending two snippets from one storyline.
+
+ // Aggregate a page's reciprocal-rank evidence across query facets. This
+ // compares each facet by its internal passage order instead of assuming raw
+ // scores from differently worded queries share the same scale. A page found
+ // by multiple facets gains corroboration; raw score breaks close ties.
+ const RANK_OFFSET=4,byPage=new Map();
+ let firstSeen=0;
  for(let facet=0;facet<groups.length;facet++){
    const group=groups[facet];
-   for(const entry of group)if(add(entry,facet))break;
+   for(let rank=0;rank<group.length;rank++){
+     const entry=group[rank];
+     if(!valid(entry))continue;
+     const key=String(entry.bookId)+':'+entry.page;
+     let record=byPage.get(key);
+     if(!record){
+       record={entry,facet,rankScore:0,bestScore:-Infinity,firstSeen:firstSeen++,
+         facets:new Set()};
+       byPage.set(key,record);
+     }
+     record.rankScore+=1/(RANK_OFFSET+rank+1);
+     record.facets.add(facet);
+     const score=Number.isFinite(entry.score)?entry.score:-Infinity;
+     if(score>record.bestScore){
+       record.entry=entry;
+       record.facet=facet;
+       record.bestScore=score;
+     }
+   }
  }
- // Round-robin to keep options available without expanding AI costs.
- for(let i=0;i<15&&out.length<limit;i++){
-   for(let f=0;f<groups.length&&out.length<limit;f++)
-     if(groups[f][i])add(groups[f][i],f);
- }
- return out.slice(0,limit);
+ return [...byPage.values()].sort((a,b)=>
+   b.rankScore-a.rankScore||b.bestScore-a.bestScore||a.firstSeen-b.firstSeen)
+   .slice(0,limit).map(({entry,facet,facets})=>({...entry,facet,
+     matchedFacets:facets.size}));
 }
 export function validSearchPlan(value){
  return Array.isArray(value)&&value.length===2&&

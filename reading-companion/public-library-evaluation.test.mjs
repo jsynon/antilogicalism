@@ -31,14 +31,14 @@ test('benchmark validation rejects duplicate IDs and incomplete two-facet plans'
  assert.throws(()=>validateSuite({...suite,cases}),/two valid planned searches/);
 });
 
-test('the production facet merger preserves both facets and ranks stronger evidence first',()=>{
+test('the production facet merger preserves both facets and ranks stronger passage evidence first',()=>{
  const page=(bookId,page,score)=>({bookId,page,score,title:'Primary source',preview:'A sufficiently long passage preview.',url:`https://drive.google.com/file/d/${DRIVE}/view#page=${page}`});
  const result=mergeFacetSearches([
   {sources:[page('7',14,64),page('12',117,55)]},
   {sources:[page('529',495,84),page('547',215,45)]},
  ],8);
- assert.deepEqual(result.map(x=>x.bookId),['7','529','12','547']);
- assert.deepEqual(result.slice(0,2).map(x=>x.facet),[0,1]);
+ assert.deepEqual(result.map(x=>x.bookId),['529','7','12','547']);
+ assert.deepEqual(result.slice(0,2).map(x=>x.facet),[1,0]);
 });
 
 test('public retrieval evaluation searches both planner facets and exact question',async()=>{
