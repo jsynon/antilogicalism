@@ -32,14 +32,20 @@ test('comparison author targeting retains a work for each named author',()=>{
  assert.deepEqual(matchExplicitBookIds(
   'How do Aristotle in Nicomachean Ethics and Darwin explain change?',books),['7','529','547']);
 });
-test('author-only mentions are left to topical ranking across that author’s works',()=>{
+test('author-only mentions search across the named author’s catalog works',()=>{
  const books=[
   {id:'149',title:'The Histories — Herodotus'},
   {id:'152',title:'History of the Peloponnesian War — Thucydides'},
   {id:'163',title:'Leviathan — Thomas Hobbes'},
+  {id:'140',title:'Fear and Trembling — Søren Kierkegaard'},
+  {id:'192',title:'Philosophical Fragments — Søren Kierkegaard'},
+  {id:'253',title:'The Sickness Unto Death — Søren Kierkegaard'},
+  {id:'436',title:'Kierkegaard’s Attack Upon “Christendom,” 1854–1855 — Søren Kierkegaard'},
  ];
  assert.deepEqual(matchExplicitBookIds(
-  'How does Herodotus handle accounts heard from others?',books),[]);
+  'How does Herodotus handle accounts heard from others?',books),['149']);
+ assert.deepEqual(matchExplicitBookIds(
+  'what did kierkegaard have to say about faith?',books),['140','192','253','436']);
  assert.deepEqual(matchExplicitBookIds(
   'In Leviathan, how does Hobbes describe the state of nature?',books),['163']);
 });
