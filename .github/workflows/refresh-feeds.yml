@@ -43,5 +43,24 @@ jobs:
             echo "No feed changes to commit."
           else
             git commit -m "Refresh static RSS feeds"
-            git push
+
+            for attempt in 1 2 3; do
+              if git push origin HEAD:main; then
+                echo "Feed updates pushed successfully."
+                exit 0
+              fi
+
+              if [ "$attempt" -eq 3 ]; then
+                echo "Could not push feed updates after 3 attempts." >&2
+                exit 1
+              fi
+
+              echo "Push attempt $attempt failed; syncing with the latest main branch."
+              git fetch --no-tags --unshallow origin main
+              if ! git rebase origin/main; then
+                git rebase --abort || true
+                echo "Could not rebase feed updates; review concurrent edits to generated files." >&2
+                exit 1
+              fi
+            done
           fi
