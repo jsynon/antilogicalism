@@ -12,6 +12,15 @@ test('smoke mode is exactly scripture plus two representative existing cases',()
  assert.equal(cases[2].id,'philosophy-aristotle-habituation');
 });
 
+test('quality mode selects seven cross-discipline cases across selected-book and All Books scopes',()=>{
+ const cases=selectLiveCases({cases:[]},'quality');
+ assert.equal(cases.length,7);
+ assert.deepEqual(new Set(cases.map(item=>item.discipline)),new Set(['science','history','literature','philosophy','religion']));
+ assert.equal(cases.filter(item=>item.selected_book_ids.length>0).length,4);
+ assert.equal(cases.filter(item=>item.selected_book_ids.length===0).length,3);
+ assert.ok(cases.every(item=>item.planner_queries.length===2&&item.review_focus.length>=2));
+});
+
 test('full mode remains exactly the existing 30-case retrieval suite',()=>{
  const cases=selectLiveCases({cases:Array.from({length:30},(_,i)=>({id:'case-'+i}))},'full');
  assert.equal(cases.length,30);
@@ -25,6 +34,21 @@ test('audit requires expected-source coverage and citations with no orphan marke
  const bad=auditLiveAnswer({answer:'Unsupported [S2].',citations:[{id:'S1',bookId:'16'}]},[{}],[{label:'Bible',book_ids:['638']}]);
  assert.equal(bad.passed,false);
  assert.deepEqual(bad.inlineIdsWithoutSource,['S2']);
+});
+
+test('quality case uses fixed queries, skips planning, and restricts retrieval to its selected book',async()=>{
+ const calls=[],searchOptions=[];
+ const library={search:async(query,options)=>{searchOptions.push({query,options});return {sources:[{id:'S1',bookId:'529',title:'On the Origin of Species',page:10,globalPageId:10,preview:'A sufficiently long preview passage for testing.',score:4}]};},
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
+ const item={id:'selected-book-test',question:'Explain Darwin in a named book with enough detail.',discipline:'science',selected_book_ids:['529'],
+  planner_queries:['first distinct fixed search concept','second distinct fixed search concept'],review_focus:['Check causal explanation.'],
+  required_source_groups:[{label:'Darwin',book_ids:['529']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{529:{title:'On the Origin of Species'}}},allowed:new Set(['529','102']),token:'x'.repeat(40),beforeCall:async()=>{},
+  fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'529'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+ assert.equal(calls.length,1);assert.match(calls[0].url,/pilot-answer$/);
+ assert.equal(result.plannerSkipped,true);assert.deepEqual(result.plannerQueries,item.planner_queries);
+ assert.equal(result.selectedBookIds[0],'529');assert.equal(result.reviewFocus[0],'Check causal explanation.');
+ assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
 });
 
 test('case evaluation sends one plan and one answer request in order without logging the token',async()=>{
