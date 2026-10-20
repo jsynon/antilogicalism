@@ -140,12 +140,14 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  }
  let loaded;
  try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback});}
- catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};throw error;}
+ catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
+  error.requestFailure.plannerFallback=plannerFallback;if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const {selected,searches}=loaded;
  let data;
  try{data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,history:[],turnstileToken:'evaluation-runner-token',
   sources:selected.map(({bookId,page,text})=>({bookId,page,text}))},beforeCall,'answer');}
- catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};throw error;}
+ catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
+  error.requestFailure.plannerFallback=plannerFallback;if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const audit=auditLiveAnswer(data,selected,item.required_source_groups);
  return {id:item.id,question:item.question,plannerQueries:plannerFallback?[]:queries,plannerFallback,
   ...(plannerFailure?{plannerFailure}:{}),searches,
@@ -155,7 +157,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
 function failedCaseResult(item,error){
  const failure=error?.requestFailure||{stage:'evaluation',httpStatus:null,failureCode:'evaluation-failed',
   message:String(error?.message||error||'Evaluation failed').slice(0,240),workerFailure:false};
- return {id:item.id,question:item.question,requestFailure:failure,plannerQueries:[],plannerFallback:false,searches:[],
+ return {id:item.id,question:item.question,requestFailure:failure,plannerQueries:[],
+  plannerFallback:failure.plannerFallback===true,...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),searches:[],
   submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',
   answerText:'',citationCount:0,citationBookIds:[],citationSources:[],inlineCitationCount:0,
   inlineIdsWithoutSource:[],submittedSourceCount:0,
