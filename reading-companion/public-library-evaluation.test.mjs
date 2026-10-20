@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {mergeFacetSearches} from './evidence-search.mjs';
-import {evaluateCase,sourceIdentityIssues,summarize,validateSuite,verifyFingerprint} from './public-library-evaluation.mjs';
+import {evaluateCase,selectEvaluationAnswerSources,sourceIdentityIssues,summarize,validateSuite,verifyFingerprint} from './public-library-evaluation.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
@@ -161,4 +161,15 @@ test('summary reports retrieval, default-selection, and verified-source coverage
  assert.equal(result.defaultSelectedGroupRecallPercent,0);
  assert.equal(result.verifiedCandidateGroupRecallPercent,100);
  assert.equal(result.verifiedDefaultGroupRecallPercent,0);
+});
+
+test('evaluation mirrors production source selection and covers distinct works before alternate pages',()=>{
+ const candidates=[
+  {bookId:'54',page:19,text:'Nietzsche source page one with enough usable text.'},
+  {bookId:'144',page:84,text:'Another Nietzsche work with relevant evidence.'},
+  {bookId:'436',page:248,text:'A relevant Kierkegaard source page.'},
+  {bookId:'54',page:9,text:'An alternate page from the first Nietzsche work.'},
+ ];
+ const selected=selectEvaluationAnswerSources(candidates,'Compare Nietzsche and Kierkegaard');
+ assert.deepEqual(selected.map(source=>source.bookId),['54','144','436','54']);
 });

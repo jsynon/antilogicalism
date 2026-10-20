@@ -9,7 +9,7 @@ import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources} from './evidence-search.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
@@ -119,8 +119,12 @@ async function sourcePageIsUsable(source,library){
   if(matches.length!==1||typeof matches[0].text!=='string')return {ok:false,status:'indexed-page-not-found'};
   const bytes=Buffer.byteLength(matches[0].text,'utf8');
   if(bytes<25||bytes>MAX_PAGE_BYTES)return {ok:false,status:'page-size-out-of-range',utf8Bytes:bytes};
-  return {ok:true,status:'usable',utf8Bytes:bytes};
+  return {ok:true,status:'usable',utf8Bytes:bytes,text:matches[0].text};
  }catch(error){return {ok:false,status:'page-shard-fetch-failed',error:String(error?.message||error)};}
+}
+
+export function selectEvaluationAnswerSources(candidates,question){
+ return selectAnswerSources(candidates,question,'evaluation-token',{maxSources:4,history:[]});
 }
 
 export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher}){
@@ -136,7 +140,8 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
  if(selectedBookId)for(const [index,source] of merged.entries())if(String(source.bookId)!==selectedBookId)
   issues.push({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code:'selected_book_scope_leak'});
  const usability=await Promise.all(merged.map(source=>sourcePageIsUsable(source,library)));
- const candidates=merged.filter((_,index)=>usability[index].ok);
+ const candidates=merged.flatMap((source,index)=>usability[index].ok?
+  [{...source,text:usability[index].text}]:[]);
  const excludedCandidates=[];
  for(let index=0;index<usability.length;index++)if(!usability[index].ok){
   excludedCandidates.push({bookId:String(merged[index].bookId),page:merged[index].page,status:usability[index].status});
@@ -145,7 +150,11 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
  }
  const fingerprintChecks=await Promise.all(candidates.map(async source=>({bookId:String(source.bookId),page:source.page,
   globalPageId:source.globalPageId,...await verifyFingerprint(source,library,allowedBookIds,fetcher)})));
- const defaultSelection=candidates.slice(0,2);
+ // Mirror the production answer request: up to four full pages, with one
+ // passage per work preferred before alternate pages from the same work.
+ // The benchmark has no prior-turn context, so use empty history and a fixed
+ // placeholder token solely for request byte-budget accounting.
+ const defaultSelection=selectEvaluationAnswerSources(candidates,item.question);
  const defaultVerified=new Set(fingerprintChecks.filter(item=>item.ok).slice(0,candidates.length).map(item=>String(item.bookId)+':'+item.page));
  const candidateVerified=new Set(fingerprintChecks.filter(item=>item.ok).map(item=>String(item.bookId)+':'+item.page));
  const groups=item.required_source_groups.map(group=>{
@@ -160,7 +169,8 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
  });
  return {id:item.id,discipline:item.discipline,task:item.task,question:item.question,selectedBookId:selectedBookId||null,plannerQueries:item.planner_queries,
   searchQueries,requiredSourceGroups:groups,candidates:candidates.map(({id,bookId,title,page,globalPageId,url,preview,score,facet})=>({id,bookId,title,page,globalPageId,url,preview,score,facet})),
-  fingerprintChecks,excludedCandidates,booksScanned:foundSets.reduce((n,r)=>n+(Number(r.booksScanned)||0),0),
+  fingerprintChecks,excludedCandidates,submittedSourceCount:defaultSelection.length,
+  booksScanned:foundSets.reduce((n,r)=>n+(Number(r.booksScanned)||0),0),
   elapsedMs:Math.round(performance.now()-start),retrievalPass:groups.every(g=>g.retrieved)&&!issues.some(issue=>issue.code==='selected_book_scope_leak'),
   defaultSelectionPass:groups.every(g=>g.defaultSelected),candidateSourcesVerified:groups.every(g=>g.sourceVerified),
   defaultSelectionVerified:groups.every(g=>g.defaultSourceVerified),sourceIdentityIssues:issues};
@@ -196,10 +206,10 @@ function markdown(report){
  }).join('\n');
  return `## Reading Companion public-library evaluation\n\n`+
  `v${m.version}: ${m.indexedBookRecords} indexed records / ${m.indexedPages.toLocaleString()} pages; ${m.catalogTitles} distinct catalog titles; ${m.fingerprintedBooks}/${m.indexedBookRecords} books fingerprinted.\n\n`+
- `Expected-source recall: ${s.candidateGroupRecallPercent}% across merged candidates; ${s.defaultSelectedGroupRecallPercent}% in the default two passages. `+
- `Fingerprint-verified recall: ${s.verifiedCandidateGroupRecallPercent}% across candidates and ${s.verifiedDefaultGroupRecallPercent}% in default selection. `+
+ `Expected-source recall: ${s.candidateGroupRecallPercent}% across merged candidates; ${s.defaultSelectedGroupRecallPercent}% in the production answer-source set (up to four passages, preferring distinct works). `+
+ `Fingerprint-verified recall: ${s.verifiedCandidateGroupRecallPercent}% across candidates and ${s.verifiedDefaultGroupRecallPercent}% in the submitted source set. `+
  `Cases passing retrieval: ${s.retrievalPassCases}/${s.caseCount}; identity issues: ${s.sourceIdentityIssueCount}; fingerprint errors: ${s.fingerprintErrors}; execution errors: ${s.executionErrorCount}; excluded oversized pages: ${s.oversizedPageCount}; mean search ${s.meanSearchMs} ms.\n\n`+
- `| Result | Search scope | Area | Case | Expected source groups | Retrieved works | Default answer sources verified | Time |\n|---|---|---|---|---|---|---|---:|\n${rows}\n\n`+
+  `| Result | Search scope | Area | Case | Expected source groups | Retrieved works | Submitted answer sources verified | Time |\n|---|---|---|---|---|---|---|---:|\n${rows}\n\n`+
  `Retrieval and exact page fingerprints are automated. This workflow makes no model calls and does not claim to grade the truth of generated interpretations.`;
 }
 
