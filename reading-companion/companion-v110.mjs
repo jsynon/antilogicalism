@@ -438,6 +438,7 @@ function renderResponse(data,turnQuestion=''){
     diagnosticState.coverage=data.coverage;
     diagnosticState.reviewStatus=data.reviewStatus;
     diagnosticState.reviewedEvidence=data.evidenceMap;
+    diagnosticState.questionParts=data.questionParts;
     diagnosticState.answer=data.answer;
     diagnosticState.citations=citations;
     diagnosticState.evidenceHighlights=highlights.map(item=>{
