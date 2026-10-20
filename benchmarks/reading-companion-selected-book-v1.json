@@ -14,6 +14,15 @@
       "planner_queries": [
         "Aristotle Nicomachean Ethics habituation through repeated bodily actions",
         "forming virtuous character by performing virtuous deeds repeatedly"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Habituation and repeated actions",
+          "book_id": "7",
+          "pages": [
+            14
+          ]
+        }
       ]
     },
     {
@@ -26,6 +35,15 @@
       "planner_queries": [
         "Darwin natural selection preserve accumulate beneficial individual variations",
         "Origin of Species survival reproduction inheritance useful variations"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Natural selection and variation",
+          "book_id": "529",
+          "pages": [
+            495
+          ]
+        }
       ]
     },
     {
@@ -38,6 +56,15 @@
       "planner_queries": [
         "Hawking event horizon boundary light cannot escape black hole",
         "A Brief History of Time definition black hole event horizon"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Event horizon definition",
+          "book_id": "102",
+          "pages": [
+            53
+          ]
+        }
       ]
     },
     {
@@ -50,6 +77,23 @@
       "planner_queries": [
         "Thucydides growth of Athenian power alarm at Sparta real cause of war",
         "Thucydides immediate disputes Corcyra Potidaea pretext for Peloponnesian War"
+      ],
+      "evidence_targets": [
+        {
+          "label": "Underlying cause",
+          "book_id": "152",
+          "pages": [
+            38
+          ]
+        },
+        {
+          "label": "Immediate disputes",
+          "book_id": "152",
+          "pages": [
+            59,
+            94
+          ]
+        }
       ]
     },
     {
@@ -86,6 +130,15 @@
       "planner_queries": [
         "1 John 4:7-12 God is love sent his Son love one another",
         "1 John 4:7-12 born of God atoning sacrifice love one another"
+      ],
+      "evidence_targets": [
+        {
+          "label": "1 John 4:7–12",
+          "book_id": "638",
+          "pages": [
+            1821
+          ]
+        }
       ]
     }
   ]
