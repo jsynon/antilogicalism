@@ -143,7 +143,14 @@ export function matchExplicitBookIds(question,books){
  // Do not choose a couple of works merely because their author was
  // named. The all-library index search already scopes author mentions and
  // ranks that author's works by topical passage evidence.
- if(!titleMatches.length)return [];
+ if(!titleMatches.length){
+  // An author-only question still needs an author-only search. Letting the
+  // global top-three book limit decide can crowd out the author's own works
+  // with commentary or unrelated catalog entries. Search each matching work
+  // and let passage-level evidence rank the resulting pages.
+  return [...new Set([...authorGroups.values()].flatMap(group=>
+   group.map(book=>String(book.id))))].slice(0,8);
+ }
  if(!authorGroups.size)
   return [...new Set(titleMatches.map(book=>String(book.id)))].slice(0,8);
  const groups=[...authorGroups.values()].map(group=>{
