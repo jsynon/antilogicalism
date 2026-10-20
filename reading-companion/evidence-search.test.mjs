@@ -8,6 +8,29 @@ test('ordinary questions preserve passage ranking instead of promoting weaker bo
  assert.deepEqual(chosen.map(item=>item.page),[1,2]);
 });
 
+test('author-wide concept questions include evidence from distinct works when available',()=>{
+ const candidates=[
+  {...page(32,'140'),title:'Fear and Trembling — Søren Kierkegaard',text:'faith passage'},
+  {...page(17,'140'),title:'Fear and Trembling — Søren Kierkegaard',text:'faith passage two'},
+  {...page(93,'253'),title:'The Sickness Unto Death — Søren Kierkegaard',text:'faith passage'},
+  {...page(55,'192'),title:'Philosophical Fragments — Søren Kierkegaard',text:'faith passage'},
+ ];
+ const chosen=selectAnswerSources(candidates,
+   'What did Kierkegaard have to say about faith?','token',{maxSources:3});
+ assert.deepEqual(chosen.map(item=>item.bookId),['140','253','192']);
+});
+
+test('questions naming a specific work keep the strongest passages from that work',()=>{
+ const candidates=[
+  {...page(32,'140'),title:'Fear and Trembling — Søren Kierkegaard',text:'strong passage'},
+  {...page(17,'140'),title:'Fear and Trembling — Søren Kierkegaard',text:'second passage'},
+  {...page(93,'253'),title:'The Sickness Unto Death — Søren Kierkegaard',text:'other work'},
+ ];
+ const chosen=selectAnswerSources(candidates,
+   'In Fear and Trembling, what does Kierkegaard say about faith?','token',{maxSources:2});
+ assert.deepEqual(chosen.map(item=>item.bookId+':'+item.page),['140:32','140:17']);
+});
+
 test('source budget prioritizes distinct books before same-book alternatives',()=>{
  const candidates=[
   {...page(1,'7'),text:'first book'},
