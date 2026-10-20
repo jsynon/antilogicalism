@@ -20,15 +20,16 @@ const PDF_ID=/^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:v
 const MAX_PAGE_BYTES=14000;
 
 function parseArgs(argv){
- const out={corpusRoot:DEFAULT_INDEX_ROOT,catalogUrl:CATALOG_URL,coverageUrl:FINGERPRINT_ROOT+'coverage-v1.json',
+ const out={suitePath:SUITE_PATH,corpusRoot:DEFAULT_INDEX_ROOT,catalogUrl:CATALOG_URL,coverageUrl:FINGERPRINT_ROOT+'coverage-v1.json',
    output:DEFAULT_OUTPUT,limit:0,caseIds:[]};
  for(let i=0;i<argv.length;i++){
   const raw=argv[i];if(raw==='--help'||raw==='-h'){out.help=true;continue;}
   const [flag,inline]=raw.split('=',2),key=flag.replace(/^--/,'');
-  if(!['corpus-root','catalog-url','coverage-url','output','limit','case'].includes(key))throw Error('Unknown option '+flag);
+  if(!['suite','corpus-root','catalog-url','coverage-url','output','limit','case'].includes(key))throw Error('Unknown option '+flag);
   const value=inline??argv[++i];if(!value)throw Error('Missing value for '+flag);
   if(key==='case'){out.caseIds.push(value);continue;}
-  if(key==='limit'){out.limit=Number(value);if(!Number.isSafeInteger(out.limit)||out.limit<1)throw Error('--limit must be a positive integer');}
+  if(key==='suite')out.suitePath=resolve(value);
+  else if(key==='limit'){out.limit=Number(value);if(!Number.isSafeInteger(out.limit)||out.limit<1)throw Error('--limit must be a positive integer');}
   else if(key==='corpus-root')out.corpusRoot=value.replace(/\/?$/,'/');
   else if(key==='catalog-url')out.catalogUrl=value;
   else if(key==='coverage-url')out.coverageUrl=value;
@@ -38,9 +39,10 @@ function parseArgs(argv){
 }
 
 export function validateSuite(suite){
- if(suite?.schema_version!==1||suite?.suite_id!=='antilogicalism-reading-companion-public-v1'||
+ if(suite?.schema_version!==1||!['antilogicalism-reading-companion-public-v1',
+    'antilogicalism-reading-companion-selected-book-v1'].includes(suite?.suite_id)||
     suite?.corpus_version!==47||!Array.isArray(suite.cases)||!suite.cases.length)
-  throw Error('Expected a non-empty public-library v47 suite.');
+  throw Error('Expected a non-empty public-library v47 evaluation suite.');
  const seen=new Set();
  for(const item of suite.cases){
   if(!item||!/^[a-z][a-z0-9-]{2,79}$/.test(item.id||'')||seen.has(item.id))throw Error('Duplicate or invalid case ID: '+String(item?.id));
@@ -48,6 +50,9 @@ export function validateSuite(suite){
   if(typeof item.question!=='string'||item.question.length<25||!validSearchPlan(item.planner_queries))throw Error(item.id+': question needs two valid planned searches.');
   if(!Array.isArray(item.required_source_groups)||!item.required_source_groups.length)throw Error(item.id+': expected source groups are required.');
   for(const group of item.required_source_groups)if(!group||typeof group.label!=='string'||!Array.isArray(group.book_ids)||!group.book_ids.length||group.book_ids.some(id=>!/^[1-9]\d{0,3}$/.test(String(id))))throw Error(item.id+': invalid expected source group.');
+  if(item.selected_book_id!==undefined&&(!/^[1-9]\d{0,3}$/.test(String(item.selected_book_id))||
+    item.required_source_groups.some(group=>!group.book_ids.map(String).includes(String(item.selected_book_id)))))
+   throw Error(item.id+': selected book must be valid and included in an expected source group.');
  }
  return suite;
 }
@@ -121,11 +126,15 @@ async function sourcePageIsUsable(source,library){
 export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher}){
  const start=performance.now();
  const searchQueries=buildSearchFacets(item.question,item.planner_queries);
+ const selectedBookId=item.selected_book_id===undefined?'':String(item.selected_book_id);
+ const searchAllowedBookIds=selectedBookId?new Set([selectedBookId]):allowedBookIds;
  const foundSets=await Promise.all(searchQueries.map(query=>library.search(query,{
-  allowedBookIds,maxBooks:2,pagesPerBook:3
+  allowedBookIds:searchAllowedBookIds,maxBooks:2,pagesPerBook:3
  })));
  const merged=mergeFacetSearches(foundSets,8);
  const issues=merged.flatMap((source,index)=>sourceIdentityIssues(source,manifest).map(code=>({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code})));
+ if(selectedBookId)for(const [index,source] of merged.entries())if(String(source.bookId)!==selectedBookId)
+  issues.push({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code:'selected_book_scope_leak'});
  const usability=await Promise.all(merged.map(source=>sourcePageIsUsable(source,library)));
  const candidates=merged.filter((_,index)=>usability[index].ok);
  const excludedCandidates=[];
@@ -149,10 +158,10 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
    defaultSelectedBookIds:[...new Set(defaultFound.map(s=>String(s.bookId)))],fingerprintedCandidateBookIds:[...new Set(verified.map(s=>String(s.bookId)))],
    retrieved:found.length>0,defaultSelected:defaultFound.length>0,sourceVerified:verified.length>0,defaultSourceVerified:defaultVerifiedFound.length>0};
  });
- return {id:item.id,discipline:item.discipline,task:item.task,question:item.question,plannerQueries:item.planner_queries,
+ return {id:item.id,discipline:item.discipline,task:item.task,question:item.question,selectedBookId:selectedBookId||null,plannerQueries:item.planner_queries,
   searchQueries,requiredSourceGroups:groups,candidates:candidates.map(({id,bookId,title,page,globalPageId,url,preview,score,facet})=>({id,bookId,title,page,globalPageId,url,preview,score,facet})),
   fingerprintChecks,excludedCandidates,booksScanned:foundSets.reduce((n,r)=>n+(Number(r.booksScanned)||0),0),
-  elapsedMs:Math.round(performance.now()-start),retrievalPass:groups.every(g=>g.retrieved),
+  elapsedMs:Math.round(performance.now()-start),retrievalPass:groups.every(g=>g.retrieved)&&!issues.some(issue=>issue.code==='selected_book_scope_leak'),
   defaultSelectionPass:groups.every(g=>g.defaultSelected),candidateSourcesVerified:groups.every(g=>g.sourceVerified),
   defaultSelectionVerified:groups.every(g=>g.defaultSourceVerified),sourceIdentityIssues:issues};
 }
@@ -179,24 +188,25 @@ function markdown(report){
  const m=report.corpus,s=report.summary;
  const rows=report.cases.map(c=>{
   const expected=c.requiredSourceGroups.map(g=>g.label).join(', ');
+  const scope=c.selectedBookId?report.titles[c.selectedBookId]||c.selectedBookId:'All books';
   const got=[...new Set(c.candidates.map(x=>report.titles[x.bookId]||x.bookId))].join('; ')||'—';
   const result=c.retrievalPass?'PASS':'MISS';
   const ready=c.defaultSelectionVerified?'yes':c.candidateSourcesVerified?'candidate only':'no';
-  return `| ${result} | ${c.discipline} | ${c.id} | ${expected} | ${got} | ${ready} | ${c.elapsedMs} ms |`;
+  return `| ${result} | ${scope} | ${c.discipline} | ${c.id} | ${expected} | ${got} | ${ready} | ${c.elapsedMs} ms |`;
  }).join('\n');
  return `## Reading Companion public-library evaluation\n\n`+
  `v${m.version}: ${m.indexedBookRecords} indexed records / ${m.indexedPages.toLocaleString()} pages; ${m.catalogTitles} distinct catalog titles; ${m.fingerprintedBooks}/${m.indexedBookRecords} books fingerprinted.\n\n`+
  `Expected-source recall: ${s.candidateGroupRecallPercent}% across merged candidates; ${s.defaultSelectedGroupRecallPercent}% in the default two passages. `+
  `Fingerprint-verified recall: ${s.verifiedCandidateGroupRecallPercent}% across candidates and ${s.verifiedDefaultGroupRecallPercent}% in default selection. `+
  `Cases passing retrieval: ${s.retrievalPassCases}/${s.caseCount}; identity issues: ${s.sourceIdentityIssueCount}; fingerprint errors: ${s.fingerprintErrors}; execution errors: ${s.executionErrorCount}; excluded oversized pages: ${s.oversizedPageCount}; mean search ${s.meanSearchMs} ms.\n\n`+
- `| Result | Area | Case | Expected source groups | Retrieved works | Default answer sources verified | Time |\n|---|---|---|---|---|---|---:|\n${rows}\n\n`+
+ `| Result | Search scope | Area | Case | Expected source groups | Retrieved works | Default answer sources verified | Time |\n|---|---|---|---|---|---|---|---:|\n${rows}\n\n`+
  `Retrieval and exact page fingerprints are automated. This workflow makes no model calls and does not claim to grade the truth of generated interpretations.`;
 }
 
 async function main(){
  const args=parseArgs(process.argv.slice(2));
- if(args.help){console.log('Usage: node reading-companion/public-library-evaluation.mjs [--limit N | --case CASE_ID ...] [--output FILE]');return 0;}
- const suite=validateSuite(JSON.parse(await readFile(SUITE_PATH,'utf8')));
+ if(args.help){console.log('Usage: node reading-companion/public-library-evaluation.mjs [--suite FILE] [--limit N | --case CASE_ID ...] [--output FILE]');return 0;}
+ const suite=validateSuite(JSON.parse(await readFile(args.suitePath,'utf8')));
  if(args.limit&&args.caseIds.length)throw Error('--limit and --case cannot be combined.');
  const unknown=args.caseIds.filter(id=>!suite.cases.some(item=>item.id===id));
  if(unknown.length)throw Error('Unknown benchmark case ID: '+unknown.join(', '));
@@ -209,6 +219,11 @@ async function main(){
  if(manifest.version!==suite.corpus_version)throw Error('Published corpus and benchmark versions differ.');
  for(const item of cases)for(const group of item.required_source_groups)for(const id of group.book_ids)
   if(!manifest.books[String(id)])throw Error(`${item.id}: expected book ${id} is absent from the corpus index.`);
+ for(const item of cases)if(item.selected_book_id!==undefined){
+  const id=String(item.selected_book_id);
+  if(!manifest.books[id])throw Error(`${item.id}: selected book ${id} is absent from the corpus index.`);
+  if(!allowedBookIds.has(id))throw Error(`${item.id}: selected book ${id} is not fingerprint-covered.`);
+ }
  const catalogTitles=new Set((catalog.books||[]).map(b=>String(b.title||'').trim()).filter(Boolean));
  const report={schema:'antilogicalism-reading-companion-public-eval-v1',suiteId:suite.suite_id,
   generatedAt:new Date().toISOString(),corpusRoot:args.corpusRoot,
@@ -217,7 +232,7 @@ async function main(){
    fingerprintCoveragePercent:Number((allowedBookIds.size/Object.keys(manifest.books).length*100).toFixed(1))},
   titles:Object.fromEntries(Object.entries(manifest.books).map(([id,book])=>[id,book.title])),cases:[]};
  console.log(`v${manifest.version}: ${Object.keys(manifest.books).length} indexed records; ${catalogTitles.size} distinct catalog titles; ${allowedBookIds.size} fingerprinted books.`);
- console.log(`Running ${cases.length}/${suite.cases.length} global cases through the production two-facet retrieval and merge path.`);
+ console.log(`Running ${cases.length}/${suite.cases.length} ${suite.suite_id.includes('selected-book')?'selected-book':'all-books'} cases through the production two-facet retrieval and merge path.`);
  for(let i=0;i<cases.length;i++){
   const item=cases[i];
   try{
