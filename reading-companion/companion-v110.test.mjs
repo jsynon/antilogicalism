@@ -39,6 +39,14 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/bookSearch\.addEventListener\('input',updateBookOptions\)/);
  assert.match(client,/bookSearch\.value=''/);
  assert.match(html,/id="companion-question"/);
+ assert.match(html,/id="companion-status" aria-live="polite" aria-atomic="true" aria-busy="false" role="status"/);
+ assert.match(html,/#companion-status:not\(:empty\).*font-size:1\.12em/);
+ assert.match(html,/companion-status-spin/);
+ assert.match(html,/prefers-reduced-motion:reduce\).*companion-status/);
+ assert.match(client,/function refreshStatusState\(\)/);
+ assert.match(client,/status\.setAttribute\('aria-busy',String\(busy\)\)/);
+ assert.match(client,/askButton\.textContent=searching\|\|answering\?'Working…':'Ask Reading Companion'/);
+ assert.match(client,/Preparing an answer from the selected passages… This can take a little while\./);
  assert.match(html,/Press Enter to ask; Shift\+Enter adds a new line\./);
  assert.match(html,/aria-describedby="companion-question-help"/);
  assert.match(client,/question\.addEventListener\('keydown',event=>\{/);
