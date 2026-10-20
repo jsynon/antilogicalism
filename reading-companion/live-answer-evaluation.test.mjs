@@ -45,6 +45,51 @@ test('case evaluation sends one plan and one answer request in order without log
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
 });
 
+test('planner 502 falls back to searching the original question and completes evaluation',async()=>{
+ const calls=[],searched=[];
+ const library={search:async(query)=>{searched.push(query);return {sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,preview:'A sufficiently long preview passage for testing.',score:4}]};},
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
+ const item={id:'planner-outage',question:'Explain the source question with enough detail.',required_source_groups:[{label:'Bible',book_ids:['638']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
+  beforeCall:async()=>{},fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});
+   if(url.endsWith('pilot-plan'))return new Response(JSON.stringify({failureCode:'search-planning-failed'}),{status:502,headers:{'content-type':'application/json'}});
+   return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+ assert.equal(calls.length,2);
+ assert.match(calls[0].url,/pilot-plan$/);assert.match(calls[1].url,/pilot-answer$/);
+ assert.equal(result.plannerFallback,true);
+ assert.deepEqual(result.plannerQueries,[]);
+ assert.deepEqual(result.plannerFailure,{httpStatus:502,failureCode:'search-planning-failed'});
+ assert.ok(result.searches.some(search=>search.query===item.question));
+ assert.ok(searched.includes(item.question));
+ assert.equal(result.passed,true);
+});
+
+test('planner rate limit remains fail-closed and skips answer generation',async()=>{
+ const item={id:'planner-rate-limit',question:'Explain the source question with enough detail.',required_source_groups:[]};
+ const library={search:async()=>{throw Error('search should not run');},jsonGzip:async()=>{throw Error('page fetch should not run');}};
+ await assert.rejects(evaluateLiveCase(item,{library,manifest:{books:{}},allowed:new Set(),token:'x'.repeat(40),
+  beforeCall:async()=>{},fetcher:async()=>new Response(JSON.stringify({failureCode:'rate-limited'}),
+   {status:429,headers:{'content-type':'application/json'}})}),error=>{
+    assert.equal(error.requestFailure.stage,'planner');
+    assert.equal(error.requestFailure.httpStatus,429);
+    assert.equal(error.requestFailure.failureCode,'rate-limited');
+    return true;
+   });
+});
+
+test('evaluation report preserves planner fallback when the later answer request fails',async()=>{
+ const item={id:'planner-fallback-answer-failure',question:'Explain the source question with enough detail.',required_source_groups:[]};
+ const library={search:async()=>({sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,preview:'A sufficiently long preview passage for testing.',score:4}]}),
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
+ const result=await runLiveCases([item],{evaluateOptions:{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
+  beforeCall:async()=>{},fetcher:async url=>url.endsWith('pilot-plan')?
+   new Response(JSON.stringify({failureCode:'search-planning-failed'}),{status:502,headers:{'content-type':'application/json'}}):
+   new Response(JSON.stringify({failureCode:'evidence-review-request-failed'}),{status:502,headers:{'content-type':'application/json'}})}});
+ assert.equal(result.results[0].requestFailure.stage,'answer');
+ assert.equal(result.results[0].plannerFallback,true);
+ assert.deepEqual(result.results[0].plannerFailure,{httpStatus:502,failureCode:'search-planning-failed'});
+});
+
 test('audit report preserves answer text, citation locations, and Worker quote highlights',()=>{
  const result=auditLiveAnswer({answer:'Supported claim [S1].',citations:[{
    id:'S1',bookId:'638',title:'Bible',page:1821,globalPageId:274264,
