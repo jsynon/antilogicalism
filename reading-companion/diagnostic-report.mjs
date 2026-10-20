@@ -102,7 +102,7 @@ export function createDiagnosticReport(input={}){
       inlineCitationIds:audit.inlineIds,
       inlineIdsWithoutSource:audit.inlineIdsWithoutSource,
       sourcesNotCited:audit.sourcesNotCited,
-      citations:Array.isArray(input.citations)?input.citations.slice(0,3).map(sourceSummary).filter(Boolean):[]
+      citations:Array.isArray(input.citations)?input.citations.slice(0,4).map(sourceSummary).filter(Boolean):[]
     },
     evidenceHighlights:Array.isArray(input.evidenceHighlights)?
       input.evidenceHighlights.slice(0,3).map(item=>({
