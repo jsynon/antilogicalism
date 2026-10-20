@@ -21,9 +21,11 @@ test('v1.10 retains Book Lite and the site navigation',()=>{
  assert.match(html,/id="secondary"/);
  assert.match(html,/companion-v110\.mjs/);
 });
-test('companion names the same searchable title count as Library Search',()=>{
- assert.match(html,/all 642 searchable titles/);
- assert.doesNotMatch(html,/644-book library/);
+test('companion introduction explains how to use it and links to Library Search',()=>{
+ assert.match(html,/Ask questions about books in the Antilogicalism library/);
+ assert.match(html,/Select a book or leave “All books” selected, enter your question/);
+ assert(html.includes('href="/antilogicalism/digital-library/">Library Search</a>'));
+ assert.doesNotMatch(html,/all 642 searchable titles|644-book library/);
 });
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');
@@ -111,8 +113,7 @@ test('v1.10 never claims unsupported books are ready if fingerprint index missin
  assert.match(client,/reader-fingerprints-v1\/coverage-v1\.json/);
 });
 
-test('public companion copy explains the pilot and keeps source reading controls',()=>{
- assert.match(html,/Answers draw on passages from the current pilot collection/);
+test('public companion copy explains cited sources and keeps source reading controls',()=>{
  assert.match(html,/Citations open original PDF pages/);
  assert.match(client,/Read passage/);
  assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
