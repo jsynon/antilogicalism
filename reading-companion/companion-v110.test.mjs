@@ -19,12 +19,12 @@ test('companion names the same searchable title count as Library Search',()=>{
 });
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');
- const explore=client.indexOf('Explore further',answer);
- const passages=client.indexOf('Key passages from the source books',explore);
+ const passages=client.indexOf('Key passages from the source books',answer);
  const sources=client.indexOf("'Additional sources'",passages);
  assert(answer>=0);
- assert(explore>answer);
- assert(passages>explore);
+ assert.equal(client.includes('Explore further'),false);
+ assert.doesNotMatch(client,/companion-follow-ups|companion-follow-up-buttons|followUpQuestions/);
+ assert(passages>answer);
  assert(sources>passages);
  assert.match(client,/highlightedSourceKeys\.add\(citation\.id\+'\|'\+Number\(citation\.page\)\)/);
  assert.match(client,/const remainingCitations=citations\.filter\(source=>/);
@@ -39,22 +39,12 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/bookSearch\.addEventListener\('input',updateBookOptions\)/);
  assert.match(client,/bookSearch\.value=''/);
  assert.match(html,/id="companion-question"/);
- assert.match(html,/id="companion-status" aria-live="polite" aria-atomic="true" aria-busy="false" role="status"/);
- assert.match(html,/#companion-status:not\(:empty\).*font-size:1\.12em/);
- assert.match(html,/companion-status-spin/);
- assert.match(html,/prefers-reduced-motion:reduce\).*companion-status/);
- assert.match(client,/function refreshStatusState\(\)/);
- assert.match(client,/status\.setAttribute\('aria-busy',String\(busy\)\)/);
- assert.match(client,/askButton\.textContent=searching\|\|answering\?'Working…':'Ask Reading Companion'/);
- assert.match(client,/Preparing an answer from the selected passages… This can take a little while\./);
  assert.match(html,/Press Enter to ask; Shift\+Enter adds a new line\./);
  assert.match(html,/aria-describedby="companion-question-help"/);
  assert.match(client,/question\.addEventListener\('keydown',event=>\{/);
  assert.match(client,/event\.key!=='Enter'\|\|event\.shiftKey\|\|event\.isComposing/);
  assert.match(client,/if\(!askButton\.disabled\)form\.requestSubmit\(askButton\)/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
- assert.match(client,/companion-follow-up-buttons/);
- assert.match(client,/button\.addEventListener\('click',\(\)=>\{void askQuestion\(suggestion\);\}\)/);
  assert.match(client,/function rememberTurn\(questionText,answerText\)/);
  assert.match(client,/conversationHistory\.slice\(-6\)/);
  assert.match(client,/answerBox\.append\(turn\)/);
@@ -62,7 +52,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/prefers-reduced-motion/);
  assert.match(client,/Recent conversation|history,/);
  assert.match(html,/id="companion-new-conversation" type="button" hidden/);
- assert.match(html,/background:#fff;color:#111;border:1px solid #333/);
+ assert.match(html,/button\.companion-inline-read\{-webkit-appearance:none;appearance:none;display:inline/);
 });
 test('catalog loading passes all verified books to the whole-list sorter',()=>{
  assert.match(client,/const list=sortBooksForSelector\(Object\.entries\(index\.books\)/);
