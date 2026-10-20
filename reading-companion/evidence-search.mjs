@@ -60,9 +60,9 @@ export function buildSearchFacets(question,plannedQueries,bookId=''){
 }
 
 /* Resolve explicit work names in the reader's question against the published
- * catalog. Exact work titles take priority; when no title is named, author
- * names can narrow a broad all-library search. This is deterministic and
- * adds no model calls.
+ * catalog. Exact work titles can constrain retrieval. Author mentions alone
+ * are left to the index's topical author ranking; choosing catalog entries by
+ * order can hide the relevant work. This is deterministic and adds no model calls.
  */
 function normalizeCatalogText(value){
  return String(value||'').toLocaleLowerCase().normalize('NFKD')
@@ -103,6 +103,10 @@ export function matchExplicitBookIds(question,books){
    }
   }
  }
+ // Do not choose a couple of works merely because their author was
+ // named. The all-library index search already scopes author mentions and
+ // ranks that author's works by topical passage evidence.
+ if(!titleMatches.length)return [];
  if(!authorGroups.size)
   return [...new Set(titleMatches.map(book=>String(book.id)))].slice(0,8);
  const groups=[...authorGroups.values()].map(group=>{
