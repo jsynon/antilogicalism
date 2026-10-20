@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
-import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
+import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,userFailureMessage,
   inlineCitationGroups} from './diagnostic-report.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
@@ -70,6 +70,12 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(diagnosticFailureCode(502,'answer','PRIVATE MODEL ERROR'),
    'answer-generation-or-citation-failed');
  assert.equal(diagnosticFailureCode(502,'planner'),'search-planning-failed');
+ assert.equal(diagnosticFailureCode(502,'planner','ai-daily-limit-reached'),
+   'ai-daily-limit-reached');
+ assert.equal(userFailureMessage('ai-daily-limit-reached'),
+   'The chatbot has reached its daily AI usage limit. Please try again after the daily reset.');
+ assert.match(userFailureMessage('ai-capacity-unavailable'),/temporarily at capacity/);
+ assert.match(userFailureMessage('ai-rate-limited'),/too many requests/);
  assert.equal(diagnosticFailureCode(503),'service-unavailable');
  assert.equal(diagnosticFailureCode(null),'network-error');
  const report=createDiagnosticReport({stage:'failed',failureHttpStatus:999,
