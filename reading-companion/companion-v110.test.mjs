@@ -19,12 +19,12 @@ test('companion names the same searchable title count as Library Search',()=>{
 });
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');
- const explore=client.indexOf('Explore further',answer);
- const passages=client.indexOf('Key passages from the source books',explore);
+ const passages=client.indexOf('Key passages from the source books',answer);
  const sources=client.indexOf("'Additional sources'",passages);
  assert(answer>=0);
- assert(explore>answer);
- assert(passages>explore);
+ assert.equal(client.includes('Explore further'),false);
+ assert.doesNotMatch(client,/companion-follow-ups|companion-follow-up-buttons|followUpQuestions/);
+ assert(passages>answer);
  assert(sources>passages);
  assert.match(client,/highlightedSourceKeys\.add\(citation\.id\+'\|'\+Number\(citation\.page\)\)/);
  assert.match(client,/const remainingCitations=citations\.filter\(source=>/);
@@ -53,8 +53,6 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/event\.key!=='Enter'\|\|event\.shiftKey\|\|event\.isComposing/);
  assert.match(client,/if\(!askButton\.disabled\)form\.requestSubmit\(askButton\)/);
  assert.doesNotMatch(html,/companion-passage-browser|companion-passage-list/);
- assert.match(client,/companion-follow-up-buttons/);
- assert.match(client,/button\.addEventListener\('click',\(\)=>\{void askQuestion\(suggestion\);\}\)/);
  assert.match(client,/function rememberTurn\(questionText,answerText\)/);
  assert.match(client,/conversationHistory\.slice\(-6\)/);
  assert.match(client,/answerBox\.append\(turn\)/);
@@ -62,7 +60,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/prefers-reduced-motion/);
  assert.match(client,/Recent conversation|history,/);
  assert.match(html,/id="companion-new-conversation" type="button" hidden/);
- assert.match(html,/background:#fff;color:#111;border:1px solid #333/);
+ assert.match(html,/button\.companion-inline-read\{-webkit-appearance:none;appearance:none;display:inline/);
 });
 test('catalog loading passes all verified books to the whole-list sorter',()=>{
  assert.match(client,/const list=sortBooksForSelector\(Object\.entries\(index\.books\)/);

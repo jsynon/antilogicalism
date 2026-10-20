@@ -72,10 +72,10 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.doesNotMatch(source,/\/api\/(?:pilot-answer|chat)/);
  assert.doesNotMatch(source,/innerHTML\s*=/);
 });
-test('reader and follow-up controls inherit the Book Lite design',()=>{
+test('reader controls inherit the Book Lite design',()=>{
  assert.match(html,/#companion-pilot\{font:inherit/);
  assert.match(html,/button\.companion-inline-read\{-webkit-appearance:none;appearance:none;display:inline/);
  assert.match(html,/button\.companion-inline-read:focus-visible\{outline:2px solid #111/);
- assert.match(html,/\.companion-follow-up-buttons button\{background:#fff;color:#111/);
+ assert.doesNotMatch(html,/companion-follow-ups|companion-follow-up-buttons/);
  assert.match(html,/mark\.cited-highlight/);
 });
