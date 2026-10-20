@@ -2,8 +2,6 @@
 
 **An independent digital archive of philosophy, literature, history, religion, and the humanities.**
 
-[Visit the Website](https://jsynon.github.io/antilogicalism/) | [Explore the Bookshelf](https://jsynon.github.io/antilogicalism/primary-sources/) | [Library Search](https://jsynon.github.io/antilogicalism/digital-library/) | [Reading Companion Repository](https://github.com/jsynon/book-chatbot) | [Library Data](https://github.com/jsynon/antilogicalism-library-data)
-
 ## About
 
 Founded in 2016, Antilogicalism began as a personal exploration of philosophy, literature, religion, and the history of ideas. Over the years, it developed into an extensive collection of articles, primary sources, historical texts, and educational resources. Today, the project is being restored and expanded as an independent digital humanities archive, combining its original content with new tools for searching, organizing, and discovering intellectual works.
@@ -22,11 +20,11 @@ One of the project's central developments is a searchable library of digitized w
 
 The search infrastructure is built using Python-based document processing and optical character recognition (OCR). Extracted text is normalized, organized by collection and volume, and transformed into compressed, partitioned inverted indexes. These indexes can be queried through JavaScript in the browser, allowing the library to provide full-text search without a dedicated backend search server. Supported search methods include exact phrases, all-word matches, and any-word matches, alongside collection and book filters.
 
-OCR accuracy remains an important area of development. Historical documents frequently contain damaged print, unusual typography, and recognition errors that can make passages difficult or impossible to retrieve. The project therefore includes tools for identifying corrupted text, evaluating repairs, and rebuilding affected index partitions. The resulting datasets are maintained separately in the [Antilogicalism Library Data](https://github.com/jsynon/antilogicalism-library-data) repository.
+OCR accuracy remains an important area of development. Historical documents frequently contain damaged print, unusual typography, and recognition errors that can make passages difficult or impossible to retrieve. The project therefore includes tools for identifying corrupted text, evaluating repairs, and rebuilding affected index partitions. The website's search interface is maintained here, while its versioned search indexes and metadata are maintained separately in the [Antilogicalism Library Data repository](https://github.com/jsynon/antilogicalism-library-data).
 
 ## The Reading Companion
 
-The Reading Companion is a live chatbot on the Antilogicalism website, hosted with Cloudflare. It lets readers ask questions across all 642 books in the digital library. Its pipeline retrieves relevant passages, selects supporting evidence, and composes concise answers with citations that link back to the source text. The [Reading Companion repository](https://github.com/jsynon/book-chatbot) contains the application and its ongoing development.
+The Reading Companion is a live chatbot on the Antilogicalism website, hosted with Cloudflare. It lets readers ask questions across all 642 books in the digital library. Its pipeline retrieves relevant passages, selects supporting evidence, and composes concise answers with citations that link back to the source text. The [Reading Companion repository](https://github.com/jsynon/book-chatbot) contains the Cloudflare Worker API and local development workbench that power its answers.
 
 Answer quality continues to be evaluated and improved. The cited passages let readers inspect the original wording and draw their own conclusions, keeping the tool focused on supporting direct engagement with primary sources.
 
