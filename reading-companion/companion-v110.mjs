@@ -9,7 +9,7 @@ import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
 import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds} from './evidence-search.mjs';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
-  inlineCitationGroups} from './diagnostic-report.mjs';
+  inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
 import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber} from './citation-numbering.mjs';
 
@@ -457,16 +457,18 @@ async function requestSourcePlan(q,verificationToken,history){
     body:JSON.stringify({question:q,bookId:bookFilter.value,history,
       turnstileToken:verificationToken})
   });
-  if(diagnosticState&& !res.ok){
-    diagnosticState.failureHttpStatus=res.status;
-    diagnosticState.failureCode=diagnosticFailureCode(res.status,'planner');
-  }
   let data;
   try{data=await res.json();}catch{
     if(diagnosticState)diagnosticState.failureCode='invalid-response';
     throw Error('The evidence search service returned an invalid response.');
   }
-  if(!res.ok)throw Error(data.error||'Evidence search planning is unavailable');
+  if(!res.ok){
+    if(diagnosticState){
+      diagnosticState.failureHttpStatus=res.status;
+      diagnosticState.failureCode=diagnosticFailureCode(res.status,'planner',data.failureCode);
+    }
+    throw Error(data.error||'Evidence search planning is unavailable');
+  }
   if(!validSearchPlan(data.queries)){
     if(diagnosticState)diagnosticState.failureCode='search-planning-failed';
     throw Error('The evidence search plan was incomplete.');
@@ -597,7 +599,7 @@ async function askQuestion(questionText){
         diagnosticState.failureCode=stage==='retrieving'?'retrieval-error':'network-error';
       refreshDiagnostic();
     }
-    setStatus('Could not prepare the answer. Please try again.');
+    setStatus(userFailureMessage(diagnosticState?.failureCode));
   }finally{
     answering=false;
     if(window.turnstile&&turnstileId!==null)window.turnstile.reset(turnstileId);
