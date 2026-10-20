@@ -186,7 +186,12 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    if(key&&!seenBooks.has(key)){seenBooks.add(key);firstPerBook.push(candidate);}
    else alternates.push(candidate);
  }
- for(const candidate of [...firstPerBook,...alternates]){
+ // Preserve the rank- and facet-balanced retrieval order for ordinary questions.
+ // Promote one result per book only when the question explicitly asks for a
+ // comparison, where source diversity is part of the answer.
+ const comparisonIntent=/\b(?:compare|contrast|versus|vs\.?|differences?|similarities?)\b/i.test(question);
+ const ordered=comparisonIntent?[...firstPerBook,...alternates]:candidates;
+ for(const candidate of ordered){
    if(chosen.length>=maxSources)break;
    if(!candidate||typeof candidate.text!=='string'||
       !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
