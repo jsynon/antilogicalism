@@ -57,7 +57,7 @@ test('selected-book evaluation constrains every search facet to the requested bo
  const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
   libraryVersion:47,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
  const scopeArgs=[];
- const library={search:async(query,options)=>{scopeArgs.push(options.allowedBookIds);return {sources:[source],booksScanned:1};},
+ const library={search:async(query,options)=>{scopeArgs.push(options);return {sources:[source],booksScanned:1};},
   jsonGzip:async()=>({pages:[{id:0,page:14,text}]})};
  const item={id:'selected-aristotle-test',discipline:'philosophy',task:'mechanism-explanation',
   selected_book_id:'7',question:'How does Aristotle explain becoming virtuous through repeated actions?',
@@ -66,7 +66,7 @@ test('selected-book evaluation constrains every search facet to the requested bo
  const result=await evaluateCase(item,{library,manifest,allowedBookIds:new Set(['7']),
   fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
  assert.equal(scopeArgs.length,3);
- assert.ok(scopeArgs.every(ids=>ids.size===1&&ids.has('7')));
+ assert.ok(scopeArgs.every(options=>options.allowedBookIds.size===1&&options.allowedBookIds.has('7')&&options.pagesPerBook===4));
  assert.equal(result.retrievalPass,true);
  assert.equal(result.candidateSourcesVerified,true);
  assert.equal(result.sourceIdentityIssues.length,0);
@@ -131,6 +131,33 @@ test('public retrieval evaluation searches both planner facets and exact questio
  assert.deepEqual(result.submittedSources.map(source=>source.page),[14]);
  assert.equal(result.unannotatedSubmittedSourceCount,0);
 });
+
+test('fourth per-book search result can reach the verified answer-source set',async()=>{
+ const text='The event horizon marks the boundary beyond which light cannot escape.';
+ const drive='https://drive.google.com/file/d/1JvAh83Yp-Tk3UIflSu6uy1sY_iWZFxvw/view';
+ const source={id:'S1',bookId:'102',title:'A Brief History of Time — Stephen Hawking',page:53,globalPageId:11232,
+  url:drive+'?usp=sharing#page=53',preview:text,score:10};
+ const pageBooks=Array(11233).fill('102');
+ const manifest={page_books:pageBooks,books:{'102':{title:source.title,drive_url:drive}}};
+ const sha256=createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
+ const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
+  libraryVersion:47,bookId:'102',chunk:1,pages:[{page:53,globalPageId:11232,utf8Bytes:Buffer.byteLength(text),sha256}]};
+ const optionsSeen=[];
+ const library={search:async(_query,options)=>{optionsSeen.push(options);return options.pagesPerBook===4?{sources:[source],booksScanned:1}:{sources:[],booksScanned:1};},
+  jsonGzip:async()=>({pages:[{id:11232,page:53,text}]})};
+ const item={id:'hawking-page-depth',discipline:'science',task:'event-horizon',
+  question:'In A Brief History of Time, how does Hawking define the event horizon?',
+  planner_queries:['Hawking event horizon boundary light cannot escape','A Brief History of Time definition of event horizon'],
+  required_source_groups:[{label:'Hawking',book_ids:['102']}],
+  evidence_targets:[{label:'Event horizon definition',book_id:'102',pages:[53]}]};
+ const result=await evaluateCase(item,{library,manifest,allowedBookIds:new Set(['102']),
+  fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
+ assert.equal(optionsSeen.length,3);
+ assert.ok(optionsSeen.every(options=>options.pagesPerBook===4));
+ assert.equal(result.selectedEvidenceTargetRecallPercent,100);
+ assert.equal(result.submittedSources[0].page,53);
+});
+
 test('source identity audit checks global ID, title, PDF ID and page anchor',()=>{
  const manifest={page_books:['7'],books:{'7':{title:'Nicomachean Ethics — Aristotle',drive_url:`https://drive.google.com/file/d/${DRIVE}/view`}}};
  const source={bookId:'7',title:manifest.books['7'].title,page:14,globalPageId:0,

@@ -4,7 +4,7 @@
  * fingerprints before any inference. The verified scope comes from the
  * owner-published cohort manifest; expanding it does not change v47 OCR.
  */
-import {RemoteLibrary} from './remote-library.mjs';
+import {RemoteLibrary,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
 import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds} from './evidence-search.mjs';
@@ -265,7 +265,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
       const foundSets=await Promise.all(searches.map(async term=>{
         const targeted=await Promise.all(targetBookIds.map(bookId=>
           library.search(term,{...(bookId?{bookId}:{}),allowedBookIds:allowed,
-            maxBooks:2,pagesPerBook:3})));
+            maxBooks:2,pagesPerBook:PRODUCTION_PAGES_PER_BOOK})));
         return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])
           .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
       }));
