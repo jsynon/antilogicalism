@@ -35,7 +35,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert(passages>answer);
  assert(sources>passages);
  assert.match(client,/highlightedSourceKeys\.add\(citation\.id\+'\|'\+Number\(citation\.page\)\)/);
- assert.match(client,/const remainingCitations=citations\.filter\(source=>/);
+ assert.match(client,/const remainingCitations=orderedCitations\.filter\(source=>/);
  assert.match(client,/if\(remainingCitations\.length\)/);
  assert.match(client,/for\(const source of remainingCitations\)/);
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
@@ -132,7 +132,7 @@ test('public companion copy explains the pilot and keeps source reading controls
 
 
 test('answer citations open in the local page reader while Sources keeps the PDF link',()=>{
- assert.ok(client.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[])'));
+ assert.ok(client.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map())'));
  assert.ok(client.includes("sourceReader.open({...source,excerpt:evidence?.quote||''},a)"));
  assert.ok(client.includes("sourceReader.open({...citation,excerpt:item.quote},read)"));
  assert.ok(client.includes('link.href=source.url'));
