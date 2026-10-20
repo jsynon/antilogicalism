@@ -24,7 +24,7 @@ test('v1.10 retains Book Lite and the site navigation',()=>{
 test('companion introduction explains how to use it and links to Library Search',()=>{
  assert.match(html,/Ask questions about books in the Antilogicalism library/);
  assert.match(html,/Select a book or leave “All books” selected, enter your question/);
- assert.match(html,/<a href="\\/antilogicalism\\/digital-library\\/">Library Search<\\/a>/);
+ assert(html.includes('href="/antilogicalism/digital-library/">Library Search</a>'));
  assert.doesNotMatch(html,/all 642 searchable titles|644-book library/);
 });
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
@@ -114,7 +114,6 @@ test('v1.10 never claims unsupported books are ready if fingerprint index missin
 });
 
 test('public companion copy explains cited sources and keeps source reading controls',()=>{
- assert.match(html,/Citations open original PDF pages/);
  assert.match(html,/Citations open original PDF pages/);
  assert.match(client,/Read passage/);
  assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
