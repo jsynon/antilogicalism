@@ -154,6 +154,7 @@ test('fourth per-book search result can reach the verified answer-source set',as
   fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
  assert.equal(optionsSeen.length,3);
  assert.ok(optionsSeen.every(options=>options.pagesPerBook===4));
+ assert.ok(optionsSeen.every(options=>options.maxBooks===3));
  assert.equal(result.selectedEvidenceTargetRecallPercent,100);
  assert.equal(result.submittedSources[0].page,53);
 });
