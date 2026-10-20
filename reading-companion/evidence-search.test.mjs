@@ -32,14 +32,14 @@ test('comparison author targeting retains a work for each named author',()=>{
  assert.deepEqual(matchExplicitBookIds(
   'How do Aristotle in Nicomachean Ethics and Darwin explain change?',books),['7','529','547']);
 });
-test('author names narrow searches when the question does not name a work',()=>{
+test('author-only mentions are left to topical ranking across that author’s works',()=>{
  const books=[
   {id:'149',title:'The Histories — Herodotus'},
   {id:'152',title:'History of the Peloponnesian War — Thucydides'},
   {id:'163',title:'Leviathan — Thomas Hobbes'},
  ];
  assert.deepEqual(matchExplicitBookIds(
-  'How does Herodotus handle accounts heard from others?',books),['149']);
+  'How does Herodotus handle accounts heard from others?',books),[]);
  assert.deepEqual(matchExplicitBookIds(
   'In Leviathan, how does Hobbes describe the state of nature?',books),['163']);
 });
