@@ -575,3 +575,20 @@ body.page-id-6350 #primary .entry-content [class*="collection-card"] p {
 #digital-library .entry-content :not(a, a *, button, button *, input, select, textarea) {
   color: #111 !important;
 }
+
+
+/* Blog archive dropdowns: match Bookshelf, Library Search, and Reading Companion. */
+#primary .entry-content #archive-year-filter,
+#primary .entry-content #archive-category-filter {
+  font-weight: 600;
+}
+
+#primary .entry-content #archive-year-filter option,
+#primary .entry-content #archive-category-filter option {
+  font-weight: 400;
+}
+
+#primary .entry-content #archive-year-filter option:checked,
+#primary .entry-content #archive-category-filter option:checked {
+  font-weight: 600;
+}
