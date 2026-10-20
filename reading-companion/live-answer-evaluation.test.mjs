@@ -118,6 +118,23 @@ test('live runner records a failed Worker case and continues with checkpoint cal
  assert.equal(run.results[1].passed,true);
  assert.equal(run.stopReason,'');
 });
+test('live runner stops immediately on quota or provider availability failures',async()=>{
+ for(const failureCode of ['ai-daily-limit-reached','ai-capacity-unavailable','ai-rate-limited']){
+  let calls=0;
+  const run=await runLiveCases(['a','b','c'].map(id=>({id,question:id,required_source_groups:[]})),{
+   evaluateCase:async item=>{
+    calls++;
+    const error=new Error('Worker provider limit');
+    error.requestFailure={stage:'planner',httpStatus:502,failureCode,message:'provider limit',workerFailure:true};
+    throw error;
+   }
+  });
+  assert.equal(calls,1);
+  assert.equal(run.results.length,1);
+  assert.equal(run.stopReason,'provider-limit-or-capacity');
+  assert.equal(run.results[0].requestFailure.failureCode,failureCode);
+ }
+});
 test('live runner stops after two consecutive Worker failures and keeps prior results',async()=>{
  const items=['a','b','c','d'].map(id=>({id,question:id,required_source_groups:[]}));
  let calls=0;const run=await runLiveCases(items,{evaluateCase:async item=>{

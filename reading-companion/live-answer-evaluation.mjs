@@ -166,6 +166,9 @@ function failedCaseResult(item,error){
    expectedBookIds:group.book_ids.map(String),foundBookIds:[],found:false})),
   evidenceHighlightCount:0,evidenceHighlights:[],passed:false,elapsedMs:0};
 }
+const TERMINAL_PROVIDER_FAILURES=new Set([
+ 'ai-daily-limit-reached','ai-capacity-unavailable','ai-rate-limited',
+]);
 export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluateOptions={},onResult=async()=>{},maxConsecutiveWorkerFailures=2}={}){
  const results=[];let consecutiveWorkerFailures=0,stopReason='';
  for(const item of cases){
@@ -175,6 +178,10 @@ export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluate
   results.push(result);
   await onResult(result,results);
   if(result.requestFailure?.workerFailure){
+   if(TERMINAL_PROVIDER_FAILURES.has(result.requestFailure.failureCode)){
+    stopReason='provider-limit-or-capacity';
+    break;
+   }
    consecutiveWorkerFailures++;
    if(consecutiveWorkerFailures>=maxConsecutiveWorkerFailures){stopReason='consecutive-worker-failures';break;}
   }else consecutiveWorkerFailures=0;
