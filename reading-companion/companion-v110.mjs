@@ -273,8 +273,11 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
         resultCount:Array.isArray(set.sources)?set.sources.length:0,
         sources:(set.sources||[]).slice(0,8)
       }));
+      // Keep a wider evidence pool for the final passage selector. The
+      // verifier still receives at most four full pages; retaining more here
+      // lets strong passages survive facet and author-wide diversity ordering.
       const results=foundSets.length>1?
-        mergeFacetSearches(foundSets,8).filter(allowedPage):
+        mergeFacetSearches(foundSets,12).filter(allowedPage):
         foundSets[0].sources.filter(allowedPage);
       // Preserve one page for each distinct facet before filling from other
       // candidates. The answer uses the strongest two verified full pages.
@@ -294,7 +297,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
         populated.push({...s,text:original.text,byteLength});
       }
     }
-    candidates=populated.slice(0,8);
+    candidates=populated.slice(0,12);
     if(diagnosticState){
       diagnosticState.candidates=candidates;
       diagnosticState.stage=candidates.length?'sources_retrieved':'no_matches';

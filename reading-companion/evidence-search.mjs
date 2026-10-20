@@ -196,8 +196,35 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    id:String(candidate?.bookId||''),title:String(candidate?.title||'')
  })));
  const authorWideIntent=authorWideBooks.length>1;
- const ordered=(comparisonIntent||authorWideIntent)?
-   [...firstPerBook,...alternates]:candidates;
+ let ordered=candidates;
+ if(comparisonIntent){
+   // A comparison requires evidence from each work or author by design.
+   ordered=[...firstPerBook,...alternates];
+ }else if(authorWideIntent){
+   // Broad author questions may benefit from multiple works, but a weak hit
+   // from a marginal title should not take a slot from a much stronger page.
+   // Treat the index score only as a retrieval-strength hint, never as proof.
+   const scores=candidates.map(candidate=>Number(candidate?.score));
+   const bestScore=Math.max(...scores.filter(Number.isFinite));
+   if(scores.every(Number.isFinite)&&bestScore>0){
+     const threshold=bestScore*0.85;
+     const strongestByBook=new Map();
+     for(const candidate of candidates){
+       const key=String(candidate?.bookId||'');
+       const previous=strongestByBook.get(key);
+       if(key&&(!previous||Number(candidate.score)>Number(previous.score)))
+         strongestByBook.set(key,candidate);
+     }
+     const strongRepresentatives=[...strongestByBook.values()].filter(candidate=>
+       Number(candidate.score)>=threshold);
+     const reserved=new Set(strongRepresentatives);
+     ordered=[...strongRepresentatives,...candidates.filter(candidate=>!reserved.has(candidate))];
+   }else{
+     // Preserve the established breadth behavior for legacy results without
+     // comparable passage scores.
+     ordered=[...firstPerBook,...alternates];
+   }
+ }
  for(const candidate of ordered){
    if(chosen.length>=maxSources)break;
    if(!candidate||typeof candidate.text!=='string'||
