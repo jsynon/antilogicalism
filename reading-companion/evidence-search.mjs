@@ -208,7 +208,14 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    const bestScore=Math.max(...scores.filter(Number.isFinite));
    if(scores.every(Number.isFinite)&&bestScore>0){
      const threshold=bestScore*0.85;
-     const strongRepresentatives=firstPerBook.filter(candidate=>
+     const strongestByBook=new Map();
+     for(const candidate of candidates){
+       const key=String(candidate?.bookId||'');
+       const previous=strongestByBook.get(key);
+       if(key&&(!previous||Number(candidate.score)>Number(previous.score)))
+         strongestByBook.set(key,candidate);
+     }
+     const strongRepresentatives=[...strongestByBook.values()].filter(candidate=>
        Number(candidate.score)>=threshold);
      const reserved=new Set(strongRepresentatives);
      ordered=[...strongRepresentatives,...candidates.filter(candidate=>!reserved.has(candidate))];
