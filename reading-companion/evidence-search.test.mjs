@@ -82,6 +82,32 @@ test('stronger passage evidence outranks a higher-ranked but weaker work match',
  ]}],2);
  assert.deepEqual(out.map(x=>x.page),[14,117]);
 });
+test('a strong passage later in a facet reaches the bounded answer context',()=>{
+ const out=mergeFacetSearches([
+  {sources:[
+   {...page(83,'7'),score:47.6},
+   {...page(84,'7'),score:40.3},
+   {...page(8,'7'),score:39.3}
+  ]},
+  {sources:[
+   {...page(122,'7'),score:48.9},
+   {...page(63,'7'),score:48.3},
+   {...page(125,'7'),score:47.8}
+  ]},
+  {sources:[
+   {...page(87,'12'),score:59.9},
+   {...page(14,'7'),score:56.8},
+   {...page(117,'12'),score:53.7},
+   {...page(108,'12'),score:51.8}
+  ]}
+ ],8);
+ const bounded=out.slice(0,4);
+ assert(bounded.some(source=>source.bookId==='7'&&source.page===14));
+ const chosen=selectAnswerSources(bounded.map(source=>({...source,text:'full source page'})),
+   'How does Aristotle explain becoming virtuous through repeated actions?','token');
+ assert(chosen.some(source=>source.bookId==='7'&&source.page===14));
+ assert(chosen.some(source=>source.bookId==='12'));
+});
 test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.equal(validSearchPlan(['Raskolnikov extraordinary man theory','Raskolnikov conscience guilt Sonia']),true);
  assert.equal(validSearchPlan(['same search phrase','same search phrase']),false);
