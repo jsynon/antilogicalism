@@ -83,11 +83,29 @@ function reviewedEvidenceSummary(value,submittedSources=[]){
   return out;
 }
 
+
+function questionPartSummary(value,submittedSources=[]){
+  if(!Array.isArray(value))return [];
+  const allowed=new Set((Array.isArray(submittedSources)?submittedSources:[])
+    .map(source=>source?.id)
+    .filter(id=>typeof id==='string'&&/^S[1-9][0-9]*$/.test(id)));
+  const out=[];
+  for(const item of value.slice(0,4)){
+    const part=typeof item?.part==='string'?item.part.trim().slice(0,140):'';
+    const status=item?.status;
+    if(part.length<3||!['supported','partial','unsupported'].includes(status))continue;
+    const evidenceIds=Array.isArray(item.evidenceIds)?
+      [...new Set(item.evidenceIds.filter(id=>typeof id==='string'&&allowed.has(id)))].slice(0,4):[];
+    out.push({part,status,evidenceIds});
+  }
+  return out;
+}
+
 export function createDiagnosticReport(input={}){
   const audit=auditCitationIds(input.answer,input.citations);
   return {
     schema:'antilogicalism-reading-companion-diagnostic-v1',
-    clientBuild:'v1.12-diagnostics',
+    clientBuild:'v1.13-diagnostics',
     libraryVersion:Number.isSafeInteger(input.libraryVersion)?input.libraryVersion:null,
     question:string(input.question,400),
     selectedBookId:string(input.selectedBookId,12)||'all',
@@ -118,7 +136,8 @@ export function createDiagnosticReport(input={}){
       inlineIdsWithoutSource:audit.inlineIdsWithoutSource,
       sourcesNotCited:audit.sourcesNotCited,
       citations:Array.isArray(input.citations)?input.citations.slice(0,4).map(sourceSummary).filter(Boolean):[],
-      reviewedEvidence:reviewedEvidenceSummary(input.reviewedEvidence,input.submittedSources)
+      reviewedEvidence:reviewedEvidenceSummary(input.reviewedEvidence,input.submittedSources),
+      questionParts:questionPartSummary(input.questionParts,input.submittedSources)
     },
     evidenceHighlights:Array.isArray(input.evidenceHighlights)?
       input.evidenceHighlights.slice(0,3).map(item=>({
