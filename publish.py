@@ -84,7 +84,7 @@ def nav_link(soup, direction, url, title):
         nav.append(section)
     section.clear()
     a = soup.new_tag('a', href=url, rel=('prev' if direction == 'previous' else 'next'))
-    a.string = title
+    a.string = ('← ' + title) if direction == 'previous' else (title + ' →')
     section.append(a)
 
 
