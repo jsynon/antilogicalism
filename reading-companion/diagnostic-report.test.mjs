@@ -98,6 +98,25 @@ test('diagnostic reports all four source pages sent to the answer service',()=>{
  assert.equal(JSON.stringify(report).includes('PRIVATE TEXT'),false);
 });
 
+
+test('diagnostics expose bounded question-part coverage tied to submitted sources',()=>{
+ const report=createDiagnosticReport({
+  submittedSources:[{id:'S1'},{id:'S2'}],
+  questionParts:[
+   {part:'definition',status:'supported',evidenceIds:['S1','S9']},
+   {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
+   {part:'x'.repeat(200),status:'partial',evidenceIds:['S2','S1','S2']}
+  ]
+ });
+ assert.equal(report.clientBuild,'v1.13-diagnostics');
+ assert.deepEqual(report.answer.questionParts,[
+  {part:'definition',status:'supported',evidenceIds:['S1']},
+  {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
+  {part:'x'.repeat(140),status:'partial',evidenceIds:['S2','S1']}
+ ]);
+ assert.match(client,/diagnosticState\.questionParts=data\.questionParts/);
+});
+
 test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(html,/id="companion-diagnostic-panel"[^>]+hidden/);
  assert.match(html,/id="companion-diagnostic-toggle" type="checkbox"/);
