@@ -130,5 +130,6 @@ test('fuzzy author scoping requires a distinct indexed topic term',async()=>{
  };
  const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
  const result=await finder.search('kierkgaard?',{maxBooks:2,pagesPerBook:2});
- assert.equal(result.sources.length,2);
+ assert.equal(result.sources.length,0);
+ assert.deepEqual(result.terms,[]);
 });
