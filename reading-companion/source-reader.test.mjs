@@ -63,10 +63,12 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(html,/id="companion-source-reader"[^>]+hidden/);
  assert.match(client,/Read passage/);
  assert.match(client,/label\.append\(link\);row\.append\(label\)/);
- assert.match(client,/appendFullPage\(row,original,highlight\?\.quote\|\|''\)/);
- assert.match(client,/appendFullPage\(card,original,item\.quote\)/);
+ assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
+ assert.match(client,/sourceReader\.open\(\{\.\.\.source,excerpt\},read\)/);
  assert.match(source,/isAllowedBook\(bookId\)/);
  assert.match(source,/getBook\(bookId\)/);
+ assert.match(source,/function renderHighlightedText/);
+ assert.match(source,/mark\.className='cited-highlight'/);
  assert.doesNotMatch(source,/\/api\/(?:pilot-answer|chat)/);
  assert.doesNotMatch(source,/innerHTML\s*=/);
 });
