@@ -92,7 +92,11 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
  const submittedBookIds=[...new Set(submitted.map(source=>String(source?.bookId||'')))];
  const questionParts=Array.isArray(data?.questionParts)?data.questionParts:[];
  const evidenceMap=Array.isArray(data?.evidenceMap)?data.evidenceMap:[];
- const submittedIds=new Set(submitted.map(source=>String(source?.id||'')));
+ // The answer endpoint accepts locators in order and the Worker assigns the
+ // trusted IDs S1, S2, ... in that same order. The local report's submitted
+ // source summaries intentionally omit those temporary IDs, so reconstruct
+ // the exact positional mapping here.
+ const submittedIds=new Set(submitted.map((_source,index)=>'S'+(index+1)));
  const mappedEvidenceIds=new Set(evidenceMap.map(item=>String(item?.id||'')));
  const partEvidenceAudit=questionParts.map(part=>{
   const evidenceIds=[...new Set(Array.isArray(part?.evidenceIds)?part.evidenceIds.map(String):[])];
