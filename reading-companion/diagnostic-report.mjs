@@ -104,7 +104,7 @@ function questionPartSummary(value,submittedSources=[]){
     const status=item?.status;
     if(part.length<3||!['supported','partial','unsupported'].includes(status))continue;
     const evidenceIds=Array.isArray(item.evidenceIds)?
-      [...new Set(item.evidenceIds.filter(id=>typeof id==='string'&&allowed.has(id)))].slice(0,4):[];
+      [...new Set(item.evidenceIds.filter(id=>typeof id==='string'&&allowed.has(id)))].slice(0,6):[];
     out.push({part,status,evidenceIds});
   }
   return out;
@@ -143,7 +143,7 @@ export function createDiagnosticReport(input={}){
     })):[],
     candidates:Array.isArray(input.candidates)?input.candidates.slice(0,8).map(sourceSummary).filter(Boolean):[],
     submittedSources:Array.isArray(input.submittedSources)?
-      input.submittedSources.slice(0,4).map(sourceSummary).filter(Boolean):[],
+      input.submittedSources.slice(0,6).map(sourceSummary).filter(Boolean):[],
     answer:{
       outcome:string(input.outcome,48),
       coverage:string(input.coverage,24),
@@ -152,7 +152,7 @@ export function createDiagnosticReport(input={}){
       inlineCitationIds:audit.inlineIds,
       inlineIdsWithoutSource:audit.inlineIdsWithoutSource,
       sourcesNotCited:audit.sourcesNotCited,
-      citations:Array.isArray(input.citations)?input.citations.slice(0,4).map(sourceSummary).filter(Boolean):[],
+      citations:Array.isArray(input.citations)?input.citations.slice(0,6).map(sourceSummary).filter(Boolean):[],
       reviewedEvidence:reviewedEvidenceSummary(input.reviewedEvidence,input.submittedSources),
       questionParts:questionPartSummary(input.questionParts,input.submittedSources)
     },
