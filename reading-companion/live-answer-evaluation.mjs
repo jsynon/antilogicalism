@@ -75,7 +75,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
   const citedBookIds=citationBookIds.filter(id=>expectedBookIds.includes(id));
   const retrieved=submitted.some(source=>expectedBookIds.includes(String(source?.bookId||'')));
   const cited=citations.some(source=>expectedBookIds.includes(String(source?.bookId||'')));
-  return {label:group.label,expectedBookIds,retrievedBookIds,citedBookIds,retrieved,cited,found:cited};
+  return {label:group.label,expectedBookIds,retrievedBookIds,citedBookIds,foundBookIds:citedBookIds,retrieved,cited,found:cited};
  });
  const highlights=Array.isArray(data?.evidenceHighlights)?data.evidenceHighlights:[];
  const citationSources=citations.map(source=>({id:String(source?.id||''),bookId:String(source?.bookId||''),
