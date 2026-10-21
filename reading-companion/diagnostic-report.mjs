@@ -81,7 +81,7 @@ function reviewedEvidenceSummary(value,submittedSources=[]){
     const key=JSON.stringify([id,point]);
     if(!allowed.has(id)||seen.has(key)||!point)continue;
     const anchorQuote=typeof item?.anchorQuote==='string'?
-      item.anchorQuote.trim().slice(0,120):'';
+      item.anchorQuote.trim().slice(0,320):'';
     const speaker=typeof item?.speaker==='string'?item.speaker.trim().slice(0,80):'';
     const qualifier=typeof item?.qualifier==='string'?item.qualifier.trim().slice(0,160):'';
     seen.add(key);out.push({id,point,quoteVerified:item?.quoteVerified===true,
