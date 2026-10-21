@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,selectLiveCases,evaluateLiveCase,evaluatePlannerCase,runLiveCases} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,selectLiveCases,evaluateLiveCase,evaluatePlannerCase,runLiveCases} from './live-answer-evaluation.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
 
@@ -99,6 +99,38 @@ test('audit distinguishes a retrieved and cited book from evidence assigned to a
  assert.equal(result.sourceGroups[0].linkedToSupportedEvidence,false);
  assert.equal(result.partEvidenceComplete,false);
  assert.equal(result.passed,false);
+});
+
+test('offline report recheck repairs positional evidence links without changing the original result',()=>{
+ const report={mode:'quality',cases:[{
+  id:'quality-philosophy-aristotle-practical-wisdom',passed:false,coverage:'full',
+  answerText:'Practical wisdom concerns human goods [S1].',
+  citationSources:[{id:'S1',bookId:'7',page:66}],
+  submittedSources:[{bookId:'7',page:66}],
+  evidenceMap:[{id:'S1',point:'Practical wisdom concerns human goods.'}],
+  questionParts:[{part:'What is practical wisdom?',status:'supported',evidenceIds:['S1']}],
+  evidenceHighlights:[]
+ }]};
+ const checked=recheckQualityReport(report);
+ assert.equal(checked.offlineRecheck.aiCalls,0);
+ assert.equal(checked.offlineRecheck.networkCalls,0);
+ assert.equal(checked.offlineRecheck.checkedCases,1);
+ assert.equal(checked.offlineRecheck.passedCases,1);
+ assert.equal(checked.cases[0].passed,false);
+ assert.equal(checked.cases[0].offlineRecheck.passed,true);
+ assert.equal(checked.cases[0].offlineRecheck.partEvidenceAudit[0].structurallyComplete,true);
+});
+
+test('offline report recheck keeps an actual partial answer as a miss',()=>{
+ const checked=recheckQualityReport({cases:[{
+  id:'quality-science-darwin-selection',coverage:'partial',answerText:'Claim [S1].',
+  citationSources:[{id:'S1',bookId:'529'}],submittedSources:[{bookId:'529'}],
+  evidenceMap:[{id:'S1',point:'Some relevant evidence.'}],
+  questionParts:[{part:'The requested point',status:'partial',evidenceIds:['S1']}]
+ }]});
+ assert.equal(checked.offlineRecheck.passedCases,0);
+ assert.equal(checked.cases[0].offlineRecheck.passed,false);
+ assert.equal(checked.cases[0].offlineRecheck.questionPartCoverage.partial,1);
 });
 
 test('quality case uses fixed queries, skips planning, and restricts retrieval to its selected book',async()=>{
