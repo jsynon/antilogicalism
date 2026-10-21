@@ -73,6 +73,13 @@ function locateHighlightInSubmittedPage(item,citations,submitted){
  if(normalizedQuote.length<24)return null;
  return normalizeDiagnosticExcerpt(original.text).includes(normalizedQuote);
 }
+function answerDeniesSupportedComparison(part,answer){
+ if(part?.status!=='supported'||!/\b(?:compare|comparison|contrast|differ|difference|different|distinguish)\b/i.test(String(part?.part||'')))return false;
+ const text=String(answer||'');
+ const explicitGap=/(?:\b(?:cannot|can't|does not|doesn't|do not|don't|unable to|fails? to)\b.{0,90}\b(?:establish|demonstrate|support|show|provide|contain|identify|determine|compare|distinguish)\b.{0,70}\b(?:comparison|contrast|difference|distinction)\b|\b(?:no|not enough|insufficient)\s+(?:direct\s+)?(?:evidence|support|basis|comparison|contrast|difference|distinction)\b|\b(?:comparison|contrast|difference|distinction)\s+(?:is\s+)?(?:not directly stated|cannot be established|is not established)\b|\b(?:texts?|passages?|excerpts?|evidence)\b.{0,80}\b(?:do not|don't|does not|doesn't|cannot|can't)\b.{0,50}\b(?:contain|establish|support|show|provide)\b.{0,40}\b(?:comparison|contrast|difference|distinction)\b)/i.test(text);
+ const givesContrast=/\b(?:whereas|by contrast|in contrast|unlike|differs? from|different from|the difference is|differ in|contrasts? with)\b/i.test(text);
+ return explicitGap&&!givesContrast;
+}
 export function auditLiveAnswer(data,submitted,requiredGroups){
  const citations=Array.isArray(data?.citations)?data.citations:[];
  const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
@@ -83,21 +90,53 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
  const missingInline=[...new Set(inline.filter(id=>!citationIds.has(id)))];
  const citationBookIds=[...new Set(citations.map(source=>String(source?.bookId||'')))];
  const submittedBookIds=[...new Set(submitted.map(source=>String(source?.bookId||'')))];
+ const questionParts=Array.isArray(data?.questionParts)?data.questionParts:[];
+ const evidenceMap=Array.isArray(data?.evidenceMap)?data.evidenceMap:[];
+ const submittedIds=new Set(submitted.map(source=>String(source?.id||'')));
+ const mappedEvidenceIds=new Set(evidenceMap.map(item=>String(item?.id||'')));
+ const partEvidenceAudit=questionParts.map(part=>{
+  const evidenceIds=[...new Set(Array.isArray(part?.evidenceIds)?part.evidenceIds.map(String):[])];
+  const mappedEvidenceIdsForPart=evidenceIds.filter(id=>mappedEvidenceIds.has(id));
+  const citedEvidenceIds=evidenceIds.filter(id=>citationIds.has(id));
+  const submittedEvidenceIds=evidenceIds.filter(id=>submittedIds.has(id));
+  const structurallyComplete=part?.status==='unsupported'?null:
+   evidenceIds.length>0&&mappedEvidenceIdsForPart.length===evidenceIds.length&&
+   citedEvidenceIds.length===evidenceIds.length&&submittedEvidenceIds.length===evidenceIds.length;
+  return {part:String(part?.part||''),status:String(part?.status||''),evidenceIds,
+   mappedEvidenceIds:mappedEvidenceIdsForPart,citedEvidenceIds,submittedEvidenceIds,structurallyComplete};
+ });
+ const completeSupportedEvidenceIds=new Set(partEvidenceAudit
+  .filter(part=>part.status==='supported'&&part.structurallyComplete===true)
+  .flatMap(part=>part.citedEvidenceIds));
+ const completePartialEvidenceIds=new Set(partEvidenceAudit
+  .filter(part=>part.status==='partial'&&part.structurallyComplete===true)
+  .flatMap(part=>part.citedEvidenceIds));
  const sourceGroups=requiredGroups.map(group=>{
   const expectedBookIds=group.book_ids.map(String);
   const retrievedBookIds=submittedBookIds.filter(id=>expectedBookIds.includes(id));
   const citedBookIds=citationBookIds.filter(id=>expectedBookIds.includes(id));
   const retrieved=submitted.some(source=>expectedBookIds.includes(String(source?.bookId||'')));
   const cited=citations.some(source=>expectedBookIds.includes(String(source?.bookId||'')));
-  return {label:group.label,expectedBookIds,retrievedBookIds,citedBookIds,foundBookIds:citedBookIds,retrieved,cited,found:cited};
+  const supportedPartLabels=questionParts.filter(part=>part?.status==='supported'&&
+   (Array.isArray(part?.evidenceIds)?part.evidenceIds:[]).some(id=>citations.some(source=>
+    String(source?.id||'')===String(id)&&completeSupportedEvidenceIds.has(String(id))&&
+     expectedBookIds.includes(String(source?.bookId||''))))
+  ).map(part=>String(part?.part||''));
+  const partialPartLabels=questionParts.filter(part=>part?.status==='partial'&&
+   (Array.isArray(part?.evidenceIds)?part.evidenceIds:[]).some(id=>citations.some(source=>
+    String(source?.id||'')===String(id)&&completePartialEvidenceIds.has(String(id))&&
+     expectedBookIds.includes(String(source?.bookId||''))))
+  ).map(part=>String(part?.part||''));
+  return {label:group.label,expectedBookIds,retrievedBookIds,citedBookIds,foundBookIds:citedBookIds,
+   retrieved,cited,found:cited,supportedPartLabels,partialPartLabels,
+   linkedToSupportedEvidence:questionParts.length?supportedPartLabels.length>0:null,
+   linkedToPartialEvidence:questionParts.length?partialPartLabels.length>0:null};
  });
  const highlights=Array.isArray(data?.evidenceHighlights)?data.evidenceHighlights:[];
  const citationSources=citations.map(source=>({id:String(source?.id||''),bookId:String(source?.bookId||''),
   title:String(source?.title||''),page:Number.isSafeInteger(source?.page)?source.page:null,
   globalPageId:Number.isSafeInteger(source?.globalPageId)?source.globalPageId:null,
   url:typeof source?.url==='string'?source.url:''}));
- const questionParts=Array.isArray(data?.questionParts)?data.questionParts:[];
- const evidenceMap=Array.isArray(data?.evidenceMap)?data.evidenceMap:[];
  const questionPartCoverage={total:questionParts.length,
   supported:questionParts.filter(item=>item?.status==='supported').length,
   partial:questionParts.filter(item=>item?.status==='partial').length,
@@ -107,12 +146,25 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
   quote:typeof item?.quote==='string'?item.quote:'',
   quoteLocated:typeof item?.quoteLocated==='boolean'?item.quoteLocated:
    locateHighlightInSubmittedPage(item,citations,submitted)}));
- return {workerVersionId,workerSourceBuild,outcome:String(data?.outcome||''),coverage:String(data?.coverage||''),reviewStatus:String(data?.reviewStatus||''),
+ const coverage=String(data?.coverage||'');
+ const partStatusesConsistent=questionParts.length===0?null:
+  (coverage==='full'?questionParts.every(part=>part?.status==='supported'):
+   coverage==='partial'?questionParts.some(part=>part?.status!=='supported'):false);
+ const proseContradictions=questionParts.filter(part=>answerDeniesSupportedComparison(part,answer))
+  .map(part=>String(part?.part||''));
+ const answerCoverageConsistent=questionParts.length===0?null:
+  partStatusesConsistent&&!proseContradictions.length;
+ const partEvidenceComplete=questionParts.length===0?null:
+  partEvidenceAudit.every(part=>part.structurallyComplete!==false);
+ const evidenceAuditScope='Evidence IDs are checked for consistent linkage across question parts, the reviewed evidence map, cited sources, and submitted pages. This is a structural check, not a semantic judge of whether a passage truly supports a claim; review the answer and source text.';
+ return {workerVersionId,workerSourceBuild,outcome:String(data?.outcome||''),coverage,reviewStatus:String(data?.reviewStatus||''),
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
-  sourceGroups,questionParts,questionPartCoverage,evidenceMap,
+  sourceGroups,questionParts,questionPartCoverage,partEvidenceAudit,partEvidenceComplete,
+  answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
   evidenceHighlightCount:highlights.length,evidenceHighlights,
-  passed:String(data?.coverage||'')==='full'&&sourceGroups.every(group=>group.found)&&missingInline.length===0&&citations.length>0};
+  passed:coverage==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
+   missingInline.length===0&&citations.length>0&&answerCoverageConsistent!==false&&partEvidenceComplete!==false};
 }
 function safeHeaders(token){return {authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json',origin:'https://jsynon.github.io'};}
 function attachRequestFailure(error,stage,details={}){
@@ -346,7 +398,7 @@ async function main(){
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
    args.mode==='quality'?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
-   'Answer text and review_focus are provided for human assessment. Automated pass checks retrieval/citation structure, not factual or interpretive truth.',
+   'Automated checks distinguish expected-book retrieval from structural evidence-ID linkage and prose/coverage consistency. They do not judge semantic relevance or factual truth; review answer text and source passages manually.',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  const saveReport=async()=>{if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');};
@@ -392,7 +444,7 @@ async function main(){
   await saveReport();
   console.log(args.mode==='planner'?
    'Done: '+report.summary.passedCases+'/'+report.caseCount+' planner plans retrieved at least one expected book; no answers were generated.':
-   'Done: '+report.summary.passedCases+'/'+report.caseCount+' cases met citation and expected-work checks; '+report.completedCases+' completed, '+report.notRunCases+' not run. This is a retrieval/citation review signal, not an AI truth grader.');
+   'Done: '+report.summary.passedCases+'/'+report.caseCount+' cases met coverage, citation, and structural evidence-link checks; '+report.completedCases+' completed, '+report.notRunCases+' not run. This is not a semantic or factual truth grader.');
   return report.requestFailureCases||(args.mode==='planner'&&report.summary.failedCases)?1:0;
  }catch(error){
   report.executionStatus=report.cases.length?'interrupted':'setup-failed';

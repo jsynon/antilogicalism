@@ -61,6 +61,35 @@ test('audit requires expected-source coverage and citations with no orphan marke
  assert.deepEqual(bad.inlineIdsWithoutSource,['S2']);
 });
 
+test('audit rejects prose that denies a comparison marked supported',()=>{
+ const result=auditLiveAnswer({coverage:'full',answer:'Aristotle discusses political order through human good [S1]. Hobbes describes common power preserving justice [S2]. The texts do not offer a direct comparison, and the evidence cannot establish a difference between their accounts [S1, S2].',
+  citations:[{id:'S1',bookId:'7'},{id:'S2',bookId:'163'}],
+  questionParts:[
+   {part:'Aristotle’s account',status:'supported',evidenceIds:['S1']},
+   {part:'Hobbes’s account',status:'supported',evidenceIds:['S2']},
+   {part:'How the accounts differ',status:'supported',evidenceIds:['S1','S2']}
+  ],evidenceMap:[{id:'S1',point:'Aristotle connects political order with human good.'},
+   {id:'S2',point:'Hobbes connects common power with justice.'}]},
+  [{id:'S1',bookId:'7'},{id:'S2',bookId:'163'}],
+  [{label:'Aristotle',book_ids:['7']},{label:'Hobbes',book_ids:['163']}]);
+ assert.equal(result.answerCoverageConsistent,false);
+ assert.deepEqual(result.coverageContradictions,['How the accounts differ']);
+ assert.equal(result.passed,false);
+});
+
+test('audit distinguishes a retrieved and cited book from evidence assigned to a supported part',()=>{
+ const result=auditLiveAnswer({coverage:'full',answer:'Claim [S1].',citations:[{id:'S1',bookId:'102'}],
+  questionParts:[{part:'Hawking’s observational evidence',status:'supported',evidenceIds:['S2']}],
+  evidenceMap:[{id:'S2',point:'A separate point from another passage.'}]},
+  [{id:'S1',bookId:'102'},{id:'S2',bookId:'102'}],
+  [{label:'Hawking',book_ids:['102']}]);
+ assert.equal(result.sourceGroups[0].retrieved,true);
+ assert.equal(result.sourceGroups[0].cited,true);
+ assert.equal(result.sourceGroups[0].linkedToSupportedEvidence,false);
+ assert.equal(result.partEvidenceComplete,false);
+ assert.equal(result.passed,false);
+});
+
 test('quality case uses fixed queries, skips planning, and restricts retrieval to its selected book',async()=>{
  const calls=[],searchOptions=[];
  const library={search:async(query,options)=>{searchOptions.push({query,options});return {sources:[{id:'S1',bookId:'529',title:'On the Origin of Species',page:10,globalPageId:10,preview:'A sufficiently long preview passage for testing.',score:4}]};},
