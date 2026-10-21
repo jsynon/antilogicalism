@@ -25,18 +25,32 @@ const QUALITY_CASES=[
  {id:'quality-all-books-cross-discipline-order',discipline:'philosophy',question:'How does Aristotle describe the aim of political science in the Nicomachean Ethics, and what role does Hobbes give common power in Leviathan? How do these accounts differ?',selected_book_ids:[],planner_queries:['Aristotle Nicomachean Ethics political science human good citizens good obedient laws','Hobbes Leviathan state of nature common power keep them in awe war every man against every man'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']},{label:'Hobbes, Leviathan',book_ids:['163']}],review_focus:['Represent each author’s account in its own terms and identify a meaningful difference.','Ground the comparison in both works instead of importing unsupported modern claims.']},
  {id:'quality-all-books-religion-scripture',discipline:'religion',question:'According to 1 John 4:7–12, what does “God is love” mean, and how does the passage connect God’s love with loving one another?',selected_book_ids:[],planner_queries:['1 John 4:7-12 God is love sent Son love one another passage','1 John 4:7-12 love of God revealed in Christ command love one another'],required_source_groups:[{label:'1 John 4:7–12',book_ids:['638']}],review_focus:['Explain the passage’s connection between God’s prior love and the command to love one another.','Stay close to the passage and distinguish its claims from later theological interpretation.']},
 ];
+const PLANNER_CASE_IDS=[
+ 'quality-philosophy-aristotle-practical-wisdom',
+ 'quality-all-books-cross-work-science',
+];
 const CALL_GAP_MS=30_500;
 const MAX_PAGE_BYTES=14_000;
 
+function copyQualityCase(item){
+ return {...item,selected_book_ids:[...item.selected_book_ids],planner_queries:[...item.planner_queries],
+  required_source_groups:item.required_source_groups.map(group=>({...group,book_ids:[...group.book_ids]})),
+  review_focus:[...item.review_focus]};
+}
 export function selectLiveCases(suite,mode='smoke'){
- if(mode==='quality')return QUALITY_CASES.map(item=>({...item,selected_book_ids:[...item.selected_book_ids],planner_queries:[...item.planner_queries],required_source_groups:item.required_source_groups.map(group=>({...group,book_ids:[...group.book_ids]})),review_focus:[...item.review_focus]}));
+ if(mode==='quality')return QUALITY_CASES.map(copyQualityCase);
+ if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
+  const item=QUALITY_CASES.find(value=>value.id===id);
+  if(!item)throw Error('The planner-only cases are missing from the quality suite.');
+  return copyQualityCase(item);
+ });
  if(mode==='smoke'){
   const selected=SMOKE_CASE_IDS.map(id=>suite.cases.find(item=>item.id===id));
   if(selected.some(item=>!item))throw Error('The live smoke cases are missing from the retrieval suite.');
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, quality, or full.');
+ throw Error('Mode must be smoke, planner, quality, or full.');
 }
 function normalizeDiagnosticExcerpt(value){
  return String(value||'').normalize('NFKC')
@@ -107,6 +121,8 @@ function attachRequestFailure(error,stage,details={}){
   failureCode:String(details.failureCode||'request-failed').slice(0,80),
   message:String(details.message||wrapped.message||'Request failed').replace(/(?:bearer\s+)[^\s]+/ig,'Bearer [redacted]').slice(0,240),
   workerFailure:details.workerFailure===true,
+  ...(typeof details.failureDetail==='string'&&/^[a-z_]{1,48}$/.test(details.failureDetail)?
+   {failureDetail:details.failureDetail}:{}),
   workerVersionId:typeof details.workerVersionId==='string'&&details.workerVersionId.length<=128?details.workerVersionId:null,
   workerSourceBuild:typeof details.workerSourceBuild==='string'&&details.workerSourceBuild.length<=128?details.workerSourceBuild:null};
  return wrapped;
@@ -120,7 +136,8 @@ async function callJson(fetcher,url,token,body,beforeCall=async()=>{},stage='wor
   throw attachRequestFailure(new Error('Worker returned invalid JSON.'),stage,{httpStatus:response.status,failureCode:'invalid-json',workerFailure:true});
  }
  if(!response.ok)throw attachRequestFailure(new Error(String(data?.failureCode||data?.error||'Worker request failed').slice(0,240)),stage,{
-  httpStatus:response.status,failureCode:String(data?.failureCode||'http-error'),workerFailure:true,
+  httpStatus:response.status,failureCode:String(data?.failureCode||'http-error'),
+  failureDetail:data?.failureDetail,workerFailure:true,
   workerVersionId:data?.workerVersionId,workerSourceBuild:data?.workerSourceBuild});
  return data;
 }
@@ -177,13 +194,15 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false}){
  const startTime=Date.now();
+ const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
+ const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
  let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false,
   plannerWorkerVersionId=null,plannerWorkerSourceBuild=null;
  if(useFixedQueries&&validSearchPlan(item.planner_queries)){
   queries=item.planner_queries;
   plannerSkipped=true;
  }else try{
-  plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:'',history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner');
+  plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner');
   if(!validSearchPlan(plan?.queries)){
    const error=attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{httpStatus:200,failureCode:'invalid-response',workerFailure:false});
    throw error;
@@ -226,6 +245,48 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   ...(plannerFailure?{plannerFailure}:{}),searches,
   submittedSources:selected.map(({bookId,title,page,globalPageId})=>({bookId,title,page,globalPageId})),
   ...audit,elapsedMs:Date.now()-startTime};
+}
+export async function evaluatePlannerCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}={}){
+ const startTime=Date.now();
+ const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
+ const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
+ const plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,
+  bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner');
+ if(!validSearchPlan(plan?.queries))
+  throw attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{
+   httpStatus:200,failureCode:'invalid-response',workerFailure:false,
+   workerVersionId:plan?.workerVersionId,workerSourceBuild:plan?.workerSourceBuild});
+ let loaded;
+ try{loaded=await loadSources(item,plan.queries,{library,manifest,allowed});}
+ catch(error){
+  const wrapped=attachRequestFailure(error,'retrieval',{failureCode:'retrieval-failed',workerFailure:false,
+   workerVersionId:plan.workerVersionId,workerSourceBuild:plan.workerSourceBuild});
+  wrapped.requestFailure.plannerSkipped=false;
+  throw wrapped;
+ }
+ const {selected,searches}=loaded;
+ const retrievedBookIds=[...new Set(selected.map(source=>String(source.bookId)))];
+ const sourceGroups=(item.required_source_groups||[]).map(group=>{
+  const expectedBookIds=group.book_ids.map(String);
+  const groupBookIds=retrievedBookIds.filter(id=>expectedBookIds.includes(id));
+  const retrieved=groupBookIds.length>0;
+  return {label:group.label,expectedBookIds,retrievedBookIds:groupBookIds,
+   citedBookIds:[],foundBookIds:[],retrieved,cited:false,found:false};
+ });
+ const passed=sourceGroups.every(group=>group.retrieved);
+ return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds,
+  reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped:false,
+  plannerQueries:plan.queries,plannerFallback:false,
+  plannerWorkerVersionId:plan.workerVersionId||null,plannerWorkerSourceBuild:plan.workerSourceBuild||null,
+  answerWorkerVersionId:null,answerWorkerSourceBuild:null,searches,
+  submittedSources:selected.map(({bookId,title,page,globalPageId})=>({bookId,title,page,globalPageId})),
+  submittedSourceCount:selected.length,sourceGroups,passed,
+  outcome:passed?'planner-retrieval-ready':'planner-retrieval-miss',
+  coverage:'not-evaluated',reviewStatus:'planner-only',answerText:'',citationCount:0,
+  citationBookIds:[],citationSources:[],inlineCitationCount:0,inlineIdsWithoutSource:[],
+  evidenceHighlightCount:0,evidenceHighlights:[],questionParts:[],
+  questionPartCoverage:{total:0,supported:0,partial:0,unsupported:0},evidenceMap:[],
+  elapsedMs:Date.now()-startTime};
 }
 function failedCaseResult(item,error){
  const failure=error?.requestFailure||{stage:'evaluation',httpStatus:null,failureCode:'evaluation-failed',
@@ -272,17 +333,20 @@ function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',out
   if(key==='mode')out.mode=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode smoke|quality|full] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|full] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
  const cases=selectLiveCases(suite,args.mode);
  const plannerCalls=args.mode==='quality'?0:cases.length;
+ const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:plannerCalls+cases.length*2;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,
-  caseCount:cases.length,estimatedWorkerAiCalls:plannerCalls+cases.length*2,
-  callsPerCase:args.mode==='quality'?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
-  answerQualityNote:'Answer text and review_focus are provided for human assessment. Automated pass checks retrieval/citation structure, not factual or interpretive truth.',
+  caseCount:cases.length,estimatedWorkerAiCalls,
+  callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
+   args.mode==='quality'?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
+  answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
+   'Answer text and review_focus are provided for human assessment. Automated pass checks retrieval/citation structure, not factual or interpretive truth.',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  const saveReport=async()=>{if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');};
@@ -298,7 +362,8 @@ async function main(){
   report.executionStatus='running';await saveReport();
   let previousCall=0;
   const beforeCall=async()=>{if(previousCall){const due=Math.max(0,CALL_GAP_MS-(Date.now()-previousCall));if(due)await new Promise(resolve=>setTimeout(resolve,due));}previousCall=Date.now();};
-  const run=await runLiveCases(cases,{evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:args.mode==='quality'},onResult:async(result,results)=>{
+  const run=await runLiveCases(cases,{evaluateCase:args.mode==='planner'?evaluatePlannerCase:evaluateLiveCase,
+   evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:args.mode==='quality'},onResult:async(result,results)=>{
    report.cases=results;report.completedCases=results.length;
    report.notRunCases=cases.length-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
@@ -306,7 +371,8 @@ async function main(){
    report.plannerSkippedCases=results.filter(item=>item.plannerSkipped).length;
    report.workerVersionIds=[...new Set(results.flatMap(item=>[item.plannerWorkerVersionId,item.answerWorkerVersionId]).filter(value=>typeof value==='string'&&value))];
    await saveReport();
-   console.log((result.passed?'REVIEW-PASS':result.requestFailure?'REQUEST-FAIL':'REVIEW-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
+   const label=args.mode==='planner'?'PLANNER': 'REVIEW';
+   console.log((result.passed?label+'-PASS':result.requestFailure?'REQUEST-FAIL':label+'-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
   }});
   report.cases=run.results;report.stopReason=run.stopReason;
   report.notRunCases=cases.length-run.results.length;
@@ -324,8 +390,10 @@ async function main(){
     return totals;
    },{total:0,supported:0,partial:0,unsupported:0})};
   await saveReport();
-  console.log('Done: '+report.summary.passedCases+'/'+report.caseCount+' cases met citation and expected-work checks; '+report.completedCases+' completed, '+report.notRunCases+' not run. This is a retrieval/citation review signal, not an AI truth grader.');
-  return report.requestFailureCases?1:0;
+  console.log(args.mode==='planner'?
+   'Done: '+report.summary.passedCases+'/'+report.caseCount+' planner plans retrieved at least one expected book; no answers were generated.':
+   'Done: '+report.summary.passedCases+'/'+report.caseCount+' cases met citation and expected-work checks; '+report.completedCases+' completed, '+report.notRunCases+' not run. This is a retrieval/citation review signal, not an AI truth grader.');
+  return report.requestFailureCases||(args.mode==='planner'&&report.summary.failedCases)?1:0;
  }catch(error){
   report.executionStatus=report.cases.length?'interrupted':'setup-failed';
   report.setupFailure={message:String(error?.message||error).slice(0,240)};
