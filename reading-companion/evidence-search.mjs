@@ -294,12 +294,12 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
  return ordered;
 }
 
-/* Send up to four full pages to the verifier while keeping the exact request
- * below the Worker body limit. The candidate order is already facet-balanced;
- * preserve it so the first options still cover each part of a comparison.
+/* The answer flow may send six full pages. Keep their exact request below
+ * both the Worker body limit and its separate verified-text limit. Candidate
+ * order is already facet-balanced; preserve it so comparison parts stay covered.
  */
 export function selectAnswerSources(candidates,question,turnstileToken,
-  {maxSources=4,maxBytes=30000,history=[],plannedFacetCount=0}={}){
+  {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[],plannedFacetCount=0}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||
     typeof turnstileToken!=='string')return [];
  const chosen=[],firstPerBook=[],seenBooks=new Set();
@@ -384,15 +384,18 @@ export function selectAnswerSources(candidates,question,turnstileToken,
      ordered=[...firstPerBook,...facetBalanced.filter(candidate=>!firstPerBook.includes(candidate))];
    }
  }
+ let selectedSourceBytes=0;
  for(const candidate of ordered){
    if(chosen.length>=maxSources)break;
    if(!candidate||typeof candidate.text!=='string'||
       !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
       !Number.isSafeInteger(candidate.page)||candidate.page<1)continue;
+   const candidateBytes=new TextEncoder().encode(candidate.text).byteLength;
+   if(selectedSourceBytes+candidateBytes>maxSourceBytes)continue;
    const next=[...chosen,candidate];
    const bytes=new TextEncoder().encode(JSON.stringify({question,turnstileToken,history,
      sources:next.map(({bookId,page,text})=>({bookId,page,text}))})).byteLength;
-   if(bytes<=maxBytes)chosen.push(candidate);
+   if(bytes<=maxBytes){chosen.push(candidate);selectedSourceBytes+=candidateBytes;}
  }
  return chosen;
 }
