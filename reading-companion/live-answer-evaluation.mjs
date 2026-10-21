@@ -41,8 +41,8 @@ export function selectLiveCases(suite,mode='smoke'){
 function normalizeDiagnosticExcerpt(value){
  return String(value||'').normalize('NFKC')
   .replace(/[’‘]/g,"'").replace(/[“”]/g,'"')
-  .replace(/…|\\.\\.\\./g,' ')
-  .replace(/\\s+/g,' ').trim().toLocaleLowerCase();
+  .replace(/…|\.\.\./g,' ')
+  .replace(/\s+/g,' ').trim().toLocaleLowerCase();
 }
 function locateHighlightInSubmittedPage(item,citations,submitted){
  const sourceId=String(item?.source_id||item?.sourceId||'');
@@ -53,8 +53,8 @@ function locateHighlightInSubmittedPage(item,citations,submitted){
   String(value?.bookId||'')===String(citation.bookId||'')&&
   Number(value?.page)===page);
  if(typeof original?.text!=='string'||typeof item?.quote!=='string')return null;
- const quote=item.quote.replace(/^(?:…|\\.\\.\\.)\\s*/,'')
-  .replace(/\\s*(?:…|\\.\\.\\.)$/,'').trim();
+ const quote=item.quote.replace(/^(?:…|\.\.\.)\s*/,'')
+  .replace(/\s*(?:…|\.\.\.)$/,'').trim();
  const normalizedQuote=normalizeDiagnosticExcerpt(quote);
  if(normalizedQuote.length<24)return null;
  return normalizeDiagnosticExcerpt(original.text).includes(normalizedQuote);
