@@ -28,12 +28,19 @@ export function mergeFacetSearches(results,limit=8){
    // evidence scores. Live retrieval results use the passage-level ranking
    // below so a strong hit later in one facet is not crowded out by weak
    // first hits from every other facet.
-   const seen=new Set(),out=[];
+   const seen=new Map(),out=[];
    function add(entry,facet){
      if(!valid(entry))return false;
      const key=String(entry.bookId)+':'+entry.page;
-     if(seen.has(key))return false;
-     seen.add(key);out.push({...entry,facet});return true;
+     const rank=groups[facet].indexOf(entry)+1;
+     if(seen.has(key)){
+       const previous=seen.get(key);
+       if(!previous.facetRanks.some(item=>item.facet===facet))
+         previous.facetRanks.push({facet,rank});
+       return false;
+     }
+     const value={...entry,facet,facetRanks:[{facet,rank}]};
+     seen.set(key,value);out.push(value);return true;
    }
    for(let facet=0;facet<groups.length;facet++){
      for(const entry of groups[facet])if(add(entry,facet))break;
@@ -60,11 +67,12 @@ export function mergeFacetSearches(results,limit=8){
      let record=byPage.get(key);
      if(!record){
        record={entry,facet,rankScore:0,bestScore:-Infinity,firstSeen:firstSeen++,
-         facets:new Set()};
+         facets:new Set(),facetRanks:[]};
        byPage.set(key,record);
      }
      record.rankScore+=1/(RANK_OFFSET+rank+1);
      record.facets.add(facet);
+     record.facetRanks.push({facet,rank:rank+1});
      const score=Number.isFinite(entry.score)?entry.score:-Infinity;
      if(score>record.bestScore){
        record.entry=entry;
@@ -75,8 +83,8 @@ export function mergeFacetSearches(results,limit=8){
  }
  return [...byPage.values()].sort((a,b)=>
    b.rankScore-a.rankScore||b.bestScore-a.bestScore||a.firstSeen-b.firstSeen)
-   .slice(0,limit).map(({entry,facet,facets})=>({...entry,facet,
-     matchedFacets:facets.size}));
+   .slice(0,limit).map(({entry,facet,facets,facetRanks})=>({...entry,facet,
+     matchedFacets:facets.size,facetRanks}));
 }
 export function validSearchPlan(value){
  return Array.isArray(value)&&value.length===2&&
@@ -184,19 +192,36 @@ export function canFallbackToDirectSearch(status,code=''){
  return ['invalid-response','search-planning-failed','network-error'].includes(code);
 }
 
+function interleavePlannedFacets(candidates,plannedFacetCount){
+ const count=Math.max(0,Math.floor(Number(plannedFacetCount)||0));
+ if(count<2||!candidates.some(candidate=>Array.isArray(candidate?.facetRanks)))
+  return candidates;
+ const used=new Set(),ordered=[];
+ // The final facet is the reader's verbatim question; earlier facets are
+ // targeted subtopic searches. Give each planned search a first and second
+ // chance before spending the four-page answer budget on verbatim-query
+ // alternatives. This preserves complementary evidence for multi-part asks.
+ for(let rank=1;rank<=2;rank++)for(let facet=0;facet<count;facet++){
+  const candidate=candidates.find(value=>!used.has(value)&&
+   value.facetRanks?.some(item=>item.facet===facet&&item.rank===rank));
+  if(candidate){used.add(candidate);ordered.push(candidate);}
+ }
+ for(const candidate of candidates)if(!used.has(candidate))ordered.push(candidate);
+ return ordered;
+}
+
 /* Send up to four full pages to the verifier while keeping the exact request
  * below the Worker body limit. The candidate order is already facet-balanced;
  * preserve it so the first options still cover each part of a comparison.
  */
 export function selectAnswerSources(candidates,question,turnstileToken,
-  {maxSources=4,maxBytes=30000,history=[]}={}){
+  {maxSources=4,maxBytes=30000,history=[],plannedFacetCount=0}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||
     typeof turnstileToken!=='string')return [];
- const chosen=[],firstPerBook=[],alternates=[],seenBooks=new Set();
+ const chosen=[],firstPerBook=[],seenBooks=new Set();
  for(const candidate of candidates){
    const key=String(candidate?.bookId||'');
    if(key&&!seenBooks.has(key)){seenBooks.add(key);firstPerBook.push(candidate);}
-   else alternates.push(candidate);
  }
  // Preserve passage ranking for ordinary questions. Comparison questions
  // need different works by design. Author-wide questions also benefit from
@@ -214,16 +239,16 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    id:String(candidate?.bookId||''),title:String(candidate?.title||'')
  })));
  const authorWideIntent=authorWideBooks.length>1;
- let ordered=candidates;
+ const facetBalanced=interleavePlannedFacets(candidates,plannedFacetCount);
+ let ordered=facetBalanced;
  if(comparisonIntent){
    // A comparison requires evidence from each work or author by design.
-   ordered=[...firstPerBook,...alternates];
+   ordered=[...firstPerBook,...facetBalanced.filter(candidate=>!firstPerBook.includes(candidate))];
  }else if(multiWorkIntent){
    // When a question names multiple specific works, give each work a strong
    // passage before filling the remaining page budget. Then alternate works
    // so repeated hits from one query facet cannot crowd out the other work's
    // second-best evidence page.
-   const bookOrder=[...explicitlyNamedWorkIds];
    const strongestByBook=new Map();
    for(const candidate of candidates){
      const key=String(candidate?.bookId||'');
@@ -237,11 +262,11 @@ export function selectAnswerSources(candidates,question,turnstileToken,
      ?[...strongestByBook.values()].sort((a,b)=>b.score-a.score)
      :firstPerBook;
    const reserved=new Set(representatives);
-   const remaining=new Map(bookOrder.map(id=>[id,candidates.filter(candidate=>
-     String(candidate?.bookId||'')===id&&!reserved.has(candidate))]));
+   const remaining=new Map([...explicitlyNamedWorkIds].map(id=>[id,
+     facetBalanced.filter(candidate=>String(candidate?.bookId||'')===id&&!reserved.has(candidate))]));
    const balanced=[];
    while([...remaining.values()].some(group=>group.length)){
-     for(const id of bookOrder){
+     for(const id of explicitlyNamedWorkIds){
        const group=remaining.get(id);
        if(group?.length)balanced.push(group.shift());
      }
@@ -264,12 +289,11 @@ export function selectAnswerSources(candidates,question,turnstileToken,
      }
      const strongRepresentatives=[...strongestByBook.values()].filter(candidate=>
        Number(candidate.score)>=threshold);
-     const reserved=new Set(strongRepresentatives);
-     ordered=[...strongRepresentatives,...candidates.filter(candidate=>!reserved.has(candidate))];
+     ordered=[...strongRepresentatives,...facetBalanced.filter(candidate=>!strongRepresentatives.includes(candidate))];
    }else{
      // Preserve the established breadth behavior for legacy results without
      // comparable passage scores.
-     ordered=[...firstPerBook,...alternates];
+     ordered=[...firstPerBook,...facetBalanced.filter(candidate=>!firstPerBook.includes(candidate))];
    }
  }
  for(const candidate of ordered){
