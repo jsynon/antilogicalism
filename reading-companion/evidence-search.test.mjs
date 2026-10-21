@@ -235,8 +235,23 @@ test('planned facets keep complementary passages inside the four-page budget',()
  const chosen=selectAnswerSources(merged.map(source=>({...source,text:'full page'})),
   'How does natural selection operate, and what roles do inherited variation and the struggle for existence play?',
   'token',{maxSources:4,plannedFacetCount:2});
- assert.deepEqual(chosen.map(source=>source.page),[96,140,495,29]);
+ assert.deepEqual(chosen.map(source=>source.page),[96,140,307,495]);
  assert.deepEqual(merged.find(source=>source.page===29).facetRanks,[{facet:1,rank:2}]);
+});
+
+test('direct-question search keeps a high-ranking exact-topic source in the answer budget',()=>{
+ const facets=[
+  {sources:[{...page(110,'221'),score:48},{...page(65,'221'),score:47}]},
+  {sources:[{...page(109,'576'),score:74},{...page(209,'576'),score:62}]},
+  {sources:[{...page(317,'317'),score:47,title:'History of the Conflict Between Religion and Science — John William Draper'},
+   {...page(47,'318'),score:46,title:'A History of the Warfare of Science with Theology in Christendom — Andrew Dickson White'}]}
+ ];
+ const candidates=mergeFacetSearches(facets,8).map(source=>({...source,text:'full source page'}));
+ const chosen=selectAnswerSources(candidates,'Is there a conflict between religion and science?','token',
+  {maxSources:4,plannedFacetCount:2});
+ assert(chosen.some(source=>source.facet===2&&['317','318'].includes(source.bookId)));
+ assert(chosen.some(source=>source.facet===0));
+ assert(chosen.some(source=>source.facet===1));
 });
 test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.equal(validSearchPlan(['Raskolnikov extraordinary man theory','Raskolnikov conscience guilt Sonia']),true);

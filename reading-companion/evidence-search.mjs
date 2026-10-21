@@ -252,10 +252,17 @@ function interleavePlannedFacets(candidates,plannedFacetCount){
   return candidates;
  const used=new Set(),ordered=[];
  // The final facet is the reader's verbatim question; earlier facets are
- // targeted subtopic searches. Give each planned search a first and second
- // chance before spending the four-page answer budget on verbatim-query
- // alternatives. This preserves complementary evidence for multi-part asks.
- for(let rank=1;rank<=2;rank++)for(let facet=0;facet<count;facet++){
+ // targeted subtopic searches. Reserve the strongest result from the direct
+ // question as well as one from each planned facet. The planner can broaden
+ // or misread a question, while the exact wording can retrieve a directly
+ // relevant work title (for example, History of the Conflict Between Religion
+ // and Science). Use remaining slots for second-ranked planned results.
+ for(let facet=0;facet<=count;facet++){
+  const candidate=candidates.find(value=>!used.has(value)&&
+   value.facetRanks?.some(item=>item.facet===facet&&item.rank===1));
+  if(candidate){used.add(candidate);ordered.push(candidate);}
+ }
+ for(let rank=2;rank<=2;rank++)for(let facet=0;facet<count;facet++){
   const candidate=candidates.find(value=>!used.has(value)&&
    value.facetRanks?.some(item=>item.facet===facet&&item.rank===rank));
   if(candidate){used.add(candidate);ordered.push(candidate);}
