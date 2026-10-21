@@ -28,7 +28,6 @@ const bookSearchStatus=el('companion-book-search-status');
 const askButton=el('companion-ask-button');
 const answerBox=el('companion-answer');
 const status=el('companion-status');
-const scope=el('companion-scope');
 const challenge=el('companion-challenge');
 const challengeBox=el('companion-turnstile');
 const diagnosticPanel=el('companion-diagnostic-panel');
@@ -109,11 +108,6 @@ function beginDiagnostic(questionText){
   diagnosticCopyStatus.textContent='';
   refreshDiagnostic();
 }
-function showAvailability(){
-  const title=oldPilotFallback?'a Thucydides sample':
-    bookList.length+' books across philosophy, history, science, and literature';
-  scope.textContent='Verified search scope: '+title+'.';
-}
 function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
   askButton.textContent=searching||answering?'Working…':'Ask Reading Companion';
@@ -135,13 +129,12 @@ function updateBookOptions(){
   bookFilter.value=previous;
   if(bookSearchStatus){
     bookSearchStatus.textContent=query?
-      (matches.length?matches.length+' matching books.':'No matching books.'):
-      bookList.length+' books available.';
+      (matches.length?'Matching books are shown below.':'No matching books.'):
+      '';
   }
 }
 function populateBooks(){
   updateBookOptions();
-  showAvailability();
 }
 async function loadCoverage(){
   try{
@@ -183,7 +176,6 @@ async function loadStatus(){
       challenge.textContent='You can browse the books, but answering is temporarily unavailable.';
       return;
     }
-    challenge.textContent='Complete the quick check below before asking a question.';
     const script=document.createElement('script');
     script.src='https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit';
     script.async=true;
