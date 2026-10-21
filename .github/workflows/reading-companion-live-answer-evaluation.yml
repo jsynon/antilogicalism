@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Run a 2-call planner check, 3 smoke questions, 7 answer-quality questions, or all 30 benchmark questions
+        description: Run a 2-case planner check, 3 smoke questions, answer-quality checks, or all 30 benchmark questions
         type: choice
         options:
           - planner
@@ -12,6 +12,20 @@ on:
           - quality
           - full
         default: smoke
+        required: true
+      case_id:
+        description: In quality mode, optionally run just one case (about 2 Worker calls plus conditional repair)
+        type: choice
+        options:
+          - all
+          - quality-science-darwin-selection
+          - quality-history-thucydides-causes
+          - quality-literature-dostoevsky-raskolnikov
+          - quality-philosophy-aristotle-practical-wisdom
+          - quality-all-books-cross-work-science
+          - quality-all-books-cross-discipline-order
+          - quality-all-books-religion-scripture
+        default: all
         required: true
       confirm_live_ai:
         description: I understand this sends questions to the live Worker and uses Cloudflare AI
@@ -38,6 +52,7 @@ jobs:
     timeout-minutes: 60
     env:
       LIVE_EVAL_MODE: ${{ inputs.mode }}
+      LIVE_EVAL_CASE_ID: ${{ inputs.case_id }}
       CONFIRM_LIVE_AI: ${{ inputs.confirm_live_ai }}
       CONFIRM_FULL_30: ${{ inputs.confirm_full_30 }}
     steps:
@@ -58,12 +73,12 @@ jobs:
         env:
           PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
           LIVE_EVAL_OUTPUT: ${{ github.workspace }}/reading-companion-live-answer-evaluation.json
-        run: node reading-companion/live-answer-evaluation.mjs --mode "$LIVE_EVAL_MODE" --confirm-live-ai true --output "$LIVE_EVAL_OUTPUT"
+        run: node reading-companion/live-answer-evaluation.mjs --mode "$LIVE_EVAL_MODE" --case "$LIVE_EVAL_CASE_ID" --confirm-live-ai true --output "$LIVE_EVAL_OUTPUT"
       - name: Save live evaluation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reading-companion-live-answer-evaluation-${{ inputs.mode }}
+          name: reading-companion-live-answer-evaluation-${{ inputs.mode }}-${{ inputs.case_id }}
           path: ${{ github.workspace }}/reading-companion-live-answer-evaluation.json
           if-no-files-found: warn
           retention-days: 14

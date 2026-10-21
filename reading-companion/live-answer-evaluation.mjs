@@ -37,7 +37,13 @@ function copyQualityCase(item){
   required_source_groups:item.required_source_groups.map(group=>({...group,book_ids:[...group.book_ids]})),
   review_focus:[...item.review_focus]};
 }
-export function selectLiveCases(suite,mode='smoke'){
+export function selectLiveCases(suite,mode='smoke',caseId=''){
+ if(caseId&&caseId!=='all'){
+  if(mode!=='quality')throw Error('A specific case can be selected only in quality mode.');
+  const selected=QUALITY_CASES.find(item=>item.id===caseId);
+  if(!selected)throw Error('Unknown quality case: '+caseId);
+  return [copyQualityCase(selected)];
+ }
  if(mode==='quality')return QUALITY_CASES.map(copyQualityCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
   const item=QUALITY_CASES.find(value=>value.id===id);
@@ -414,21 +420,21 @@ export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluate
  }
  return {results,stopReason};
 }
-function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
+function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',caseId:process.env.LIVE_EVAL_CASE_ID||'',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
  for(let i=0;i<argv.length;i++){const [flag,inline]=argv[i].split('=',2),key=flag.replace(/^--/,'');if(flag==='--help'||flag==='-h'){out.help=true;continue;}
-  if(!['mode','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
-  if(key==='mode')out.mode=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
+  if(!['mode','case','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
+  if(key==='mode')out.mode=value;else if(key==='case')out.caseId=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|full] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|full] [--case quality-case-id] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
- const cases=selectLiveCases(suite,args.mode);
+ const cases=selectLiveCases(suite,args.mode,args.caseId);
  const plannerCalls=args.mode==='quality'?0:cases.length;
  const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:plannerCalls+cases.length*2;
- const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,
+ const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   caseCount:cases.length,estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
    args.mode==='quality'?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
