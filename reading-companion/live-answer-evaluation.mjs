@@ -21,11 +21,11 @@ const QUALITY_CASES=[
  {id:'quality-history-thucydides-causes',discipline:'history',question:'According to Thucydides, what were the underlying causes of the Peloponnesian War, and how did they differ from the immediate disputes that preceded it?',selected_book_ids:['152'],planner_queries:['Thucydides real cause growth Athenian power fear Lacedaemon','Thucydides immediate disputes Corcyra Potidaea grievances'],required_source_groups:[{label:'Thucydides',book_ids:['152']}],review_focus:['Separate the underlying cause from the immediate disputes.','Support both parts with passages from Thucydides, without treating them as interchangeable.']},
  {id:'quality-literature-dostoevsky-raskolnikov',discipline:'literature',question:'In Crime and Punishment, how does Raskolnikov try to justify murder, and how does the novel test or undermine his reasoning?',selected_book_ids:['114'],planner_queries:['Raskolnikov extraordinary men right to transgress law murder','Crime and Punishment Raskolnikov guilt suffering confession theory'],required_source_groups:[{label:'Dostoevsky, Crime and Punishment',book_ids:['114']}],review_focus:['Describe Raskolnikov’s theory as the character’s argument, not as Dostoevsky’s endorsed view.','Explain how later events in the novel complicate that theory.']},
  {id:'quality-philosophy-aristotle-practical-wisdom',discipline:'philosophy',question:"According to Aristotle's Nicomachean Ethics, what is practical wisdom, and how does it differ from scientific knowledge and skill?",selected_book_ids:['7'],planner_queries:['Aristotle Nicomachean Ethics definition phronesis practical wisdom deliberation human good','Aristotle Nicomachean Ethics phronesis episteme techne variable action making'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']}],review_focus:['Define practical wisdom as a reasoned capacity concerned with human good and action.','Explain why it is not science (variable, deliberable matters rather than necessary demonstrations) or craft (action differs from making).']},
- {id:'quality-all-books-cross-work-science',discipline:'science',question:'How does Darwin explain natural selection preserving favorable variations in On the Origin of Species, and how does Hawking use astronomical observations to support an explanation of black-hole phenomena in A Brief History of Time?',selected_book_ids:[],planner_queries:['Darwin Origin of Species preservation favorable variations struggle for existence inherited variation','Darwin natural selection more individuals born than survive inherited favorable variations'],required_source_groups:[{label:'Darwin',book_ids:['529']},{label:'Hawking',book_ids:['102']}],review_focus:['Compare each author’s use of observation and explanation.','Cite evidence from both named works; avoid implying the authors use identical methods.']},
+ {id:'quality-all-books-cross-work-science',discipline:'science',question:'How does Darwin explain natural selection preserving favorable variations in On the Origin of Species, and how does Hawking use astronomical observations to support an explanation of black-hole phenomena in A Brief History of Time?',selected_book_ids:[],planner_queries:['Darwin Origin of Species natural selection favorable inherited variations struggle for existence','Hawking A Brief History of Time black hole evidence observations Cygnus X-1 X-rays'],required_source_groups:[{label:'Darwin',book_ids:['529']},{label:'Hawking',book_ids:['102']}],review_focus:['Compare each author’s use of observation and explanation.','Cite evidence from both named works; avoid implying the authors use identical methods.']},
  {id:'quality-all-books-cross-discipline-order',discipline:'philosophy',question:'How does Aristotle describe the aim of political science in the Nicomachean Ethics, and what role does Hobbes give common power in Leviathan? How do these accounts differ?',selected_book_ids:[],planner_queries:['Aristotle Nicomachean Ethics political science human good citizens good obedient laws','Hobbes Leviathan state of nature common power keep them in awe war every man against every man'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']},{label:'Hobbes, Leviathan',book_ids:['163']}],review_focus:['Represent each author’s account in its own terms and identify a meaningful difference.','Ground the comparison in both works instead of importing unsupported modern claims.']},
  {id:'quality-all-books-religion-scripture',discipline:'religion',question:'According to 1 John 4:7–12, what does “God is love” mean, and how does the passage connect God’s love with loving one another?',selected_book_ids:[],planner_queries:['1 John 4:7-12 God is love sent Son love one another passage','1 John 4:7-12 love of God revealed in Christ command love one another'],required_source_groups:[{label:'1 John 4:7–12',book_ids:['638']}],review_focus:['Explain the passage’s connection between God’s prior love and the command to love one another.','Stay close to the passage and distinguish its claims from later theological interpretation.']},
 ];
-const CALL_GAP_MS=16_000;
+const CALL_GAP_MS=30_500;
 const MAX_PAGE_BYTES=14_000;
 
 export function selectLiveCases(suite,mode='smoke'){
@@ -37,6 +37,27 @@ export function selectLiveCases(suite,mode='smoke'){
  }
  if(mode==='full')return [...suite.cases];
  throw Error('Mode must be smoke, quality, or full.');
+}
+function normalizeDiagnosticExcerpt(value){
+ return String(value||'').normalize('NFKC')
+  .replace(/[’‘]/g,"'").replace(/[“”]/g,'"')
+  .replace(/…|\\.\\.\\./g,' ')
+  .replace(/\\s+/g,' ').trim().toLocaleLowerCase();
+}
+function locateHighlightInSubmittedPage(item,citations,submitted){
+ const sourceId=String(item?.source_id||item?.sourceId||'');
+ const page=Number(item?.page);
+ const citation=citations.find(value=>String(value?.id||'')===sourceId&&
+  Number(value?.page)===page);
+ const original=citation&&submitted.find(value=>
+  String(value?.bookId||'')===String(citation.bookId||'')&&
+  Number(value?.page)===page);
+ if(typeof original?.text!=='string'||typeof item?.quote!=='string')return null;
+ const quote=item.quote.replace(/^(?:…|\\.\\.\\.)\\s*/,'')
+  .replace(/\\s*(?:…|\\.\\.\\.)$/,'').trim();
+ const normalizedQuote=normalizeDiagnosticExcerpt(quote);
+ if(normalizedQuote.length<24)return null;
+ return normalizeDiagnosticExcerpt(original.text).includes(normalizedQuote);
 }
 export function auditLiveAnswer(data,submitted,requiredGroups){
  const citations=Array.isArray(data?.citations)?data.citations:[];
@@ -55,14 +76,22 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
   title:String(source?.title||''),page:Number.isSafeInteger(source?.page)?source.page:null,
   globalPageId:Number.isSafeInteger(source?.globalPageId)?source.globalPageId:null,
   url:typeof source?.url==='string'?source.url:''}));
+ const questionParts=Array.isArray(data?.questionParts)?data.questionParts:[];
+ const evidenceMap=Array.isArray(data?.evidenceMap)?data.evidenceMap:[];
+ const questionPartCoverage={total:questionParts.length,
+  supported:questionParts.filter(item=>item?.status==='supported').length,
+  partial:questionParts.filter(item=>item?.status==='partial').length,
+  unsupported:questionParts.filter(item=>item?.status==='unsupported').length};
  const evidenceHighlights=highlights.map(item=>({sourceId:String(item?.source_id||item?.sourceId||''),
   title:String(item?.title||''),page:Number.isSafeInteger(item?.page)?item.page:null,
   quote:typeof item?.quote==='string'?item.quote:'',
-  quoteLocated:typeof item?.quoteLocated==='boolean'?item.quoteLocated:null}));
+  quoteLocated:typeof item?.quoteLocated==='boolean'?item.quoteLocated:
+   locateHighlightInSubmittedPage(item,citations,submitted)}));
  return {workerVersionId,workerSourceBuild,outcome:String(data?.outcome||''),coverage:String(data?.coverage||''),reviewStatus:String(data?.reviewStatus||''),
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
-  sourceGroups,evidenceHighlightCount:highlights.length,evidenceHighlights,
+  sourceGroups,questionParts,questionPartCoverage,evidenceMap,
+  evidenceHighlightCount:highlights.length,evidenceHighlights,
   passed:String(data?.coverage||'')==='full'&&sourceGroups.every(group=>group.found)&&missingInline.length===0&&citations.length>0};
 }
 function safeHeaders(token){return {authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json',origin:'https://jsynon.github.io'};}
@@ -280,7 +309,14 @@ async function main(){
   report.executionStatus=report.requestFailureCases?'completed-with-request-failures':'completed';
   report.summary={passedCases:report.cases.filter(item=>item.passed).length,
    failedCases:report.cases.filter(item=>!item.passed).length,requestFailureCases:report.requestFailureCases,
-   plannerFallbackCases:report.plannerFallbackCases};
+   plannerFallbackCases:report.plannerFallbackCases,
+   questionPartStatusCounts:report.cases.reduce((totals,item)=>{
+    const counts=item.questionPartCoverage||{};
+    for(const status of ['supported','partial','unsupported'])
+     totals[status]+=Number(counts[status])||0;
+    totals.total+=Number(counts.total)||0;
+    return totals;
+   },{total:0,supported:0,partial:0,unsupported:0})};
   await saveReport();
   console.log('Done: '+report.summary.passedCases+'/'+report.caseCount+' cases met citation and expected-work checks; '+report.completedCases+' completed, '+report.notRunCases+' not run. This is a retrieval/citation review signal, not an AI truth grader.');
   return report.requestFailureCases?1:0;
