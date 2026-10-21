@@ -554,7 +554,7 @@ async function askQuestion(questionText){
       if(!found)return;
     }
     const chosen=selectAnswerSources(candidates,q,token,{history,
-      plannedFacetCount:Math.max(0,searches.length-1)});
+      plannedFacetCount:Math.max(0,(diagnosticState?.searches?.length||0)-1)});
     if(!chosen.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
     if(diagnosticState){
       diagnosticState.submittedSources=chosen.map((source,index)=>({...source,id:'S'+(index+1)}));
