@@ -40,6 +40,8 @@ export function selectLiveCases(suite,mode='smoke'){
 }
 export function auditLiveAnswer(data,submitted,requiredGroups){
  const citations=Array.isArray(data?.citations)?data.citations:[];
+ const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
+ const workerSourceBuild=typeof data?.workerSourceBuild==='string'&&data.workerSourceBuild.length<=128?data.workerSourceBuild:null;
  const answer=String(data?.answer||'');
  const inline=[...answer.matchAll(/\[(S\d+)\]/g)].map(match=>match[1]);
  const citationIds=new Set(citations.map(source=>String(source?.id||'')));
@@ -57,7 +59,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
   title:String(item?.title||''),page:Number.isSafeInteger(item?.page)?item.page:null,
   quote:typeof item?.quote==='string'?item.quote:'',
   quoteLocated:typeof item?.quoteLocated==='boolean'?item.quoteLocated:null}));
- return {outcome:String(data?.outcome||''),coverage:String(data?.coverage||''),reviewStatus:String(data?.reviewStatus||''),
+ return {workerVersionId,workerSourceBuild,outcome:String(data?.outcome||''),coverage:String(data?.coverage||''),reviewStatus:String(data?.reviewStatus||''),
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
   sourceGroups,evidenceHighlightCount:highlights.length,evidenceHighlights,
@@ -69,7 +71,9 @@ function attachRequestFailure(error,stage,details={}){
  wrapped.requestFailure={stage,httpStatus:Number.isSafeInteger(details.httpStatus)?details.httpStatus:null,
   failureCode:String(details.failureCode||'request-failed').slice(0,80),
   message:String(details.message||wrapped.message||'Request failed').replace(/(?:bearer\s+)[^\s]+/ig,'Bearer [redacted]').slice(0,240),
-  workerFailure:details.workerFailure===true};
+  workerFailure:details.workerFailure===true,
+  workerVersionId:typeof details.workerVersionId==='string'&&details.workerVersionId.length<=128?details.workerVersionId:null,
+  workerSourceBuild:typeof details.workerSourceBuild==='string'&&details.workerSourceBuild.length<=128?details.workerSourceBuild:null};
  return wrapped;
 }
 async function callJson(fetcher,url,token,body,beforeCall=async()=>{},stage='worker-request'){
@@ -81,7 +85,8 @@ async function callJson(fetcher,url,token,body,beforeCall=async()=>{},stage='wor
   throw attachRequestFailure(new Error('Worker returned invalid JSON.'),stage,{httpStatus:response.status,failureCode:'invalid-json',workerFailure:true});
  }
  if(!response.ok)throw attachRequestFailure(new Error(String(data?.failureCode||data?.error||'Worker request failed').slice(0,240)),stage,{
-  httpStatus:response.status,failureCode:String(data?.failureCode||'http-error'),workerFailure:true});
+  httpStatus:response.status,failureCode:String(data?.failureCode||'http-error'),workerFailure:true,
+  workerVersionId:data?.workerVersionId,workerSourceBuild:data?.workerSourceBuild});
  return data;
 }
 function makeCachedFetch(root){
@@ -137,7 +142,8 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false}){
  const startTime=Date.now();
- let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false;
+ let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false,
+  plannerWorkerVersionId=null,plannerWorkerSourceBuild=null;
  if(useFixedQueries&&validSearchPlan(item.planner_queries)){
   queries=item.planner_queries;
   plannerSkipped=true;
@@ -148,9 +154,13 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    throw error;
   }
   queries=plan.queries;
+  plannerWorkerVersionId=plan.workerVersionId||null;
+  plannerWorkerSourceBuild=plan.workerSourceBuild||null;
  }catch(error){
   if(!error.requestFailure)error.requestFailure={stage:'planner',httpStatus:null,failureCode:'planner-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   const failure=error.requestFailure;
+  plannerWorkerVersionId=failure.workerVersionId||null;
+  plannerWorkerSourceBuild=failure.workerSourceBuild||null;
   if(!canFallbackToDirectSearch(failure.httpStatus,failure.failureCode))throw error;
   plannerFallback=true;
   plannerFailure={httpStatus:failure.httpStatus,failureCode:failure.failureCode};
@@ -165,10 +175,15 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  try{data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,history:[],turnstileToken:'evaluation-runner-token',
   sources:selected.map(({bookId,page,text})=>({bookId,page,text}))},beforeCall,'answer');}
  catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
-  error.requestFailure.plannerFallback=plannerFallback;if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
+  error.requestFailure.plannerFallback=plannerFallback;
+  error.requestFailure.plannerSkipped=plannerSkipped;
+  error.requestFailure.plannerWorkerVersionId=plannerWorkerVersionId;
+  error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
+  if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const audit=auditLiveAnswer(data,selected,item.required_source_groups);
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerQueries:plannerFallback?[]:queries,plannerFallback,
+  plannerWorkerVersionId,plannerWorkerSourceBuild,answerWorkerVersionId:audit.workerVersionId,answerWorkerSourceBuild:audit.workerSourceBuild,
   ...(plannerFailure?{plannerFailure}:{}),searches,
   submittedSources:selected.map(({bookId,title,page,globalPageId})=>({bookId,title,page,globalPageId})),
   ...audit,elapsedMs:Date.now()-startTime};
@@ -177,7 +192,11 @@ function failedCaseResult(item,error){
  const failure=error?.requestFailure||{stage:'evaluation',httpStatus:null,failureCode:'evaluation-failed',
   message:String(error?.message||error||'Evaluation failed').slice(0,240),workerFailure:false};
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
-  reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],requestFailure:failure,plannerQueries:[],plannerSkipped:false,
+  reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],requestFailure:failure,plannerQueries:[],plannerSkipped:failure.plannerSkipped===true,
+  plannerWorkerVersionId:failure.plannerWorkerVersionId|| (failure.stage==='planner'?failure.workerVersionId:null),
+  plannerWorkerSourceBuild:failure.plannerWorkerSourceBuild|| (failure.stage==='planner'?failure.workerSourceBuild:null),
+  answerWorkerVersionId:failure.stage==='answer'?failure.workerVersionId:null,
+  answerWorkerSourceBuild:failure.stage==='answer'?failure.workerSourceBuild:null,
   plannerFallback:failure.plannerFallback===true,...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),searches:[],
   submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',
   answerText:'',citationCount:0,citationBookIds:[],citationSources:[],inlineCitationCount:0,
@@ -225,7 +244,7 @@ async function main(){
   caseCount:cases.length,estimatedWorkerAiCalls:plannerCalls+cases.length*2,
   callsPerCase:args.mode==='quality'?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
   answerQualityNote:'Answer text and review_focus are provided for human assessment. Automated pass checks retrieval/citation structure, not factual or interpretive truth.',
-  executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,stopReason:'',cases:[]};
+  executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  const saveReport=async()=>{if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');};
  await saveReport();
@@ -245,6 +264,8 @@ async function main(){
    report.notRunCases=cases.length-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
    report.plannerFallbackCases=results.filter(item=>item.plannerFallback).length;
+   report.plannerSkippedCases=results.filter(item=>item.plannerSkipped).length;
+   report.workerVersionIds=[...new Set(results.flatMap(item=>[item.plannerWorkerVersionId,item.answerWorkerVersionId]).filter(value=>typeof value==='string'&&value))];
    await saveReport();
    console.log((result.passed?'REVIEW-PASS':result.requestFailure?'REQUEST-FAIL':'REVIEW-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
   }});
