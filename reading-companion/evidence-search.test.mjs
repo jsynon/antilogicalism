@@ -203,6 +203,19 @@ test('a strong passage later in a facet reaches the bounded answer context',()=>
  assert(chosen.some(source=>source.bookId==='7'&&source.page===14));
  assert(chosen.some(source=>source.bookId==='12'));
 });
+test('planned facets keep complementary passages inside the four-page budget',()=>{
+ const facets=[
+  [page(96,'529'),page(495,'529'),page(218,'529')],
+  [page(140,'529'),page(29,'529'),page(31,'529')],
+  [page(307,'529'),page(101,'529'),page(167,'529')],
+ ].map(group=>({sources:group.map((source,index)=>({...source,score:90-index}))}));
+ const merged=mergeFacetSearches(facets,8);
+ const chosen=selectAnswerSources(merged.map(source=>({...source,text:'full page'})),
+  'How does natural selection operate, and what roles do inherited variation and the struggle for existence play?',
+  'token',{maxSources:4,plannedFacetCount:2});
+ assert.deepEqual(chosen.map(source=>source.page),[96,140,495,29]);
+ assert.deepEqual(merged.find(source=>source.page===29).facetRanks,[{facet:1,rank:2}]);
+});
 test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.equal(validSearchPlan(['Raskolnikov extraordinary man theory','Raskolnikov conscience guilt Sonia']),true);
  assert.equal(validSearchPlan(['same search phrase','same search phrase']),false);
@@ -291,7 +304,7 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
  assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text\}\)=>\(\{bookId,page,text\}\)\)/);
- assert.match(js,/selectAnswerSources\(candidates,q,token,\{history\}\)/);
+ assert.match(js,/selectAnswerSources\(candidates,q,token,\{history,\s*plannedFacetCount:/);
  assert.doesNotMatch(js,/searchPages\(|lastSearch|checked passages will guide/i);
  assert.match(js,/data\.outcome==='insufficient-evidence'/);
  assert.doesNotMatch(js,/innerHTML\s*=/);

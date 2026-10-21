@@ -276,7 +276,8 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   populated.push({...source,text:pages[0].text,byteLength:bytes});
  }
  if(!populated.length)throw Error('Retrieval returned no fingerprint-eligible source pages.');
- const selected=selectAnswerSources(populated,item.question,'evaluation-runner-token',{maxSources:4,maxBytes:30_000,history:[]});
+ const selected=selectAnswerSources(populated,item.question,'evaluation-runner-token',{
+  maxSources:4,maxBytes:30_000,history:[],plannedFacetCount:Math.max(0,searchQueries.length-1)});
  if(!selected.length)throw Error('No source pages fit the Worker request limit.');
  for(const source of selected){
   const book=manifest.books[String(source.bookId)];

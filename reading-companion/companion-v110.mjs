@@ -553,7 +553,8 @@ async function askQuestion(questionText){
       const found=await retrieveSources();
       if(!found)return;
     }
-    const chosen=selectAnswerSources(candidates,q,token,{history});
+    const chosen=selectAnswerSources(candidates,q,token,{history,
+      plannedFacetCount:Math.max(0,searches.length-1)});
     if(!chosen.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
     if(diagnosticState){
       diagnosticState.submittedSources=chosen.map((source,index)=>({...source,id:'S'+(index+1)}));
