@@ -132,6 +132,60 @@ function catalogAuthorNames(title){
  if(/\bedited by\b/i.test(author))return [];
  return author.split(/\s+and\s+/i).filter(Boolean);
 }
+function explicitlyNamedAuthorGroups(question,candidates){
+ const groups=new Map();
+ for(const candidate of candidates){
+  const bookId=String(candidate?.bookId||'');
+  if(!bookId)continue;
+  for(const name of catalogAuthorNames(candidate?.title)){
+   const key=normalizeCatalogText(name);
+   if(!key)continue;
+   if(!groups.has(key))groups.set(key,{key,name,bookIds:new Set()});
+   groups.get(key).bookIds.add(bookId);
+  }
+ }
+ const surnameCounts=new Map();
+ for(const group of groups.values()){
+  const surname=group.key.split(' ').at(-1)||'';
+  surnameCounts.set(surname,(surnameCounts.get(surname)||0)+1);
+ }
+ return [...groups.values()].filter(group=>{
+  const surname=group.key.split(' ').at(-1)||'';
+  return questionContainsPhrase(question,group.name)||
+   (surname.length>=4&&surnameCounts.get(surname)===1&&
+    questionContainsPhrase(question,surname));
+ });
+}
+function comparisonAuthorOrder(question,candidates,facetBalanced,directFacet){
+ const groups=explicitlyNamedAuthorGroups(question,candidates);
+ if(groups.length<2)return null;
+ const representatives=groups.map(group=>{
+  const groupCandidates=candidates.filter(candidate=>
+   group.bookIds.has(String(candidate?.bookId||'')));
+  const direct=groupCandidates.filter(candidate=>
+   Array.isArray(candidate?.facetRanks)&&candidate.facetRanks.some(item=>
+    item.facet===directFacet));
+  if(direct.length){
+   return direct.sort((a,b)=>{
+    const rank=source=>Math.min(...source.facetRanks.filter(item=>
+     item.facet===directFacet).map(item=>item.rank));
+    return rank(a)-rank(b)||(Number(b.score)||0)-(Number(a.score)||0);
+   })[0];
+  }
+  return facetBalanced.find(candidate=>group.bookIds.has(String(candidate?.bookId||'')))||
+   groupCandidates[0];
+ });
+ const ordered=[...representatives],used=new Set(representatives);
+ // After ensuring one author-grounded page per side, alternate complementary
+ // pages across the same author groups instead of filling by book ID.
+ for(let depth=0;depth<candidates.length;depth++)for(const group of groups){
+  const next=facetBalanced.find(candidate=>!used.has(candidate)&&
+   group.bookIds.has(String(candidate?.bookId||'')));
+  if(next){used.add(next);ordered.push(next);}
+ }
+ for(const candidate of facetBalanced)if(!used.has(candidate))ordered.push(candidate);
+ return ordered;
+}
 export function matchExplicitBookIds(question,books){
  if(typeof question!=='string'||!Array.isArray(books))return [];
  const valid=books.filter(book=>/^[1-9]\d{0,3}$/.test(String(book?.id||''))&&
@@ -242,8 +296,12 @@ export function selectAnswerSources(candidates,question,turnstileToken,
  const facetBalanced=interleavePlannedFacets(candidates,plannedFacetCount);
  let ordered=facetBalanced;
  if(comparisonIntent){
-   // A comparison requires evidence from each work or author by design.
-   ordered=[...firstPerBook,...facetBalanced.filter(candidate=>!firstPerBook.includes(candidate))];
+   // For author comparisons, reserve one page per named author before filling
+   // the budget. A book-per-side reservation can spend several slots on one
+   // author's multiple works and omit the other author's best comparison page.
+   ordered=comparisonAuthorOrder(question,candidates,facetBalanced,
+     Math.max(0,Math.floor(Number(plannedFacetCount)||0)))||
+     [...firstPerBook,...facetBalanced.filter(candidate=>!firstPerBook.includes(candidate))];
  }else if(multiWorkIntent){
    // When a question names multiple specific works, give each work a strong
    // passage before filling the remaining page budget. Then alternate works
