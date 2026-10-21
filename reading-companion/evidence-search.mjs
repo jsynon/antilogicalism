@@ -270,11 +270,14 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
  // and Science). Use remaining slots for second-ranked planned results.
  for(let facet=0;facet<=count;facet++){
   const facetCandidates=candidates.filter(value=>!used.has(value)&&
-   value.facetRanks?.some(item=>item.facet===facet&&item.rank===1));
+   value.facetRanks?.some(item=>item.facet===facet&&
+    (facet===count||item.rank===1)));
   // On the verbatim-question facet, a work whose title matches the question
   // is often a better direct source than a higher-scoring bibliographic or
-  // incidental mention of that work. Prefer title overlap there, then retain
-  // retrieval order for ties.
+  // incidental mention of that work. Consider every direct-query candidate
+  // already in the shortlist, not only its top-ranked passage: an exact-title
+  // source can rank just below a bibliographic mention. Retain retrieval order
+  // for title-overlap ties.
   const candidate=facet===count&&facetCandidates.length
    ?facetCandidates.reduce((best,value)=>
      directFacetTitleMatch(question,value.title)>directFacetTitleMatch(question,best.title)
