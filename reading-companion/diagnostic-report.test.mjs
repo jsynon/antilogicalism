@@ -103,30 +103,30 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(complete.failureCode,'');
 });
 
-test('diagnostic reports all four source pages sent to the answer service',()=>{
- const submittedSources=Array.from({length:4},(_,index)=>({id:'S'+(index+1),
+test('diagnostic reports all six source pages sent to the answer service',()=>{
+ const submittedSources=Array.from({length:6},(_,index)=>({id:'S'+(index+1),
    bookId:'102',title:'A Brief History of Time',page:53+index,text:'PRIVATE TEXT'}));
  const citations=submittedSources.map(({text,...source})=>source);
- const report=createDiagnosticReport({submittedSources,answer:'[S1] [S2] [S3] [S4]',
+ const report=createDiagnosticReport({submittedSources,answer:'[S1] [S2] [S3] [S4] [S5] [S6]',
    citations});
- assert.deepEqual(report.submittedSources.map(source=>source.page),[53,54,55,56]);
- assert.deepEqual(report.answer.citations.map(source=>source.id),['S1','S2','S3','S4']);
+ assert.deepEqual(report.submittedSources.map(source=>source.page),[53,54,55,56,57,58]);
+ assert.deepEqual(report.answer.citations.map(source=>source.id),['S1','S2','S3','S4','S5','S6']);
  assert.equal(JSON.stringify(report).includes('PRIVATE TEXT'),false);
 });
 
 
 test('diagnostics expose bounded question-part coverage tied to submitted sources',()=>{
  const report=createDiagnosticReport({
-  submittedSources:[{id:'S1'},{id:'S2'}],
+  submittedSources:Array.from({length:6},(_,index)=>({id:'S'+(index+1)})),
   questionParts:[
-   {part:'definition',status:'supported',evidenceIds:['S1','S9']},
+   {part:'definition',status:'supported',evidenceIds:['S1','S2','S3','S4','S5','S6','S9']},
    {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
    {part:'x'.repeat(200),status:'partial',evidenceIds:['S2','S1','S2']}
   ]
  });
  assert.equal(report.clientBuild,'v1.15-evidence-anchor-diagnostics');
  assert.deepEqual(report.answer.questionParts,[
-  {part:'definition',status:'supported',evidenceIds:['S1']},
+  {part:'definition',status:'supported',evidenceIds:['S1','S2','S3','S4','S5','S6']},
   {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
   {part:'x'.repeat(140),status:'partial',evidenceIds:['S2','S1']}
  ]);
