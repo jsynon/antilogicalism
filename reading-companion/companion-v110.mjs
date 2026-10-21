@@ -129,7 +129,7 @@ function updateBookOptions(){
   bookFilter.value=previous;
   if(bookSearchStatus){
     bookSearchStatus.textContent=query?
-      (matches.length?'Matching books are shown below.':'No matching books.'):
+      (matches.length?matches.length+' matching books.':'No matching books.'):
       '';
   }
 }
