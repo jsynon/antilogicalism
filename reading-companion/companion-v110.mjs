@@ -449,7 +449,7 @@ function renderResponse(data,turnQuestion=''){
       const source=citations.find(s=>s.id===item.source_id&&Number(s.page)===Number(item.page));
       const original=sourcePage(source);
       const page=original?readablePageWithHighlight(original.text,item.quote):null;
-      return {source_id:item.source_id,page:Number(item.page),
+      return {source_id:item.source_id,page:Number(item.page),quote:item.quote,
         quoteLocated:Boolean(page?.match),partialMatch:page?.match?.partial===true};
     });
     refreshDiagnostic();
@@ -603,7 +603,7 @@ async function askQuestion(questionText){
         diagnosticState.citations=responseCitations;
         diagnosticState.evidenceHighlights=Array.isArray(data.evidenceHighlights)?
           data.evidenceHighlights.map(item=>({source_id:item.source_id,
-            page:Number(item.page),quoteLocated:false,partialMatch:false})):[];
+            page:Number(item.page),quote:item.quote,quoteLocated:false,partialMatch:false})):[];
         refreshDiagnostic();
       }
       setStatus('The answer included citations without matching sources. Please try again.');

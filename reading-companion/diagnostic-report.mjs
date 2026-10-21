@@ -68,18 +68,26 @@ export function auditCitationIds(answer,citations=[]){
 }
 
 // Intentionally whitelist fields: never serialize full page text, previews,
-// request bodies, CAPTCHA tokens, or arbitrary error messages.
+// request bodies, CAPTCHA tokens, or arbitrary error messages. Quality
+// diagnostics may include only bounded claim anchors and highlight windows.
 function reviewedEvidenceSummary(value,submittedSources=[]){
   if(!Array.isArray(value))return [];
   const allowed=new Set((Array.isArray(submittedSources)?submittedSources:[])
     .map(source=>source?.id).filter(id=>typeof id==='string'&&/^S[1-9][0-9]*$/.test(id)));
   const out=[],seen=new Set();
-  for(const item of value.slice(0,6)){
+  for(const item of value.slice(0,8)){
     const id=typeof item?.id==='string'?item.id:'';
     const point=typeof item?.point==='string'?item.point.trim().slice(0,220):'';
-    if(!allowed.has(id)||seen.has(id)||!point)continue;
-    seen.add(id);out.push({id,point});
-    if(out.length===4)break;
+    const key=JSON.stringify([id,point]);
+    if(!allowed.has(id)||seen.has(key)||!point)continue;
+    const anchorQuote=typeof item?.anchorQuote==='string'?
+      item.anchorQuote.trim().slice(0,120):'';
+    const speaker=typeof item?.speaker==='string'?item.speaker.trim().slice(0,80):'';
+    const qualifier=typeof item?.qualifier==='string'?item.qualifier.trim().slice(0,160):'';
+    seen.add(key);out.push({id,point,quoteVerified:item?.quoteVerified===true,
+      ...(anchorQuote&&item?.quoteVerified===true?{anchorQuote}:{}),
+      ...(speaker?{speaker}:{}),...(qualifier?{qualifier}:{})});
+    if(out.length===6)break;
   }
   return out;
 }
@@ -106,7 +114,7 @@ export function createDiagnosticReport(input={}){
   const audit=auditCitationIds(input.answer,input.citations);
   return {
     schema:'antilogicalism-reading-companion-diagnostic-v1',
-    clientBuild:'v1.14-worker-version-diagnostics',
+    clientBuild:'v1.15-evidence-anchor-diagnostics',
     libraryVersion:Number.isSafeInteger(input.libraryVersion)?input.libraryVersion:null,
     plannerWorkerVersionId:optionalString(input.plannerWorkerVersionId),
     plannerWorkerVersionTag:optionalString(input.plannerWorkerVersionTag),
@@ -152,6 +160,7 @@ export function createDiagnosticReport(input={}){
       input.evidenceHighlights.slice(0,3).map(item=>({
         sourceId:string(item?.source_id,24),
         page:Number.isSafeInteger(item?.page)?item.page:null,
+        quote:string(item?.quote,320),
         quoteLocated:item?.quoteLocated===true,
         partialMatch:item?.partialMatch===true
       })):[]
