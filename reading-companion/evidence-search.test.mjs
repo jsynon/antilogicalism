@@ -249,7 +249,8 @@ test('direct-question search keeps a high-ranking exact-topic source in the answ
  const candidates=mergeFacetSearches(facets,8).map(source=>({...source,text:'full source page'}));
  const chosen=selectAnswerSources(candidates,'Is there a conflict between religion and science?','token',
   {maxSources:4,plannedFacetCount:2});
- assert(chosen.some(source=>source.facet===2&&['317','318'].includes(source.bookId)));
+ assert(chosen.some(source=>source.facet===2&&source.bookId==='317'),
+  'prefer Draper’s directly relevant work title over White’s page that only cites Draper');
  assert(chosen.some(source=>source.facet===0));
  assert(chosen.some(source=>source.facet===1));
 });

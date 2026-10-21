@@ -246,7 +246,18 @@ export function canFallbackToDirectSearch(status,code=''){
  return ['invalid-response','search-planning-failed','network-error'].includes(code);
 }
 
-function interleavePlannedFacets(candidates,plannedFacetCount){
+function directFacetTitleMatch(question,title){
+ const stop=new Set(['what','when','where','which','who','whom','whose','why','how','does','did','has','have','had','are','was','were','the','and','for','from','with','into','about','between','this','that','these','those','there','their','they','them','than','then','your','our','also','only','could','would','should']);
+ const questionTerms=new Set((String(question||'').toLowerCase().match(/[a-z0-9]+/g)||[])
+  .filter(term=>term.length>=4&&!stop.has(term)));
+ const workTitle=String(title||'').split(/[—–]/,1)[0].toLowerCase();
+ const titleTerms=new Set(workTitle.match(/[a-z0-9]+/g)||[]);
+ let score=0;
+ for(const term of questionTerms)if(titleTerms.has(term))score++;
+ return score;
+}
+
+function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
  const count=Math.max(0,Math.floor(Number(plannedFacetCount)||0));
  if(count<2||!candidates.some(candidate=>Array.isArray(candidate?.facetRanks)))
   return candidates;
@@ -258,8 +269,17 @@ function interleavePlannedFacets(candidates,plannedFacetCount){
  // relevant work title (for example, History of the Conflict Between Religion
  // and Science). Use remaining slots for second-ranked planned results.
  for(let facet=0;facet<=count;facet++){
-  const candidate=candidates.find(value=>!used.has(value)&&
+  const facetCandidates=candidates.filter(value=>!used.has(value)&&
    value.facetRanks?.some(item=>item.facet===facet&&item.rank===1));
+  // On the verbatim-question facet, a work whose title matches the question
+  // is often a better direct source than a higher-scoring bibliographic or
+  // incidental mention of that work. Prefer title overlap there, then retain
+  // retrieval order for ties.
+  const candidate=facet===count&&facetCandidates.length
+   ?facetCandidates.reduce((best,value)=>
+     directFacetTitleMatch(question,value.title)>directFacetTitleMatch(question,best.title)
+      ?value:best,facetCandidates[0])
+   :facetCandidates[0];
   if(candidate){used.add(candidate);ordered.push(candidate);}
  }
  for(let rank=2;rank<=2;rank++)for(let facet=0;facet<count;facet++){
@@ -300,7 +320,7 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    id:String(candidate?.bookId||''),title:String(candidate?.title||'')
  })));
  const authorWideIntent=authorWideBooks.length>1;
- const facetBalanced=interleavePlannedFacets(candidates,plannedFacetCount);
+ const facetBalanced=interleavePlannedFacets(candidates,plannedFacetCount,question);
  let ordered=facetBalanced;
  if(comparisonIntent){
    // For author comparisons, reserve one page per named author before filling
