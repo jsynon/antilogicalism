@@ -66,8 +66,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/status\.setAttribute\('aria-busy',String\(busy\)\)/);
  assert.match(client,/askButton\.textContent=searching\|\|answering\?'Working…':'Ask Reading Companion'/);
  assert.match(client,/Preparing an answer from the selected passages… This can take a little while\./);
- assert.match(html,/Press Enter to ask; Shift\+Enter adds a new line\./);
- assert.match(html,/aria-describedby="companion-question-help"/);
+ assert.doesNotMatch(html,/Press Enter to ask|companion-question-help/);
  assert.match(client,/question\.addEventListener\('keydown',event=>\{/);
  assert.match(client,/event\.key!=='Enter'\|\|event\.shiftKey\|\|event\.isComposing/);
  assert.match(client,/if\(!askButton\.disabled\)form\.requestSubmit\(askButton\)/);
@@ -128,7 +127,9 @@ test('public companion copy explains cited sources and keeps source reading cont
  assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
  assert.match(client,/sourceReader\.open\(\{\.\.\.source,excerpt\},read\)/);
  assert.match(html,/id="companion-turnstile" aria-label="Quick check"/);
- assert.match(html,/Complete the quick check below before asking a question/);
+ assert.doesNotMatch(html,/Complete the quick check below before asking a question/);
+ assert.doesNotMatch(html,/Verified search scope|books available/);
+ assert.match(html,/border-top:1px solid #dfe2e3/);
  assert.match(client,/turnstile\.render\(challengeBox/);
  assert.match(client,/callback:token=>/);
  assert.doesNotMatch(client,/Checked passages will guide the answer/);
