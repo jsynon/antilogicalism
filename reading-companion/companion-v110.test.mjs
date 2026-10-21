@@ -15,6 +15,15 @@ test('response citation labels are plain ordered numbers while IDs stay internal
  assert.match(client,/putCitationTokens\(reply,answer,citations,highlights,numbering\)/);
 });
 
+test('structured missing-evidence notice is not repeated when answer already states it',()=>{
+ assert.ok(client.includes('normalizeNotice(answer).includes(normalizeNotice(missing))'));
+ assert.ok(client.includes("replace(/[^\\p{L}\\p{N}]+/gu,' ').trim()"));
+ assert.ok(client.includes('if(missing&&!answerAlreadyContainsMissing)'));
+});
+test('answer source packet allows six verified passages',()=>{
+ assert.match(client,/const MAX_ANSWER_SOURCES=6/);
+ assert.match(client,/maxSources:MAX_ANSWER_SOURCES/);
+});
 test('v1.10 retains Book Lite and the site navigation',()=>{
  assert.match(html,/wp-content\/themes\/book-lite/);
  assert.match(html,/id="masthead"/);
