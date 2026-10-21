@@ -61,6 +61,17 @@ test('audit requires expected-source coverage and citations with no orphan marke
  assert.deepEqual(bad.inlineIdsWithoutSource,['S2']);
 });
 
+test('audit maps Worker evidence IDs to submitted locators by their request order',()=>{
+ const result=auditLiveAnswer({coverage:'full',answer:'A sourced claim [S1].',
+  citations:[{id:'S1',bookId:'638'}],
+  questionParts:[{part:'the requested claim',status:'supported',evidenceIds:['S1']}],
+  evidenceMap:[{id:'S1',point:'The reviewed passage supports the claim.'}]},
+  [{bookId:'638',page:10}],[{label:'Bible',book_ids:['638']}]);
+ assert.equal(result.partEvidenceAudit[0].structurallyComplete,true);
+ assert.equal(result.sourceGroups[0].linkedToSupportedEvidence,true);
+ assert.equal(result.passed,true);
+});
+
 test('audit rejects prose that denies a comparison marked supported',()=>{
  const result=auditLiveAnswer({coverage:'full',answer:'Aristotle discusses political order through human good [S1]. Hobbes describes common power preserving justice [S2]. The texts do not offer a direct comparison, and the evidence cannot establish a difference between their accounts [S1, S2].',
   citations:[{id:'S1',bookId:'7'},{id:'S2',bookId:'163'}],
@@ -79,9 +90,9 @@ test('audit rejects prose that denies a comparison marked supported',()=>{
 
 test('audit distinguishes a retrieved and cited book from evidence assigned to a supported part',()=>{
  const result=auditLiveAnswer({coverage:'full',answer:'Claim [S1].',citations:[{id:'S1',bookId:'102'}],
-  questionParts:[{part:'Hawking’s observational evidence',status:'supported',evidenceIds:['S2']}],
-  evidenceMap:[{id:'S2',point:'A separate point from another passage.'}]},
-  [{id:'S1',bookId:'102'},{id:'S2',bookId:'102'}],
+  questionParts:[{part:'Hawking’s observational evidence',status:'supported',evidenceIds:['S3']}],
+  evidenceMap:[{id:'S3',point:'A separate point from another passage.'}]},
+  [{bookId:'102'},{bookId:'102'}],
   [{label:'Hawking',book_ids:['102']}]);
  assert.equal(result.sourceGroups[0].retrieved,true);
  assert.equal(result.sourceGroups[0].cited,true);
