@@ -57,6 +57,14 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
 });
 
+test('fixed-query retrieval failure still reports that planner execution was skipped',async()=>{
+ const item={id:'fixed-query-retrieval-failure',question:'Explain the source question with enough detail.',
+  planner_queries:['fixed query one concept','fixed query two concept'],required_source_groups:[]};
+ await assert.rejects(evaluateLiveCase(item,{library:{search:async()=>{throw Error('offline search failure');}},
+  manifest:{books:{}},allowed:new Set(),token:'x'.repeat(40),useFixedQueries:true}),
+  error=>{assert.equal(error.requestFailure.stage,'retrieval');assert.equal(error.requestFailure.plannerSkipped,true);return true;});
+});
+
 test('partial Worker coverage is an evaluation miss even when citations and expected books are present',()=>{
  const result=auditLiveAnswer({coverage:'partial',answer:'Supported claim [S1].',citations:[{id:'S1',bookId:'638'}]},[{}],[{label:'Bible',book_ids:['638']}]);
  assert.equal(result.sourceGroups[0].found,true);
