@@ -4,9 +4,10 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Run 3 smoke questions, 7 cross-discipline quality questions, or all 30 benchmark questions
+        description: Run a 2-call planner check, 3 smoke questions, 7 answer-quality questions, or all 30 benchmark questions
         type: choice
         options:
+          - planner
           - smoke
           - quality
           - full

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,selectLiveCases,evaluateLiveCase,runLiveCases} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,selectLiveCases,evaluateLiveCase,evaluatePlannerCase,runLiveCases} from './live-answer-evaluation.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
 
@@ -19,6 +19,16 @@ test('quality mode selects seven cross-discipline cases across selected-book and
  assert.equal(cases.filter(item=>item.selected_book_ids.length>0).length,4);
  assert.equal(cases.filter(item=>item.selected_book_ids.length===0).length,3);
  assert.ok(cases.every(item=>item.planner_queries.length===2&&item.review_focus.length>=2));
+});
+
+test('planner mode selects one selected-book case and one All Books cross-work case',()=>{
+ const cases=selectLiveCases({cases:[]},'planner');
+ assert.deepEqual(cases.map(item=>item.id),[
+  'quality-philosophy-aristotle-practical-wisdom',
+  'quality-all-books-cross-work-science'
+ ]);
+ assert.deepEqual(cases[0].selected_book_ids,['7']);
+ assert.deepEqual(cases[1].selected_book_ids,[]);
 });
 
 test('full mode remains exactly the existing 30-case retrieval suite',()=>{
@@ -69,6 +79,50 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
 });
 
+test('planner-only evaluation checks selected and All Books retrieval without answer calls',async()=>{
+ const calls=[],searchScopes=[];
+ const pages={
+  '7':{id:70,title:'Nicomachean Ethics — Aristotle',page:66,text:'Practical wisdom is a reasoned capacity for acting about matters that can be otherwise.'},
+  '529':{id:5290,title:'On the Origin of Species — Charles Darwin',page:96,text:'Natural selection preserves favorable individual differences and destroys injurious ones.'},
+  '102':{id:1020,title:'A Brief History of Time — Stephen Hawking',page:58,text:'Astronomical observations of X-rays from Cygnus X-1 support an account of a black hole.'}
+ };
+ const library={
+  search:async(query,options)=>{
+   const bookId=String(options.bookId||'');searchScopes.push(bookId);
+   const page=pages[bookId];
+   return {sources:page?[{id:'p'+page.id,bookId,title:page.title,page:page.page,
+    globalPageId:page.id,preview:page.text,score:50,url:'https://example.test/#page='+page.page}]:[]};
+  },
+  jsonGzip:async(path)=>{
+   const bookId=path.match(/book-(\d+)\.json/)[1],page=pages[bookId];
+   return {pages:page?[{id:page.id,page:page.page,text:page.text}]:[]};
+  }
+ };
+ const cases=selectLiveCases({cases:[]},'planner');
+ const results=[];
+ for(const item of cases){
+  results.push(await evaluatePlannerCase(item,{library,
+   manifest:{books:Object.fromEntries(Object.entries(pages).map(([id,page])=>[id,{title:page.title}]))},
+   allowed:new Set(Object.keys(pages)),token:'x'.repeat(40),beforeCall:async()=>{},
+   fetcher:async(url,options)=>{
+    calls.push({url,body:JSON.parse(options.body)});
+    return new Response(JSON.stringify({queries:['first distinct query concept','second distinct query concept'],
+     workerVersionId:'planner-worker-7',workerSourceBuild:'gateway-build-7'}),
+     {status:200,headers:{'content-type':'application/json'}});
+   }}));
+ }
+ assert.equal(calls.length,2);
+ assert.ok(calls.every(call=>call.url.endsWith('/api/pilot-plan')));
+ assert.equal(calls[0].body.bookId,'7');
+ assert.equal(calls[1].body.bookId,'');
+ assert.ok(results.every(result=>result.passed&&result.coverage==='not-evaluated'));
+ assert.ok(results.every(result=>result.reviewStatus==='planner-only'&&!result.answerWorkerVersionId));
+ assert.deepEqual(results[0].sourceGroups[0].retrievedBookIds,['7']);
+ assert.deepEqual(results[1].sourceGroups.map(group=>group.retrievedBookIds),[['529'],['102']]);
+ assert.ok(searchScopes.includes('7'));
+ assert.ok(searchScopes.includes('529')&&searchScopes.includes('102'));
+});
+
 test('fixed-query retrieval failure still reports that planner execution was skipped',async()=>{
  const item={id:'fixed-query-retrieval-failure',question:'Explain the source question with enough detail.',
   planner_queries:['fixed query one concept','fixed query two concept'],required_source_groups:[]};
@@ -83,17 +137,18 @@ test('partial Worker coverage is an evaluation miss even when citations and expe
  assert.equal(result.passed,false);
 });
 
-test('case evaluation sends one plan and one answer request in order without logging the token',async()=>{
+test('case evaluation sends one selected-book plan and one answer request in order without logging the token',async()=>{
  const calls=[],searched=[];
  const library={search:async(query)=>{searched.push(query);return {sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]};},
   jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
- const item={question:'Explain the source question with enough detail.',required_source_groups:[{label:'Bible',book_ids:['638']}]};
+ const item={question:'Explain the source question with enough detail.',selected_book_ids:['638'],required_source_groups:[{label:'Bible',book_ids:['638']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
   beforeCall:async()=>{},fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body),authorization:options.headers.authorization});
    return new Response(JSON.stringify(url.endsWith('pilot-plan')?{queries:['first distinct search concept','second distinct search concept'],workerVersionId:'plan-worker-3',workerSourceBuild:'gateway-build-3'}:
     {outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',workerVersionId:'answer-worker-3',workerSourceBuild:'gateway-build-3',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(calls.length,2);
  assert.match(calls[0].url,/pilot-plan$/);assert.match(calls[1].url,/pilot-answer$/);
+ assert.equal(calls[0].body.bookId,'638');
  assert.equal(calls[0].authorization,'Bearer '+'x'.repeat(40));
  assert.equal(result.passed,true);
  assert.equal(result.plannerWorkerVersionId,'plan-worker-3');
@@ -143,9 +198,11 @@ test('evaluation report preserves planner fallback when the later answer request
  const result=await runLiveCases([item],{evaluateOptions:{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
   beforeCall:async()=>{},fetcher:async url=>url.endsWith('pilot-plan')?
    new Response(JSON.stringify({failureCode:'search-planning-failed'}),{status:502,headers:{'content-type':'application/json'}}):
-   new Response(JSON.stringify({failureCode:'evidence-review-request-failed'}),{status:502,headers:{'content-type':'application/json'}})}});
+   new Response(JSON.stringify({failureCode:'evidence-review-invalid-response',failureDetail:'retry_invalid_json'}),
+    {status:502,headers:{'content-type':'application/json'}})}});
  assert.equal(result.results[0].requestFailure.stage,'answer');
  assert.equal(result.results[0].plannerFallback,true);
+ assert.equal(result.results[0].requestFailure.failureDetail,'retry_invalid_json');
  assert.deepEqual(result.results[0].plannerFailure,{httpStatus:502,failureCode:'search-planning-failed'});
 });
 
