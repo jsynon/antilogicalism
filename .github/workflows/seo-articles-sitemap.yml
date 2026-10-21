@@ -1,0 +1,33 @@
+name: Generate articles-only sitemap (temporary)
+on:
+  push:
+    branches:
+      - seo-articles-sitemap-2026-10-21
+permissions:
+  contents: write
+jobs:
+  sitemap:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - name: Generate article sitemap
+        run: python3 scripts/build_article_sitemap.py --apply
+      - name: Confirm deterministic output
+        run: python3 scripts/build_article_sitemap.py --check
+      - name: Validate XML
+        run: python3 -c "import xml.etree.ElementTree as E; E.parse('sitemap-articles.xml'); print('XML valid')"
+      - name: Commit resulting sitemap
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add sitemap-articles.xml
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No changes required."
+          else
+            git commit -m "SEO: add dedicated sitemap for original article archive"
+            git push origin HEAD:seo-articles-sitemap-2026-10-21
+          fi
