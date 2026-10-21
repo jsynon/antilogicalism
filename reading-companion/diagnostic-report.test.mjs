@@ -116,7 +116,7 @@ test('diagnostics expose bounded question-part coverage tied to submitted source
    {part:'x'.repeat(200),status:'partial',evidenceIds:['S2','S1','S2']}
   ]
  });
- assert.equal(report.clientBuild,'v1.13-diagnostics');
+ assert.equal(report.clientBuild,'v1.14-worker-version-diagnostics');
  assert.deepEqual(report.answer.questionParts,[
   {part:'definition',status:'supported',evidenceIds:['S1']},
   {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
