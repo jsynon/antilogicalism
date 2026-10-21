@@ -370,7 +370,13 @@ function renderResponse(data,turnQuestion=''){
   const reply=node('div',undefined,'companion-answer-text');
   putCitationTokens(reply,answer,citations,highlights,numbering);
   turn.append(reply);
-  if(data.missing)turn.append(node('p','What these passages don’t establish: '+data.missing,'companion-hint'));
+  const missing=String(data.missing||'').trim();
+  const normalizeNotice=value=>String(value||'').normalize('NFKC').toLocaleLowerCase()
+    .replace(/[’']/g,"'").replace(/[^\\p{L}\\p{N}]+/gu,' ').trim();
+  const answerAlreadyContainsMissing=!!missing&&
+    normalizeNotice(answer).includes(normalizeNotice(missing));
+  if(missing&&!answerAlreadyContainsMissing)
+    turn.append(node('p','What these passages don’t establish: '+missing,'companion-hint'));
 
   const highlightedSourceKeys=new Set();
   if(highlights.length){
