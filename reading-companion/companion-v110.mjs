@@ -17,7 +17,7 @@ const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
 const FALLBACK_BOOK={id:'152',title:'History of the Peloponnesian War — Thucydides'};
 const PDF_PAGE_LIMIT=14000;
-const MAX_ANSWER_SOURCES=2;
+const MAX_ANSWER_SOURCES=6;
 const el=id=>document.getElementById(id);
 const question=el('companion-question');
 const form=el('companion-question-form');
@@ -278,13 +278,13 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
         sources:(set.sources||[]).slice(0,8)
       }));
       // Keep a wider evidence pool for the final passage selector. The
-      // verifier still receives at most four full pages; retaining more here
-      // lets strong passages survive facet and author-wide diversity ordering.
+      // The six-page answer packet keeps distinct facets and works available
+      // for broader questions while staying within the request-size budget.
       const results=foundSets.length>1?
         mergeFacetSearches(foundSets,12).filter(allowedPage):
         foundSets[0].sources.filter(allowedPage);
       // Preserve one page for each distinct facet before filling from other
-      // candidates. The answer uses the strongest two verified full pages.
+      // candidates. The answer can use up to six verified full pages.
       const representatives=[],others=[],visited=new Set();
       for(const r of results){
         const group=plannedQueries?String(r.facet):r.bookId;
@@ -372,7 +372,7 @@ function renderResponse(data,turnQuestion=''){
   turn.append(reply);
   const missing=String(data.missing||'').trim();
   const normalizeNotice=value=>String(value||'').normalize('NFKC').toLocaleLowerCase()
-    .replace(/[’']/g,"'").replace(/[^\\p{L}\\p{N}]+/gu,' ').trim();
+    .replace(/[’']/g,"'").replace(/[^\p{L}\p{N}]+/gu,' ').trim();
   const answerAlreadyContainsMissing=!!missing&&
     normalizeNotice(answer).includes(normalizeNotice(missing));
   if(missing&&!answerAlreadyContainsMissing)
@@ -560,6 +560,7 @@ async function askQuestion(questionText){
       if(!found)return;
     }
     const chosen=selectAnswerSources(candidates,q,token,{history,
+      maxSources:MAX_ANSWER_SOURCES,
       plannedFacetCount:Math.max(0,(diagnosticState?.searches?.length||0)-1)});
     if(!chosen.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
     if(diagnosticState){
