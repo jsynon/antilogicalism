@@ -133,8 +133,8 @@ test('public companion copy explains cited sources and keeps source reading cont
  assert.match(html,/id="companion-diagnostic-toggle" type="checkbox"/);
  assert.match(html,/Show diagnostic report for this result/);
  assert.match(html,/id="companion-diagnostic-copy" type="button"/);
- assert.match(client,/matches\\.length\\+' matching books\\.'/);
  assert.match(html,/border-top:1px solid #dfe2e3/);
+ assert.match(client,/matches\.length\+' matching books\.'/);
  assert.match(client,/turnstile\.render\(challengeBox/);
  assert.match(client,/callback:token=>/);
  assert.doesNotMatch(client,/Checked passages will guide the answer/);
