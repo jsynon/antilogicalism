@@ -29,11 +29,23 @@ test('full mode remains exactly the existing 30-case retrieval suite',()=>{
 test('audit requires expected-source coverage and citations with no orphan markers',()=>{
  const result=auditLiveAnswer({outcome:'verified-source-draft',coverage:'full',reviewStatus:'citations_not_claim_verified',
   answer:'A sourced claim [S1].',workerVersionId:'answer-version-1',workerSourceBuild:'gateway-build-1',
-  citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[{quoteLocated:true}]},[{}],[{label:'Bible',book_ids:['638','646']}]);
+  citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[{quoteLocated:true}]},[{bookId:'638'}],[{label:'Bible',book_ids:['638','646']}]);
  assert.equal(result.passed,true);
  assert.equal(result.workerVersionId,'answer-version-1');
  assert.equal(result.workerSourceBuild,'gateway-build-1');
  assert.deepEqual(result.sourceGroups[0].foundBookIds,['638']);
+ assert.deepEqual(result.sourceGroups[0].retrievedBookIds,['638']);
+ assert.deepEqual(result.sourceGroups[0].citedBookIds,['638']);
+ assert.equal(result.sourceGroups[0].retrieved,true);
+ assert.equal(result.sourceGroups[0].cited,true);
+ const uncited=auditLiveAnswer({coverage:'partial',answer:'A supported claim [S1].',
+  citations:[{id:'S1',bookId:'529'}]},[{bookId:'529'},{bookId:'102'}],
+  [{label:'Hawking',book_ids:['102']}]);
+ assert.deepEqual(uncited.sourceGroups[0].retrievedBookIds,['102']);
+ assert.deepEqual(uncited.sourceGroups[0].citedBookIds,[]);
+ assert.equal(uncited.sourceGroups[0].retrieved,true);
+ assert.equal(uncited.sourceGroups[0].cited,false);
+ assert.equal(uncited.sourceGroups[0].found,false);
  const bad=auditLiveAnswer({answer:'Unsupported [S2].',citations:[{id:'S1',bookId:'16'}]},[{}],[{label:'Bible',book_ids:['638']}]);
  assert.equal(bad.passed,false);
  assert.deepEqual(bad.inlineIdsWithoutSource,['S2']);

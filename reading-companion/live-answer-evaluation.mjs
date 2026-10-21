@@ -68,9 +68,15 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
  const citationIds=new Set(citations.map(source=>String(source?.id||'')));
  const missingInline=[...new Set(inline.filter(id=>!citationIds.has(id)))];
  const citationBookIds=[...new Set(citations.map(source=>String(source?.bookId||'')))];
- const sourceGroups=requiredGroups.map(group=>({label:group.label,
-  expectedBookIds:group.book_ids.map(String),foundBookIds:citationBookIds.filter(id=>group.book_ids.map(String).includes(id)),
-  found:citations.some(source=>group.book_ids.map(String).includes(String(source?.bookId||'')))}));
+ const submittedBookIds=[...new Set(submitted.map(source=>String(source?.bookId||'')))];
+ const sourceGroups=requiredGroups.map(group=>{
+  const expectedBookIds=group.book_ids.map(String);
+  const retrievedBookIds=submittedBookIds.filter(id=>expectedBookIds.includes(id));
+  const citedBookIds=citationBookIds.filter(id=>expectedBookIds.includes(id));
+  const retrieved=submitted.some(source=>expectedBookIds.includes(String(source?.bookId||'')));
+  const cited=citations.some(source=>expectedBookIds.includes(String(source?.bookId||'')));
+  return {label:group.label,expectedBookIds,retrievedBookIds,citedBookIds,foundBookIds:citedBookIds,retrieved,cited,found:cited};
+ });
  const highlights=Array.isArray(data?.evidenceHighlights)?data.evidenceHighlights:[];
  const citationSources=citations.map(source=>({id:String(source?.id||''),bookId:String(source?.bookId||''),
   title:String(source?.title||''),page:Number.isSafeInteger(source?.page)?source.page:null,
