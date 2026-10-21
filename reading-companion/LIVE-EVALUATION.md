@@ -10,6 +10,18 @@ The `quality` mode uses two fixed, curated queries per case so its seven questio
 
 Quality reports separate expected-book retrieval from source use: for each requested part, `partEvidenceAudit` shows whether its evidence IDs resolve to the review map, cited source, and submitted page. `sourceGroups` then shows whether each required work is linked to a supported part. `answerCoverageConsistent` checks that reported coverage matches the part statuses and flags explicit prose that denies a comparison marked supported. These are structural checks only. They cannot determine whether the cited passage semantically supports the claim or whether the interpretation is correct; inspect `answerText`, `evidenceMap`, highlights, and cited page text manually. The automated `passed` count is a review signal, not an AI truth grade.
 
+## Recheck a saved quality report without AI or network calls
+
+The standalone `recheck-live-answer-evaluation.mjs` script reapplies the current structural audit to a saved quality JSON report. It does not contact the Worker, retrieve books, or call a model. First extract `reading-companion-live-answer-evaluation.json` from the GitHub Actions artifact ZIP, then run:
+
+```powershell
+node .\reading-companion\recheck-live-answer-evaluation.mjs `
+  --input .\downloaded-artifact\reading-companion-live-answer-evaluation.json `
+  --output .\downloaded-artifact\reading-companion-live-answer-evaluation.offline-rechecked.json
+```
+
+The new `offlineRecheck` fields preserve the original report and show the corrected structural score alongside it. This can correct evaluator false negatives, but it does not change the generated answer or verify factual truth. Run its regression tests with `node --test .\reading-companion\live-answer-evaluation.test.mjs`.
+
 ## One-time setup
 
 After Worker PR #62 (manual evaluation authorization) is merged and deployed:
