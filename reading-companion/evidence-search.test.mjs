@@ -254,6 +254,25 @@ test('direct-question search keeps a high-ranking exact-topic source in the answ
  assert(chosen.some(source=>source.facet===0));
  assert(chosen.some(source=>source.facet===1));
 });
+test('six-source packets use the available Worker body budget',()=>{
+ const candidates=Array.from({length:6},(_,index)=>({...page(index+1,String(index+1)),
+  title:'Work '+(index+1),score:90-index,text:'x'.repeat(5800),
+  facetRanks:[{facet:index%3,rank:1}]}));
+ const chosen=selectAnswerSources(candidates,'A broad question about six distinct sources?','token',
+  {maxSources:6,plannedFacetCount:2});
+ const body=JSON.stringify({question:'A broad question about six distinct sources?',
+  turnstileToken:'token',history:[],sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))});
+ assert.equal(chosen.length,6);
+ assert(new TextEncoder().encode(body).byteLength<=40000);
+ assert(chosen.reduce((sum,source)=>sum+new TextEncoder().encode(source.text).byteLength,0)<=35000);
+});
+test('source selection stays within the Worker verified-text limit',()=>{
+ const candidates=Array.from({length:6},(_,index)=>({...page(index+1,String(index+1)),
+  text:'x'.repeat(6000)}));
+ const chosen=selectAnswerSources(candidates,'A question','token',{maxSources:6});
+ assert.equal(chosen.length,5);
+ assert.equal(chosen.reduce((sum,source)=>sum+new TextEncoder().encode(source.text).byteLength,0),30000);
+});
 test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.equal(validSearchPlan(['Raskolnikov extraordinary man theory','Raskolnikov conscience guilt Sonia']),true);
  assert.equal(validSearchPlan(['same search phrase','same search phrase']),false);
@@ -302,13 +321,13 @@ test('answer submissions include up to four facet-balanced pages within the exac
  assert.deepEqual(chosen.slice(0,2).map(x=>x.facet),[0,1]);
  const body=JSON.stringify({question,turnstileToken:token,history:[],
   sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))});
- assert(new TextEncoder().encode(body).byteLength<=30000);
+ assert(new TextEncoder().encode(body).byteLength<=39000);
  assert(new TextEncoder().encode(body).byteLength>20000);
 });
 
 test('answer submission skips pages that do not fit and keeps later source candidates',()=>{
  const candidates=[
-  {...page(1),text:'x'.repeat(31000)},
+  {...page(1),text:'x'.repeat(40000)},
   {...page(2,'529'),text:'useful smaller page'}
  ];
  const chosen=selectAnswerSources(candidates,'A question','a token');
