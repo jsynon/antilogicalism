@@ -243,14 +243,14 @@ test('direct-question search keeps a high-ranking exact-topic source in the answ
  const facets=[
   {sources:[{...page(110,'221'),score:48},{...page(65,'221'),score:47}]},
   {sources:[{...page(109,'576'),score:74},{...page(209,'576'),score:62}]},
-  {sources:[{...page(317,'317'),score:47,title:'History of the Conflict Between Religion and Science — John William Draper'},
-   {...page(47,'318'),score:46,title:'A History of the Warfare of Science with Theology in Christendom — Andrew Dickson White'}]}
+  {sources:[{...page(47,'318'),score:47.1972,title:'A History of the Warfare of Science with Theology in Christendom — Andrew Dickson White'},
+   {...page(317,'317'),score:45.3863,title:'History of the Conflict Between Religion and Science — John William Draper'}]}
  ];
  const candidates=mergeFacetSearches(facets,8).map(source=>({...source,text:'full source page'}));
  const chosen=selectAnswerSources(candidates,'Is there a conflict between religion and science?','token',
   {maxSources:4,plannedFacetCount:2});
  assert(chosen.some(source=>source.facet===2&&source.bookId==='317'),
-  'prefer Draper’s directly relevant work title over White’s page that only cites Draper');
+  'prefer Draper’s exact-topic work title even when White’s bibliographic mention ranks higher');
  assert(chosen.some(source=>source.facet===0));
  assert(chosen.some(source=>source.facet===1));
 });
