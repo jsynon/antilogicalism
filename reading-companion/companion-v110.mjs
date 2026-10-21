@@ -7,7 +7,7 @@
 import {RemoteLibrary,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet} from './evidence-search.mjs';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -264,7 +264,8 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
         matchExplicitBookIds(q,bookList);
       const targetBookIds=namedBookIds.length?namedBookIds:[null];
       const foundSets=await Promise.all(searches.map(async term=>{
-        const targeted=await Promise.all(targetBookIds.map(bookId=>
+        const facetBookIds=targetBooksForFacet(term,bookList,targetBookIds[0]===null?null:targetBookIds);
+        const targeted=await Promise.all(facetBookIds.map(bookId=>
           library.search(term,{...(bookId?{bookId}:{}),allowedBookIds:allowed,
             maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK})));
         return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])

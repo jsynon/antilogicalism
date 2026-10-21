@@ -47,6 +47,34 @@ test('questions naming a specific work keep the strongest passages from that wor
  assert.deepEqual(chosen.map(item=>item.bookId+':'+item.page),['140:32','140:17']);
 });
 
+test('questions naming multiple works reserve and alternate evidence pages across works',()=>{
+ const candidates=[
+  {...page(495,'529'),title:'The Origin of Species — Charles Darwin',score:85,text:'Darwin lead'},
+  {...page(240,'529'),title:'The Origin of Species — Charles Darwin',score:74,text:'Darwin alternate one'},
+  {...page(96,'529'),title:'The Origin of Species — Charles Darwin',score:73,text:'Darwin alternate two'},
+  {...page(58,'102'),title:'A Brief History of Time — Stephen Hawking',score:87,text:'Hawking lead'},
+  {...page(48,'102'),title:'A Brief History of Time — Stephen Hawking',score:85,text:'Hawking alternate one'},
+  {...page(49,'102'),title:'A Brief History of Time — Stephen Hawking',score:77,text:'Hawking alternate two'},
+ ];
+ const question='How does Darwin explain selection in On the Origin of Species, and how does Hawking explain black holes in A Brief History of Time?';
+ const chosen=selectAnswerSources(candidates,question,'token',{maxSources:4});
+ assert.deepEqual(chosen.map(item=>item.bookId+':'+item.page),
+  ['102:58','529:495','529:240','102:48']);
+});
+
+test('explicit multi-work selection alternates remaining sources when retrieval scores are absent',()=>{
+ const candidates=[
+  {...page(1,'529'),title:'The Origin of Species — Charles Darwin',text:'Darwin one'},
+  {...page(2,'529'),title:'The Origin of Species — Charles Darwin',text:'Darwin two'},
+  {...page(1,'102'),title:'A Brief History of Time — Stephen Hawking',text:'Hawking one'},
+  {...page(2,'102'),title:'A Brief History of Time — Stephen Hawking',text:'Hawking two'},
+ ];
+ const question='How does Darwin explain On the Origin of Species, and how does Hawking explain A Brief History of Time?';
+ const chosen=selectAnswerSources(candidates,question,'token',{maxSources:4});
+ assert.deepEqual(chosen.map(item=>item.bookId+':'+item.page),
+  ['529:1','102:1','529:2','102:2']);
+});
+
 test('source budget prioritizes distinct books before same-book alternatives',()=>{
  const candidates=[
   {...page(1,'7'),text:'first book'},
@@ -70,6 +98,18 @@ test('explicit work titles narrow searches to matching catalog books',()=>{
   ['7','529']);
  assert.deepEqual(matchExplicitBookIds(
   "In Homer's Odyssey, what shapes Odysseus' return home?",books),['186','540']);
+});
+test('explicitly named planner facets search their own work inside the question scope',()=>{
+ const books=[
+  {id:'529',title:'The Origin of Species — Charles Darwin'},
+  {id:'102',title:'A Brief History of Time — Stephen Hawking'},
+  {id:'7',title:'Nicomachean Ethics — Aristotle'},
+ ];
+ assert.deepEqual(targetBooksForFacet('Darwin natural selection in Origin of Species',books,['102','529']),['529']);
+ assert.deepEqual(targetBooksForFacet('Hawking Cygnus X-1 unseen companion X-rays',books,['102','529']),['102']);
+ assert.deepEqual(targetBooksForFacet('How do their accounts differ?',books,['102','529']),['102','529']);
+ assert.deepEqual(targetBooksForFacet('Hawking black holes',books,['7']),['7']);
+ assert.deepEqual(targetBooksForFacet('Black holes and evolution',books),[null]);
 });
 test('comparison author targeting retains a work for each named author',()=>{
  const books=[
@@ -101,7 +141,7 @@ test('author-only mentions search across the named author’s catalog works',()=
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet} from './evidence-search.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
  preview:'Authentic indexed excerpt',url:'https://drive.google.com/file/d/X/view#page='+page});

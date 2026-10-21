@@ -161,6 +161,18 @@ export function matchExplicitBookIds(question,books){
  return [...new Set(selected)].slice(0,8);
 }
 
+/* A planner facet that explicitly names a work or author should search that
+ * work alone. Keep selected-book scope intact, and fall back to the caller's
+ * broader scope when a facet does not identify a catalog source. */
+export function targetBooksForFacet(query,books,allowedBookIds=null){
+ const scoped=Array.isArray(allowedBookIds)&&allowedBookIds.length
+  ?allowedBookIds.map(String):null;
+ const matches=matchExplicitBookIds(String(query||''),books)
+  .filter(id=>!scoped||scoped.includes(String(id)));
+ if(matches.length)return matches;
+ return scoped?.length?scoped:[null];
+}
+
 /* Planning improves retrieval, but a temporary planner outage must not block
  * direct search with the reader's own wording. Keep explicit request denials
  * and rate limits fail-closed. */
@@ -192,6 +204,12 @@ export function selectAnswerSources(candidates,question,turnstileToken,
  // one specific work. matchExplicitBookIds resolves this from the candidates'
  // trusted catalog titles and does not add a model call.
  const comparisonIntent=/\b(?:compare|contrast|versus|vs\.?|differences?|similarities?)\b/i.test(question);
+ const explicitlyNamedWorkIds=new Set(candidates.filter(candidate=>{
+   const id=String(candidate?.bookId||'');
+   return id&&catalogWorkTitles(candidate?.title).some(title=>
+     questionContainsPhrase(question,title));
+ }).map(candidate=>String(candidate.bookId)));
+ const multiWorkIntent=explicitlyNamedWorkIds.size>1;
  const authorWideBooks=matchExplicitBookIds(question,candidates.map(candidate=>({
    id:String(candidate?.bookId||''),title:String(candidate?.title||'')
  })));
@@ -200,6 +218,35 @@ export function selectAnswerSources(candidates,question,turnstileToken,
  if(comparisonIntent){
    // A comparison requires evidence from each work or author by design.
    ordered=[...firstPerBook,...alternates];
+ }else if(multiWorkIntent){
+   // When a question names multiple specific works, give each work a strong
+   // passage before filling the remaining page budget. Then alternate works
+   // so repeated hits from one query facet cannot crowd out the other work's
+   // second-best evidence page.
+   const bookOrder=[...explicitlyNamedWorkIds];
+   const strongestByBook=new Map();
+   for(const candidate of candidates){
+     const key=String(candidate?.bookId||'');
+     if(!explicitlyNamedWorkIds.has(key))continue;
+     const previous=strongestByBook.get(key);
+     if(key&&(!previous||Number(candidate.score)>Number(previous.score)))
+       strongestByBook.set(key,candidate);
+   }
+   const hasScores=candidates.every(candidate=>Number.isFinite(candidate?.score));
+   const representatives=hasScores
+     ?[...strongestByBook.values()].sort((a,b)=>b.score-a.score)
+     :firstPerBook;
+   const reserved=new Set(representatives);
+   const remaining=new Map(bookOrder.map(id=>[id,candidates.filter(candidate=>
+     String(candidate?.bookId||'')===id&&!reserved.has(candidate))]));
+   const balanced=[];
+   while([...remaining.values()].some(group=>group.length)){
+     for(const id of bookOrder){
+       const group=remaining.get(id);
+       if(group?.length)balanced.push(group.shift());
+     }
+   }
+   ordered=[...representatives,...balanced];
  }else if(authorWideIntent){
    // Broad author questions may benefit from multiple works, but a weak hit
    // from a marginal title should not take a slot from a much stronger page.
