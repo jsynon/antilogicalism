@@ -18,6 +18,8 @@ test('audits citation markers against the sources returned by the server',()=>{
 test('parses grouped citation markers and the UI renders each source link',()=>{
  const answer='The passages support this claim [S1, S3].';
  assert.deepEqual(inlineCitationGroups(answer).map(group=>group.ids),[['S1','S3']]);
+ assert.match(client,/diagnosticState\.plannerWorkerVersionId=data\.workerVersionId/);
+ assert.match(client,/diagnosticState\.answerWorkerVersionId=data\.workerVersionId/);
  assert.match(client,/const citationAudit=auditCitationIds\(data\.answer,responseCitations\)/);
  assert.match(client,/citationAudit\.inlineIdsWithoutSource\.length/);
  assert.match(client,/const groups=inlineCitationGroups\(answer\)/);
@@ -30,6 +32,9 @@ test('diagnostic output is bounded and never includes source text or challenge d
  const report=createDiagnosticReport({
   question:'How do Aristotle and Darwin explain change?',selectedBookId:'',
   plannerQueries:['Aristotle virtue','Darwin evolution'],stage:'failed',
+  plannerWorkerVersionId:'worker-plan-7',plannerWorkerVersionTag:'production',
+  plannerWorkerVersionTimestamp:'2026-10-21T00:00:00Z',plannerWorkerSourceBuild:'build-a',
+  answerWorkerVersionId:'worker-answer-7',answerWorkerSourceBuild:'build-a',
   failureHttpStatus:502,failureCode:diagnosticFailureCode(502),
   candidates:[{id:'S1',bookId:'7',title:'Ethics',page:12,score:2.5,
     text:'PRIVATE FULL PAGE TEXT',preview:'PRIVATE PREVIEW',turnstileToken:'PRIVATE TOKEN'}],
@@ -44,6 +49,9 @@ test('diagnostic output is bounded and never includes source text or challenge d
  assert.equal(report.schema,'antilogicalism-reading-companion-diagnostic-v1');
  assert.deepEqual(report.answer.inlineIdsWithoutSource,['S2']);
  assert.equal(report.failureHttpStatus,502);
+ assert.equal(report.plannerWorkerVersionId,'worker-plan-7');
+ assert.equal(report.answerWorkerVersionId,'worker-answer-7');
+ assert.equal(report.answerWorkerVersionTag,null);
  assert.equal(report.failureCode,'answer-generation-or-citation-failed');
  assert.equal(report.candidates[0].score,2.5);
  assert.equal(report.evidenceHighlights[0].quoteLocated,true);
@@ -108,7 +116,7 @@ test('diagnostics expose bounded question-part coverage tied to submitted source
    {part:'x'.repeat(200),status:'partial',evidenceIds:['S2','S1','S2']}
   ]
  });
- assert.equal(report.clientBuild,'v1.13-diagnostics');
+ assert.equal(report.clientBuild,'v1.14-worker-version-diagnostics');
  assert.deepEqual(report.answer.questionParts,[
   {part:'definition',status:'supported',evidenceIds:['S1']},
   {part:'contrast with skill',status:'unsupported',evidenceIds:[]},

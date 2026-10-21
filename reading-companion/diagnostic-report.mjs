@@ -1,4 +1,5 @@
 const string=(value,limit=180)=>typeof value==='string'?value.slice(0,limit):'';
+const optionalString=(value,limit=128)=>typeof value==='string'&&value.length>0?value.slice(0,limit):null;
 // The Worker owns this field and emits stable, non-sensitive reason codes. Accept
 // newly introduced codes without requiring a synchronized frontend allowlist.
 // Reject free-form messages and cap length before including the value in reports.
@@ -105,8 +106,16 @@ export function createDiagnosticReport(input={}){
   const audit=auditCitationIds(input.answer,input.citations);
   return {
     schema:'antilogicalism-reading-companion-diagnostic-v1',
-    clientBuild:'v1.13-diagnostics',
+    clientBuild:'v1.14-worker-version-diagnostics',
     libraryVersion:Number.isSafeInteger(input.libraryVersion)?input.libraryVersion:null,
+    plannerWorkerVersionId:optionalString(input.plannerWorkerVersionId),
+    plannerWorkerVersionTag:optionalString(input.plannerWorkerVersionTag),
+    plannerWorkerVersionTimestamp:optionalString(input.plannerWorkerVersionTimestamp,64),
+    plannerWorkerSourceBuild:optionalString(input.plannerWorkerSourceBuild),
+    answerWorkerVersionId:optionalString(input.answerWorkerVersionId),
+    answerWorkerVersionTag:optionalString(input.answerWorkerVersionTag),
+    answerWorkerVersionTimestamp:optionalString(input.answerWorkerVersionTimestamp,64),
+    answerWorkerSourceBuild:optionalString(input.answerWorkerSourceBuild),
     question:string(input.question,400),
     selectedBookId:string(input.selectedBookId,12)||'all',
     fallbackMode:input.fallbackMode===true,

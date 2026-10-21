@@ -28,8 +28,11 @@ test('full mode remains exactly the existing 30-case retrieval suite',()=>{
 
 test('audit requires expected-source coverage and citations with no orphan markers',()=>{
  const result=auditLiveAnswer({outcome:'verified-source-draft',coverage:'full',reviewStatus:'citations_not_claim_verified',
-  answer:'A sourced claim [S1].',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[{quoteLocated:true}]},[{}],[{label:'Bible',book_ids:['638','646']}]);
+  answer:'A sourced claim [S1].',workerVersionId:'answer-version-1',workerSourceBuild:'gateway-build-1',
+  citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[{quoteLocated:true}]},[{}],[{label:'Bible',book_ids:['638','646']}]);
  assert.equal(result.passed,true);
+ assert.equal(result.workerVersionId,'answer-version-1');
+ assert.equal(result.workerSourceBuild,'gateway-build-1');
  assert.deepEqual(result.sourceGroups[0].foundBookIds,['638']);
  const bad=auditLiveAnswer({answer:'Unsupported [S2].',citations:[{id:'S1',bookId:'16'}]},[{}],[{label:'Bible',book_ids:['638']}]);
  assert.equal(bad.passed,false);
@@ -44,11 +47,22 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
   planner_queries:['first distinct fixed search concept','second distinct fixed search concept'],review_focus:['Check causal explanation.'],
   required_source_groups:[{label:'Darwin',book_ids:['529']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{529:{title:'On the Origin of Species'}}},allowed:new Set(['529','102']),token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,
-  fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'529'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+  fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',workerVersionId:'answer-worker-9',workerSourceBuild:'gateway-build-9',citations:[{id:'S1',bookId:'529'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(calls.length,1);assert.match(calls[0].url,/pilot-answer$/);
  assert.equal(result.plannerSkipped,true);assert.deepEqual(result.plannerQueries,item.planner_queries);
+ assert.equal(result.plannerWorkerVersionId,null);
+ assert.equal(result.answerWorkerVersionId,'answer-worker-9');
+ assert.equal(result.answerWorkerSourceBuild,'gateway-build-9');
  assert.equal(result.selectedBookIds[0],'529');assert.equal(result.reviewFocus[0],'Check causal explanation.');
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
+});
+
+test('fixed-query retrieval failure still reports that planner execution was skipped',async()=>{
+ const item={id:'fixed-query-retrieval-failure',question:'Explain the source question with enough detail.',
+  planner_queries:['fixed query one concept','fixed query two concept'],required_source_groups:[]};
+ await assert.rejects(evaluateLiveCase(item,{library:{search:async()=>{throw Error('offline search failure');}},
+  manifest:{books:{}},allowed:new Set(),token:'x'.repeat(40),useFixedQueries:true}),
+  error=>{assert.equal(error.requestFailure.stage,'retrieval');assert.equal(error.requestFailure.plannerSkipped,true);return true;});
 });
 
 test('partial Worker coverage is an evaluation miss even when citations and expected books are present',()=>{
@@ -64,12 +78,14 @@ test('case evaluation sends one plan and one answer request in order without log
  const item={question:'Explain the source question with enough detail.',required_source_groups:[{label:'Bible',book_ids:['638']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
   beforeCall:async()=>{},fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body),authorization:options.headers.authorization});
-   return new Response(JSON.stringify(url.endsWith('pilot-plan')?{queries:['first distinct search concept','second distinct search concept']}:
-    {outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+   return new Response(JSON.stringify(url.endsWith('pilot-plan')?{queries:['first distinct search concept','second distinct search concept'],workerVersionId:'plan-worker-3',workerSourceBuild:'gateway-build-3'}:
+    {outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',workerVersionId:'answer-worker-3',workerSourceBuild:'gateway-build-3',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(calls.length,2);
  assert.match(calls[0].url,/pilot-plan$/);assert.match(calls[1].url,/pilot-answer$/);
  assert.equal(calls[0].authorization,'Bearer '+'x'.repeat(40));
  assert.equal(result.passed,true);
+ assert.equal(result.plannerWorkerVersionId,'plan-worker-3');
+ assert.equal(result.answerWorkerVersionId,'answer-worker-3');
  assert.deepEqual(searched,['first distinct search concept','second distinct search concept',item.question]);
  assert.equal(result.searches[2].query,item.question);
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
@@ -98,11 +114,12 @@ test('planner rate limit remains fail-closed and skips answer generation',async(
  const item={id:'planner-rate-limit',question:'Explain the source question with enough detail.',required_source_groups:[]};
  const library={search:async()=>{throw Error('search should not run');},jsonGzip:async()=>{throw Error('page fetch should not run');}};
  await assert.rejects(evaluateLiveCase(item,{library,manifest:{books:{}},allowed:new Set(),token:'x'.repeat(40),
-  beforeCall:async()=>{},fetcher:async()=>new Response(JSON.stringify({failureCode:'rate-limited'}),
+  beforeCall:async()=>{},fetcher:async()=>new Response(JSON.stringify({failureCode:'rate-limited',workerVersionId:'limited-worker-3',workerSourceBuild:'gateway-build-3'}),
    {status:429,headers:{'content-type':'application/json'}})}),error=>{
     assert.equal(error.requestFailure.stage,'planner');
     assert.equal(error.requestFailure.httpStatus,429);
     assert.equal(error.requestFailure.failureCode,'rate-limited');
+    assert.equal(error.requestFailure.workerVersionId,'limited-worker-3');
     return true;
    });
 });

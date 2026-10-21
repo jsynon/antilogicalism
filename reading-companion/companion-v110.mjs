@@ -98,7 +98,10 @@ function beginDiagnostic(questionText){
   diagnosticState={question:questionText,selectedBookId:bookFilter.value||'all',
     libraryVersion:47,fallbackMode:oldPilotFallback,stage:'planning',
     plannerQueries:[],searches:[],candidates:[],submittedSources:[],
-    evidenceHighlights:[],failureHttpStatus:null,failureCode:''};
+    evidenceHighlights:[],failureHttpStatus:null,failureCode:'',
+    plannerWorkerVersionId:null,plannerWorkerVersionTag:null,plannerWorkerVersionTimestamp:null,
+    plannerWorkerSourceBuild:null,answerWorkerVersionId:null,answerWorkerVersionTag:null,
+    answerWorkerVersionTimestamp:null,answerWorkerSourceBuild:null};
   diagnosticPanel.hidden=false;
   diagnosticToggle.checked=false;
   diagnosticDetails.hidden=true;
@@ -467,6 +470,13 @@ async function requestSourcePlan(q,verificationToken,history){
     if(diagnosticState)diagnosticState.failureCode='invalid-response';
     throw Error('The evidence search service returned an invalid response.');
   }
+  if(diagnosticState){
+    diagnosticState.plannerWorkerVersionId=data.workerVersionId;
+    diagnosticState.plannerWorkerVersionTag=data.workerVersionTag;
+    diagnosticState.plannerWorkerVersionTimestamp=data.workerVersionTimestamp;
+    diagnosticState.plannerWorkerSourceBuild=data.workerSourceBuild;
+    refreshDiagnostic();
+  }
   if(!res.ok){
     if(diagnosticState){
       diagnosticState.failureHttpStatus=res.status;
@@ -561,6 +571,13 @@ async function askQuestion(questionText){
     try{data=await response.json();}catch{
       if(diagnosticState)diagnosticState.failureCode='invalid-response';
       throw Error('The answer service returned an invalid response.');
+    }
+    if(diagnosticState){
+      diagnosticState.answerWorkerVersionId=data.workerVersionId;
+      diagnosticState.answerWorkerVersionTag=data.workerVersionTag;
+      diagnosticState.answerWorkerVersionTimestamp=data.workerVersionTimestamp;
+      diagnosticState.answerWorkerSourceBuild=data.workerSourceBuild;
+      refreshDiagnostic();
     }
     if(!response.ok){
       if(diagnosticState){
