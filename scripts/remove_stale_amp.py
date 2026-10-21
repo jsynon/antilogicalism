@@ -68,6 +68,9 @@ def main() -> None:
             continue
         with path.open("r", encoding="utf-8", newline="") as fh:
             old = fh.read()
+        if not re.search(r"<head\b", old, re.I):
+            # Google verification and other standalone text/HTML fragments.
+            continue
         new, count = cleaned(old, str(path.relative_to(ROOT)))
         if old != new:
             modifications.append((path, new))
