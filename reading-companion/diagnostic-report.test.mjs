@@ -28,7 +28,7 @@ test('parses grouped citation markers and the UI renders each source link',()=>{
  assert.deepEqual(audit.inlineIdsWithoutSource,[]);
 });
 
-test('diagnostic output is bounded and never includes source text or challenge data',()=>{
+test('diagnostic output is bounded and excludes full source text and challenge data',()=>{
  const report=createDiagnosticReport({
   question:'How do Aristotle and Darwin explain change?',selectedBookId:'',
   plannerQueries:['Aristotle virtue','Darwin evolution'],stage:'failed',
@@ -42,6 +42,9 @@ test('diagnostic output is bounded and never includes source text or challenge d
   outcome:'verified-source-draft',coverage:'partial',reviewStatus:'citations_not_claim_verified',
   answer:'The authors differ [S1, S2].',citations:[{id:'S1',bookId:'7',title:'Ethics',page:12,
     text:'PRIVATE FULL PAGE TEXT'}],
+  reviewedEvidence:[{id:'S1',point:'The speaker makes a conditional claim.',
+    quoteVerified:true,anchorQuote:'If they could observe justice',speaker:'Hobbes',
+    qualifier:'If they could observe justice without common power'}],
   evidenceHighlights:[{source_id:'S1',page:12,quoteLocated:true,partialMatch:false,
     quote:'PRIVATE QUOTE'}]
  });
@@ -55,10 +58,15 @@ test('diagnostic output is bounded and never includes source text or challenge d
  assert.equal(report.failureCode,'answer-generation-or-citation-failed');
  assert.equal(report.candidates[0].score,2.5);
  assert.equal(report.evidenceHighlights[0].quoteLocated,true);
+ assert.equal(report.evidenceHighlights[0].quote,'PRIVATE QUOTE');
+ assert.deepEqual(report.answer.reviewedEvidence,[{id:'S1',
+  point:'The speaker makes a conditional claim.',quoteVerified:true,
+  anchorQuote:'If they could observe justice',speaker:'Hobbes',
+  qualifier:'If they could observe justice without common power'}]);
  assert.equal(serialized.includes('PRIVATE FULL PAGE TEXT'),false);
  assert.equal(serialized.includes('PRIVATE PREVIEW'),false);
  assert.equal(serialized.includes('PRIVATE TOKEN'),false);
- assert.equal(serialized.includes('PRIVATE QUOTE'),false);
+ assert.equal(serialized.includes('PRIVATE QUOTE'),true);
  assert.equal(serialized.includes('The authors differ [S1, S2].'),false);
 });
 
@@ -116,7 +124,7 @@ test('diagnostics expose bounded question-part coverage tied to submitted source
    {part:'x'.repeat(200),status:'partial',evidenceIds:['S2','S1','S2']}
   ]
  });
- assert.equal(report.clientBuild,'v1.14-worker-version-diagnostics');
+ assert.equal(report.clientBuild,'v1.15-evidence-anchor-diagnostics');
  assert.deepEqual(report.answer.questionParts,[
   {part:'definition',status:'supported',evidenceIds:['S1']},
   {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
@@ -145,14 +153,16 @@ test('diagnostics expose only bounded reviewed points tied to submitted sources'
   submittedSources:[{id:'S1'},{id:'S2'}],
   reviewedEvidence:[
    {id:'S1',point:'Directly supported summary.'},
+   {id:'S1',point:'A separate point from the same source.'},
    {id:'S2',point:'x'.repeat(300)},
    {id:'S9',point:'Invented source must be excluded.'},
-   {id:'S1',point:'Duplicate source must be excluded.'},
+   {id:'S1',point:'Directly supported summary.'},
    {id:'S2',point:' '}
   ]
  });
  assert.deepEqual(report.answer.reviewedEvidence,[
-  {id:'S1',point:'Directly supported summary.'},
-  {id:'S2',point:'x'.repeat(220)}
+  {id:'S1',point:'Directly supported summary.',quoteVerified:false},
+  {id:'S1',point:'A separate point from the same source.',quoteVerified:false},
+  {id:'S2',point:'x'.repeat(220),quoteVerified:false}
  ]);
 });
