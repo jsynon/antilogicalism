@@ -21,6 +21,16 @@ test('quality mode selects seven cross-discipline cases across selected-book and
  assert.ok(cases.every(item=>item.planner_queries.length===2&&item.review_focus.length>=2));
 });
 
+test('quality mode can select exactly one named case for a low-cost live check',()=>{
+ const id='quality-all-books-cross-work-science';
+ const cases=selectLiveCases({cases:[]},'quality',id);
+ assert.equal(cases.length,1);
+ assert.equal(cases[0].id,id);
+ assert.deepEqual(cases[0].required_source_groups.map(group=>group.book_ids),[['529'],['102']]);
+ assert.throws(()=>selectLiveCases({cases:[]},'quality','not-a-quality-case'),/Unknown quality case/);
+ assert.throws(()=>selectLiveCases({cases:[]},'smoke',id),/only in quality mode/);
+});
+
 test('planner mode selects one selected-book case and one All Books cross-work case',()=>{
  const cases=selectLiveCases({cases:[]},'planner');
  assert.deepEqual(cases.map(item=>item.id),[
