@@ -169,7 +169,11 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  let loaded;
  try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback});}
  catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
-  error.requestFailure.plannerFallback=plannerFallback;if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
+  error.requestFailure.plannerFallback=plannerFallback;
+  error.requestFailure.plannerSkipped=plannerSkipped;
+  error.requestFailure.plannerWorkerVersionId=plannerWorkerVersionId;
+  error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
+  if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const {selected,searches}=loaded;
  let data;
  try{data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,history:[],turnstileToken:'evaluation-runner-token',
