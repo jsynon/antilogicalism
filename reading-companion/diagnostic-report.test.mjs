@@ -166,3 +166,13 @@ test('diagnostics expose only bounded reviewed points tied to submitted sources'
   {id:'S2',point:'x'.repeat(220),quoteVerified:false}
  ]);
 });
+
+test('diagnostics retain complete sentence context around a verified quote anchor',()=>{
+ const sentence='If a great multitude could observe justice without a common power to keep them in awe, there would be peace without subjection and no need for civil government.';
+ const report=createDiagnosticReport({
+  submittedSources:[{id:'S1'}],
+  reviewedEvidence:[{id:'S1',point:'The claim is conditional.',quoteVerified:true,
+    anchorQuote:sentence,speaker:'Hobbes'}]
+ });
+ assert.equal(report.answer.reviewedEvidence[0].anchorQuote,sentence);
+});
