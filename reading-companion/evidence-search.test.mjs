@@ -75,6 +75,28 @@ test('explicit multi-work selection alternates remaining sources when retrieval 
   ['529:1','102:1','529:2','102:2']);
 });
 
+test('author comparison reserves each named author and keeps direct-question evidence',()=>{
+ const candidates=[
+  {...page(105,'96'),title:'Athens and Jerusalem — Lev Shestov',score:48.2,
+   facetRanks:[{facet:1,rank:1}],text:'Shestov on reason and Spinoza'},
+  {...page(39,'140'),title:'Fear and Trembling — Søren Kierkegaard',score:39.6,
+   facetRanks:[{facet:0,rank:1}],text:'Kierkegaard on Abraham and the universal'},
+  {...page(196,'96'),title:'Athens and Jerusalem — Lev Shestov',score:38.3,
+   facetRanks:[{facet:2,rank:1}],text:'Shestov directly compares Kierkegaard and Greek philosophy'},
+  {...page(33,'96'),title:'Athens and Jerusalem — Lev Shestov',score:45.8,
+   facetRanks:[{facet:1,rank:2}],text:'Shestov on reason'},
+  {...page(34,'140'),title:'Fear and Trembling — Søren Kierkegaard',score:38.2,
+   facetRanks:[{facet:0,rank:2}],text:'Kierkegaard on faith'},
+  {...page(59,'192'),title:'Philosophical Fragments — Søren Kierkegaard',score:33.1,
+   facetRanks:[{facet:2,rank:2}],text:'Kierkegaard on faith and the God'},
+ ].map(candidate=>({...candidate,globalPageId:candidate.page}));
+ const chosen=selectAnswerSources(candidates,
+  "what's the difference between the thought of kierkegaard and shestov?",'token',
+  {maxSources:4,plannedFacetCount:2});
+ assert.deepEqual(chosen.slice(0,2).map(item=>item.page),[196,59]);
+ assert(chosen.some(item=>item.bookId==='96'));
+ assert(chosen.some(item=>['140','192'].includes(item.bookId)));
+});
 test('source budget prioritizes distinct books before same-book alternatives',()=>{
  const candidates=[
   {...page(1,'7'),text:'first book'},
