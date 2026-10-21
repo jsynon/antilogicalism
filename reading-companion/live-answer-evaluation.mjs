@@ -170,6 +170,37 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
   passed:coverage==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
    missingInline.length===0&&citations.length>0&&answerCoverageConsistent!==false&&partEvidenceComplete!==false};
 }
+export function recheckQualityReport(report){
+ if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
+ const definitions=new Map(QUALITY_CASES.map(item=>[item.id,item]));
+ const cases=report.cases.map(item=>{
+  const definition=definitions.get(String(item?.id||''));
+  if(!definition)return {...item,offlineRecheck:null};
+  const audit=auditLiveAnswer({
+   answer:item.answerText,coverage:item.coverage,citations:item.citationSources,
+   questionParts:item.questionParts,evidenceMap:item.evidenceMap,
+   evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
+   workerSourceBuild:item.answerWorkerSourceBuild
+  },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups);
+  return {...item,offlineRecheck:{passed:audit.passed,sourceGroups:audit.sourceGroups,
+   questionPartCoverage:audit.questionPartCoverage,partEvidenceAudit:audit.partEvidenceAudit,
+   partEvidenceComplete:audit.partEvidenceComplete,
+   answerCoverageConsistent:audit.answerCoverageConsistent,
+   coverageContradictions:audit.coverageContradictions,
+   inlineIdsWithoutSource:audit.inlineIdsWithoutSource}};
+ });
+ const checked=cases.filter(item=>item.offlineRecheck);
+ return {...report,cases,offlineRecheck:{checkedAt:new Date().toISOString(),
+  evaluator:'local-structural-recheck-v1',networkCalls:0,aiCalls:0,
+  checkedCases:checked.length,
+  passedCases:checked.filter(item=>item.offlineRecheck.passed).length,
+  failedCases:checked.filter(item=>!item.offlineRecheck.passed).length,
+  questionPartStatusCounts:checked.reduce((totals,item)=>{
+   const counts=item.offlineRecheck.questionPartCoverage||{};
+   for(const status of ['supported','partial','unsupported'])totals[status]+=Number(counts[status])||0;
+   totals.total+=Number(counts.total)||0;return totals;
+  },{total:0,supported:0,partial:0,unsupported:0})}};
+}
 function safeHeaders(token){return {authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json',origin:'https://jsynon.github.io'};}
 function attachRequestFailure(error,stage,details={}){
  const wrapped=error instanceof Error?error:new Error(String(error));
