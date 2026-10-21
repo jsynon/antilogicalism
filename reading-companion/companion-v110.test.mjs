@@ -52,7 +52,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
  assert.match(html,/id="companion-book-search" type="search"/);
- assert.match(html,/<strong>Find a book<\\/strong>/);
+ assert.match(html,/<strong>Find a book<\/strong>/);
  assert.match(html,/companion-book-controls/);
  assert.ok(client.includes("new Option('All books','')"));
  assert.match(client,/bookSearch\.addEventListener\('input',updateBookOptions\)/);
