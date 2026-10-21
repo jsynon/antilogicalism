@@ -138,7 +138,7 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(html,/id="companion-diagnostic-toggle" type="checkbox"/);
  assert.match(html,/id="companion-diagnostic-details" hidden/);
  assert.match(html,/id="companion-diagnostic-copy" type="button">Copy diagnostic report/);
- assert.match(html,/shared only if you copy it/);
+ assert.doesNotMatch(html,/The report includes your question and retrieval details|shared only if you copy it/);
  assert.match(client,/navigator\.clipboard\.writeText\(diagnosticOutput\.textContent\)/);
  assert.match(client,/foundSets\.map\(\(set,index\)=>/);
  assert.match(client,/diagnosticState\.evidenceHighlights=highlights\.map/);
