@@ -4,6 +4,10 @@ const optionalString=(value,limit=128)=>typeof value==='string'&&value.length>0?
 // newly introduced codes without requiring a synchronized frontend allowlist.
 // Reject free-form messages and cap length before including the value in reports.
 const SAFE_FAILURE_CODE=/^[a-z][a-z0-9-]{0,63}$/;
+const SAFE_DIAGNOSTIC_TOKEN=/^[a-z0-9_-]{1,48}$/;
+function safeDiagnosticToken(value){
+  return typeof value==='string'&&SAFE_DIAGNOSTIC_TOKEN.test(value)?value:null;
+}
 function isSafeFailureCode(value){
   return typeof value==='string'&&SAFE_FAILURE_CODE.test(value);
 }
@@ -114,7 +118,7 @@ export function createDiagnosticReport(input={}){
   const audit=auditCitationIds(input.answer,input.citations);
   return {
     schema:'antilogicalism-reading-companion-diagnostic-v1',
-    clientBuild:'v1.15-evidence-anchor-diagnostics',
+    clientBuild:'v1.16-worker-failure-details',
     libraryVersion:Number.isSafeInteger(input.libraryVersion)?input.libraryVersion:null,
     plannerWorkerVersionId:optionalString(input.plannerWorkerVersionId),
     plannerWorkerVersionTag:optionalString(input.plannerWorkerVersionTag),
@@ -134,6 +138,12 @@ export function createDiagnosticReport(input={}){
       input.failureHttpStatus:null,
       failureCode:input.stage==='complete'?'':(
         isSafeFailureCode(input.failureCode)?input.failureCode:'unclassified'),
+    failureStage:input.stage==='complete'?null:safeDiagnosticToken(input.failureStage),
+    failureProviderClass:input.stage==='complete'?null:safeDiagnosticToken(input.failureProviderClass),
+    failureAnswerCharacters:Number.isSafeInteger(input.failureAnswerCharacters)&&
+      input.failureAnswerCharacters>=0&&input.failureAnswerCharacters<=20000?
+      input.failureAnswerCharacters:null,
+    failureDetail:input.stage==='complete'?null:safeDiagnosticToken(input.failureDetail),
     plannerQueries:Array.isArray(input.plannerQueries)?
       input.plannerQueries.filter(x=>typeof x==='string').slice(0,4).map(x=>x.slice(0,240)):[],
     searches:Array.isArray(input.searches)?input.searches.slice(0,4).map(search=>({

@@ -98,6 +98,7 @@ function beginDiagnostic(questionText){
     libraryVersion:47,fallbackMode:oldPilotFallback,stage:'planning',
     plannerQueries:[],searches:[],candidates:[],submittedSources:[],
     evidenceHighlights:[],failureHttpStatus:null,failureCode:'',
+    failureStage:null,failureProviderClass:null,failureAnswerCharacters:null,failureDetail:null,
     plannerWorkerVersionId:null,plannerWorkerVersionTag:null,plannerWorkerVersionTimestamp:null,
     plannerWorkerSourceBuild:null,answerWorkerVersionId:null,answerWorkerVersionTag:null,
     answerWorkerVersionTimestamp:null,answerWorkerSourceBuild:null};
@@ -584,6 +585,10 @@ async function askQuestion(questionText){
       if(diagnosticState){
         diagnosticState.failureHttpStatus=response.status;
         diagnosticState.failureCode=diagnosticFailureCode(response.status,'answer',data.failureCode);
+        diagnosticState.failureStage=data.failureStage;
+        diagnosticState.failureProviderClass=data.failureProviderClass;
+        diagnosticState.failureAnswerCharacters=data.failureAnswerCharacters;
+        diagnosticState.failureDetail=data.failureDetail;
       }
       throw Error('The answer service could not prepare an answer.');
     }

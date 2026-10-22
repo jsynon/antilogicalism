@@ -36,6 +36,8 @@ test('diagnostic output is bounded and excludes full source text and challenge d
   plannerWorkerVersionTimestamp:'2026-10-21T00:00:00Z',plannerWorkerSourceBuild:'build-a',
   answerWorkerVersionId:'worker-answer-7',answerWorkerSourceBuild:'build-a',
   failureHttpStatus:502,failureCode:diagnosticFailureCode(502),
+  failureStage:'answer-composition',failureProviderClass:'timeout',
+  failureAnswerCharacters:2810,failureDetail:'retry_invalid_json',
   candidates:[{id:'S1',bookId:'7',title:'Ethics',page:12,score:2.5,
     text:'PRIVATE FULL PAGE TEXT',preview:'PRIVATE PREVIEW',turnstileToken:'PRIVATE TOKEN'}],
   submittedSources:[{id:'S1',bookId:'7',title:'Ethics',page:12,text:'PRIVATE FULL PAGE TEXT'}],
@@ -56,6 +58,10 @@ test('diagnostic output is bounded and excludes full source text and challenge d
  assert.equal(report.answerWorkerVersionId,'worker-answer-7');
  assert.equal(report.answerWorkerVersionTag,null);
  assert.equal(report.failureCode,'answer-generation-or-citation-failed');
+  assert.equal(report.failureStage,'answer-composition');
+  assert.equal(report.failureProviderClass,'timeout');
+  assert.equal(report.failureAnswerCharacters,2810);
+  assert.equal(report.failureDetail,'retry_invalid_json');
  assert.equal(report.candidates[0].score,2.5);
  assert.equal(report.evidenceHighlights[0].quoteLocated,true);
  assert.equal(report.evidenceHighlights[0].quote,'PRIVATE QUOTE');
@@ -70,6 +76,22 @@ test('diagnostic output is bounded and excludes full source text and challenge d
  assert.equal(serialized.includes('The authors differ [S1, S2].'),false);
 });
 
+test('worker failure diagnostics retain only bounded safe detail',()=>{
+ const report=createDiagnosticReport({stage:'failed',
+  failureStage:'answer-pipeline',failureProviderClass:'quota-or-credit-limit',
+  failureAnswerCharacters:5050,failureDetail:'retry_invalid_json'});
+ assert.equal(report.failureStage,'answer-pipeline');
+ assert.equal(report.failureProviderClass,'quota-or-credit-limit');
+ assert.equal(report.failureAnswerCharacters,5050);
+ assert.equal(report.failureDetail,'retry_invalid_json');
+ const unsafe=createDiagnosticReport({stage:'failed',
+  failureStage:'PRIVATE PROVIDER MESSAGE',failureProviderClass:'Unknown Provider',
+  failureAnswerCharacters:-5,failureDetail:'private exception body'});
+ assert.equal(unsafe.failureStage,null);
+ assert.equal(unsafe.failureProviderClass,null);
+ assert.equal(unsafe.failureAnswerCharacters,null);
+ assert.equal(unsafe.failureDetail,null);
+});
 test('diagnostic failure codes preserve useful status categories without raw error text',()=>{
  assert.equal(diagnosticFailureCode(403),'visitor-or-origin-rejected');
  assert.equal(diagnosticFailureCode(422),'source-verification-rejected');
@@ -124,7 +146,7 @@ test('diagnostics expose bounded question-part coverage tied to submitted source
    {part:'x'.repeat(200),status:'partial',evidenceIds:['S2','S1','S2']}
   ]
  });
- assert.equal(report.clientBuild,'v1.15-evidence-anchor-diagnostics');
+ assert.equal(report.clientBuild,'v1.16-worker-failure-details');
  assert.deepEqual(report.answer.questionParts,[
   {part:'definition',status:'supported',evidenceIds:['S1','S2','S3','S4','S5','S6']},
   {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
@@ -144,6 +166,10 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(client,/diagnosticState\.evidenceHighlights=highlights\.map/);
  assert.match(client,/diagnosticState\.failureHttpStatus=res\.status/);
  assert.match(client,/diagnosticState\.failureHttpStatus=response\.status/);
+ assert.match(client,/diagnosticState\.failureStage=data\.failureStage/);
+ assert.match(client,/diagnosticState\.failureProviderClass=data\.failureProviderClass/);
+ assert.match(client,/diagnosticState\.failureAnswerCharacters=data\.failureAnswerCharacters/);
+ assert.match(client,/diagnosticState\.failureDetail=data\.failureDetail/);
  assert.match(client,/body:JSON\.stringify\(\{question:q,turnstileToken:token,\s*history,\s*sources:chosen\.map/);
 });
 
