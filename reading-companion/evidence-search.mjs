@@ -239,7 +239,8 @@ export function targetBooksForFacet(query,books,allowedBookIds=null){
  * direct search with the reader's own wording. Keep explicit request denials
  * and rate limits fail-closed. */
 export function canFallbackToDirectSearch(status,code=''){
- if(['ai-daily-limit-reached','ai-capacity-unavailable','ai-rate-limited'].includes(code))return false;
+ if(['ai-daily-limit-reached','ai-daily-free-allocation','ai-provider-usage-limit',
+   'ai-credit-limit','ai-capacity-unavailable','ai-rate-limited'].includes(code))return false;
  if(status===null||status===undefined)return true;
  if(Number.isInteger(status)&&status>=500)return true;
  if(Number.isInteger(status)&&status>=400)return false;

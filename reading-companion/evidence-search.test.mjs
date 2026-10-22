@@ -306,6 +306,9 @@ test('planner outages fall back to direct search while denials and rate limits r
  assert.equal(canFallbackToDirectSearch(403,'invalid-response'),false);
  assert.equal(canFallbackToDirectSearch(429,'rate-limited'),false);
  assert.equal(canFallbackToDirectSearch(502,'ai-daily-limit-reached'),false);
+ assert.equal(canFallbackToDirectSearch(502,'ai-daily-free-allocation'),false);
+ assert.equal(canFallbackToDirectSearch(502,'ai-provider-usage-limit'),false);
+ assert.equal(canFallbackToDirectSearch(502,'ai-credit-limit'),false);
  assert.equal(canFallbackToDirectSearch(502,'ai-capacity-unavailable'),false);
 });
 

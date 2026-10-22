@@ -22,8 +22,10 @@ export function inlineCitationGroups(answer){
 }
 
 export function userFailureMessage(code=''){
-  if(code==='ai-daily-limit-reached')
-    return 'The chatbot has reached its daily AI usage limit. Please try again after the daily reset.';
+  if(code==='ai-daily-free-allocation')
+    return 'Cloudflare Workers AI reported that this account reached its daily free allocation. If this Worker is on a paid Workers account, check that account’s Workers AI billing and usage; paid usage above the free allocation should be billed.';
+  if(code==='ai-provider-usage-limit'||code==='ai-credit-limit')
+    return 'Cloudflare Workers AI reported a usage or billing limit for the account serving this Worker. Check that account’s Workers AI usage and billing. The Reading Companion cannot verify the account’s plan or spending limit.';
   if(code==='ai-capacity-unavailable')
     return 'The AI service is temporarily at capacity. Please wait a moment and try again.';
   if(code==='ai-rate-limited')
@@ -140,6 +142,9 @@ export function createDiagnosticReport(input={}){
         isSafeFailureCode(input.failureCode)?input.failureCode:'unclassified'),
     failureStage:input.stage==='complete'?null:safeDiagnosticToken(input.failureStage),
     failureProviderClass:input.stage==='complete'?null:safeDiagnosticToken(input.failureProviderClass),
+    failureProviderCode:input.stage==='complete'?null:
+      (typeof input.failureProviderCode==='string'&&/^[A-Za-z0-9_.-]{1,48}$/.test(input.failureProviderCode)?
+        input.failureProviderCode:null),
     failureAnswerCharacters:Number.isSafeInteger(input.failureAnswerCharacters)&&
       input.failureAnswerCharacters>=0&&input.failureAnswerCharacters<=20000?
       input.failureAnswerCharacters:null,
