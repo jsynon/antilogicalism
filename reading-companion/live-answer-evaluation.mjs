@@ -58,6 +58,12 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  if(mode==='full')return [...suite.cases];
  throw Error('Mode must be smoke, planner, quality, or full.');
 }
+export function applyQualityScope(cases,scope='selected-books'){
+ if(!['selected-books','all-books'].includes(scope))
+  throw Error('Quality scope must be selected-books or all-books.');
+ if(scope==='selected-books')return cases;
+ return cases.map(item=>({...item,selected_book_ids:[]}));
+}
 function normalizeDiagnosticExcerpt(value){
  return String(value||'').normalize('NFKC')
   .replace(/[’‘]/g,"'").replace(/[“”]/g,'"')
@@ -424,24 +430,28 @@ export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluate
  }
  return {results,stopReason};
 }
-function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',caseId:process.env.LIVE_EVAL_CASE_ID||'',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
+function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',scope:process.env.LIVE_EVAL_SCOPE||'selected-books',caseId:process.env.LIVE_EVAL_CASE_ID||'',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
  for(let i=0;i<argv.length;i++){const [flag,inline]=argv[i].split('=',2),key=flag.replace(/^--/,'');if(flag==='--help'||flag==='-h'){out.help=true;continue;}
-  if(!['mode','case','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
-  if(key==='mode')out.mode=value;else if(key==='case')out.caseId=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
+  if(!['mode','scope','case','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
+  if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|full] [--case quality-case-id] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|full] [--scope selected-books|all-books] [--case quality-case-id] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
+ if(args.mode!=='quality'&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality mode.');
+ if(args.mode==='quality'&&!['selected-books','all-books'].includes(args.scope))throw Error('Quality scope must be selected-books or all-books.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
- const cases=selectLiveCases(suite,args.mode,args.caseId);
- const plannerCalls=args.mode==='quality'?0:cases.length;
+ const selectedCases=selectLiveCases(suite,args.mode,args.caseId);
+ const cases=args.mode==='quality'?applyQualityScope(selectedCases,args.scope):selectedCases;
+ const qualityUsesPlanner=args.mode==='quality'&&args.scope==='all-books';
+ const plannerCalls=args.mode==='quality'&&!qualityUsesPlanner?0:cases.length;
  const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:plannerCalls+cases.length*2;
- const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
+ const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:args.mode==='quality'?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   caseCount:cases.length,estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
-   args.mode==='quality'?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
+   args.mode==='quality'&&!qualityUsesPlanner?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
    'Automated checks distinguish expected-book retrieval from structural evidence-ID linkage and prose/coverage consistency. They do not judge semantic relevance or factual truth; review answer text and source passages manually.',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
@@ -460,7 +470,7 @@ async function main(){
   let previousCall=0;
   const beforeCall=async()=>{if(previousCall){const due=Math.max(0,CALL_GAP_MS-(Date.now()-previousCall));if(due)await new Promise(resolve=>setTimeout(resolve,due));}previousCall=Date.now();};
   const run=await runLiveCases(cases,{evaluateCase:args.mode==='planner'?evaluatePlannerCase:evaluateLiveCase,
-   evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:args.mode==='quality'},onResult:async(result,results)=>{
+   evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:args.mode==='quality'&&!qualityUsesPlanner},onResult:async(result,results)=>{
    report.cases=results;report.completedCases=results.length;
    report.notRunCases=cases.length-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
