@@ -20,6 +20,10 @@ test('structured missing-evidence notice is not repeated when answer already sta
  assert.ok(client.includes("replace(/[^\\p{L}\\p{N}]+/gu,' ').trim()"));
  assert.ok(client.includes('if(missing&&!answerAlreadyContainsMissing)'));
 });
+test('unverified answer drafts get an evidence-check label instead of a source-gap claim',()=>{
+ assert.match(client,/data\.reviewStatus==='answer-draft-unverified'\?\s*'Evidence check: '/);
+ assert.match(client,/What these passages don’t establish: /);
+});
 test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);
  assert.match(client,/maxSources:MAX_ANSWER_SOURCES/);

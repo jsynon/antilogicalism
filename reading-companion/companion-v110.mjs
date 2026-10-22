@@ -369,8 +369,11 @@ function renderResponse(data,turnQuestion=''){
     .replace(/[’']/g,"'").replace(/[^\p{L}\p{N}]+/gu,' ').trim();
   const answerAlreadyContainsMissing=!!missing&&
     normalizeNotice(answer).includes(normalizeNotice(missing));
-  if(missing&&!answerAlreadyContainsMissing)
-    turn.append(node('p','What these passages don’t establish: '+missing,'companion-hint'));
+  if(missing&&!answerAlreadyContainsMissing){
+    const label=data.reviewStatus==='answer-draft-unverified'?
+      'Evidence check: ':'What these passages don’t establish: ';
+    turn.append(node('p',label+missing,'companion-hint'));
+  }
 
   const highlightedSourceKeys=new Set();
   if(highlights.length){
