@@ -2,7 +2,7 @@
  * It reads canonical v47 shards already hosted on GitHub Pages and only
  * displays excerpts. No AI calls, no secrets, no mutation of cited book text.
  */
-import {readableParagraphs,locateCitedExcerpt} from './source-text-format.mjs';
+import {normalizeKnownOcrArtifacts,readableParagraphs,locateCitedExcerpt} from './source-text-format.mjs';
 
 const PDF=/^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:view|preview)(?:[?#]|$)/;
 const byId=id=>document.getElementById(id);
@@ -73,10 +73,14 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     const onCitedPage=page.page===source.page;
     const quotation=onCitedPage && typeof source.excerpt==='string'?source.excerpt:'';
     title.textContent=source.title||'Original source';
-    meta.textContent='Physical PDF page '+page.page+' · Original indexed v47 text';
+    const originalLayout=layout.value==='original';
+    const normalizedNkjv=!originalLayout&&String(source.bookId)==='335';
+    meta.textContent='Physical PDF page '+page.page+' · '+
+      (normalizedNkjv?'v47 text; known NKJV OCR ligatures normalized for reading':
+        'Original indexed v47 text');
     quoteBox.hidden=!quotation;
     quoteBox.textContent=quotation;
-    const shown=renderHighlightedText(viewer,page.text,quotation,layout.value==='original');
+    const shown=renderHighlightedText(viewer,page.text,quotation,originalLayout,source.bookId);
     if(quotation){
       status.textContent=shown.matched?
         'The matching cited passage is highlighted in yellow.':
