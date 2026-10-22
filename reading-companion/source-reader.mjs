@@ -25,7 +25,7 @@ export function renderHighlightedText(container,text,quote,original=false,bookId
   const sourceText=original?String(text):normalizeKnownOcrArtifacts(text,bookId);
   const displayQuote=original?String(quote||''):normalizeKnownOcrArtifacts(quote,bookId);
   const paragraphs=original?[sourceText]:readableParagraphs(sourceText);
-  const separator=original?'':'\\n\\n';
+  const separator=original?'':'\n\n';
   const display=paragraphs.join(separator);
   const match=displayQuote?locateCitedExcerpt(display,displayQuote):null;
   container.replaceChildren();
