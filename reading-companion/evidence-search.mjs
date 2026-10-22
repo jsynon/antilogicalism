@@ -87,13 +87,13 @@ export function mergeFacetSearches(results,limit=8){
      matchedFacets:facets.size,facetRanks}));
 }
 export function validSearchPlan(value){
- return Array.isArray(value)&&value.length===2&&
+ return Array.isArray(value)&&value.length>=2&&value.length<=4&&
    value.every(q=>typeof q==='string'&&q.trim().length>=12&&q.trim().length<=160)&&
-   value[0].trim().toLowerCase()!==value[1].trim().toLowerCase();
+   new Set(value.map(q=>q.trim().toLocaleLowerCase())).size===value.length;
 }
 
-/* Keep the reader's exact wording as a lexical facet alongside the two
- * planner rewrites. This lets retrieval recover source language the planner
+/* Keep the reader's exact wording as a lexical facet alongside the planner's
+ * rewrites. This lets retrieval recover source language the planner
  * paraphrases away. Search remains local to the published index and spends no
  * additional model calls. */
 export function buildSearchFacets(question,plannedQueries,bookId=''){
