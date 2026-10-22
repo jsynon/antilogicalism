@@ -18,15 +18,15 @@ test('returns contiguous readable paragraphs without changing stored OCR text',(
  assert.equal(fixed.includes('\r\n'),true,'The original text is not modified');
 });
 test('normalizes known NKJV OCR ligature substitutions only in the readable display',()=>{
- const raw='9 ... only begoƩen Son ... the propiƟaƟon ... at any Ɵme.';
- const expected='9 ... only begotten Son ... the propitiation ... at any time.';
+ const raw='9 In this the love of God was manifested toward us, that God has sent His only begoƩen Son into the world, that we might live through Him. 10 In this is love, not that we loved God, but that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme.';
+ const expected=raw.replaceAll('begoƩen','begotten').replaceAll('propiƟaƟon','propitiation').replaceAll('Ɵme','time');
  assert.equal(normalizeKnownOcrArtifacts(raw,'335'),expected);
  assert.equal(normalizeKnownOcrArtifacts(raw,'638'),raw,'other books retain their exact indexed text');
- const quote='only begoƩen Son ... propiƟaƟon ... at any Ɵme.';
+ const quote='that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme';
  const page=readablePageWithHighlight(raw,quote,'335');
  assert(page.match,'highlight matching normalizes both the page and the cited OCR quote');
  assert.equal(page.displayText,expected);
- assert.equal(page.displayText.slice(page.match.start,page.match.end),'only begotten Son ... propitiation ... at any time');
+ assert.equal(page.displayText.slice(page.match.start,page.match.end),'that He loved us and sent His Son to be the propitiation for our sins. 12 No one has seen God at any time');
 });
 test('identifies an exact quoted evidence passage despite OCR line wrapping',()=>{
  const raw='A short introductory sentence.\nThe nature of virtue and the role of practical wisdom\nin shaping good character and making our lives happy\nbecome clear through the actions a person chooses.';
