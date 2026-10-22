@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,selectLiveCases,evaluateLiveCase,evaluatePlannerCase,runLiveCases} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluateLiveCase,evaluatePlannerCase,runLiveCases} from './live-answer-evaluation.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
 
@@ -19,6 +19,17 @@ test('quality mode selects seven cross-discipline cases across selected-book and
  assert.equal(cases.filter(item=>item.selected_book_ids.length>0).length,4);
  assert.equal(cases.filter(item=>item.selected_book_ids.length===0).length,3);
  assert.ok(cases.every(item=>item.planner_queries.length===2&&item.review_focus.length>=2));
+});
+
+test('all-books quality scope runs every question without a selected-book restriction',()=>{
+ const selected=selectLiveCases({cases:[]},'quality');
+ const allBooks=applyQualityScope(selected,'all-books');
+ assert.equal(allBooks.length,7);
+ assert.ok(allBooks.every(item=>item.selected_book_ids.length===0));
+ assert.ok(allBooks.every(item=>item.required_source_groups.length>=1));
+ assert.equal(selected.filter(item=>item.selected_book_ids.length>0).length,4,
+  'applying the scope must not mutate the selected-book suite');
+ assert.throws(()=>applyQualityScope(selected,'invalid'),/Quality scope must be/);
 });
 
 test('quality mode can select exactly one named case for a low-cost live check',()=>{

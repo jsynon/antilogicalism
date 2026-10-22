@@ -14,7 +14,7 @@ on:
         default: smoke
         required: true
       case_id:
-        description: In quality mode, optionally run just one case (about 2 Worker calls plus conditional repair)
+        description: In quality mode, optionally run just one case; all seven are the default
         type: choice
         options:
           - all
@@ -26,6 +26,14 @@ on:
           - quality-all-books-cross-discipline-order
           - quality-all-books-religion-scripture
         default: all
+        required: true
+      scope:
+        description: In quality mode, keep each case's selected-book scope or run every case in All Books mode (adds one planner call per question)
+        type: choice
+        options:
+          - selected-books
+          - all-books
+        default: selected-books
         required: true
       confirm_live_ai:
         description: I understand this sends questions to the live Worker and uses Cloudflare AI
@@ -52,6 +60,7 @@ jobs:
     timeout-minutes: 60
     env:
       LIVE_EVAL_MODE: ${{ inputs.mode }}
+      LIVE_EVAL_SCOPE: ${{ inputs.scope }}
       LIVE_EVAL_CASE_ID: ${{ inputs.case_id }}
       CONFIRM_LIVE_AI: ${{ inputs.confirm_live_ai }}
       CONFIRM_FULL_30: ${{ inputs.confirm_full_30 }}
@@ -73,12 +82,12 @@ jobs:
         env:
           PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
           LIVE_EVAL_OUTPUT: ${{ github.workspace }}/reading-companion-live-answer-evaluation.json
-        run: node reading-companion/live-answer-evaluation.mjs --mode "$LIVE_EVAL_MODE" --case "$LIVE_EVAL_CASE_ID" --confirm-live-ai true --output "$LIVE_EVAL_OUTPUT"
+        run: node reading-companion/live-answer-evaluation.mjs --mode "$LIVE_EVAL_MODE" --scope "$LIVE_EVAL_SCOPE" --case "$LIVE_EVAL_CASE_ID" --confirm-live-ai true --output "$LIVE_EVAL_OUTPUT"
       - name: Save live evaluation report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reading-companion-live-answer-evaluation-${{ inputs.mode }}-${{ inputs.case_id }}
+          name: reading-companion-live-answer-evaluation-${{ inputs.mode }}-${{ inputs.scope }}-${{ inputs.case_id }}
           path: ${{ github.workspace }}/reading-companion-live-answer-evaluation.json
           if-no-files-found: warn
           retention-days: 14
