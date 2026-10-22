@@ -158,6 +158,7 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  assert.equal(result.answerWorkerVersionId,'answer-worker-9');
  assert.equal(result.answerWorkerSourceBuild,'gateway-build-9');
  assert.equal(result.selectedBookIds[0],'529');assert.equal(result.reviewFocus[0],'Check causal explanation.');
+ assert.equal(result.submittedSources[0].excerpt,'A sufficiently long preview passage for testing.');
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
 });
 
