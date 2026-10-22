@@ -29,9 +29,10 @@ function readableParagraphs(text) {
 // Use the same readable line-joining as the full-page dropdown before finding
 // the cited words. This keeps its highlight offsets aligned with what readers
 // actually see without changing the stored OCR text.
-function readablePageWithHighlight(text, excerptText) {
-  const displayText = readableParagraphs(text).join('\n\n');
-  const match = excerptText ? locateCitedExcerpt(displayText, excerptText) : null;
+function readablePageWithHighlight(text, excerptText, bookId='') {
+  const displayText = readableParagraphs(normalizeKnownOcrArtifacts(text,bookId)).join('\n\n');
+  const displayQuote = normalizeKnownOcrArtifacts(excerptText,bookId);
+  const match = excerptText ? locateCitedExcerpt(displayText, displayQuote) : null;
   return {displayText, match};
 }
 
