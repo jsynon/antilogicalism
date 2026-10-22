@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {readableParagraphs,locateCitedExcerpt,readablePageWithHighlight} from './source-text-format.mjs';
+import {normalizeKnownOcrArtifacts,readableParagraphs,locateCitedExcerpt,readablePageWithHighlight} from './source-text-format.mjs';
 import {eligiblePages} from './source-reader.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
@@ -16,6 +16,17 @@ test('returns contiguous readable paragraphs without changing stored OCR text',(
   'A new paragraph.'
  ]);
  assert.equal(fixed.includes('\r\n'),true,'The original text is not modified');
+});
+test('normalizes known NKJV OCR ligature substitutions only in the readable display',()=>{
+ const raw='9 ... only begoƩen Son ... the propiƟaƟon ... at any Ɵme.';
+ const expected='9 ... only begotten Son ... the propitiation ... at any time.';
+ assert.equal(normalizeKnownOcrArtifacts(raw,'335'),expected);
+ assert.equal(normalizeKnownOcrArtifacts(raw,'638'),raw,'other books retain their exact indexed text');
+ const quote='the propiƟaƟon ... at any Ɵme.';
+ const page=readablePageWithHighlight(raw,quote,'335');
+ assert(page.match,'highlight matching normalizes both the page and the cited OCR quote');
+ assert.equal(page.displayText,expected);
+ assert.equal(page.displayText.slice(page.match.start,page.match.end),'the propitiation ... at any time');
 });
 test('identifies an exact quoted evidence passage despite OCR line wrapping',()=>{
  const raw='A short introductory sentence.\nThe nature of virtue and the role of practical wisdom\nin shaping good character and making our lives happy\nbecome clear through the actions a person chooses.';
