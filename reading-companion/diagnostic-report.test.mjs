@@ -146,7 +146,7 @@ test('diagnostics expose bounded question-part coverage tied to submitted source
    {part:'x'.repeat(200),status:'partial',evidenceIds:['S2','S1','S2']}
   ]
  });
- assert.equal(report.clientBuild,'v1.15-evidence-anchor-diagnostics');
+ assert.equal(report.clientBuild,'v1.16-worker-failure-details');
  assert.deepEqual(report.answer.questionParts,[
   {part:'definition',status:'supported',evidenceIds:['S1','S2','S3','S4','S5','S6']},
   {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
