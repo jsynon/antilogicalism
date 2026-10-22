@@ -81,7 +81,8 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
       (normalizedNkjv?'v47 text; known NKJV OCR ligatures normalized for reading':
         'Original indexed v47 text');
     quoteBox.hidden=!quotation;
-    quoteBox.textContent=quotation;
+    quoteBox.textContent=originalLayout?quotation:
+      normalizeKnownOcrArtifacts(quotation,source.bookId);
     const shown=renderHighlightedText(viewer,page.text,quotation,originalLayout,source.bookId);
     if(quotation){
       status.textContent=shown.matched?
