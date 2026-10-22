@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {normalizeKnownOcrArtifacts,readableParagraphs,locateCitedExcerpt,readablePageWithHighlight} from './source-text-format.mjs';
-import {eligiblePages} from './source-reader.mjs';
+import {eligiblePages,renderHighlightedText} from './source-reader.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
@@ -27,6 +27,29 @@ test('normalizes known NKJV OCR ligature substitutions only in the readable disp
  assert(page.match,'highlight matching normalizes both the page and the cited OCR quote');
  assert.equal(page.displayText,expected);
  assert.equal(page.displayText.slice(page.match.start,page.match.end),'that He loved us and sent His Son to be the propitiation for our sins. 12 No one has seen God at any time');
+});
+test('renders normalized NKJV text while retaining raw OCR layout',()=>{
+ const raw='9 In this the love of God was manifested toward us, that God has sent His only begoƩen Son into the world, that we might live through Him.\\n\\n10 In this is love, not that we loved God, but that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme.';
+ const quote='10 In this is love, not that we loved God, but that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme';
+ const element=tag=>({tag,children:[],classList:{toggle(){}},append(child){this.children.push(child)},replaceChildren(){this.children=[]},set textContent(value){this._text=String(value);this.children=[]},get textContent(){return this._text??this.children.map(child=>child.textContent||'').join('')}});
+ const originalDocument=globalThis.document;
+ globalThis.document={createElement:element,createTextNode:value=>({textContent:String(value)})};
+ try{
+  const readable=element('div');
+  const shown=renderHighlightedText(readable,raw,quote,false,'335');
+  assert.equal(shown.matched,true);
+  assert.match(readable.textContent,/begotten/);
+  assert.match(readable.textContent,/propitiation/);
+  assert.match(readable.textContent,/at any time/);
+  const original=element('div');
+  const rawShown=renderHighlightedText(original,raw,quote,true,'335');
+  assert.equal(rawShown.matched,true);
+  assert.match(original.textContent,/begoƩen/);
+  assert.match(original.textContent,/propiƟaƟon/);
+ }finally{
+  if(originalDocument===undefined)delete globalThis.document;
+  else globalThis.document=originalDocument;
+ }
 });
 test('identifies an exact quoted evidence passage despite OCR line wrapping',()=>{
  const raw='A short introductory sentence.\nThe nature of virtue and the role of practical wisdom\nin shaping good character and making our lives happy\nbecome clear through the actions a person chooses.';
