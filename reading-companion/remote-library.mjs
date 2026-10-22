@@ -21,6 +21,15 @@ const scriptureBookPattern=SCRIPTURE_BOOK_NAMES
   .map(name=>name.replace(/\s+/g,'\\s+')).join('|');
 const SCRIPTURE_REFERENCE=new RegExp(
   `\\b(?:${scriptureBookPattern})\\s+\\d{1,3}\\s*[:.]\\s*\\d{1,3}(?:\\s*[-–—]\\s*\\d{1,3})?\\b`,'i');
+function scriptureEditionBoost(title,question){
+  if(!hasExplicitScriptureReference(question)||!/\bbible\b/i.test(String(title||'')))return 0;
+  // A verse citation asks for the passage itself. Study and annotated
+  // editions can contain the passage, but their notes can match more strongly
+  // than the verses and crowd primary translations out of the small all-books
+  // result budget. Keep them eligible as a fallback while ranking unannotated
+  // Bible editions first.
+  return /\b(?:annotated|study|commentary|notes)\b/i.test(String(title||''))?100:1000;
+}
 // Remove question framing and common function words before searching. These
 // terms describe what the reader wants the assistant to do, not what the
 // source passage is likely to say, and can otherwise reward incidental pages.
@@ -397,8 +406,9 @@ export class RemoteLibrary {
       // A named Bible book plus a chapter-and-verse locator is a precise
       // source request. Prefer Bible editions among otherwise matching works;
       // still rank their actual pages by the question terms below.
-      const scriptureBoost=hasExplicitScriptureReference(question) &&
-        /\bbible\b/i.test(manifest.books[id].title||'') ? 1000 : 0;
+      // Prefer unannotated Bible text over study notes while keeping
+      // annotated editions eligible when no primary text is found.
+      const scriptureBoost=scriptureEditionBoost(manifest.books[id].title,question);
       return {id, hits, titleOverlap:overlap, score:hits[0].score + 3 * hits[0].matched +
         Math.log1p(hits.length) + 12 * overlap + scriptureBoost};
     });
