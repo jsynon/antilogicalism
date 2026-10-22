@@ -1,7 +1,17 @@
 /* Reader-only OCR formatting and exact quoted-passage location.
- * Ported unchanged from the local book-chatbot/source_text_format.js pilot.
- * Text is never corrected, dehyphenated, or altered in the trusted v47 corpus.
+ * The trusted v47 corpus remains unchanged. The readable NKJV display applies
+ * only two well-established OCR font substitutions; raw layout remains exact.
  */
+function normalizeKnownOcrArtifacts(text,bookId='') {
+  const value=String(text == null ? '' : text);
+  // In the NKJV shard these OCR glyph substitutions recur across thousands
+  // of pages: Ɵ represents “ti” (e.g. propiƟaƟon), and Ʃ represents “tt”
+  // (e.g. begoƩen). Scope the repair to this verified book and to the
+  // readable display; the original OCR layout remains available unchanged.
+  if(String(bookId)!=='335')return value;
+  return value.replaceAll('Ɵ','ti').replaceAll('Ʃ','tt');
+}
+
 function readableParagraphs(text) {
   const original = String(text == null ? '' : text);
   const lines = original.replace(/\r\n?/g, '\n');
@@ -19,9 +29,10 @@ function readableParagraphs(text) {
 // Use the same readable line-joining as the full-page dropdown before finding
 // the cited words. This keeps its highlight offsets aligned with what readers
 // actually see without changing the stored OCR text.
-function readablePageWithHighlight(text, excerptText) {
-  const displayText = readableParagraphs(text).join('\n\n');
-  const match = excerptText ? locateCitedExcerpt(displayText, excerptText) : null;
+function readablePageWithHighlight(text, excerptText, bookId='') {
+  const displayText = readableParagraphs(normalizeKnownOcrArtifacts(text,bookId)).join('\n\n');
+  const displayQuote = normalizeKnownOcrArtifacts(excerptText,bookId);
+  const match = excerptText ? locateCitedExcerpt(displayText, displayQuote) : null;
   return {displayText, match};
 }
 
@@ -110,4 +121,4 @@ function locateCitedExcerpt(displayText, excerptText) {
 }
 
 
-export {readableParagraphs, locateCitedExcerpt, readablePageWithHighlight};
+export {normalizeKnownOcrArtifacts,readableParagraphs, locateCitedExcerpt, readablePageWithHighlight};
