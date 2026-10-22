@@ -98,7 +98,8 @@ function beginDiagnostic(questionText){
     libraryVersion:47,fallbackMode:oldPilotFallback,stage:'planning',
     plannerQueries:[],searches:[],candidates:[],submittedSources:[],
     evidenceHighlights:[],failureHttpStatus:null,failureCode:'',
-    failureStage:null,failureProviderClass:null,failureAnswerCharacters:null,failureDetail:null,
+    failureStage:null,failureProviderClass:null,failureProviderCode:null,
+    failureAnswerCharacters:null,failureDetail:null,
     plannerWorkerVersionId:null,plannerWorkerVersionTag:null,plannerWorkerVersionTimestamp:null,
     plannerWorkerSourceBuild:null,answerWorkerVersionId:null,answerWorkerVersionTag:null,
     answerWorkerVersionTimestamp:null,answerWorkerSourceBuild:null};
@@ -481,6 +482,8 @@ async function requestSourcePlan(q,verificationToken,history){
     if(diagnosticState){
       diagnosticState.failureHttpStatus=res.status;
       diagnosticState.failureCode=diagnosticFailureCode(res.status,'planner',data.failureCode);
+      diagnosticState.failureProviderClass=data.failureProviderClass||null;
+      diagnosticState.failureProviderCode=data.failureProviderCode||null;
     }
     throw Error(data.error||'Evidence search planning is unavailable');
   }
@@ -585,6 +588,8 @@ async function askQuestion(questionText){
       if(diagnosticState){
         diagnosticState.failureHttpStatus=response.status;
         diagnosticState.failureCode=diagnosticFailureCode(response.status,'answer',data.failureCode);
+        diagnosticState.failureProviderClass=data.failureProviderClass||null;
+        diagnosticState.failureProviderCode=data.failureProviderCode||null;
         diagnosticState.failureStage=data.failureStage;
         diagnosticState.failureProviderClass=data.failureProviderClass;
         diagnosticState.failureAnswerCharacters=data.failureAnswerCharacters;

@@ -78,10 +78,12 @@ test('diagnostic output is bounded and excludes full source text and challenge d
 
 test('worker failure diagnostics retain only bounded safe detail',()=>{
  const report=createDiagnosticReport({stage:'failed',
-  failureStage:'answer-pipeline',failureProviderClass:'quota-or-credit-limit',
+  failureStage:'answer-pipeline',failureProviderClass:'daily-free-allocation',
+  failureProviderCode:'3036',
   failureAnswerCharacters:5050,failureDetail:'retry_invalid_json'});
  assert.equal(report.failureStage,'answer-pipeline');
- assert.equal(report.failureProviderClass,'quota-or-credit-limit');
+ assert.equal(report.failureProviderClass,'daily-free-allocation');
+ assert.equal(report.failureProviderCode,'3036');
  assert.equal(report.failureAnswerCharacters,5050);
  assert.equal(report.failureDetail,'retry_invalid_json');
  const unsafe=createDiagnosticReport({stage:'failed',
@@ -108,10 +110,12 @@ test('diagnostic failure codes preserve useful status categories without raw err
  assert.equal(diagnosticFailureCode(502,'answer','PRIVATE MODEL ERROR'),
    'answer-generation-or-citation-failed');
  assert.equal(diagnosticFailureCode(502,'planner'),'search-planning-failed');
- assert.equal(diagnosticFailureCode(502,'planner','ai-daily-limit-reached'),
-   'ai-daily-limit-reached');
- assert.equal(userFailureMessage('ai-daily-limit-reached'),
-   'The chatbot has reached its daily AI usage limit. Please try again after the daily reset.');
+ assert.equal(diagnosticFailureCode(502,'planner','ai-daily-free-allocation'),
+   'ai-daily-free-allocation');
+ assert.match(userFailureMessage('ai-daily-free-allocation'),/Cloudflare Workers AI reported/);
+ assert.match(userFailureMessage('ai-daily-free-allocation'),/paid Workers account/);
+ assert.match(userFailureMessage('ai-provider-usage-limit'),/usage or billing limit/);
+ assert.match(userFailureMessage('ai-credit-limit'),/cannot verify the account’s plan/);
  assert.match(userFailureMessage('ai-capacity-unavailable'),/temporarily at capacity/);
  assert.match(userFailureMessage('ai-rate-limited'),/too many requests/);
  assert.equal(diagnosticFailureCode(503),'service-unavailable');
