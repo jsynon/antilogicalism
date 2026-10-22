@@ -338,7 +338,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,answerWorkerVersionId:audit.workerVersionId,answerWorkerSourceBuild:audit.workerSourceBuild,
   ...(plannerFailure?{plannerFailure}:{}),searches,
-  submittedSources:selected.map(({bookId,title,page,globalPageId})=>({bookId,title,page,globalPageId})),
+  submittedSources:selected.map(({bookId,title,page,globalPageId,preview})=>({bookId,title,page,globalPageId,
+   excerpt:String(preview||'').slice(0,1200)})),
   ...audit,elapsedMs:Date.now()-startTime};
 }
 export async function evaluatePlannerCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}={}){
@@ -374,7 +375,8 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
   plannerQueries:plan.queries,plannerFallback:false,
   plannerWorkerVersionId:plan.workerVersionId||null,plannerWorkerSourceBuild:plan.workerSourceBuild||null,
   answerWorkerVersionId:null,answerWorkerSourceBuild:null,searches,
-  submittedSources:selected.map(({bookId,title,page,globalPageId})=>({bookId,title,page,globalPageId})),
+  submittedSources:selected.map(({bookId,title,page,globalPageId,preview})=>({bookId,title,page,globalPageId,
+   excerpt:String(preview||'').slice(0,1200)})),
   submittedSourceCount:selected.length,sourceGroups,passed,
   outcome:passed?'planner-retrieval-ready':'planner-retrieval-miss',
   coverage:'not-evaluated',reviewStatus:'planner-only',answerText:'',citationCount:0,
