@@ -102,6 +102,7 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(source,/isAllowedBook\(bookId\)/);
  assert.match(source,/getBook\(bookId\)/);
  assert.match(source,/function renderHighlightedText/);
+ assert.match(source,/quoteBox\.textContent=originalLayout\?quotation:/);
  assert.match(source,/mark\.className='cited-highlight'/);
  assert.doesNotMatch(source,/\/api\/(?:pilot-answer|chat)/);
  assert.doesNotMatch(source,/innerHTML\s*=/);
