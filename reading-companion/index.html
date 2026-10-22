@@ -337,9 +337,9 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot #companion-status:not(:empty){display:block;position:relative;margin:1.05rem 0;padding:1rem 1.2rem 1.05rem 3.3rem;border:1px solid #dce4e8;border-left:4px solid #55788b;border-radius:5px;background:linear-gradient(135deg,#fcfdfd 0%,#f1f5f7 100%);box-shadow:0 2px 8px rgba(28,48,59,.06);color:#26343c;font-size:1.12em;font-weight:500;line-height:1.6}
 #companion-pilot #companion-status:not(:empty)::before{content:"READING COMPANION";display:block;margin:0 0 .2rem;color:#587383;font-size:.64em;font-weight:700;letter-spacing:.11em;line-height:1.4}
 #companion-pilot #companion-status.is-busy{border-left-color:#315d73}
-#companion-pilot #companion-status.is-busy::after{content:"";position:absolute;left:1.05rem;top:1.2rem;width:1rem;height:1rem;border:2px solid #c4d0d7;border-top-color:#315d73;border-radius:50%;animation:companion-status-spin .8s linear infinite}
+#companion-pilot #companion-status.is-busy::after{content:"";position:absolute;left:1.05rem;top:1.16rem;width:1.1rem;height:1.1rem;border:3px solid #d1dce1;border-top-color:#315d73;border-right-color:#55788b;border-radius:50%;transform-origin:center;animation:companion-status-spin .7s linear infinite;will-change:transform}
 @keyframes companion-status-spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){#companion-pilot #companion-status.is-busy::after{animation:none;border-color:#315d73;border-right-color:#c4d0d7}}
+@media(prefers-reduced-motion:reduce){#companion-pilot #companion-status.is-busy::after{animation:companion-status-spin 2s linear infinite}}
 #companion-pilot #companion-turnstile{margin:.8rem 0}
 #companion-pilot .companion-source-entry,#companion-pilot .companion-key-passage{padding:.9rem 0;border-bottom:1px solid #dfe2e3}
 #companion-pilot .companion-source-entry p{margin:.3rem 0 .65rem}
