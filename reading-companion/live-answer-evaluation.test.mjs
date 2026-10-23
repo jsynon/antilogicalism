@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluateLiveCase,evaluatePlannerCase,runLiveCases} from './live-answer-evaluation.mjs';
+import {PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
 
@@ -171,6 +172,8 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  assert.equal(result.selectedBookIds[0],'529');assert.equal(result.reviewFocus[0],'Check causal explanation.');
  assert.equal(result.submittedSources[0].excerpt,'A sufficiently long preview passage for testing.');
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
+ assert.ok(searchOptions.every(({options})=>options.maxBooks===3&&
+  options.pagesPerBook===PRODUCTION_PAGES_PER_BOOK));
 });
 
 test('all-books evaluation sends the same six-page evidence budget as the public companion',async()=>{

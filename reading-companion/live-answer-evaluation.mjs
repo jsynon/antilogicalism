@@ -5,7 +5,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
+import {RemoteLibrary,DEFAULT_INDEX_ROOT,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet} from './evidence-search.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -267,7 +267,8 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
  const searchSets=await Promise.all(searchQueries.map(async query=>{
   const facetBookIds=targetBooksForFacet(query,bookCatalog,targetBookIds[0]===null?null:targetBookIds);
   const targeted=await Promise.all(facetBookIds.map(bookId=>
-   library.search(query,{...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks:2,pagesPerBook:3})));
+   library.search(query,{...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,
+    maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK})));
   return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])
    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
  }));
