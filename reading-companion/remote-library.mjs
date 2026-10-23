@@ -261,6 +261,18 @@ export function excerptAroundEvidence(text, terms, max = 1080) {
   return '…'+compact.slice(bestStart,end).trim()+(end<compact.length?'…':'');
 }
 
+function beginsMidSentence(text) {
+  const firstLetter=String(text||'').trimStart().match(/[A-Za-z]/)?.[0]||'';
+  return !!firstLetter&&firstLetter===firstLetter.toLowerCase();
+}
+
+function endsMidSentence(text) {
+  const tail=String(text||'').trimEnd();
+  if(!tail||/[.!?]["'’”)}\]]*$/.test(tail))return false;
+  return /\b(?:and|but|because|that|which|when|if|while|although|as|with|for|to|of|in|on|by|from|the|a|an)\s*[,;:]?$/i
+    .test(tail.slice(-80));
+}
+
 export class RemoteLibrary {
   // Call window.fetch through its owning global object. Storing the bare
   // browser method and later invoking it as this.fetcher() can throw
@@ -480,18 +492,24 @@ export class RemoteLibrary {
       }
       candidates.sort((a,b) => b.rank - a.rank || a.item.page - b.item.page);
       // Fill the evidence budget with the strongest direct matches first.
-      // A nearby page can add useful context, but it must not displace a
-      // stronger independently relevant page (for example, a key definition
-      // earlier in a book). Add a neighbor only when direct matches leave room.
+      // If the strongest page visibly starts or ends mid-sentence, preserve
+      // one relevant adjacent page even when the direct-match budget is full.
+      // This recovers arguments split by physical page boundaries without
+      // spending a slot on unrelated neighboring pages.
       const selected = candidates.slice(0, pageLimit);
-      if (pageLimit >= 3 && selected.length < pageLimit && selected.length) {
-        const topPage = selected[0].item.page;
-        for (const adjacent of [topPage + 1, topPage - 1]) {
-          const item = proseByPage.get(adjacent);
-          if (item && !selected.some(entry => entry.item.page === item.page)) {
-            selected.push({item, rank:0, contextual:true});
-            break;
-          }
+      if (pageLimit >= 2 && selected.length) {
+        const anchor=selected[0];
+        const neighborPage=beginsMidSentence(anchor.item.text)?anchor.item.page-1:
+          endsMidSentence(anchor.item.text)?anchor.item.page+1:0;
+        const item=neighborPage?proseByPage.get(neighborPage):null;
+        const neighborEvidence=item&&substantivePageEvidence(item.text,
+          bookEvidenceTerms,bookTitleTerms,phrase);
+        const relevantNeighbor=neighborEvidence&&
+          (neighborEvidence.localUnique>=1||neighborEvidence.phraseMatches>0);
+        if(item&&relevantNeighbor&&
+          !selected.some(entry=>entry.item.page===item.page)){
+          if(selected.length>=pageLimit)selected.pop();
+          selected.splice(1,0,{item,rank:Math.max(0,anchor.rank-0.01),contextual:true});
         }
       }
       for (const entry of candidates) {
