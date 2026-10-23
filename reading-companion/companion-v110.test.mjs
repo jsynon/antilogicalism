@@ -110,10 +110,13 @@ test('book selector search matches title or author without changing source entri
  assert.deepEqual(bookOrder.filterBooksByText(books,''),books);
 });
 
-test('v1.10 uses original v47 retrieval, verified pilot endpoint and text-only output',()=>{
+test('v1.10 uses original v47 retrieval, verified pilot endpoint and safe Markdown rendering',()=>{
  assert.match(client,/new RemoteLibrary\(\)/);
  assert.match(client,/allowedBookIds:allowed/);
  assert.match(client,/\/api\/pilot-answer/);
+ assert.match(client,/putMarkdownBlocks\(reply,answer,citations,highlights,numbering\)/);
+ assert.match(client,/document\.createElement\('strong'\)/);
+ assert.match(client,/document\.createElement\('li'\)/);
  assert.match(client,/\.textContent/);
  assert.doesNotMatch(client,/innerHTML\s*=/);
  assert.doesNotMatch(client,/SOURCE_PROBE_TOKEN|TURNSTILE_SECRET|TEST_TOKEN/);
