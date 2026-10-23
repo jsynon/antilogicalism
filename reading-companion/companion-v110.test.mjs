@@ -128,8 +128,10 @@ test('v1.10 never claims unsupported books are ready if fingerprint index missin
 });
 
 test('public companion copy explains cited sources and keeps source reading controls',()=>{
- assert.match(html,/Citations open original PDF pages/);
- assert.match(client,/Read passage/);
+ assert.match(html,/Open PDF.*original scanned book page/);
+ assert.match(client,/Read passage on this page/);
+ assert.match(client,/Open PDF · /);
+ assert.doesNotMatch(client,/Citations link to the original PDF pages/);
  assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
  assert.match(client,/sourceReader\.open\(\{\.\.\.source,excerpt\},read\)/);
  assert.match(html,/id="companion-turnstile" aria-label="Quick check"/);
