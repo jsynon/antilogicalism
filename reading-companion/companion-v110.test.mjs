@@ -12,7 +12,7 @@ test('response citation labels are plain ordered numbers while IDs stay internal
  assert.match(client,/sortCitationsByNumber\(citations,numbering\)/);
  assert.match(client,/citationDisplayLabel\(item\.source_id,numbering\)/);
  assert.match(client,/citationDisplayLabel\(source\.id,numbering\)/);
- assert.match(client,/putCitationTokens\(reply,answer,citations,highlights,numbering\)/);
+ assert.match(client,/putMarkdownBlocks\(reply,answer,citations,highlights,numbering\)/);
 });
 
 test('structured missing-evidence notice is not repeated when answer already states it',()=>{
