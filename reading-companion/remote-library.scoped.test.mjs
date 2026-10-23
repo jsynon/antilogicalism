@@ -214,7 +214,39 @@ test('a relevant previous page is retained when the strongest passage starts mid
   'book-149.json':{pages:[
    {id:0,page:145,text:'The priests said Helen had been brought toward Egypt after Paris took her away.'},
    {id:1,page:146,text:'he found the Egyptian priests could recount Helen at Troy because the affair happened in their country. Their account continues with the events that followed.'},
-   {id:2,page:80,text:'Egyptian records mention priests and Helen in a separate discussion. The text later mentions Troy in another context.'}
+   {id:2,page:80,text:'Egyptian records discuss a different topic in another section of the book.'}
+  ]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const result=await finder.search('Herodotus Egyptian priests Helen Troy account',{
+  allowedBookIds:new Set(['149']),maxBooks:1,pagesPerBook:2
+ });
+ assert.deepEqual(result.sources.map(source=>source.page),[146,145]);
+ assert(result.sources[1].preview.includes('Helen'));
+});
+
+test('uppercase proper-name fragments also retain a relevant previous page',async()=>{
+ const corpus={
+  'manifest.json':{
+   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+   page_books:[149,149,149],partitions:['eg','pr','he','tr'],
+   books:{'149':{title:'The Histories — Herodotus',
+    drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
+  },
+  'terms-eg.json':{egyptian:[0,1]},
+  'terms-pr.json':{priests:[1]},
+  'terms-he.json':{helen:[1,0]},
+  'terms-tr.json':{troy:[1]},
+  'book-149.json':{pages:[
+   {id:0,page:145,text:'The priests said Helen had been taken toward Egypt after Paris carried her away.'},
+   {id:1,page:146,text:'Egypt, and on his arrival he spoke with the priests about Helen and Troy. The account was reported in that country.'},
+   {id:2,page:80,text:'Egyptian records discuss a different topic in another section of the book.'}
   ]}
  };
  const localFetch=async url=>{

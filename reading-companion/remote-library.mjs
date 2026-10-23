@@ -262,8 +262,14 @@ export function excerptAroundEvidence(text, terms, max = 1080) {
 }
 
 function beginsMidSentence(text) {
-  const firstLetter=String(text||'').trimStart().match(/[A-Za-z]/)?.[0]||'';
-  return !!firstLetter&&firstLetter===firstLetter.toLowerCase();
+  const start=String(text||'').trimStart();
+  const firstLetter=start.match(/[A-Za-z]/)?.[0]||'';
+  if(firstLetter&&firstLetter===firstLetter.toLowerCase())return true;
+  // A page can continue a sentence with a capitalized proper name, so a
+  // lowercase-first-letter check misses cases like “Egypt, and on his arrival
+  // ...”. Treat a proper noun followed by a comma and a clause connector as a
+  // boundary fragment; the neighbor must still pass the normal relevance test.
+  return /^[A-Z][\p{Ll}’'-]{1,30},\s+(?:and|but|for|when|while|which|who|because)\b/u.test(start);
 }
 
 function endsMidSentence(text) {
