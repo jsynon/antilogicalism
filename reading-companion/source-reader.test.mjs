@@ -18,10 +18,11 @@ test('returns contiguous readable paragraphs without changing stored OCR text',(
  assert.equal(fixed.includes('\r\n'),true,'The original text is not modified');
 });
 test('normalizes known NKJV OCR ligature substitutions only in the readable display',()=>{
- const raw='9 In this the love of God was manifested toward us, that God has sent His only begoƩen Son into the world, that we might live through Him. 10 In this is love, not that we loved God, but that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme.';
- const expected=raw.replaceAll('begoƩen','begotten').replaceAll('propiƟaƟon','propitiation').replaceAll('Ɵme','time');
+ const raw='9 In this the love of God was manifested toward us, that God has sent His only begoƩen Son into the world, that we might live through Him. 10 In this is love, not that we loved God, but that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme. James was jusƟﬁed when he oﬀered Isaac; the Scripture was fulﬁlled.';
+ const expected=raw.normalize('NFKC').replaceAll('Ɵ','ti').replaceAll('Ʃ','tt');
  assert.equal(normalizeKnownOcrArtifacts(raw,'335'),expected);
  assert.equal(normalizeKnownOcrArtifacts(raw,'638'),raw,'other books retain their exact indexed text');
+ assert.match(expected,/James was justified when he offered Isaac; the Scripture was fulfilled/);
  const quote='that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme';
  const page=readablePageWithHighlight(raw,quote,'335');
  assert(page.match,'highlight matching normalizes both the page and the cited OCR quote');
@@ -42,7 +43,7 @@ test('renders normalized NKJV text as readable paragraphs',()=>{
   assert.match(readable.textContent,/begotten/);
   assert.match(readable.textContent,/propitiation/);
   assert.match(readable.textContent,/at any time/);
-  assert.doesNotMatch(readable.textContent,/begoƩen|propiƟaƟon|Ɵme/);
+  assert.doesNotMatch(readable.textContent,/begoƩen|propiƟaƟon|Ɵme|jusƟﬁed|oﬀered|fulﬁlled/);
  }finally{
   if(originalDocument===undefined)delete globalThis.document;
   else globalThis.document=originalDocument;
