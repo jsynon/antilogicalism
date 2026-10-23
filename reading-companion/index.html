@@ -391,14 +391,11 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-source-actions{display:flex;flex-wrap:wrap;gap:.5em;align-items:center;margin:.7em 0}
 #companion-pilot .companion-source-actions button{font:inherit;font-size:.89em;padding:6px 10px;min-height:38px}
 #companion-pilot .companion-source-actions a{font-size:.89em}
-#companion-pilot .companion-layout-picker{display:flex;align-items:center;flex-wrap:wrap;gap:.6em;margin:1em 0}
 #primary .entry-content #companion-pilot select{font-weight:600}
 #primary .entry-content #companion-pilot select option{font-weight:400}
 #primary .entry-content #companion-pilot select option:checked{font-weight:600}
-#companion-pilot .companion-layout-picker select{width:auto;max-width:100%;font:inherit;font-weight:600;font-size:.89em}
 #companion-pilot .companion-source-text{max-height:65vh;overflow-y:auto;overflow-wrap:anywhere;border-top:1px solid #dfe2e3;padding-top:.8em;line-height:1.8;font-size:1em}
 #companion-pilot .companion-source-text p{margin:0 0 1em;text-indent:0;white-space:normal}
-#companion-pilot .companion-source-text.original-ocr p{white-space:pre-wrap}
 #companion-pilot .companion-source-text mark.cited-highlight{background:#fff0a5;color:#111;box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:1px 0}
 #companion-pilot #companion-source-quote{position:static!important;padding:.6em .75em!important;margin:.7em 0!important;border-left:2px solid #aaa!important;background:#fafafa!important;text-indent:0!important;white-space:pre-wrap}
 #companion-pilot #companion-source-quote::before,#companion-pilot #companion-source-quote::after{display:none!important;content:none!important}
@@ -490,14 +487,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <button type="button" id="companion-source-next" disabled>Next page →</button>
 <a id="companion-source-pdf" target="_blank" rel="noopener noreferrer">Open original PDF</a>
 </div>
-<div class="companion-layout-picker">
-<label for="companion-source-layout">Text display</label>
-<select id="companion-source-layout">
-<option value="readable">Readable paragraphs</option>
-<option value="original">Original OCR layout</option>
-</select>
-</div>
-<div id="companion-source-text" class="companion-source-text" aria-label="Original PDF page text"></div>
+<div id="companion-source-text" class="companion-source-text" aria-label="Readable source text"></div>
 <p class="companion-hint">Page numbers refer to the PDF. Scanned text may contain errors; open the original page to compare it.</p>
 </section>
 <p class="companion-hint">The citation link opens the original scanned book; “Read passage” shows the excerpt here. Scanned text and AI interpretations can contain errors, so check the source. Search the full-text collection with <a href="/antilogicalism/digital-library/">Library Search</a> or browse books by title with the <a href="/antilogicalism/primary-sources/">Bookshelf</a>.</p>

@@ -28,24 +28,21 @@ test('normalizes known NKJV OCR ligature substitutions only in the readable disp
  assert.equal(page.displayText,expected);
  assert.equal(page.displayText.slice(page.match.start,page.match.end),'that He loved us and sent His Son to be the propitiation for our sins. 12 No one has seen God at any time');
 });
-test('renders normalized NKJV text while retaining raw OCR layout',()=>{
- const raw='9 In this the love of God was manifested toward us, that God has sent His only begoƩen Son into the world, that we might live through Him.\\n\\n10 In this is love, not that we loved God, but that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme.';
+test('renders normalized NKJV text as readable paragraphs',()=>{
+ const raw='9 In this the love of God was manifested toward us, that God has sent His only begoƩen Son into the world, that we might live through Him.\n\n10 In this is love, not that we loved God, but that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme.';
  const quote='10 In this is love, not that we loved God, but that He loved us and sent His Son to be the propiƟaƟon for our sins. 12 No one has seen God at any Ɵme';
- const element=tag=>({tag,children:[],classList:{toggle(){}},append(child){this.children.push(child)},replaceChildren(){this.children=[]},set textContent(value){this._text=String(value);this.children=[]},get textContent(){return this._text??this.children.map(child=>child.textContent||'').join('')}});
+ const element=tag=>({tag,children:[],append(child){this.children.push(child)},replaceChildren(){this.children=[]},set textContent(value){this._text=String(value);this.children=[]},get textContent(){return this._text??this.children.map(child=>child.textContent||'').join('')}});
  const originalDocument=globalThis.document;
  globalThis.document={createElement:element,createTextNode:value=>({textContent:String(value)})};
  try{
   const readable=element('div');
-  const shown=renderHighlightedText(readable,raw,quote,false,'335');
+  const shown=renderHighlightedText(readable,raw,quote,'335');
   assert.equal(shown.matched,true);
+  assert.equal(readable.children.length,2,'OCR paragraph breaks remain visible as paragraphs');
   assert.match(readable.textContent,/begotten/);
   assert.match(readable.textContent,/propitiation/);
   assert.match(readable.textContent,/at any time/);
-  const original=element('div');
-  const rawShown=renderHighlightedText(original,raw,quote,true,'335');
-  assert.equal(rawShown.matched,true);
-  assert.match(original.textContent,/begoƩen/);
-  assert.match(original.textContent,/propiƟaƟon/);
+  assert.doesNotMatch(readable.textContent,/begoƩen|propiƟaƟon|Ɵme/);
  }finally{
   if(originalDocument===undefined)delete globalThis.document;
   else globalThis.document=originalDocument;
@@ -92,7 +89,7 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  const ids=['companion-source-reader','companion-source-title',
   'companion-source-meta','companion-source-quote','companion-reader-status',
   'companion-source-prev','companion-source-next','companion-close-source',
-  'companion-source-pdf','companion-source-layout','companion-source-text'];
+  'companion-source-pdf','companion-source-text'];
  for(const id of ids)assert(html.includes('id="'+id+'"'),id+' markup');
  assert.match(html,/id="companion-source-reader"[^>]+hidden/);
  assert.match(client,/Read passage/);
@@ -102,7 +99,10 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(source,/isAllowedBook\(bookId\)/);
  assert.match(source,/getBook\(bookId\)/);
  assert.match(source,/function renderHighlightedText/);
- assert.match(source,/quoteBox\.textContent=originalLayout\?quotation:/);
+ assert.match(source,/renderHighlightedText\(viewer,page\.text,quotation,source\.bookId\)/);
+ assert.match(source,/Readable paragraphs from indexed v47 text/);
+ assert.doesNotMatch(source,/originalLayout|original-ocr|companion-source-layout/);
+ assert.doesNotMatch(html,/companion-source-layout|Original OCR layout|companion-layout-picker/);
  assert.match(source,/mark\.className='cited-highlight'/);
  assert.doesNotMatch(source,/\/api\/(?:pilot-answer|chat)/);
  assert.doesNotMatch(source,/innerHTML\s*=/);
