@@ -199,6 +199,41 @@ test('all-books search honors an explicitly named author when limiting candidate
  assert(result.sources.every(source=>source.bookId==='7'));
 });
 
+test('a thinker named as the subject of another author’s view is not searched as its source',async()=>{
+ const corpus={
+  'manifest.json':{
+   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
+   page_books:[54,74],partitions:['ni','th','pl'],
+   books:{
+    '54':{title:'Thus Spake Zarathustra — Friedrich Nietzsche',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+    '74':{title:'The Republic — Plato',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
+   }
+  },
+  'terms-ni.json':{nietzsche:[0,1]},
+  'terms-th.json':{think:[0,1]},
+  'terms-pl.json':{plato:[0]},
+  'book-54.json':{pages:[
+   {id:0,page:31,text:'Nietzsche thinks about Plato as an opponent of the ideal world.'}
+  ]},
+  'book-74.json':{pages:[
+   {id:1,page:110,text:'Plato thinks about Nietzsche’s account while discussing justice and the order of the soul.'}
+  ]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const result=await finder.search('What did Nietzsche think about Plato?',{
+  maxBooks:2,pagesPerBook:2
+ });
+ assert(result.sources.length>0);
+ assert.deepEqual([...new Set(result.sources.map(source=>source.bookId))],['54']);
+ assert(result.sources[0].preview.includes('Plato'));
+});
+
 test('a relevant previous page is retained when the strongest passage starts mid-sentence',async()=>{
  const corpus={
   'manifest.json':{
@@ -287,7 +322,7 @@ test('an ellipsis-truncated final connector retains the relevant next page',asyn
    new Response('Not found',{status:404});
  };
  const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
- const result=await finder.search('Hamlet soliloquy dreams',{
+ const result=await finder.search("Hamlet soliloquy dreams: 'To be, or not to be'",{
   allowedBookIds:new Set(['212']),maxBooks:1,pagesPerBook:2
  });
  assert.deepEqual(result.sources.map(source=>source.page),[453,454]);
