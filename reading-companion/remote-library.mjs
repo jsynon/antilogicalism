@@ -274,9 +274,14 @@ function beginsMidSentence(text) {
 
 function endsMidSentence(text) {
   const tail=String(text||'').trimEnd();
-  if(!tail||/[.!?]["'’”)}\]]*$/.test(tail))return false;
+  // OCR/page extracts can mark a cut-off with an ellipsis after the final
+  // word (for example, “Ham. To…”). Strip that omission marker before testing
+  // whether the page ends on a dangling connector; the adjacent page must
+  // still pass the usual relevance check before it is included.
+  const content=tail.replace(/(?:…|\.{2,})["'’”)}\]]*$/u,'').trimEnd();
+  if(!content||/[.!?]["'’”)}\]]*$/.test(content))return false;
   return /\b(?:and|but|because|that|which|when|if|while|although|as|with|for|to|of|in|on|by|from|the|a|an)\s*[,;:]?$/i
-    .test(tail.slice(-80));
+    .test(content.slice(-80));
 }
 
 export class RemoteLibrary {
