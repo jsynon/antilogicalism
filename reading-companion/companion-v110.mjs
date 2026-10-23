@@ -403,7 +403,7 @@ function renderResponse(data,turnQuestion=''){
         try{await sourceReader.open({...citation,excerpt:item.quote},read);}
         catch(error){setStatus('Source reader: '+error.message);}
       });
-      card.append(quote,a,read);
+      card.append(quote,read,a);
       panel.append(card);
       highlightedSourceKeys.add(citation.id+'|'+Number(citation.page));
     }
@@ -420,7 +420,7 @@ function renderResponse(data,turnQuestion=''){
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
       link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · PDF page '+source.page;
-      label.append(link);row.append(label);
+      label.append(link);
       // The original PDF link remains untouched. The new button opens a
       // separate in-page reader using the same trusted v47 book shard.
       const highlight=(Array.isArray(data.evidenceHighlights)?
@@ -436,7 +436,7 @@ function renderResponse(data,turnQuestion=''){
           await sourceReader.open({...source,excerpt},read);
         }catch(error){setStatus('Source reader: '+error.message);}
       });
-      row.append(read);
+      row.append(read,label);
       sources.append(row);
     }
     turn.append(sources);
