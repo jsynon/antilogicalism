@@ -21,15 +21,14 @@ export function eligiblePages(shard){
     return true;
   }).sort((a,b)=>a.page-b.page);
 }
-export function renderHighlightedText(container,text,quote,original=false,bookId=''){
-  const sourceText=original?String(text):normalizeKnownOcrArtifacts(text,bookId);
-  const displayQuote=original?String(quote||''):normalizeKnownOcrArtifacts(quote,bookId);
-  const paragraphs=original?[sourceText]:readableParagraphs(sourceText);
-  const separator=original?'':'\n\n';
+export function renderHighlightedText(container,text,quote,bookId=''){
+  const sourceText=normalizeKnownOcrArtifacts(text,bookId);
+  const displayQuote=normalizeKnownOcrArtifacts(quote,bookId);
+  const paragraphs=readableParagraphs(sourceText);
+  const separator='\n\n';
   const display=paragraphs.join(separator);
   const match=displayQuote?locateCitedExcerpt(display,displayQuote):null;
   container.replaceChildren();
-  container.classList.toggle('original-ocr',original);
   let at=0,firstMark=null;
   for(const paragraph of paragraphs){
     const p=make('p');
@@ -57,8 +56,8 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
   const status=byId('companion-reader-status'),viewer=byId('companion-source-text');
   const quoteBox=byId('companion-source-quote'),previous=byId('companion-source-prev');
   const next=byId('companion-source-next'),close=byId('companion-close-source');
-  const pdf=byId('companion-source-pdf'),layout=byId('companion-source-layout');
-  if([root,title,meta,status,viewer,quoteBox,previous,next,close,pdf,layout].some(x=>!x))
+  const pdf=byId('companion-source-pdf');
+  if([root,title,meta,status,viewer,quoteBox,previous,next,close,pdf].some(x=>!x))
     throw Error('The in-page source reader markup is missing.');
   let active=null,requestId=0,returnFocus=null;
 
@@ -75,15 +74,13 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     const onCitedPage=page.page===source.page;
     const quotation=onCitedPage && typeof source.excerpt==='string'?source.excerpt:'';
     title.textContent=source.title||'Original source';
-    const originalLayout=layout.value==='original';
-    const normalizedNkjv=!originalLayout&&String(source.bookId)==='335';
+    const normalizedNkjv=String(source.bookId)==='335';
     meta.textContent='Physical PDF page '+page.page+' · '+
-      (normalizedNkjv?'v47 text; known NKJV OCR ligatures normalized for reading':
-        'Original indexed v47 text');
+      (normalizedNkjv?'Readable v47 text; known NKJV OCR ligatures normalized':
+        'Readable paragraphs from indexed v47 text');
     quoteBox.hidden=!quotation;
-    quoteBox.textContent=originalLayout?quotation:
-      normalizeKnownOcrArtifacts(quotation,source.bookId);
-    const shown=renderHighlightedText(viewer,page.text,quotation,originalLayout,source.bookId);
+    quoteBox.textContent=normalizeKnownOcrArtifacts(quotation,source.bookId);
+    const shown=renderHighlightedText(viewer,page.text,quotation,source.bookId);
     if(quotation){
       status.textContent=shown.matched?
         'The matching cited passage is highlighted in yellow.':
@@ -142,6 +139,5 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     if(active&&active.idx+1<active.pages.length){active.idx++;present();}
   });
   close.addEventListener('click',()=>reset({restoreFocus:true}));
-  layout.addEventListener('change',()=>{if(active)present();});
   return {open,reset};
 }
