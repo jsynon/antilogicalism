@@ -10,14 +10,14 @@ const bookOrder=await import('./book-order.mjs');
 test('response citation labels are plain ordered numbers while IDs stay internal',()=>{
  assert.match(client,/buildCitationNumbering\(answer,citations\)/);
  assert.match(client,/sortCitationsByNumber\(citations,numbering\)/);
- assert.match(client,/citationDisplayLabel\(item\.source_id,numbering\)/);
+ assert.match(client,/highlight\.find\(item=>/);
  assert.match(client,/citationDisplayLabel\(source\.id,numbering\)/);
  assert.match(client,/putMarkdownBlocks\(reply,answer,citations,highlights,numbering\)/);
 });
 
 test('structured missing-evidence notice is not repeated when answer already states it',()=>{
  assert.ok(client.includes('normalizeNotice(answer).includes(normalizeNotice(missing))'));
- assert.ok(client.includes("replace(/[^\\p{L}\\p{N}]+/gu,' ').trim()"));
+ assert.ok(client.includes("replace(/[^\p{L}\p{N}]+/gu,' ').trim()"));
  assert.ok(client.includes('if(missing&&!answerAlreadyContainsMissing)'));
 });
 test('unverified answer drafts get an evidence-check label instead of a source-gap claim',()=>{
@@ -48,10 +48,10 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.doesNotMatch(client,/companion-follow-ups|companion-follow-up-buttons|followUpQuestions/);
  assert(passages>answer);
  assert.equal(client.includes("'Additional sources'"),false);
- assert.match(client,/if\\(orderedCitations\\.length\\)/);
- assert.match(client,/for\\(const source of orderedCitations\\)/);
- assert.match(client,/const quote=node\\('p',excerpt,'companion-key-quote'\\)/);
- assert.match(client,/highlight\\?\\.quote/);
+ assert.match(client,/if\(orderedCitations\.length\)/);
+ assert.match(client,/for\(const source of orderedCitations\)/);
+ assert.match(client,/const quote=node\('p',excerpt,'companion-key-quote'\)/);
+ assert.match(client,/highlight\?\.quote/);
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
  assert.match(html,/id="companion-book-search" type="search"/);
@@ -156,7 +156,7 @@ test('public companion copy explains cited sources and keeps source reading cont
 test('answer citations open in the local page reader while Sources keeps the PDF link',()=>{
  assert.ok(client.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map())'));
  assert.ok(client.includes("sourceReader.open({...source,excerpt:evidence?.quote||''},a)"));
- assert.ok(client.includes("sourceReader.open({...citation,excerpt:item.quote},read)"));
+ assert.ok(client.includes("sourceReader.open({...source,excerpt},read)"));
  assert.ok(client.includes('link.href=source.url'));
  assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
 });
