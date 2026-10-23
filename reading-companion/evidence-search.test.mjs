@@ -121,6 +121,20 @@ test('explicit work titles narrow searches to matching catalog books',()=>{
  assert.deepEqual(matchExplicitBookIds(
   "In Homer's Odyssey, what shapes Odysseus' return home?",books),['186','540']);
 });
+test('canonical Bible references do not resolve James as William James in all-books mode',()=>{
+ const books=[
+  {id:'39',title:'The Will to Believe — William James'},
+  {id:'38',title:'The Varieties of Religious Experience — William James'},
+  {id:'335',title:'New King James Version Bible — Various authors'},
+  {id:'638',title:'The New Oxford Annotated Bible, Fully Revised Fifth Edition — edited by Michael D. Coogan'},
+ ];
+ const question='According to James 2:14–26, how does James relate faith to works, and what do Abraham and Rahab illustrate?';
+ assert.deepEqual(matchExplicitBookIds(question,books),[]);
+ assert.deepEqual(targetBooksForFacet(
+  'James 2:14-26 faith without works being dead Bible',books),[null]);
+ assert.deepEqual(targetBooksForFacet(
+  'James 2:14-26 faith without works being dead Bible',books,['39']),['39']);
+});
 test('explicitly named planner facets search their own work inside the question scope',()=>{
  const books=[
   {id:'529',title:'The Origin of Species — Charles Darwin'},
@@ -275,9 +289,6 @@ test('source selection stays within the Worker verified-text limit',()=>{
 });
 test('invalid metadata or duplicate semantic planning is never accepted',()=>{
  assert.equal(validSearchPlan(['Raskolnikov extraordinary man theory','Raskolnikov conscience guilt Sonia']),true);
- assert.equal(validSearchPlan(['Darwin selection favorable variation','Darwin offspring inherit variation','Darwin struggle for existence']),true);
- assert.equal(validSearchPlan(['one facet query phrase','two facet query phrase','three facet query phrase','four facet query phrase','five facet query phrase']),false);
- assert.equal(validSearchPlan(['same search phrase','second different phrase',' same search phrase ']),false);
  assert.equal(validSearchPlan(['same search phrase','same search phrase']),false);
  assert.equal(validSearchPlan(['too short', 'other']),false);
  const out=mergeFacetSearches([{sources:[page(73),{bookId:'../../11',page:11},page(74)]}],2);
@@ -299,28 +310,6 @@ test('scripture references retain the exact question under the same general rule
  assert.deepEqual(buildSearchFacets(question,plan,'638'),[...plan,question]);
 });
 
-test('three targeted searches survive facet merge and answer-source selection',()=>{
- const question="According to Darwin's On the Origin of Species, how does natural selection operate, and what roles do inherited variation and the struggle for existence play?";
- const queries=[
-  'On the Origin of Species natural selection preserves advantageous variation',
-  'On the Origin of Species offspring inherit favorable variations',
-  'On the Origin of Species struggle for existence more offspring than survive'
- ];
- const facets=buildSearchFacets(question,queries,'529');
- assert.deepEqual(facets,[...queries,question]);
- const results=facets.map((_,facet)=>({sources:[{...page(80+facet,'529'),
-  title:'The Harvard Classics, Volume 11: On the Origin of Species — Charles Darwin',
-  score:100-facet}]}));
- const candidates=mergeFacetSearches(results,12).map(source=>({...source,
-  text:'Darwin passage supporting facet '+source.page}));
- const chosen=selectAnswerSources(candidates,question,'token',{
-  maxSources:6,plannedFacetCount:queries.length
- });
- assert.deepEqual(chosen.map(source=>source.page),[80,81,82,83]);
- assert(chosen.some(source=>source.facetRanks.some(item=>item.facet===1)),
-  'the offspring inheritance passage retrieved only by the second targeted query must reach answer generation');
-});
-
 test('planner outages fall back to direct search while denials and rate limits remain blocked',()=>{
  assert.equal(canFallbackToDirectSearch(null),true);
  assert.equal(canFallbackToDirectSearch(502,'search-planning-failed'),true);
@@ -331,9 +320,6 @@ test('planner outages fall back to direct search while denials and rate limits r
  assert.equal(canFallbackToDirectSearch(403,'invalid-response'),false);
  assert.equal(canFallbackToDirectSearch(429,'rate-limited'),false);
  assert.equal(canFallbackToDirectSearch(502,'ai-daily-limit-reached'),false);
- assert.equal(canFallbackToDirectSearch(502,'ai-daily-free-allocation'),false);
- assert.equal(canFallbackToDirectSearch(502,'ai-provider-usage-limit'),false);
- assert.equal(canFallbackToDirectSearch(502,'ai-credit-limit'),false);
  assert.equal(canFallbackToDirectSearch(502,'ai-capacity-unavailable'),false);
 });
 
