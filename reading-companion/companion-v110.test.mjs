@@ -128,7 +128,8 @@ test('v1.10 never claims unsupported books are ready if fingerprint index missin
 });
 
 test('public companion copy explains cited sources and keeps source reading controls',()=>{
- assert.match(html,/Open PDF.*original scanned book/);
+ assert.match(html,/citation link opens the original scanned book/);
+ assert.doesNotMatch(html,/Open PDF/);
  assert.match(client,/Read passage/);
  assert.ok(client.includes("link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · p. '+source.page;"));
  assert.doesNotMatch(client,/Citations link to the original PDF pages/);
