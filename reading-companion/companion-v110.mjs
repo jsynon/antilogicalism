@@ -442,7 +442,7 @@ function renderResponse(data,turnQuestion=''){
       const quote=node('p',excerpt,'companion-key-quote');
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
-      link.textContent='Open PDF · ['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · p. '+source.page;
+      link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · p. '+source.page;
       const read=node('button','Read passage','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
