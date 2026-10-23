@@ -25,6 +25,15 @@ const QUALITY_CASES=[
  {id:'quality-all-books-cross-discipline-order',discipline:'philosophy',question:'How does Aristotle describe the aim of political science in the Nicomachean Ethics, and what role does Hobbes give common power in Leviathan? How do these accounts differ?',selected_book_ids:[],planner_queries:['Aristotle Nicomachean Ethics political science human good citizens good obedient laws','Hobbes Leviathan state of nature common power keep them in awe war every man against every man'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']},{label:'Hobbes, Leviathan',book_ids:['163']}],review_focus:['Represent each author’s account in its own terms and identify a meaningful difference.','Ground the comparison in both works instead of importing unsupported modern claims.']},
  {id:'quality-all-books-religion-scripture',discipline:'religion',question:'According to 1 John 4:7–12, what does “God is love” mean, and how does the passage connect God’s love with loving one another?',selected_book_ids:[],planner_queries:['1 John 4:7-12 God is love sent Son love one another passage','1 John 4:7-12 love of God revealed in Christ command love one another'],required_source_groups:[{label:'1 John 4:7–12',book_ids:['335']}],review_focus:['Explain the passage’s connection between God’s prior love and the command to love one another.','Stay close to the passage and distinguish its claims from later theological interpretation.']},
 ];
+const HOLDOUT_CASES=[
+ {id:'holdout-history-herodotus-helen',discipline:'history',question:'When Herodotus recounts the story of Helen’s journey to Troy, what do the Egyptian priests tell him, and how does he explain why he finds their account more credible?',selected_book_ids:['149'],planner_queries:['Herodotus Histories Helen Egypt priests account Troy credibility','Herodotus Helen Paris Egypt Egyptian priests story judgment'],required_source_groups:[{label:'Herodotus, Histories',book_ids:['149']}],review_focus:['Keep the Egyptian priests’ account distinct from Herodotus’s own reasoning and reported Greek traditions.','Explain the basis he gives for preferring one account without turning his inference into a directly witnessed fact.']},
+ {id:'holdout-literature-hamlet-soliloquy',discipline:'literature',question:'In Hamlet’s “To be, or not to be” soliloquy, what alternatives does he weigh, and how does uncertainty about what follows death affect his reasoning?',selected_book_ids:['212'],planner_queries:['Hamlet to be or not to be soliloquy sleep death fear unknown country','Hamlet soliloquy conscience makes cowards of us all after death'],required_source_groups:[{label:'Shakespeare, Hamlet',book_ids:['212','564']}],review_focus:['Describe Hamlet’s alternatives and reasoning in the soliloquy without treating them as the play’s settled doctrine.','Connect the fear of the unknown after death to his hesitation, citing the soliloquy.']},
+ {id:'holdout-philosophy-aristotle-soul-body',discipline:'philosophy',question:'According to Aristotle’s De Anima, how is the soul related to a living body, and how does the form-and-matter comparison clarify that relation?',selected_book_ids:['4'],planner_queries:['Aristotle De Anima soul actuality form natural body organ life','De Anima soul form matter body first actuality Aristotle'],required_source_groups:[{label:'Aristotle, De Anima',book_ids:['4']}],review_focus:['Explain the soul as the actuality or form of a natural body with life potentially.','Use the form-and-matter comparison without reducing soul to a separate bodily part.']},
+ {id:'holdout-religion-james-faith-works',discipline:'religion',question:'According to James 2:14–26, how does James relate faith to works, and what do Abraham and Rahab illustrate in his argument?',selected_book_ids:['335'],planner_queries:['James 2:14-26 faith without works Abraham Rahab justified works','James faith works body without spirit Abraham offered Isaac Rahab received messengers'],required_source_groups:[{label:'James 2:14–26',book_ids:['335']}],review_focus:['Explain James’s argument about living faith and works using the passage’s examples.','Represent Abraham and Rahab as distinct illustrations and avoid importing a broader doctrinal resolution not stated in the passage.']},
+ {id:'holdout-all-books-hume-kant-causation',discipline:'philosophy',question:'How do Hume’s Enquiry and Kant’s Critique of Pure Reason differ over how we can know causal necessity?',selected_book_ids:[],planner_queries:['Hume Enquiry cause effect necessary connection constant conjunction custom','Kant Critique Pure Reason causality category understanding a priori experience'],required_source_groups:[{label:'Hume, Enquiry Concerning Human Understanding',book_ids:['35']},{label:'Kant, Critique of Pure Reason',book_ids:['40']}],review_focus:['Explain each author’s account on its own terms and distinguish Hume’s account of experience and habit from Kant’s account of a priori understanding.','Cite evidence from both books and avoid presenting the comparison as a direct exchange between the authors.']},
+ {id:'holdout-all-books-plato-rousseau-order',discipline:'politics',question:'How do Plato’s Republic and Rousseau’s Social Contract explain what makes political order legitimate, and how does each connect it to the common good?',selected_book_ids:[],planner_queries:['Plato Republic justice city common good political order rulers knowledge','Rousseau Social Contract general will common good legitimate political authority'],required_source_groups:[{label:'Plato, Republic',book_ids:['74']},{label:'Rousseau, Social Contract',book_ids:['245']}],review_focus:['Identify the basis of political order in each work, keeping Plato’s and Rousseau’s concepts distinct.','Explain how each account relates to collective good using passages from both works.']},
+ {id:'holdout-all-books-wollstonecraft-dubois',discipline:'society',question:'How do Wollstonecraft’s Vindication of the Rights of Woman and Du Bois’s Souls of Black Folk describe the effects of unequal social conditions on people’s development and self-understanding?',selected_book_ids:[],planner_queries:['Wollstonecraft Vindication education dependence reason virtue women social conditions','Du Bois Souls of Black Folk veil double consciousness self understanding social conditions'],required_source_groups:[{label:'Wollstonecraft, Vindication of the Rights of Woman',book_ids:['87']},{label:'Du Bois, The Souls of Black Folk',book_ids:['454']}],review_focus:['Explain each author’s account of how social conditions shape development or self-understanding without flattening their distinct historical arguments.','Use evidence from both works and mark any comparative synthesis as a reader’s synthesis.']},
+];
 const PLANNER_CASE_IDS=[
  'quality-philosophy-aristotle-practical-wisdom',
  'quality-all-books-cross-work-science',
@@ -32,23 +41,25 @@ const PLANNER_CASE_IDS=[
 const CALL_GAP_MS=30_500;
 const MAX_PAGE_BYTES=14_000;
 
-function copyQualityCase(item){
+function copyEvaluationCase(item){
  return {...item,selected_book_ids:[...item.selected_book_ids],planner_queries:[...item.planner_queries],
   required_source_groups:item.required_source_groups.map(group=>({...group,book_ids:[...group.book_ids]})),
   review_focus:[...item.review_focus]};
 }
 export function selectLiveCases(suite,mode='smoke',caseId=''){
+ const evaluationCases=mode==='holdout'?HOLDOUT_CASES:QUALITY_CASES;
  if(caseId&&caseId!=='all'){
-  if(mode!=='quality')throw Error('A specific case can be selected only in quality mode.');
-  const selected=QUALITY_CASES.find(item=>item.id===caseId);
-  if(!selected)throw Error('Unknown quality case: '+caseId);
-  return [copyQualityCase(selected)];
+  if(!['quality','holdout'].includes(mode))throw Error('A specific case can be selected only in quality or holdout mode.');
+  const selected=evaluationCases.find(item=>item.id===caseId);
+  if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
+  return [copyEvaluationCase(selected)];
  }
- if(mode==='quality')return QUALITY_CASES.map(copyQualityCase);
+ if(mode==='quality')return QUALITY_CASES.map(copyEvaluationCase);
+ if(mode==='holdout')return HOLDOUT_CASES.map(copyEvaluationCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
   const item=QUALITY_CASES.find(value=>value.id===id);
   if(!item)throw Error('The planner-only cases are missing from the quality suite.');
-  return copyQualityCase(item);
+  return copyEvaluationCase(item);
  });
  if(mode==='smoke'){
   const selected=SMOKE_CASE_IDS.map(id=>suite.cases.find(item=>item.id===id));
@@ -56,11 +67,11 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, or full.');
+ throw Error('Mode must be smoke, planner, quality, holdout, or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(!['selected-books','all-books'].includes(scope))
-  throw Error('Quality scope must be selected-books or all-books.');
+  throw Error('Evaluation scope must be selected-books or all-books.');
  if(scope==='selected-books')return cases;
  return cases.map(item=>({...item,selected_book_ids:[]}));
 }
@@ -441,22 +452,23 @@ function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',sco
   if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|full] [--scope selected-books|all-books] [--case quality-case-id] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|holdout|full] [--scope selected-books|all-books] [--case quality-or-holdout-case-id] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
- if(args.mode!=='quality'&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality mode.');
- if(args.mode==='quality'&&!['selected-books','all-books'].includes(args.scope))throw Error('Quality scope must be selected-books or all-books.');
+ const usesEvaluationMode=['quality','holdout'].includes(args.mode);
+ if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality or holdout mode.');
+ if(usesEvaluationMode&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
  const selectedCases=selectLiveCases(suite,args.mode,args.caseId);
- const cases=args.mode==='quality'?applyQualityScope(selectedCases,args.scope):selectedCases;
- const qualityUsesPlanner=args.mode==='quality'&&args.scope==='all-books';
- const plannerCalls=args.mode==='quality'&&!qualityUsesPlanner?0:cases.length;
+ const cases=usesEvaluationMode?applyQualityScope(selectedCases,args.scope):selectedCases;
+ const evaluationUsesPlanner=usesEvaluationMode&&args.scope==='all-books';
+ const plannerCalls=usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
  const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:plannerCalls+cases.length*2;
- const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:args.mode==='quality'?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
+ const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   caseCount:cases.length,estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
-   args.mode==='quality'&&!qualityUsesPlanner?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
+   usesEvaluationMode&&!evaluationUsesPlanner?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
    'Automated checks distinguish expected-book retrieval from structural evidence-ID linkage and prose/coverage consistency. They do not judge semantic relevance or factual truth; review answer text and source passages manually.',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
@@ -475,7 +487,7 @@ async function main(){
   let previousCall=0;
   const beforeCall=async()=>{if(previousCall){const due=Math.max(0,CALL_GAP_MS-(Date.now()-previousCall));if(due)await new Promise(resolve=>setTimeout(resolve,due));}previousCall=Date.now();};
   const run=await runLiveCases(cases,{evaluateCase:args.mode==='planner'?evaluatePlannerCase:evaluateLiveCase,
-   evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:args.mode==='quality'&&!qualityUsesPlanner},onResult:async(result,results)=>{
+   evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:usesEvaluationMode&&!evaluationUsesPlanner},onResult:async(result,results)=>{
    report.cases=results;report.completedCases=results.length;
    report.notRunCases=cases.length-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
