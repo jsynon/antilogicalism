@@ -89,13 +89,13 @@ export function mergeFacetSearches(results,limit=8){
      matchedFacets:facets.size,facetRanks}));
 }
 export function validSearchPlan(value){
- return Array.isArray(value)&&value.length===2&&
+ return Array.isArray(value)&&value.length>=2&&value.length<=4&&
    value.every(q=>typeof q==='string'&&q.trim().length>=12&&q.trim().length<=160)&&
-   value[0].trim().toLowerCase()!==value[1].trim().toLowerCase();
+   new Set(value.map(q=>q.trim().toLocaleLowerCase())).size===value.length;
 }
 
-/* Keep the reader's exact wording as a lexical facet alongside the two
- * planner rewrites. This lets retrieval recover source language the planner
+/* Keep the reader's exact wording as a lexical facet alongside the planner's
+ * rewrites. This lets retrieval recover source language the planner
  * paraphrases away. Search remains local to the published index and spends no
  * additional model calls. */
 export function buildSearchFacets(question,plannedQueries,bookId=''){
@@ -251,7 +251,8 @@ export function targetBooksForFacet(query,books,allowedBookIds=null){
  * direct search with the reader's own wording. Keep explicit request denials
  * and rate limits fail-closed. */
 export function canFallbackToDirectSearch(status,code=''){
- if(['ai-daily-limit-reached','ai-capacity-unavailable','ai-rate-limited'].includes(code))return false;
+ if(['ai-daily-limit-reached','ai-daily-free-allocation','ai-provider-usage-limit',
+   'ai-credit-limit','ai-capacity-unavailable','ai-rate-limited'].includes(code))return false;
  if(status===null||status===undefined)return true;
  if(Number.isInteger(status)&&status>=500)return true;
  if(Number.isInteger(status)&&status>=400)return false;
