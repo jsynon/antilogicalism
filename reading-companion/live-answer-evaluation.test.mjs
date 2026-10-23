@@ -173,6 +173,42 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
 });
 
+test('all-books evaluation sends the same six-page evidence budget as the public companion',async()=>{
+ const item={id:'all-books-six-source-budget',
+  question:'How do Darwin in On the Origin of Species and Hawking in A Brief History of Time explain their evidence?',
+  selected_book_ids:[],planner_queries:['Darwin On the Origin of Species natural selection evidence',
+   'Hawking A Brief History of Time black hole observations'],review_focus:[],
+  required_source_groups:[{label:'Darwin',book_ids:['529']},{label:'Hawking',book_ids:['102']}]};
+ const pages=new Map();
+ for(const [bookId,title] of [['529','On the Origin of Species — Charles Darwin'],
+   ['102','A Brief History of Time — Stephen Hawking']]){
+  for(let index=0;index<3;index++){
+   const page=100+index+(bookId==='102'?10:0),globalPageId=Number(bookId)*100+index;
+   pages.set(bookId+':'+globalPageId,{id:globalPageId,page,
+    text:`${title} passage ${index+1} gives a distinct observation and explanation relevant to the question.`});
+  }
+ }
+ const library={search:async(_query,{bookId})=>({sources:[...pages.entries()]
+   .filter(([key])=>key.startsWith(String(bookId)+':')).map(([,page],index)=>({
+    bookId:String(bookId),title:pages.get(String(bookId)+':'+page.id).title||
+     (String(bookId)==='529'?'On the Origin of Species — Charles Darwin':'A Brief History of Time — Stephen Hawking'),
+    page:page.page,globalPageId:page.id,preview:page.text,score:50-index,
+    url:`https://example.test/#page=${page.page}`}))}),
+  jsonGzip:async(path)=>{const id=path.match(/book-(\d+)\.json/)[1];return {pages:[...pages.entries()]
+   .filter(([key])=>key.startsWith(id+':')).map(([,page])=>page)};}};
+ let answerBody;
+ const result=await evaluateLiveCase(item,{library,
+  manifest:{books:{529:{title:'On the Origin of Species — Charles Darwin'},
+   102:{title:'A Brief History of Time — Stephen Hawking'}}},
+  allowed:new Set(['529','102']),token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,
+  fetcher:async(_url,options)=>{answerBody=JSON.parse(options.body);return new Response(JSON.stringify({
+   outcome:'verified-source-draft',coverage:'full',answer:'Claims from both works [S1, S4].',
+   citations:[],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+ assert.equal(answerBody.sources.length,6);
+ assert.deepEqual(new Set(answerBody.sources.map(source=>source.bookId)),new Set(['529','102']));
+ assert.equal(result.submittedSources.length,6);
+});
+
 test('planner-only evaluation checks selected and All Books retrieval without answer calls',async()=>{
  const calls=[],searchScopes=[];
  const pages={
