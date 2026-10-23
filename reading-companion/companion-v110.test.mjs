@@ -43,16 +43,15 @@ test('companion introduction explains how to use it and links to Library Search'
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');
  const passages=client.indexOf('Key passages from the source books',answer);
- const sources=client.indexOf("'Additional sources'",passages);
  assert(answer>=0);
  assert.equal(client.includes('Explore further'),false);
  assert.doesNotMatch(client,/companion-follow-ups|companion-follow-up-buttons|followUpQuestions/);
  assert(passages>answer);
- assert(sources>passages);
- assert.match(client,/highlightedSourceKeys\.add\(citation\.id\+'\|'\+Number\(citation\.page\)\)/);
- assert.match(client,/const remainingCitations=orderedCitations\.filter\(source=>/);
- assert.match(client,/if\(remainingCitations\.length\)/);
- assert.match(client,/for\(const source of remainingCitations\)/);
+ assert.equal(client.includes("'Additional sources'"),false);
+ assert.match(client,/if\\(orderedCitations\\.length\\)/);
+ assert.match(client,/for\\(const source of orderedCitations\\)/);
+ assert.match(client,/const quote=node\\('p',excerpt,'companion-key-quote'\\)/);
+ assert.match(client,/highlight\\?\\.quote/);
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
  assert.match(html,/id="companion-book-search" type="search"/);
