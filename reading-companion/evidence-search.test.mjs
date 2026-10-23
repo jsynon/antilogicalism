@@ -121,6 +121,20 @@ test('explicit work titles narrow searches to matching catalog books',()=>{
  assert.deepEqual(matchExplicitBookIds(
   "In Homer's Odyssey, what shapes Odysseus' return home?",books),['186','540']);
 });
+test('canonical Bible references do not resolve James as William James in all-books mode',()=>{
+ const books=[
+  {id:'39',title:'The Will to Believe — William James'},
+  {id:'38',title:'The Varieties of Religious Experience — William James'},
+  {id:'335',title:'New King James Version Bible — Various authors'},
+  {id:'638',title:'The New Oxford Annotated Bible, Fully Revised Fifth Edition — edited by Michael D. Coogan'},
+ ];
+ const question='According to James 2:14–26, how does James relate faith to works, and what do Abraham and Rahab illustrate?';
+ assert.deepEqual(matchExplicitBookIds(question,books),[]);
+ assert.deepEqual(targetBooksForFacet(
+  'James 2:14-26 faith without works being dead Bible',books),[null]);
+ assert.deepEqual(targetBooksForFacet(
+  'James 2:14-26 faith without works being dead Bible',books,['39']),['39']);
+});
 test('explicitly named planner facets search their own work inside the question scope',()=>{
  const books=[
   {id:'529',title:'The Origin of Species — Charles Darwin'},
