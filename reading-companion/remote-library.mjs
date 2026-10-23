@@ -52,8 +52,9 @@ export function hasExplicitScriptureReference(text) {
 }
 function requestedPhrase(text) {
   const value=String(text||'').trim();
-  const quoted=[...value.matchAll(/[\"“]([^\"”]{2,120})[\"”]/g)]
-    .map(match=>match[1].trim()).find(Boolean);
+  const quotedDouble=value.match(/["“]([^"”]{2,120})["”]/u)?.[1];
+  const quotedSingle=value.match(/(?<![\p{L}\p{N}])['‘]([^'’\n]{2,120})['’](?![\p{L}\p{N}])/u)?.[1];
+  const quoted=(quotedDouble||quotedSingle||'').trim();
   if(quoted)return quoted;
   const patterns=[
     /^(?:what\s+does|what\s+do)\s+(.+?)\s+mean\s*[?.!]*$/i,
@@ -72,6 +73,23 @@ function exactPhraseMatchCount(text,phrase) {
     if(target.every((word,index)=>words[i+index]===word))count++;
   }
   return count;
+}
+function phraseMatchCount(text,phrase) {
+  const exact=exactPhraseMatchCount(text,phrase);
+  if(exact)return exact;
+  const target=String(phrase||'').toLowerCase().match(/[a-z0-9]+/g)||[];
+  const words=String(text||'').toLowerCase().match(/[a-z0-9]+/g)||[];
+  if(target.length<4)return 0;
+  let longest=0;
+  for(let i=0;i<target.length;i++)for(let j=0;j<words.length;j++){
+    let length=0;
+    while(i+length<target.length&&j+length<words.length&&target[i+length]===words[j+length])length++;
+    if(length>longest)longest=length;
+  }
+  // A quoted phrase may be split by a physical page boundary. A contiguous
+  // half-phrase is a retrieval lead; the adjacent-page check below verifies
+  // the complete phrase before joining the two excerpts.
+  return longest>=Math.max(3,Math.ceil(target.length/2))?1:0;
 }
 export function queryTerms(question) {
   return [...new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || [])]
@@ -115,6 +133,30 @@ function fuzzyAuthorMentions(queryTokens,books){
     if(best&&!tied)matches.set(token,{surname:best,bookIds:bySurname.get(best)});
   }
   return matches;
+}
+function stanceSourceSurname(question,books){
+  const text=String(question||'');
+  if(/\b(?:compare|contrast|differ(?:s|ed|ence|ent)?|between|versus|vs\.?)\b/i.test(text)||
+    /\band\s+(?:how|what|why|where)\b/i.test(text))return '';
+  const stance=/\b(?:think|thinks|thought|say|says|said|write|writes|wrote|argue|argues|argued|believe|believes|believed|consider|considers|considered|view|views|opinion|interpretation|criticism|critique|describe|describes|described)\b[^?!.]{0,70}\b(?:about|of|on|regarding|concerning)\b/giu;
+  const owners=new Map();
+  for(const [id,meta] of Object.entries(books||{})){
+    const byline=String(meta?.title||'').split(/\s+[—–-]\s+/).slice(1).join(' ');
+    const name=byline.toLocaleLowerCase().match(/[a-z0-9]+/g)||[];
+    const surname=name.at(-1)||'';
+    if(!surname)continue;
+    if(!owners.has(surname))owners.set(surname,new Set());
+    owners.get(surname).add(id);
+  }
+  const subjects=new Set();
+  for(const match of text.matchAll(stance)){
+    const prefix=text.slice(0,match.index).toLocaleLowerCase().match(/[a-z0-9]+/g)||[];
+    const found=[...owners].filter(([surname,ids])=>prefix.includes(surname)&&ids.size>0)
+      .map(([surname])=>surname);
+    if(found.length===1)subjects.add(found[0]);
+    else if(found.length>1)return '';
+  }
+  return subjects.size===1?[...subjects][0]:'';
 }
 
 export function decodeDeltas(deltas, total) {
@@ -223,7 +265,7 @@ export function substantivePageEvidence(text, terms, headerTerms = new Set(), ph
   // Prefer a compact passage where several topic terms meet over a page that
   // mentions many query terms in unrelated paragraphs. Whole-page coverage is
   // still useful, but should not outweigh local evidence concentration.
-  const phraseMatches=exactPhraseMatchCount(text,phrase);
+  const phraseMatches=phraseMatchCount(text,phrase);
   // A directly requested expression can be strong evidence even when its
   // page has fewer surrounding topic words than a commentary page. Reward
   // exact occurrence and modestly favor pages where it appears in context.
@@ -385,6 +427,17 @@ export class RemoteLibrary {
         mentionedAuthors.add(surname);
         for(const id of bookIds)namedAuthorBookIds.add(id);
       }
+      const stanceSurname=stanceSourceSurname(question,manifest.books);
+      if(stanceSurname){
+        mentionedAuthors.clear();
+        mentionedAuthors.add(stanceSurname);
+        namedAuthorBookIds.clear();
+        for(const [id,meta] of Object.entries(manifest.books)){
+          const byline=String(meta?.title||'').split(/\s+[—–-]\s+/).slice(1).join(' ');
+          const surname=byline.toLocaleLowerCase().match(/[a-z0-9]+/g)?.at(-1)||'';
+          if(surname===stanceSurname)namedAuthorBookIds.add(id);
+        }
+      }
     }
     const comparison = /\b(?:compare|contrast|versus|vs\.?|between)\b/i.test(question) || mentionedAuthors.size >= 2;
     const prefixes = [...new Set(terms.map(t => t.slice(0,2)))];
@@ -525,10 +578,23 @@ export class RemoteLibrary {
           bookEvidenceTerms,bookTitleTerms,phrase);
         const relevantNeighbor=neighborEvidence&&
           (neighborEvidence.localUnique>=1||neighborEvidence.phraseMatches>0);
-        if(item&&relevantNeighbor&&
-          !selected.some(entry=>entry.item.page===item.page)){
+        const phraseContinuesAcrossBoundary=phrase&&exactPhraseMatchCount(
+          neighborPage<anchor.item.page?item?.text+' '+anchor.item.text:
+            anchor.item.text+' '+item?.text,phrase)>0;
+        const selectedNeighborIndex=selected.findIndex(entry=>entry.item.page===neighborPage);
+        if(item&&relevantNeighbor&&selectedNeighborIndex>=0){
+          if(phraseContinuesAcrossBoundary){
+            const [neighbor]=selected.splice(selectedNeighborIndex,1);
+            const anchorIndex=selected.findIndex(entry=>entry.item.id===anchor.item.id);
+            selected.splice(neighborPage<anchor.item.page?anchorIndex:anchorIndex+1,0,neighbor);
+          }
+        }else if(item&&relevantNeighbor){
           if(selected.length>=pageLimit)selected.pop();
-          selected.splice(1,0,{item,rank:Math.max(0,anchor.rank-0.01),contextual:true});
+          if(neighborEvidence.localUnique>=1||phraseContinuesAcrossBoundary){
+            const anchorIndex=selected.findIndex(entry=>entry.item.id===anchor.item.id);
+            selected.splice(neighborPage<anchor.item.page?anchorIndex:anchorIndex+1,0,
+              {item,rank:Math.max(0,anchor.rank-0.01),contextual:true});
+          }
         }
       }
       for (const entry of candidates) {
