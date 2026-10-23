@@ -43,3 +43,19 @@ node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true --mode 
 Use `--mode planner` for the two planner-only cases. It still requires the live-AI confirmation and evaluation token, but makes no answer-stage inference calls.
 
 Add `CONFIRM_FULL_30=true` to the environment and choose `--mode full` to allow all 30 live questions. Never commit either secret.
+
+## Fresh holdout questions
+
+`Reading Companion holdout answer evaluation` is a separate, manually dispatched seven-question set. It does not replace or edit the original `quality` baseline. The holdout uses new prompts across history, literature, philosophy, scripture, and cross-work comparisons:
+
+| Case | Scope | What it tests |
+|---|---|---|
+| Herodotus on Helen in Egypt | One book | Separating reported testimony from the narrator’s judgment |
+| Hamlet’s “To be, or not to be” soliloquy | One book | Supporting interpretation with the right passage and rhetorical context |
+| Aristotle on soul, body, form, and matter | One book | Explaining a conceptual relation without overclaiming |
+| James on faith and works | One book | Complete passage coverage and distinct examples |
+| Hume and Kant on causal necessity | All Books | Accurate two-source comparison |
+| Plato and Rousseau on political order | All Books | Distinguishing authors’ arguments while synthesizing |
+| Wollstonecraft and Du Bois on social conditions | All Books | Cross-discipline comparison with careful attribution |
+
+The default `selected-books` run keeps the four one-book cases restricted to their selected work and uses curated fixed queries for all seven; the three comparison cases still search across books. It estimates 14 baseline answer/review inference calls, plus any conditional Worker repairs. The `all-books` option uses the live planner for each question and estimates 21 baseline calls (7 planner + 14 answer/review), plus conditional repairs. You can select one case to keep a diagnostic run smaller. Both choices require the live-AI confirmation. Review answer text and cited passages manually; the automated checks remain structural and do not establish semantic accuracy.
