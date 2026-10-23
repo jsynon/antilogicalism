@@ -38,7 +38,7 @@ test('companion introduction explains how to use it and links to Library Search'
  assert.match(html,/Ask questions about books in the Antilogicalism library/);
  assert.match(html,/Select a book or leave “All books” selected, enter your question/);
  assert(html.includes('href="/antilogicalism/digital-library/">Library Search</a>'));
- assert(html.includes('Browse the full Bookshelf</a> or use <a href="/antilogicalism/digital-library/">Library Search</a>.'));
+ assert(html.includes('Search the full-text collection with <a href="/antilogicalism/digital-library/">Library Search</a> or browse books by title with the <a href="/antilogicalism/primary-sources/">Bookshelf</a>.'));
  assert.doesNotMatch(html,/all 642 searchable titles|644-book library/);
 });
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
