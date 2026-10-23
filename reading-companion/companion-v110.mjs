@@ -443,7 +443,7 @@ function renderResponse(data,turnQuestion=''){
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
       link.textContent='Open PDF · ['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · p. '+source.page;
-      const read=node('button','Read passage on this page','companion-inline-read');
+      const read=node('button','Read passage','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
         try{await sourceReader.open({...source,excerpt},read);}
