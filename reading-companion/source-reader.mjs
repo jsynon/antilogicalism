@@ -54,10 +54,10 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
   const root=byId('companion-source-reader');
   const title=byId('companion-source-title'),meta=byId('companion-source-meta');
   const status=byId('companion-reader-status'),viewer=byId('companion-source-text');
-  const quoteBox=byId('companion-source-quote'),previous=byId('companion-source-prev');
+  const previous=byId('companion-source-prev');
   const next=byId('companion-source-next'),close=byId('companion-close-source');
   const pdf=byId('companion-source-pdf');
-  if([root,title,meta,status,viewer,quoteBox,previous,next,close,pdf].some(x=>!x))
+  if([root,title,meta,status,viewer,previous,next,close,pdf].some(x=>!x))
     throw Error('The in-page source reader markup is missing.');
   let active=null,requestId=0,returnFocus=null;
 
@@ -76,10 +76,8 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     title.textContent=source.title||'Original source';
     const normalizedNkjv=String(source.bookId)==='335';
     meta.textContent='Physical PDF page '+page.page+' · '+
-      (normalizedNkjv?'Readable v47 text; known NKJV OCR ligatures normalized':
-        'Readable paragraphs from indexed v47 text');
-    quoteBox.hidden=!quotation;
-    quoteBox.textContent=normalizeKnownOcrArtifacts(quotation,source.bookId);
+      (normalizedNkjv?'v47 OCR text; known NKJV ligatures normalized':
+        'v47 OCR text formatted as paragraphs');
     const shown=renderHighlightedText(viewer,page.text,quotation,source.bookId);
     if(quotation){
       status.textContent=shown.matched?
@@ -112,7 +110,7 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     root.scrollIntoView({block:'start',behavior:'smooth'});
     title.textContent='Loading source page…';
     status.textContent='Reading the original indexed book…';
-    viewer.replaceChildren();quoteBox.hidden=true;
+    viewer.replaceChildren();
     previous.disabled=true;next.disabled=true;pdf.removeAttribute('href');
     try{
       const [shard,manifest]=await Promise.all([getBook(bookId),getManifest()]);
