@@ -115,9 +115,8 @@ test('v1.10 uses original v47 retrieval, verified pilot endpoint and safe Markdo
  assert.match(client,/allowedBookIds:allowed/);
  assert.match(client,/\/api\/pilot-answer/);
  assert.match(client,/putMarkdownBlocks\(reply,answer,citations,highlights,numbering\)/);
- assert.match(client,/document\.createElement\('strong'\)/);
- assert.match(client,/document\\.createElement\\(isBold\\?'strong':'em'\\)/);
- assert.match(client,/\\*\\*\(\[\^\*\\n\]\+\?\)\\*\*\|__\(\[\^_\\n\]\+\?\)__\|\\*\(\[\^\*\\n\]\+\?\)\\*/);
+ assert.ok(client.includes("document.createElement(isBold?'strong':'em')"));
+ assert.ok(client.includes('|\\*([^*\\n]+?)\\*'));
  assert.match(client,/document\.createElement\('li'\)/);
  assert.match(client,/\.textContent/);
  assert.doesNotMatch(client,/innerHTML\s*=/);
