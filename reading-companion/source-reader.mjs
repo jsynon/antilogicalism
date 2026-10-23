@@ -75,9 +75,7 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     const quotation=onCitedPage && typeof source.excerpt==='string'?source.excerpt:'';
     title.textContent=source.title||'Original source';
     const normalizedNkjv=String(source.bookId)==='335';
-    meta.textContent='Physical PDF page '+page.page+' · '+
-      (normalizedNkjv?'v47 OCR text; known NKJV ligatures normalized':
-        'v47 OCR text formatted as paragraphs');
+    meta.textContent='Physical PDF page '+page.page;
     const shown=renderHighlightedText(viewer,page.text,quotation,source.bookId);
     if(quotation){
       status.textContent=shown.matched?
