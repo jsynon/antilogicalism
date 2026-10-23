@@ -384,7 +384,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot button.companion-inline-read:hover{background:#111518;border-color:#111518;color:#fff}
 #companion-pilot button.companion-inline-read:focus-visible{outline:2px solid #111;outline-offset:2px}
 #companion-pilot #companion-source-reader[hidden],
-#companion-pilot #companion-source-quote[hidden]{display:none!important}
 #companion-pilot .companion-source-reader{margin:1.6em 0;padding:1em;border:1px solid #d5d8da;border-top:3px solid #333;background:#fff}
 #companion-pilot .companion-source-reader h2{text-align:left;margin:.45em 0 .25em;font-size:1.58em;font-style:italic}
 #companion-pilot .companion-reader-meta{margin:.3em 0 .7em;font-size:.89em;color:#61696e}
@@ -397,8 +396,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-source-text{max-height:65vh;overflow-y:auto;overflow-wrap:anywhere;border-top:1px solid #dfe2e3;padding-top:.8em;line-height:1.8;font-size:1em}
 #companion-pilot .companion-source-text p{margin:0 0 1em;text-indent:0;white-space:normal}
 #companion-pilot .companion-source-text mark.cited-highlight{background:#fff0a5;color:#111;box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:1px 0}
-#companion-pilot #companion-source-quote{position:static!important;padding:.6em .75em!important;margin:.7em 0!important;border-left:2px solid #aaa!important;background:#fafafa!important;text-indent:0!important;white-space:pre-wrap}
-#companion-pilot #companion-source-quote::before,#companion-pilot #companion-source-quote::after{display:none!important;content:none!important}
 #companion-pilot .companion-diagnostics{margin:1rem 0;padding:.65rem 0;border-top:1px solid #dfe2e3}
 #companion-pilot .companion-diagnostic-toggle{display:flex;align-items:flex-start;gap:.5em;font-size:.92em}
 #companion-pilot .companion-diagnostic-toggle input{margin-top:.35em}
@@ -480,7 +477,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <div class="companion-source-actions"><button type="button" id="companion-close-source">← Return to answer</button></div>
 <h2 id="companion-source-title">Original source</h2>
 <p id="companion-source-meta" class="companion-reader-meta"></p>
-<blockquote id="companion-source-quote" hidden></blockquote>
 <p id="companion-reader-status" role="status" aria-live="polite" class="companion-hint"></p>
 <div class="companion-source-actions">
 <button type="button" id="companion-source-prev" disabled>← Previous page</button>
