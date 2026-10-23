@@ -10,7 +10,7 @@ const bookOrder=await import('./book-order.mjs');
 test('response citation labels are plain ordered numbers while IDs stay internal',()=>{
  assert.match(client,/buildCitationNumbering\(answer,citations\)/);
  assert.match(client,/sortCitationsByNumber\(citations,numbering\)/);
- assert.match(client,/citationDisplayLabel\(item\.source_id,numbering\)/);
+ assert.ok(client.includes('highlight=highlights.find(item=>'));
  assert.match(client,/citationDisplayLabel\(source\.id,numbering\)/);
  assert.match(client,/putMarkdownBlocks\(reply,answer,citations,highlights,numbering\)/);
 });
@@ -43,16 +43,15 @@ test('companion introduction explains how to use it and links to Library Search'
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');
  const passages=client.indexOf('Key passages from the source books',answer);
- const sources=client.indexOf("'Additional sources'",passages);
  assert(answer>=0);
  assert.equal(client.includes('Explore further'),false);
  assert.doesNotMatch(client,/companion-follow-ups|companion-follow-up-buttons|followUpQuestions/);
  assert(passages>answer);
- assert(sources>passages);
- assert.match(client,/highlightedSourceKeys\.add\(citation\.id\+'\|'\+Number\(citation\.page\)\)/);
- assert.match(client,/const remainingCitations=orderedCitations\.filter\(source=>/);
- assert.match(client,/if\(remainingCitations\.length\)/);
- assert.match(client,/for\(const source of remainingCitations\)/);
+ assert.equal(client.includes("'Additional sources'"),false);
+ assert.ok(client.includes('if(orderedCitations.length)'));
+ assert.ok(client.includes('for(const source of orderedCitations)'));
+ assert.ok(client.includes("node('p',excerpt,'companion-key-quote')"));
+ assert.ok(client.includes('highlight?.quote'));
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
  assert.match(html,/id="companion-book-search" type="search"/);
@@ -157,7 +156,7 @@ test('public companion copy explains cited sources and keeps source reading cont
 test('answer citations open in the local page reader while Sources keeps the PDF link',()=>{
  assert.ok(client.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map())'));
  assert.ok(client.includes("sourceReader.open({...source,excerpt:evidence?.quote||''},a)"));
- assert.ok(client.includes("sourceReader.open({...citation,excerpt:item.quote},read)"));
+ assert.ok(client.includes("sourceReader.open({...source,excerpt},read)"));
  assert.ok(client.includes('link.href=source.url'));
  assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
 });

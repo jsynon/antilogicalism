@@ -428,68 +428,31 @@ function renderResponse(data,turnQuestion=''){
     turn.append(node('p',label+missing,'companion-hint'));
   }
 
-  const highlightedSourceKeys=new Set();
-  if(highlights.length){
+  if(orderedCitations.length){
     const panel=node('section',undefined,'companion-highlights');
     panel.append(node('h3','Key passages from the source books'));
-    const orderedHighlights=highlights.slice(0,3).sort((a,b)=>
-      (numbering.get(String(a.source_id))||Number.MAX_SAFE_INTEGER)-
-      (numbering.get(String(b.source_id))||Number.MAX_SAFE_INTEGER));
-    for(const item of orderedHighlights){
-      if(typeof item.quote!=='string'||!item.quote.trim()||
-        typeof item.url!=='string')continue;
-      const citation=citations.find(source=>source.id===item.source_id&&
-        Number(source.page)===Number(item.page));
-      if(!citation)continue;
-      const original=sourcePage(citation);
-      const card=node('article',undefined,'companion-key-passage');
-      const quote=node('p',item.quote,'companion-key-quote');
-      const a=document.createElement('a');a.href=item.url;
-      a.target='_blank';a.rel='noopener noreferrer';
-      a.textContent='['+citationDisplayLabel(item.source_id,numbering)+'] '+item.title+' · PDF p. '+item.page;
-      const read=node('button','Read passage','companion-inline-read');
-      read.type='button';
-      read.addEventListener('click',async()=>{
-        try{await sourceReader.open({...citation,excerpt:item.quote},read);}
-        catch(error){setStatus('Source reader: '+error.message);}
-      });
-      card.append(quote,a,read);
-      panel.append(card);
-      highlightedSourceKeys.add(citation.id+'|'+Number(citation.page));
-    }
-    turn.append(panel);
-  }
-  const remainingCitations=orderedCitations.filter(source=>
-    !highlightedSourceKeys.has(source.id+'|'+Number(source.page)));
-  if(remainingCitations.length){
-    const sources=node('section',undefined,'companion-citations');
-    sources.append(node('h3','Additional sources'));
-    for(const source of remainingCitations){
-      const row=node('article',undefined,'companion-source-entry');
-      const label=node('p');
-      const link=document.createElement('a');link.href=source.url;
-      link.target='_blank';link.rel='noopener noreferrer';
-      link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · PDF page '+source.page;
-      label.append(link);row.append(label);
-      // The original PDF link remains untouched. The new button opens a
-      // separate in-page reader using the same trusted v47 book shard.
-      const highlight=(Array.isArray(data.evidenceHighlights)?
-        data.evidenceHighlights:[]).find(h=>
-        h.source_id===source.id&&Number(h.page)===Number(source.page));
+    for(const source of orderedCitations){
+      const highlight=highlights.find(item=>
+        item.source_id===source.id&&Number(item.page)===Number(source.page));
       const original=sourcePage(source);
       const excerpt=(typeof highlight?.quote==='string'&&highlight.quote.trim())?
-        highlight.quote:(original?.preview||source.preview||'');
+        highlight.quote:String(original?.preview||source.preview||original?.text||'')
+          .replace(/\\s+/g,' ').trim().slice(0,600);
+      const card=node('article',undefined,'companion-key-passage');
+      const quote=node('p',excerpt,'companion-key-quote');
+      const link=document.createElement('a');link.href=source.url;
+      link.target='_blank';link.rel='noopener noreferrer';
+      link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · PDF p. '+source.page;
       const read=node('button','Read passage','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
-        try{
-          await sourceReader.open({...source,excerpt},read);
-        }catch(error){setStatus('Source reader: '+error.message);}
+        try{await sourceReader.open({...source,excerpt},read);}
+        catch(error){setStatus('Source reader: '+error.message);}
       });
-      row.append(read);
-      sources.append(row);
+      card.append(quote,link,read);
+      panel.append(card);
     }
-    turn.append(sources);
+    turn.append(panel);
   }
   turn.append(node('p','Citations link to the original PDF pages. Scanned text and interpretations can contain errors.','companion-hint'));
   if(diagnosticState){
