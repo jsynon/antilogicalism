@@ -315,7 +315,7 @@ function sourcePage(source){
   return candidates.find(page=>page.bookId===String(source.bookId) &&
     page.page===Number(source.page))||null;
 }
-function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
+function appendCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
   const byId=new Map(citations.map(s=>[s.id,s]));
   const groups=inlineCitationGroups(answer);
   let at=0;
@@ -354,6 +354,56 @@ function putCitationTokens(target,answer,citations,evidenceHighlights=[],numberi
   }
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
 }
+function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
+  const pattern=/\*\*([^*\n]+?)\*\*|__([^_\n]+?)__/g;
+  let at=0;
+  for(const match of answer.matchAll(pattern)){
+    if(match.index>at)appendCitationTokens(target,answer.slice(at,match.index),
+      citations,evidenceHighlights,numbering);
+    const strong=document.createElement('strong');
+    appendCitationTokens(strong,match[1]??match[2],citations,evidenceHighlights,numbering);
+    target.append(strong);
+    at=match.index+match[0].length;
+  }
+  if(at<answer.length)appendCitationTokens(target,answer.slice(at),
+    citations,evidenceHighlights,numbering);
+}
+function putMarkdownBlocks(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
+  let paragraph=[];
+  let list=null;
+  let listType='';
+  const flushParagraph=()=>{
+    if(!paragraph.length)return;
+    const p=document.createElement('p');
+    putCitationTokens(p,paragraph.join(' ').trim(),citations,evidenceHighlights,numbering);
+    target.append(p);
+    paragraph=[];
+  };
+  for(const line of String(answer).replace(/\r\n?/g,'\n').split('\n')){
+    const bullet=line.match(/^\s*(?:[*+-]|\d+[.)])\s+(.+?)\s*$/);
+    if(bullet){
+      flushParagraph();
+      const nextListType=/^\s*\d/.test(line)?'ol':'ul';
+      if(!list||listType!==nextListType){
+        list=document.createElement(nextListType);
+        target.append(list);
+        listType=nextListType;
+      }
+      const item=document.createElement('li');
+      putCitationTokens(item,bullet[1],citations,evidenceHighlights,numbering);
+      list.append(item);
+      continue;
+    }
+    if(!line.trim()){
+      flushParagraph();
+      continue;
+    }
+    list=null;
+    listType='';
+    paragraph.push(line);
+  }
+  flushParagraph();
+}
 function renderResponse(data,turnQuestion=''){
   const turn=node('article',undefined,'companion-turn');
   if(turnQuestion)turn.append(node('p','Question: '+turnQuestion,'companion-turn-question'));
@@ -365,7 +415,7 @@ function renderResponse(data,turnQuestion=''){
   turn.append(node('h2',data.outcome==='insufficient-evidence'?
     'Insufficient evidence':'Reading Companion answer'));
   const reply=node('div',undefined,'companion-answer-text');
-  putCitationTokens(reply,answer,citations,highlights,numbering);
+  putMarkdownBlocks(reply,answer,citations,highlights,numbering);
   turn.append(reply);
   const missing=String(data.missing||'').trim();
   const normalizeNotice=value=>String(value||'').normalize('NFKC').toLocaleLowerCase()
