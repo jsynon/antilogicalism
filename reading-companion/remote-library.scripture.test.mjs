@@ -48,3 +48,31 @@ test('a cited Bible passage prefers unannotated verse text over topical and anno
  assert(result.sources.some(source=>source.bookId==='335'&&source.page===5546));
  assert.match(result.sources.find(source=>source.bookId==='335').preview,/love one another/i);
 });
+
+test('a James chapter-and-verse question cannot be narrowed to William James works',async()=>{
+ const jamesFixture={
+  'manifest.json':{
+   version:47,postings_encoding:'delta-json-v1',prefix_length:2,
+   pages:2,page_books:[39,335],partitions:['fa'],
+   books:{
+    '39':{title:'The Will to Believe — William James',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+    '335':{title:'New King James Version Bible — Various authors',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
+   }
+  },
+  'terms-fa.json':{faith:[0,1]},
+  'book-39.json':{pages:[{id:0,page:12,text:'William James discusses religious faith and practical belief in his philosophical writing.'}]},
+  'book-335.json':{pages:[{id:1,page:5546,text:'James 2 14 My brethren what does it profit if someone says he has faith but does not have works? Faith without works is dead. Abraham and Rahab illustrate this teaching.'}]}
+ };
+ const library=new RemoteLibrary('https://example.test/v47/',url=>{
+  const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  return Promise.resolve(key in jamesFixture?
+   new Response(gzipSync(JSON.stringify(jamesFixture[key])),{status:200}):
+   new Response('Not found',{status:404}));
+ });
+ const result=await library.search(
+  'According to James 2:14–26, how does James relate faith to works, and what do Abraham and Rahab illustrate?',
+  {maxBooks:2,pagesPerBook:2});
+ assert(result.sources.length>0);
+ assert.equal(result.sources[0].bookId,'335');
+ assert.match(result.sources.find(source=>source.bookId==='335').preview,/Abraham and Rahab/i);
+});
