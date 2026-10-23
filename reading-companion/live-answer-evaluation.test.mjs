@@ -22,6 +22,31 @@ test('quality mode selects seven cross-discipline cases across selected-book and
  assert.ok(cases.every(item=>item.planner_queries.length===2&&item.review_focus.length>=2));
 });
 
+test('holdout mode selects a separate seven-question set across disciplines',()=>{
+ const cases=selectLiveCases({cases:[]},'holdout');
+ assert.equal(cases.length,7);
+ assert.deepEqual(new Set(cases.map(item=>item.discipline)),new Set(['history','literature','philosophy','religion','politics','society']));
+ assert.equal(cases.filter(item=>item.selected_book_ids.length>0).length,4);
+ assert.equal(cases.filter(item=>item.selected_book_ids.length===0).length,3);
+ assert.ok(cases.every(item=>item.planner_queries.length===2&&item.review_focus.length>=2));
+ assert.ok(cases.every(item=>item.id.startsWith('holdout-')));
+ assert.equal(selectLiveCases({cases:[]},'quality').length,7,'the original quality baseline remains intact');
+});
+
+test('holdout all-books scope and single-case selection behave independently of the baseline',()=>{
+ const cases=selectLiveCases({cases:[]},'holdout');
+ const allBooks=applyQualityScope(cases,'all-books');
+ assert.equal(allBooks.length,7);
+ assert.ok(allBooks.every(item=>item.selected_book_ids.length===0));
+ assert.equal(cases.filter(item=>item.selected_book_ids.length>0).length,4,
+  'applying all-books scope must not mutate holdout cases');
+ const selected=selectLiveCases({cases:[]},'holdout','holdout-religion-james-faith-works');
+ assert.equal(selected.length,1);
+ assert.deepEqual(selected[0].required_source_groups[0].book_ids,['335']);
+ assert.throws(()=>selectLiveCases({cases:[]},'holdout','quality-history-thucydides-causes'),/Unknown holdout case/);
+ assert.throws(()=>selectLiveCases({cases:[]},'smoke','holdout-religion-james-faith-works'),/only in quality or holdout mode/);
+});
+
 test('all-books quality scope runs every question without a selected-book restriction',()=>{
  const selected=selectLiveCases({cases:[]},'quality');
  const allBooks=applyQualityScope(selected,'all-books');
@@ -30,7 +55,7 @@ test('all-books quality scope runs every question without a selected-book restri
  assert.ok(allBooks.every(item=>item.required_source_groups.length>=1));
  assert.equal(selected.filter(item=>item.selected_book_ids.length>0).length,4,
   'applying the scope must not mutate the selected-book suite');
- assert.throws(()=>applyQualityScope(selected,'invalid'),/Quality scope must be/);
+ assert.throws(()=>applyQualityScope(selected,'invalid'),/Evaluation scope must be/);
 });
 
 test('quality mode can select exactly one named case for a low-cost live check',()=>{
@@ -40,7 +65,7 @@ test('quality mode can select exactly one named case for a low-cost live check',
  assert.equal(cases[0].id,id);
  assert.deepEqual(cases[0].required_source_groups.map(group=>group.book_ids),[['529'],['102']]);
  assert.throws(()=>selectLiveCases({cases:[]},'quality','not-a-quality-case'),/Unknown quality case/);
- assert.throws(()=>selectLiveCases({cases:[]},'smoke',id),/only in quality mode/);
+ assert.throws(()=>selectLiveCases({cases:[]},'smoke',id),/only in quality or holdout mode/);
 });
 
 test('planner mode selects one selected-book case and one All Books cross-work case',()=>{
