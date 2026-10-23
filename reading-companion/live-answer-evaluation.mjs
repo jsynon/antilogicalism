@@ -5,7 +5,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
+import {RemoteLibrary,DEFAULT_INDEX_ROOT,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet} from './evidence-search.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -267,7 +267,8 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
  const searchSets=await Promise.all(searchQueries.map(async query=>{
   const facetBookIds=targetBooksForFacet(query,bookCatalog,targetBookIds[0]===null?null:targetBookIds);
   const targeted=await Promise.all(facetBookIds.map(bookId=>
-   library.search(query,{...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks:2,pagesPerBook:3})));
+   library.search(query,{...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,
+    maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK})));
   return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])
    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
  }));
@@ -282,8 +283,12 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   populated.push({...source,text:pages[0].text,byteLength:bytes});
  }
  if(!populated.length)throw Error('Retrieval returned no fingerprint-eligible source pages.');
+ // Match the public companion's answer packet limits. A four-page / 30 KB
+ // evaluation can omit a strong passage that the website itself would send,
+ // especially when an all-books question needs evidence from several facets.
  const selected=selectAnswerSources(populated,item.question,'evaluation-runner-token',{
-  maxSources:4,maxBytes:30_000,history:[],plannedFacetCount:Math.max(0,searchQueries.length-1)});
+  maxSources:6,maxBytes:39_000,maxSourceBytes:35_000,history:[],
+  plannedFacetCount:Math.max(0,searchQueries.length-1)});
  if(!selected.length)throw Error('No source pages fit the Worker request limit.');
  for(const source of selected){
   const book=manifest.books[String(source.bookId)];
