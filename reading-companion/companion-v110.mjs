@@ -319,7 +319,7 @@ function putCitationTokens(target,answer,citations,evidenceHighlights=[],numberi
   const byId=new Map(citations.map(s=>[s.id,s]));
   const groups=inlineCitationGroups(answer);
   let at=0;
-  const appendCitation=(id)=>{
+  const appendCitation=(id,citationGroup)=>{
     const source=byId.get(id);
     if(source){
       const a=document.createElement('button');
@@ -336,17 +336,20 @@ function putCitationTokens(target,answer,citations,evidenceHighlights=[],numberi
           await sourceReader.open({...source,excerpt:evidence?.quote||''},a);
         }catch(error){setStatus('Source reader: '+error.message);}
       });
-      target.append(a);
-    }else target.append(document.createTextNode(citationDisplayLabel(id,numbering)));
+      citationGroup.append(a);
+    }else citationGroup.append(document.createTextNode(citationDisplayLabel(id,numbering)));
   };
   for(const group of groups){
     if(group.start>at)target.append(document.createTextNode(answer.slice(at,group.start)));
-    target.append(document.createTextNode('['));
+    const citationGroup=document.createElement('span');
+    citationGroup.style.whiteSpace='nowrap';
+    citationGroup.append(document.createTextNode('['));
     group.ids.forEach((id,index)=>{
-      if(index)target.append(document.createTextNode(', '));
-      appendCitation(id);
+      if(index)citationGroup.append(document.createTextNode(', '));
+      appendCitation(id,citationGroup);
     });
-    target.append(document.createTextNode(']'));
+    citationGroup.append(document.createTextNode(']'));
+    target.append(citationGroup);
     at=group.end;
   }
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
