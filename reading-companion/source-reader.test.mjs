@@ -100,7 +100,9 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(source,/getBook\(bookId\)/);
  assert.match(source,/function renderHighlightedText/);
  assert.match(source,/renderHighlightedText\(viewer,page\.text,quotation,source\.bookId\)/);
- assert.match(source,/v47 OCR text formatted as paragraphs/);
+ assert.match(source,/meta\.textContent='Physical PDF page '\+page\.page/);
+ assert.doesNotMatch(source,/v47 OCR text formatted as paragraphs|v47 OCR text/);
+ assert.match(html,/#companion-pilot \.companion-source-reader\[hidden\]\{display:none!important\}/);
  assert.doesNotMatch(source,/companion-source-quote|quoteBox/);
  assert.doesNotMatch(html,/companion-source-quote|<blockquote/);
  assert.doesNotMatch(source,/originalLayout|original-ocr|companion-source-layout/);
