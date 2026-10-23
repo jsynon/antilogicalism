@@ -262,3 +262,34 @@ test('uppercase proper-name fragments also retain a relevant previous page',asyn
  assert.deepEqual(result.sources.map(source=>source.page),[146,145]);
  assert(result.sources[1].preview.includes('Helen'));
 });
+
+test('an ellipsis-truncated final connector retains the relevant next page',async()=>{
+ const corpus={
+  'manifest.json':{
+   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+   page_books:[212,212,212],partitions:['ha','so','dr'],
+   books:{'212':{title:'The Complete Works of William Shakespeare — William Shakespeare',
+    drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
+  },
+  'terms-ha.json':{hamlet:[0,1]},
+  'terms-so.json':{soliloquy:[0,1]},
+  'terms-dr.json':{dreams:[1,1]},
+  'book-212.json':{pages:[
+   {id:0,page:453,text:'Hamlet’s soliloquy weighs a painful choice; the speech contrasts endurance and ending life. Ham. To…'},
+   {id:1,page:80,text:'A Hamlet soliloquy discusses a separate introductory passage.'},
+   {id:2,page:454,text:'be, or not to be? Dreams after death may follow.'}
+  ]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const result=await finder.search('Hamlet soliloquy dreams',{
+  allowedBookIds:new Set(['212']),maxBooks:1,pagesPerBook:2
+ });
+ assert.deepEqual(result.sources.map(source=>source.page),[453,454]);
+ assert(result.sources[1].preview.includes('Dreams after death'));
+});
