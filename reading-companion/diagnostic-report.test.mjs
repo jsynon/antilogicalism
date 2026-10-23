@@ -23,7 +23,9 @@ test('parses grouped citation markers and the UI renders each source link',()=>{
  assert.match(client,/const citationAudit=auditCitationIds\(data\.answer,responseCitations\)/);
  assert.match(client,/citationAudit\.inlineIdsWithoutSource\.length/);
  assert.match(client,/const groups=inlineCitationGroups\(answer\)/);
- assert.match(client,/appendCitation\(id\)/);
+ assert.match(client,/appendCitation\(id,citationGroup\)/);
+ assert.match(client,/citationGroup\.style\.whiteSpace='nowrap'/);
+ assert.match(client,/citationGroup\.append\(document\.createTextNode\('\]'\)\)/);
  const audit=auditCitationIds(answer,[{id:'S1'},{id:'S3'}]);
  assert.deepEqual(audit.inlineIdsWithoutSource,[]);
 });
