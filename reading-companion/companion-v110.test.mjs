@@ -10,14 +10,14 @@ const bookOrder=await import('./book-order.mjs');
 test('response citation labels are plain ordered numbers while IDs stay internal',()=>{
  assert.match(client,/buildCitationNumbering\(answer,citations\)/);
  assert.match(client,/sortCitationsByNumber\(citations,numbering\)/);
- assert.match(client,/highlight\.find\(item=>/);
+ assert.ok(client.includes('highlight=highlights.find(item=>'));
  assert.match(client,/citationDisplayLabel\(source\.id,numbering\)/);
  assert.match(client,/putMarkdownBlocks\(reply,answer,citations,highlights,numbering\)/);
 });
 
 test('structured missing-evidence notice is not repeated when answer already states it',()=>{
  assert.ok(client.includes('normalizeNotice(answer).includes(normalizeNotice(missing))'));
- assert.ok(client.includes("replace(/[^\p{L}\p{N}]+/gu,' ').trim()"));
+ assert.ok(client.includes("replace(/[^\\p{L}\\p{N}]+/gu,' ').trim()"));
  assert.ok(client.includes('if(missing&&!answerAlreadyContainsMissing)'));
 });
 test('unverified answer drafts get an evidence-check label instead of a source-gap claim',()=>{
@@ -48,10 +48,10 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.doesNotMatch(client,/companion-follow-ups|companion-follow-up-buttons|followUpQuestions/);
  assert(passages>answer);
  assert.equal(client.includes("'Additional sources'"),false);
- assert.match(client,/if\(orderedCitations\.length\)/);
- assert.match(client,/for\(const source of orderedCitations\)/);
- assert.match(client,/const quote=node\('p',excerpt,'companion-key-quote'\)/);
- assert.match(client,/highlight\?\.quote/);
+ assert.ok(client.includes('if(orderedCitations.length)'));
+ assert.ok(client.includes('for(const source of orderedCitations)'));
+ assert.ok(client.includes("node('p',excerpt,'companion-key-quote')"));
+ assert.ok(client.includes('highlight?.quote'));
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
  assert.match(html,/id="companion-book-search" type="search"/);
