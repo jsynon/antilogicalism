@@ -96,7 +96,7 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  for(const id of ids)assert(html.includes('id="'+id+'"'),id+' markup');
  assert.match(html,/id="companion-source-reader"[^>]+hidden/);
  assert.match(client,/Read passage/);
- assert.match(client,/label\.append\(link\);row\.append\(label\)/);
+ assert.match(client,/link\.href=source\.url/);
  assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
  assert.match(client,/sourceReader\.open\(\{\.\.\.source,excerpt\},read\)/);
  assert.match(source,/isAllowedBook\(bookId\)/);
