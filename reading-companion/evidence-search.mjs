@@ -1,3 +1,5 @@
+import {hasExplicitScriptureReference} from './remote-library.mjs';
+
 /* Merge two independently retrieved question facets, retaining alternatives
  * for source selection and manual inspection.
  * No generated claim or PDF locator is trusted by this component.
@@ -87,13 +89,13 @@ export function mergeFacetSearches(results,limit=8){
      matchedFacets:facets.size,facetRanks}));
 }
 export function validSearchPlan(value){
- return Array.isArray(value)&&value.length>=2&&value.length<=4&&
+ return Array.isArray(value)&&value.length===2&&
    value.every(q=>typeof q==='string'&&q.trim().length>=12&&q.trim().length<=160)&&
-   new Set(value.map(q=>q.trim().toLocaleLowerCase())).size===value.length;
+   value[0].trim().toLowerCase()!==value[1].trim().toLowerCase();
 }
 
-/* Keep the reader's exact wording as a lexical facet alongside the planner's
- * rewrites. This lets retrieval recover source language the planner
+/* Keep the reader's exact wording as a lexical facet alongside the two
+ * planner rewrites. This lets retrieval recover source language the planner
  * paraphrases away. Search remains local to the published index and spends no
  * additional model calls. */
 export function buildSearchFacets(question,plannedQueries,bookId=''){
@@ -188,6 +190,11 @@ function comparisonAuthorOrder(question,candidates,facetBalanced,directFacet){
 }
 export function matchExplicitBookIds(question,books){
  if(typeof question!=='string'||!Array.isArray(books))return [];
+ // A canonical chapter-and-verse locator such as "James 2:14–26" is a
+ // scripture reference, not an author-only mention of William James. Let the
+ // library's scripture-aware ranking choose a Bible edition instead of
+ // narrowing the all-books search to works by an author with that surname.
+ if(hasExplicitScriptureReference(question))return [];
  const valid=books.filter(book=>/^[1-9]\d{0,3}$/.test(String(book?.id||''))&&
   typeof book?.title==='string');
  const titleMatches=valid.filter(book=>
@@ -229,6 +236,11 @@ export function matchExplicitBookIds(question,books){
 export function targetBooksForFacet(query,books,allowedBookIds=null){
  const scoped=Array.isArray(allowedBookIds)&&allowedBookIds.length
   ?allowedBookIds.map(String):null;
+ // Preserve a reader's explicit selected-book filter, but do not let a
+ // canonical Bible locator become a false author-title constraint in an
+ // all-books facet. RemoteLibrary.search recognizes the same locator and
+ // boosts indexed Bible editions when it searches the full catalog.
+ if(hasExplicitScriptureReference(String(query||'')))return scoped?.length?scoped:[null];
  const matches=matchExplicitBookIds(String(query||''),books)
   .filter(id=>!scoped||scoped.includes(String(id)));
  if(matches.length)return matches;
@@ -239,8 +251,7 @@ export function targetBooksForFacet(query,books,allowedBookIds=null){
  * direct search with the reader's own wording. Keep explicit request denials
  * and rate limits fail-closed. */
 export function canFallbackToDirectSearch(status,code=''){
- if(['ai-daily-limit-reached','ai-daily-free-allocation','ai-provider-usage-limit',
-   'ai-credit-limit','ai-capacity-unavailable','ai-rate-limited'].includes(code))return false;
+ if(['ai-daily-limit-reached','ai-capacity-unavailable','ai-rate-limited'].includes(code))return false;
  if(status===null||status===undefined)return true;
  if(Number.isInteger(status)&&status>=500)return true;
  if(Number.isInteger(status)&&status>=400)return false;
