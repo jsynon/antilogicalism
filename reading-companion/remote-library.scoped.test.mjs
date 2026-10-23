@@ -199,6 +199,42 @@ test('all-books search honors an explicitly named author when limiting candidate
  assert(result.sources.every(source=>source.bookId==='7'));
 });
 
+test('a named scene routed through its canonical author prefers the primary collected work',async()=>{
+ const corpus={
+  'manifest.json':{
+   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
+   page_books:[212,552],partitions:['ha','sh'],
+   books:{
+    '212':{title:'The Complete Works of William Shakespeare — William Shakespeare',
+     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+    '552':{title:'French and English Philosophers (Harvard Classics, Vol. 34) — René Descartes, Jean-Jacques Rousseau, Voltaire, and Thomas Hobbes',
+     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
+   }
+  },
+  'terms-ha.json':{hamlet:[0,1]},
+  'terms-sh.json':{shakespeare:[0]},
+  'book-212.json':{pages:[
+   {id:0,page:453,text:'Hamlet. To be, or not to be: that is the question. Whether it is nobler to suffer fortune or to take arms against troubles.'}
+  ]},
+  'book-552.json':{pages:[
+   {id:1,page:140,text:'Voltaire translates Shakespeare: To be, or not to be? Whether it is nobler to suffer fortune or take arms against troubles.'}
+  ]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const result=await finder.search("Hamlet William Shakespeare 'To be, or not to be'",{
+  maxBooks:2,pagesPerBook:2
+ });
+ assert(result.sources.length>0);
+ assert.deepEqual([...new Set(result.sources.map(source=>source.bookId))],['212']);
+ assert.match(result.sources[0].title,/Complete Works of William Shakespeare/);
+});
+
 test('a thinker named as the subject of another author’s view is not searched as its source',async()=>{
  const corpus={
   'manifest.json':{

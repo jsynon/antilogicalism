@@ -4,12 +4,12 @@
  */
 function normalizeKnownOcrArtifacts(text,bookId='') {
   const value=String(text == null ? '' : text);
-  // In the NKJV shard these OCR glyph substitutions recur across thousands
-  // of pages: Ɵ represents “ti” (e.g. propiƟaƟon), and Ʃ represents “tt”
-  // (e.g. begoƩen). Scope the repair to this verified book and to the
-  // readable display; the original OCR layout remains available unchanged.
+  // These NKJV scans contain recurring font substitutions (Ɵ for “ti”, Ʃ
+  // for “tt”) and Unicode presentation ligatures (ﬁ, ﬀ, etc.). NFKC expands
+  // the ligatures; scope all repairs to this verified book and readable
+  // display so stored OCR and other books remain unchanged.
   if(String(bookId)!=='335')return value;
-  return value.replaceAll('Ɵ','ti').replaceAll('Ʃ','tt');
+  return value.normalize('NFKC').replaceAll('Ɵ','ti').replaceAll('Ʃ','tt');
 }
 
 function readableParagraphs(text) {
