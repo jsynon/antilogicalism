@@ -87,7 +87,7 @@ test('previous/next reader navigation is defined by actually indexed physical PD
 });
 test('reader is hidden initially, preserves original PDF links, and loads no new AI endpoint',()=>{
  const ids=['companion-source-reader','companion-source-title',
-  'companion-source-meta','companion-source-quote','companion-reader-status',
+  'companion-source-meta','companion-reader-status',
   'companion-source-prev','companion-source-next','companion-close-source',
   'companion-source-pdf','companion-source-text'];
  for(const id of ids)assert(html.includes('id="'+id+'"'),id+' markup');
@@ -100,7 +100,9 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(source,/getBook\(bookId\)/);
  assert.match(source,/function renderHighlightedText/);
  assert.match(source,/renderHighlightedText\(viewer,page\.text,quotation,source\.bookId\)/);
- assert.match(source,/Readable paragraphs from indexed v47 text/);
+ assert.match(source,/v47 OCR text formatted as paragraphs/);
+ assert.doesNotMatch(source,/companion-source-quote|quoteBox/);
+ assert.doesNotMatch(html,/companion-source-quote|<blockquote/);
  assert.doesNotMatch(source,/originalLayout|original-ocr|companion-source-layout/);
  assert.doesNotMatch(html,/companion-source-layout|Original OCR layout|companion-layout-picker/);
  assert.match(source,/mark\.className='cited-highlight'/);
