@@ -355,14 +355,16 @@ function appendCitationTokens(target,answer,citations,evidenceHighlights=[],numb
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
 }
 function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
-  const pattern=/\*\*([^*\n]+?)\*\*|__([^_\n]+?)__/g;
+  const pattern=/\*\*([^*\n]+?)\*\*|__([^_\n]+?)__|\*([^*\n]+?)\*|_([^_\n]+?)_/g;
   let at=0;
   for(const match of answer.matchAll(pattern)){
     if(match.index>at)appendCitationTokens(target,answer.slice(at,match.index),
       citations,evidenceHighlights,numbering);
-    const strong=document.createElement('strong');
-    appendCitationTokens(strong,match[1]??match[2],citations,evidenceHighlights,numbering);
-    target.append(strong);
+    const isBold=match[1]!==undefined||match[2]!==undefined;
+    const formatted=document.createElement(isBold?'strong':'em');
+    appendCitationTokens(formatted,match[1]??match[2]??match[3]??match[4],
+      citations,evidenceHighlights,numbering);
+    target.append(formatted);
     at=match.index+match[0].length;
   }
   if(at<answer.length)appendCitationTokens(target,answer.slice(at),
