@@ -338,7 +338,13 @@ export class RemoteLibrary {
     // name the reader's actual subject (for example, the Peloponnesian War).
     // Keep those query terms and ignore title words only in page-header text.
     const queryTokens=queryTerms(question);
-    const fuzzyAuthorCandidates=fuzzyAuthorMentions(queryTokens,manifest.books);
+    const scriptureReference=hasExplicitScriptureReference(question);
+    // Canonical references such as "James 2:14–26" identify a Bible passage,
+    // not the surname of William James. Do not let author-name matching turn
+    // the reference into an author-scoped search before scripture ranking has
+    // a chance to select an edition containing the cited passage.
+    const fuzzyAuthorCandidates=scriptureReference?new Map():
+      fuzzyAuthorMentions(queryTokens,manifest.books);
     // Apply fuzzy author scoping only when the question also has at least one
     // indexed non-author topic term; a surname alone is not enough evidence.
     const hasTopicTerm=queryTokens.some(term=>!fuzzyAuthorCandidates.has(term)&&
@@ -353,19 +359,21 @@ export class RemoteLibrary {
     const questionWords = new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || []);
     const mentionedAuthors = new Set();
     const namedAuthorBookIds = new Set();
-    for (const [id, meta] of Object.entries(manifest.books)) {
-      const byline = String(meta.title || '').split(/\s+[—–-]\s+/).slice(1).join(' ');
-      const authorWords = byline.toLowerCase().match(/[a-z0-9]+/g) || [];
-      const surname = authorWords.at(-1);
-      const fullNameMentioned = authorWords.length > 1 && authorWords.every(word => questionWords.has(word));
-      if ((surname && surname.length >= 3 && questionWords.has(surname)) || fullNameMentioned) {
-        mentionedAuthors.add(surname);
-        namedAuthorBookIds.add(id);
+    if(!scriptureReference){
+      for (const [id, meta] of Object.entries(manifest.books)) {
+        const byline = String(meta.title || '').split(/\s+[—–-]\s+/).slice(1).join(' ');
+        const authorWords = byline.toLowerCase().match(/[a-z0-9]+/g) || [];
+        const surname = authorWords.at(-1);
+        const fullNameMentioned = authorWords.length > 1 && authorWords.every(word => questionWords.has(word));
+        if ((surname && surname.length >= 3 && questionWords.has(surname)) || fullNameMentioned) {
+          mentionedAuthors.add(surname);
+          namedAuthorBookIds.add(id);
+        }
       }
-    }
-    for(const {surname,bookIds} of fuzzyAuthorMatches.values()){
-      mentionedAuthors.add(surname);
-      for(const id of bookIds)namedAuthorBookIds.add(id);
+      for(const {surname,bookIds} of fuzzyAuthorMatches.values()){
+        mentionedAuthors.add(surname);
+        for(const id of bookIds)namedAuthorBookIds.add(id);
+      }
     }
     const comparison = /\b(?:compare|contrast|versus|vs\.?|between)\b/i.test(question) || mentionedAuthors.size >= 2;
     const prefixes = [...new Set(terms.map(t => t.slice(0,2)))];
@@ -394,7 +402,7 @@ export class RemoteLibrary {
       const id = String(manifest.page_books[pageId]);
       if (bookId && id !== String(bookId)) continue;
       if (allowedBookIds && !allowedBookIds.has(id)) continue;
-      if (!bookId && namedAuthorBookIds.size && !namedAuthorBookIds.has(id)) continue;
+      if (!bookId && !scriptureReference && namedAuthorBookIds.size && !namedAuthorBookIds.has(id)) continue;
       if (!manifest.books[id] || !PDF.test(manifest.books[id].drive_url || '')) continue;
       const authorTerms = new Set((String(manifest.books[id].title || '').split(/\s+[—–-]\s+/).slice(1).join(' ')
         .toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
