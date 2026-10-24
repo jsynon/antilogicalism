@@ -467,6 +467,20 @@ test('part queries keep matching page IDs linked to each question part through s
  assert.deepEqual(new Set(selected.flatMap(source=>source.candidatePartIds)),new Set(['P1','P2']));
 });
 
+test('answer packet selection prefers a page that addresses the part over a higher-ranked topical page',()=>{
+ const title='Critique of Pure Reason — Immanuel Kant';
+ const candidates=[
+  {bookId:'40',title,page:54,score:95,candidatePartIds:['P2'],
+   text:'Causality is one of the categories of relation, and the categories are a priori.'},
+  {bookId:'40',title,page:98,score:72,candidatePartIds:['P2'],
+   text:'The Second Analogy argues that every change follows a causal rule, which grounds the objective necessity of causal judgments in experience.'}
+ ];
+ const selected=selectAnswerSources(candidates,'How does Kant explain causal necessity?',
+  'token',{maxSources:1,maxBytes:5000,maxSourceBytes:5000,
+   partQuestions:[{partId:'P2',question:'How does Kant explain the grounds of causal necessity in experience?'}]});
+ assert.deepEqual(selected.map(source=>source.page),[98]);
+});
+
 test('reused comparison queries may link to more than six parts while unique searches stay bounded',async()=>{
  const books=[{id:'35',title:'An Enquiry Concerning Human Understanding — David Hume'},
   {id:'40',title:'Critique of Pure Reason — Immanuel Kant'}];

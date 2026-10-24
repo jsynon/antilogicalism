@@ -429,7 +429,8 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
  * order is already facet-balanced; preserve it so comparison parts stay covered.
  */
 export function selectAnswerSources(candidates,question,turnstileToken,
-  {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[],plannedFacetCount=0}={}){
+  {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[],plannedFacetCount=0,
+   partQuestions=[]}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||
     typeof turnstileToken!=='string')return [];
  const chosen=[],firstPerBook=[],seenBooks=new Set();
@@ -519,15 +520,21 @@ export function selectAnswerSources(candidates,question,turnstileToken,
  // question part when a broad planner query dominates the shortlist.
  const partRepresentatives=[],reservedPartPages=new Set();
  const partIds=[...new Set(candidates.flatMap(candidate=>candidate.candidatePartIds||[]))];
+ const partQuestionById=new Map((Array.isArray(partQuestions)?partQuestions:[])
+  .filter(item=>item&&typeof item.partId==='string'&&typeof item.question==='string')
+  .map(item=>[item.partId,/^How do the named sources compare in response to this question:/i
+    .test(item.question)?question:item.question]));
  for(const partId of partIds){
   const eligible=candidates.filter(value=>value.candidatePartIds?.includes(partId)&&
    !reservedPartPages.has(value));
-  // For a comparison's synthesis part, choose the linked page whose wording
-  // best matches the exact question, rather than blindly taking the first
-  // aggregate-ranked result. Ties retain retrieval order.
-  const candidate=comparisonIntent&&eligible.length?eligible.reduce((best,value)=>
-    directFacetTextMatch(question,value.text??value.preview)>
-      directFacetTextMatch(question,best.text??best.preview)?value:best,eligible[0]):eligible[0];
+  // Aggregate vector rank can favor a page that mentions the topic without
+  // answering this specific part. Among pages already linked to the part,
+  // prefer the one whose actual prose covers more of the part's distinctive
+  // terms. The original question remains the fallback and comparison target.
+  const targetQuestion=partQuestionById.get(partId)||question;
+  const candidate=eligible.length?eligible.reduce((best,value)=>
+    directFacetTextMatch(targetQuestion,value.text??value.preview)>
+      directFacetTextMatch(targetQuestion,best.text??best.preview)?value:best,eligible[0]):null;
   if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
  }
  if(partRepresentatives.length)ordered=[...partRepresentatives,...ordered.filter(value=>!reservedPartPages.has(value))];
