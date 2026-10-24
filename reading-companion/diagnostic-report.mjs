@@ -49,6 +49,8 @@ export function diagnosticFailureCode(status,requestStage='answer',serverCode=''
 
 function sourceSummary(source){
   if(!source||typeof source!=='object')return null;
+  const candidatePartIds=Array.isArray(source.candidatePartIds)?
+    [...new Set(source.candidatePartIds.filter(id=>typeof id==='string'&&/^P[1-9]\d*$/.test(id)))].slice(0,6):null;
   return {
     id:string(source.id,24),
     bookId:string(source.bookId,12),
@@ -56,7 +58,8 @@ function sourceSummary(source){
     page:Number.isSafeInteger(source.page)?source.page:null,
     globalPageId:Number.isSafeInteger(source.globalPageId)?source.globalPageId:null,
     score:Number.isFinite(source.score)?Number(source.score.toFixed(4)):null,
-    facet:string(source.facet,120)
+    facet:string(source.facet,120),
+    ...(candidatePartIds?{candidatePartIds}:{})
   };
 }
 
@@ -121,9 +124,11 @@ function questionPartSummary(value,submittedSources=[]){
 
 export function createDiagnosticReport(input={}){
   const audit=auditCitationIds(input.answer,input.citations);
+  const partIds=value=>Array.isArray(value)?
+    [...new Set(value.filter(id=>typeof id==='string'&&/^P[1-9]\d*$/.test(id)))].slice(0,6):[];
   return {
     schema:'antilogicalism-reading-companion-diagnostic-v1',
-    clientBuild:'v1.16-worker-failure-details',
+    clientBuild:'v1.17-part-evidence-diagnostics',
     libraryVersion:Number.isSafeInteger(input.libraryVersion)?input.libraryVersion:null,
     plannerWorkerVersionId:optionalString(input.plannerWorkerVersionId),
     plannerWorkerVersionTag:optionalString(input.plannerWorkerVersionTag),
@@ -172,9 +177,10 @@ export function createDiagnosticReport(input={}){
       inputTokens:Number.isFinite(input.usage.inputTokens)?input.usage.inputTokens:null,
       outputTokens:Number.isFinite(input.usage.outputTokens)?input.usage.outputTokens:null,
     }:null,
-    searches:Array.isArray(input.searches)?input.searches.slice(0,4).map(search=>({
+    searches:Array.isArray(input.searches)?input.searches.slice(0,10).map(search=>({
       query:string(search?.query,240),
       resultCount:Number.isSafeInteger(search?.resultCount)?search.resultCount:null,
+      partIds:partIds(search?.partIds),
       sources:Array.isArray(search?.sources)?search.sources.slice(0,8).map(sourceSummary).filter(Boolean):[]
     })):[],
     candidates:Array.isArray(input.candidates)?input.candidates.slice(0,8).map(sourceSummary).filter(Boolean):[],

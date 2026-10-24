@@ -152,13 +152,30 @@ test('diagnostics expose bounded question-part coverage tied to submitted source
    {part:'x'.repeat(200),status:'partial',evidenceIds:['S2','S1','S2']}
   ]
  });
- assert.equal(report.clientBuild,'v1.16-worker-failure-details');
+ assert.equal(report.clientBuild,'v1.17-part-evidence-diagnostics');
  assert.deepEqual(report.answer.questionParts,[
   {part:'definition',status:'supported',evidenceIds:['S1','S2','S3','S4','S5','S6']},
   {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
   {part:'x'.repeat(140),status:'partial',evidenceIds:['S2','S1']}
  ]);
  assert.match(client,/diagnosticState\.questionParts=data\.questionParts/);
+});
+
+test('diagnostics preserve bounded per-part search and selected-page mappings',()=>{
+ const searches=Array.from({length:7},(_,index)=>({
+  query:'question facet '+index,resultCount:10,partIds:['P'+(index+1)],
+  sources:[{id:'S'+(index+1),bookId:'40',title:'Critique of Pure Reason',page:index+1,
+   candidatePartIds:['P'+(index+1),'P0','invalid']}]
+ }));
+ const report=createDiagnosticReport({searches,
+  candidates:[{id:'S1',candidatePartIds:['P1','P2','bad']}],
+  submittedSources:[{id:'S1',candidatePartIds:['P1','P2','P2','bad']}]});
+ assert.equal(report.searches.length,7,'all planned question facets fit in the diagnostic');
+ assert.deepEqual(report.searches.map(search=>search.partIds),[
+  ['P1'],['P2'],['P3'],['P4'],['P5'],['P6'],['P7']]);
+ assert.deepEqual(report.searches[6].sources[0].candidatePartIds,['P7']);
+ assert.deepEqual(report.candidates[0].candidatePartIds,['P1','P2']);
+ assert.deepEqual(report.submittedSources[0].candidatePartIds,['P1','P2']);
 });
 
 test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
