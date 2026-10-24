@@ -269,6 +269,18 @@ test('direct-question search keeps a high-ranking exact-topic source in the answ
  assert(chosen.some(source=>source.facet===0));
  assert(chosen.some(source=>source.facet===1));
 });
+test('direct-question source selection breaks near-ties by passage relevance',()=>{
+ const question='How do Hume’s Enquiry and Kant’s Critique of Pure Reason differ over how we can know causal necessity?';
+ const candidates=[
+  {...page(24,'40'),title:'Critique of Pure Reason — Immanuel Kant',score:61.9957,
+   facetRanks:[{facet:2,rank:1}],text:'How is metaphysics possible as a science? The critique of reason sets limits to speculative assertions.'},
+  {...page(23,'40'),title:'Critique of Pure Reason — Immanuel Kant',score:61.9857,
+   facetRanks:[{facet:2,rank:2}],text:'Kant discusses Hume’s claim that a priori knowledge of cause and effect is impossible and habit gives necessity its appearance.'}
+ ];
+ const chosen=selectAnswerSources(candidates,question,'token',{
+  maxSources:1,plannedFacetCount:2});
+ assert.deepEqual(chosen.map(source=>source.page),[23]);
+});
 test('six-source packets use the available Worker body budget',()=>{
  const candidates=Array.from({length:6},(_,index)=>({...page(index+1,String(index+1)),
   title:'Work '+(index+1),score:90-index,text:'x'.repeat(5800),
