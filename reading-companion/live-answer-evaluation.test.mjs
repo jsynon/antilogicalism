@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluateLiveCase,evaluatePlannerCase,runLiveCases} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluateLiveCase,evaluatePlannerCase,runLiveCases,summarizeManualReviews,summarizeAnswerVariants} from './live-answer-evaluation.mjs';
 import {PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -33,6 +33,14 @@ test('holdout mode selects a separate seven-question set across disciplines',()=
  assert.equal(selectLiveCases({cases:[]},'quality').length,7,'the original quality baseline remains intact');
 });
 
+test('acceptance mode is a separate untouched all-books set',()=>{
+ const cases=selectLiveCases({cases:[]},'acceptance');
+ assert.equal(cases.length,7);
+ assert.ok(cases.every(item=>item.id.startsWith('acceptance-')&&item.selected_book_ids.length===0));
+ assert.equal(new Set(cases.map(item=>item.id)).size,7);
+ assert.throws(()=>selectLiveCases({cases:[]},'acceptance','holdout-history-herodotus-helen'),/Unknown acceptance case/);
+});
+
 test('holdout all-books scope and single-case selection behave independently of the baseline',()=>{
  const cases=selectLiveCases({cases:[]},'holdout');
  const allBooks=applyQualityScope(cases,'all-books');
@@ -44,7 +52,7 @@ test('holdout all-books scope and single-case selection behave independently of 
  assert.equal(selected.length,1);
  assert.deepEqual(selected[0].required_source_groups[0].book_ids,['335']);
  assert.throws(()=>selectLiveCases({cases:[]},'holdout','quality-history-thucydides-causes'),/Unknown holdout case/);
- assert.throws(()=>selectLiveCases({cases:[]},'smoke','holdout-religion-james-faith-works'),/only in quality or holdout mode/);
+ assert.throws(()=>selectLiveCases({cases:[]},'smoke','holdout-religion-james-faith-works'),/only in quality, holdout or acceptance mode/);
 });
 
 test('all-books quality scope runs every question without a selected-book restriction',()=>{
@@ -65,7 +73,7 @@ test('quality mode can select exactly one named case for a low-cost live check',
  assert.equal(cases[0].id,id);
  assert.deepEqual(cases[0].required_source_groups.map(group=>group.book_ids),[['529'],['102']]);
  assert.throws(()=>selectLiveCases({cases:[]},'quality','not-a-quality-case'),/Unknown quality case/);
- assert.throws(()=>selectLiveCases({cases:[]},'smoke',id),/only in quality or holdout mode/);
+ assert.throws(()=>selectLiveCases({cases:[]},'smoke',id),/only in quality, holdout or acceptance mode/);
 });
 
 test('planner mode selects one selected-book case and one All Books cross-work case',()=>{
@@ -128,6 +136,40 @@ test('audit maps Worker evidence IDs to submitted locators by their request orde
  assert.equal(result.passed,true);
 });
 
+test('audit rejects a comparison part that cites the other named work',()=>{
+ const result=auditLiveAnswer({coverage:'full',answer:'Rousseau’s social contract grounds authority [S1].',
+  citations:[{id:'S1',bookId:'245'}],
+  questionParts:[{part:'How does Plato explain legitimate political order?',status:'supported',evidenceIds:['S1']}],
+  evidenceMap:[{id:'S1',claimId:'C1',quote:'A convention between the body and each of its members.'}]},
+  [{bookId:'245',page:24}],[{label:'Rousseau',book_ids:['245']},{label:'Plato',book_ids:['74']}],
+  [{partIncludes:'Plato',book_ids:['74']}]);
+ assert.equal(result.sourcePartAlignment.length,1);
+ assert.equal(result.sourcePartAlignment[0].aligned,false);
+ assert.deepEqual(result.sourcePartAlignment[0].misalignedBookIds,['245']);
+ assert.equal(result.passed,false);
+});
+
+test('human rubric summary keeps semantic review separate from structural passes',()=>{
+ const pending=summarizeManualReviews([{id:'a',manualReview:{status:'not-reviewed',scores:{}}}]);
+ assert.equal(pending.reviewed,0);assert.equal(pending.pending,1);assert.equal(pending.qualityPass,null);
+ const scored=summarizeManualReviews([{id:'a',manualReview:{scores:{accuracy:2,questionCoverage:1,
+  explanationQuality:1,citationSupport:2,citationCompleteness:0}}}]);
+ assert.equal(scored.reviewed,1);
+ assert.deepEqual(scored.averageScores,{accuracy:2,questionCoverage:1,explanationQuality:1,citationSupport:2,citationCompleteness:0});
+ assert.equal(scored.qualityPass,null,'human scores are reported, not collapsed into an unsupported pass threshold');
+});
+
+test('paired variant summary reports structural results and human scores separately',()=>{
+ const summary=summarizeAnswerVariants([{id:'pair',reviewAblation:{variants:[
+  {answerVariant:'with-review',structuralPassed:true,manualReview:{scores:{accuracy:2,questionCoverage:2,explanationQuality:1,citationSupport:2,citationCompleteness:2}}},
+  {answerVariant:'compose-only',structuralPassed:false,manualReview:{scores:{accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null}}}
+ ]}}]);
+ assert.equal(summary['with-review'].structuralPassed,1);
+ assert.equal(summary['with-review'].humanScores.reviewed,1);
+ assert.equal(summary['compose-only'].structuralFailed,1);
+ assert.equal(summary['compose-only'].humanScores.pending,1);
+});
+
 test('audit rejects prose that denies a comparison marked supported',()=>{
  const result=auditLiveAnswer({coverage:'full',answer:'Aristotle discusses political order through human good [S1]. Hobbes describes common power preserving justice [S2]. The texts do not offer a direct comparison, and the evidence cannot establish a difference between their accounts [S1, S2].',
   citations:[{id:'S1',bookId:'7'},{id:'S2',bookId:'163'}],
@@ -187,6 +229,23 @@ test('offline report recheck keeps an actual partial answer as a miss',()=>{
  assert.equal(checked.offlineRecheck.passedCases,0);
  assert.equal(checked.cases[0].offlineRecheck.passed,false);
  assert.equal(checked.cases[0].offlineRecheck.questionPartCoverage.partial,1);
+});
+
+test('offline report recheck refreshes both paired variant audits and preserves manual scores',()=>{
+ const manualReview={scores:{accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:2,citationCompleteness:2},notes:'Checked'};
+ const variant={answerVariant:'compose-only',answerText:'A sourced claim [S1].',coverage:'full',reviewStatus:'answer-draft-unverified',
+  citations:[{id:'S1',bookId:'25'}],citationSources:[{id:'S1',bookId:'25'}],
+  questionParts:[{part:'What does the text say?',status:'supported',evidenceIds:['S1']}],
+  evidenceMap:[{id:'S1',claimId:'C1',quote:'A passage long enough to demonstrate the claim.'}],
+  evidenceHighlights:[],manualReview};
+ const report={cases:[{id:'acceptance-descartes-cogito',answerText:variant.answerText,coverage:'full',
+  citations:variant.citations,citationSources:variant.citationSources,questionParts:variant.questionParts,
+  evidenceMap:variant.evidenceMap,evidenceHighlights:[],submittedSources:[{bookId:'25',page:1}],
+  reviewAblation:{variants:[variant]}}]};
+ const checked=recheckQualityReport(report);
+ assert.equal(checked.cases[0].reviewAblation.variants[0].structuralPassed,true);
+ assert.deepEqual(checked.cases[0].reviewAblation.variants[0].manualReview,manualReview);
+ assert.equal(checked.answerVariants['compose-only'].humanScores.reviewed,1);
 });
 
 test('quality case uses fixed queries, skips planning, and restricts retrieval to its selected book',async()=>{
@@ -324,6 +383,35 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  assert.equal(result.searches[2].query,item.question+' [named books: 638]');
  assert.equal(calls[1].body.bookId,'638');
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
+});
+
+test('review ablation compares both answer paths against the identical source packet',async()=>{
+ const calls=[];
+ const library={search:async()=>({sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,
+  url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]}),
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
+ const item={id:'paired-test',question:'Explain the source question with enough detail.',selected_book_ids:['638'],
+  planner_queries:['first distinct query concept','second distinct query concept'],
+  required_source_groups:[{label:'Bible',book_ids:['638']}],review_focus:[]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),
+  token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,answerVariant:'paired-review-ablation',
+  fetcher:async(url,options)=>{
+   const body=JSON.parse(options.body);calls.push({url,body});
+   const reviewed=body.answerVariant==='with-review';
+   return new Response(JSON.stringify({outcome:reviewed?'verified-source-draft':'unverified-source-draft',
+    coverage:reviewed?'full':'partial',reviewStatus:reviewed?'claim-review':'answer-draft-unverified',
+    answer:'A sourced claim [S1].',workerVersionId:'answer-worker-10',workerSourceBuild:'gateway-build-10',
+    citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});
+  }});
+ assert.equal(calls.length,2);
+ assert.deepEqual(calls.map(call=>call.body.answerVariant),['with-review','compose-only']);
+ assert.deepEqual(calls[0].body.sources,calls[1].body.sources);
+ assert.deepEqual(calls[0].body.sources,[{bookId:'638',page:10,text:'A sufficiently long source passage for the fake test page.'}]);
+ assert.equal(result.answerVariant,'paired-review-ablation');
+ assert.equal(result.passed,true);
+ assert.deepEqual(result.reviewAblation.variants.map(variant=>variant.answerVariant),['with-review','compose-only']);
+ assert.equal(result.reviewAblation.variants[0].passed,true);
+ assert.equal(result.reviewAblation.variants[1].passed,null);
 });
 
 test('planner 502 falls back to searching the original question and completes evaluation',async()=>{

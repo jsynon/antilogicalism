@@ -1,10 +1,18 @@
-name: Reading Companion holdout answer evaluation
+name: Reading Companion live answer evaluation
 
 on:
   workflow_dispatch:
     inputs:
+      suite:
+        description: Development regression cases or the untouched acceptance set
+        type: choice
+        options:
+          - holdout
+          - acceptance
+        default: holdout
+        required: true
       case_id:
-        description: Run one holdout case or all seven
+        description: Run one case from the selected suite or all seven
         type: choice
         options:
           - all
@@ -15,10 +23,26 @@ on:
           - holdout-all-books-hume-kant-causation
           - holdout-all-books-plato-rousseau-order
           - holdout-all-books-wollstonecraft-dubois
+          - acceptance-descartes-cogito
+          - acceptance-mill-harm-principle
+          - acceptance-epictetus-freedom
+          - acceptance-augustine-memory
+          - acceptance-aristotle-tragedy-plot
+          - acceptance-boethius-fortune
+          - acceptance-locke-political-authority
         default: all
         required: true
+      answer_variant:
+        description: Paired mode runs both variants on the same plan and pages; it uses about 4 calls per all-books case, plus bounded recovery when needed
+        type: choice
+        options:
+          - with-review
+          - compose-only
+          - paired-review-ablation
+        default: with-review
+        required: true
       scope:
-        description: Selected-books keeps one-book cases in-book; comparison cases search across books. All Books adds a planner call per question
+        description: Acceptance requires All Books; All Books adds a planner call per question
         type: choice
         options:
           - selected-books
@@ -44,9 +68,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
-      LIVE_EVAL_MODE: holdout
+      LIVE_EVAL_MODE: ${{ inputs.suite }}
       LIVE_EVAL_SCOPE: ${{ inputs.scope }}
       LIVE_EVAL_CASE_ID: ${{ inputs.case_id }}
+      LIVE_EVAL_ANSWER_VARIANT: ${{ inputs.answer_variant }}
       CONFIRM_LIVE_AI: ${{ inputs.confirm_live_ai }}
     steps:
       - uses: actions/checkout@v4
@@ -65,12 +90,13 @@ jobs:
         env:
           PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
           LIVE_EVAL_OUTPUT: ${{ github.workspace }}/reading-companion-holdout-answer-evaluation.json
-        run: node reading-companion/live-answer-evaluation.mjs --mode "$LIVE_EVAL_MODE" --scope "$LIVE_EVAL_SCOPE" --case "$LIVE_EVAL_CASE_ID" --confirm-live-ai true --output "$LIVE_EVAL_OUTPUT"
+        run: node reading-companion/live-answer-evaluation.mjs --mode "$LIVE_EVAL_MODE" --scope "$LIVE_EVAL_SCOPE" --answer-variant "$LIVE_EVAL_ANSWER_VARIANT" --case "$LIVE_EVAL_CASE_ID" --confirm-live-ai true --output "$LIVE_EVAL_OUTPUT"
       - name: Save holdout report
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reading-companion-holdout-answer-evaluation-${{ inputs.scope }}-${{ inputs.case_id }}
+          name: reading-companion-${{ inputs.suite }}-answer-evaluation-${{ inputs.answer_variant }}-${{ inputs.scope }}-${{ inputs.case_id }}
           path: ${{ github.workspace }}/reading-companion-holdout-answer-evaluation.json
           if-no-files-found: warn
           retention-days: 14
+
