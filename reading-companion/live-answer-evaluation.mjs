@@ -599,9 +599,9 @@ async function main(){
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   answerVariant:args.answerVariant,caseCount:cases.length,estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
-   (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; one bounded malformed-output regeneration may add a call in each answer variant',
+   (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; the simplified answer path has no automatic composer regeneration',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
-   'Automated checks cover source identity, exact evidence links, named-work-to-question-part alignment, and coverage consistency. They do not judge factual truth or whether cited passages semantically support the prose. Each answer includes a blank human rubric: rate accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong).',
+   'Automated checks cover source identity, per-part citation linkage, named-work-to-question-part alignment, and coverage consistency. They do not judge factual truth or whether cited passages semantically support the prose. Each answer includes a blank human rubric: rate accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong).',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  let activeLibrary=null;
@@ -611,8 +611,13 @@ async function main(){
   if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');
  };
  await saveReport();
+ console.log('Initializing '+args.mode+' evaluation for '+cases.length+' question'+(cases.length===1?'':'s')+
+  '; loading the published fingerprint coverage and corpus manifest before retrieval.');
+ const startupHeartbeat=setInterval(()=>console.log('['+new Date().toISOString()+
+  '] SETUP WAIT: still loading the published fingerprint coverage and corpus manifest.'),15_000);
  try{
   const results=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v1.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
+  clearInterval(startupHeartbeat);
   const coverage=results[0],manifest=results[1];
   if(coverage?.schema!=='antilogicalism-reader-coverage-v1'||coverage?.libraryVersion!==47||manifest.version!==47)throw Error('Published v47 coverage or corpus is incompatible.');
   const allowed=new Set(Object.keys(coverage.books));
@@ -681,6 +686,7 @@ async function main(){
   return report.requestFailureCases||(args.mode==='planner'&&report.summary.failedCases)||
    (usesEvaluationMode&&report.summary.failedCases>0)?1:0;
  }catch(error){
+  clearInterval(startupHeartbeat);
   report.executionStatus=report.cases.length?'interrupted':'setup-failed';
   report.setupFailure={message:String(error?.message||error).slice(0,240)};
   report.completedCases=report.cases.length;report.notRunCases=cases.length-report.cases.length;
