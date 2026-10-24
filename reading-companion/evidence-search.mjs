@@ -356,7 +356,7 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
   // incidental mention of that work. Consider every direct-query candidate
   // already in the shortlist, not only its top-ranked passage: an exact-title
   // source can rank just below a bibliographic mention. For same-title pages,
-  // prefer text matching the reader's exact question over tiny score gaps.
+  // use question-text overlap to break ties with retrieval order.
   const candidate=facet===count&&facetCandidates.length
    ?facetCandidates.reduce((best,value)=>{
      const titleMatch=directFacetTitleMatch(question,value.title);
