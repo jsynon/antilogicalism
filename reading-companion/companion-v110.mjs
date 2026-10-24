@@ -528,6 +528,7 @@ async function askQuestion(questionText){
   if(!pilotEnabled){setStatus('Answering is temporarily unavailable.');return;}
   if(q.length<5||q.length>400){setStatus('Please enter a question of 5–400 characters.');return;}
   const currentScope=bookFilter.value||'all';
+  let partQuestions=[];
   if(conversationBookScope&&conversationBookScope!==currentScope)conversationHistory=[];
   conversationBookScope=currentScope;
   beginDiagnostic(q);
@@ -554,6 +555,8 @@ async function askQuestion(questionText){
           diagnosticState.failureCode='';
         }
       }
+      partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>
+        ({partId:part.id,question:part.question})):[];
       if(planned)setStatus('Gathering passages from across the collection…');
       const found=await retrieveSources(planned?.queries||null,{plannerFallback,plan:planned?.plan||null});
       if(!found)return;
@@ -564,7 +567,8 @@ async function askQuestion(questionText){
     }
     const chosen=selectAnswerSources(candidates,q,token,{history,
       maxSources:MAX_ANSWER_SOURCES,
-      plannedFacetCount:Math.max(0,(diagnosticState?.searches?.length||0)-1)});
+      plannedFacetCount:Math.max(0,(diagnosticState?.searches?.length||0)-1),
+      partQuestions});
     if(!chosen.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
     if(diagnosticState){
       diagnosticState.submittedSources=chosen.map((source,index)=>({...source,id:'S'+(index+1)}));

@@ -369,7 +369,8 @@ function makeCachedFetch(root){
  };
 }
 async function fetchJson(url){const response=await fetch(url,{headers:{accept:'application/json'},cache:'no-store'});if(!response.ok)throw Error(url+' returned HTTP '+response.status);return response.json();}
-async function loadSources(item,queries,{library,manifest,allowed,directFallback=false,partQueries=[]}){
+async function loadSources(item,queries,{library,manifest,allowed,directFallback=false,
+ partQueries=[],partQuestions=[]}){
  const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,directFallback,
@@ -387,7 +388,8 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
  // especially when an all-books question needs evidence from several facets.
  const selected=selectAnswerSources(populated,item.question,'evaluation-runner-token',{
   maxSources:6,maxBytes:39_000,maxSourceBytes:35_000,history:[],
-  plannedFacetCount:Math.max(0,retrieval.searchQueries.length-1)});
+  plannedFacetCount:Math.max(0,retrieval.searchQueries.length-1),
+  partQuestions});
  if(!selected.length)throw Error('No source pages fit the Worker request limit.');
  for(const source of selected){
   const book=manifest.books[String(source.bookId)];
@@ -436,7 +438,10 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  let loaded;
  await progress('retrieval','started',`Searching ${new Set([...queries,...partQueries.map(value=>value.query)]).size} distinct facets and assembling source pages.`,
   {queryCount:queries.length,partFacetCount:partQueries.length});
- try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,partQueries});}
+ const partQuestions=!plannerFallback&&Array.isArray(plan?.plan?.parts)?plan.plan.parts.map(part=>
+  ({partId:part.id,question:part.question})):[];
+ try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,
+  partQueries,partQuestions});}
  catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   error.requestFailure.plannerFallback=plannerFallback;
   error.requestFailure.plannerSkipped=plannerSkipped;
@@ -500,7 +505,12 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
    workerVersionId:plan?.workerVersionId,workerSourceBuild:plan?.workerSourceBuild});
  let loaded;
  await progress('retrieval','started',`Searching ${plan.queries.length} planner queries against the library.`,{queryCount:plan.queries.length});
- try{loaded=await loadSources(item,plan.queries,{library,manifest,allowed});}
+ const partQueries=Array.isArray(plan?.plan?.parts)?plan.plan.parts.flatMap(part=>
+  (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
+   .map(query=>({partId:part.id,query}))):[];
+ const partQuestions=Array.isArray(plan?.plan?.parts)?plan.plan.parts.map(part=>
+  ({partId:part.id,question:part.question})):[];
+ try{loaded=await loadSources(item,plan.queries,{library,manifest,allowed,partQueries,partQuestions});}
  catch(error){
   const wrapped=attachRequestFailure(error,'retrieval',{failureCode:'retrieval-failed',workerFailure:false,
    workerVersionId:plan.workerVersionId,workerSourceBuild:plan.workerSourceBuild});
