@@ -109,10 +109,15 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   if(!Array.isArray(queries)||queries.length!==1||String(queries[0]||'').trim()!==direct)
    throw Error('Direct fallback must use the unchanged question.');
  }else if(!validSearchPlan(queries))throw Error('Planner returned an invalid search plan.');
- if(!Array.isArray(partQueries)||partQueries.length>6||partQueries.some(item=>
+ if(!Array.isArray(partQueries)||partQueries.length>12||partQueries.some(item=>
    !item||typeof item.partId!=='string'||!/^P[1-9]\d*$/.test(item.partId)||
    typeof item.query!=='string'||item.query.trim().length<5||item.query.trim().length>400))
   throw Error('Part-specific retrieval queries are invalid.');
+ // A search query may be linked to several question parts. Bound the unique
+ // searches separately from those links so comparison parts can reuse each
+ // source-side query without spending additional retrieval work.
+ if(new Set(partQueries.map(item=>item.query.trim().toLocaleLowerCase())).size>6)
+  throw Error('Too many distinct part-specific retrieval queries.');
  const baseQueries=buildSearchFacets(direct,useDirect?[direct]:queries);
  const searchQueries=[...baseQueries];
  for(const item of partQueries){
