@@ -490,6 +490,42 @@ test('reused comparison queries may link to more than six parts while unique sea
   source.candidatePartIds.includes('P2')&&source.candidatePartIds.includes('P3')));
 });
 
+test('a second-ranked directly relevant page survives retrieval and reaches the answer packet',async()=>{
+ const question='How do Hume’s Enquiry and Kant’s Critique of Pure Reason differ over causal necessity?';
+ const humeQuery='Hume Enquiry causal necessity custom habit';
+ const kantQuery='Kant Critique causal necessity category a priori';
+ const books=[{id:'35',title:'An Enquiry Concerning Human Understanding — David Hume'},
+  {id:'40',title:'Critique of Pure Reason — Immanuel Kant'}];
+ const allowedBookIds=new Set(['35','40']);
+ const library={search:async(query,{bookId}={})=>{
+  if(query===question&&bookId==='40')return {sources:[
+   {bookId:'40',title:books[1].title,page:24,globalPageId:3112,score:90},
+   {bookId:'40',title:books[1].title,page:23,globalPageId:3111,score:85}]};
+  if(query===question&&bookId==='35')return {sources:[
+   {bookId:'35',title:books[0].title,page:47,globalPageId:2742,score:60}]};
+  if(query===humeQuery)return {sources:[{bookId:'35',title:books[0].title,page:48,globalPageId:2743,score:80}]};
+  if(query===kantQuery)return {sources:[{bookId:'40',title:books[1].title,page:86,globalPageId:3174,score:80}]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question,queries:[humeQuery,kantQuery],
+  partQueries:[{partId:'P1',query:humeQuery},{partId:'P2',query:kantQuery},
+   {partId:'P3',query:question}],library,books,allowedBookIds,maxCandidates:12,
+  pageLoader:async source=>({text:source.page===23?
+   'Kant discusses Hume’s principle of causality, synthetic a priori knowledge, necessity, experience, and habit.':
+   source.page===24?'The Critique asks how metaphysics is possible as a science and discusses pure reason.':
+   `A verified source page about causal necessity and experience, page ${source.page}.`})});
+ const kant23=result.candidates.find(value=>value.bookId==='40'&&value.page===23);
+ assert.ok(kant23,'the second-ranked Kant result must survive the candidate cap');
+ assert.ok(kant23.candidatePartIds.includes('P3'),
+  'the exact question facet should link its result to the comparison part');
+ const selected=selectAnswerSources(result.candidates,question,'token',{
+  maxSources:4,maxBytes:20000,maxSourceBytes:20000,plannedFacetCount:result.searchQueries.length-1});
+ assert.ok(selected.some(value=>value.bookId==='40'&&value.page===23),
+  'the page matching the causal-necessity comparison should reach the submitted packet: '+
+   JSON.stringify({candidatePages:result.candidates.map(value=>({bookId:value.bookId,page:value.page,parts:value.candidatePartIds,facets:value.facetRanks})),
+    selectedPages:selected.map(value=>({bookId:value.bookId,page:value.page,parts:value.candidatePartIds}))}));
+});
+
 test('synthetic comparison coverage reuses source searches instead of spending a facet on generic wording',()=>{
  const question='How do Hume’s Enquiry and Kant’s Critique of Pure Reason differ over causal necessity?';
  const humeQuery='Hume Enquiry causal necessity custom habit';
@@ -504,7 +540,7 @@ test('synthetic comparison coverage reuses source searches instead of spending a
    '40':'Critique of Pure Reason — Immanuel Kant'});
  const comparison=plan.parts[2];
  assert.match(comparison.question,/compare in response to this question/i);
- assert.deepEqual(comparison.searchQueries,[humeQuery,kantQuery]);
+ assert.deepEqual(comparison.searchQueries,[humeQuery,kantQuery,question]);
  assert.ok(!comparison.searchQueries.includes(comparison.question));
 });
 

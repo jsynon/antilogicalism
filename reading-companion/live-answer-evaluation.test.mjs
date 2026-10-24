@@ -364,12 +364,12 @@ test('partial Worker coverage is an evaluation miss even when citations and expe
 });
 
 test('case evaluation sends one selected-book plan and one answer request in order without logging the token',async()=>{
- const calls=[],searched=[];
+ const calls=[],searched=[],progress=[];
  const library={search:async(query)=>{searched.push(query);return {sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]};},
   jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
  const item={question:'Explain the source question with enough detail.',selected_book_ids:['638'],required_source_groups:[{label:'Bible',book_ids:['638']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
-  beforeCall:async()=>{},fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body),authorization:options.headers.authorization});
+  beforeCall:async()=>{},onProgress:event=>progress.push(event),fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body),authorization:options.headers.authorization});
    return new Response(JSON.stringify(url.endsWith('pilot-plan')?{queries:['first distinct search concept','second distinct search concept'],
     plan:{parts:[{id:'P1',question:'Explain the source question with enough detail.'}]},
     workerVersionId:'plan-worker-3',workerSourceBuild:'gateway-build-3'}:
@@ -387,6 +387,12 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  assert.deepEqual(calls[1].body.sources[0].candidatePartIds,['P1']);
  assert.deepEqual(result.submittedSources[0].candidatePartIds,['P1']);
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
+ assert.deepEqual(progress.filter(event=>['case','planner','retrieval'].includes(event.stage))
+  .map(event=>event.stage+':'+event.status),[
+   'case:started','planner:started','planner:completed','retrieval:started','retrieval:completed']);
+ assert.ok(progress.some(event=>event.stage==='answer'&&event.status==='started'&&/waiting for the Worker/.test(event.message)));
+ assert.ok(progress.some(event=>event.stage==='answer'&&event.status==='completed'&&/verified-source-draft/.test(event.message)));
+ assert.ok(!JSON.stringify(progress).includes('x'.repeat(40)));
 });
 
 test('review ablation compares both answer paths against the identical source packet',async()=>{
