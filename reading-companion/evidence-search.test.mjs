@@ -281,6 +281,28 @@ test('direct-question source selection breaks near-ties by passage relevance',()
   maxSources:1,plannedFacetCount:2});
  assert.deepEqual(chosen.map(source=>source.page),[23]);
 });
+test('multi-work packet includes the relevant direct-question passage among same-work hits',()=>{
+ const question='How do Hume’s Enquiry and Kant’s Critique of Pure Reason differ over how we can know causal necessity?';
+ const candidates=[
+  {...page(54,'40'),title:'Critique of Pure Reason — Immanuel Kant',score:75,
+   facetRanks:[{facet:1,rank:1}],text:'Causality is an a priori category in the understanding.'},
+  {...page(42,'35'),title:'An Enquiry Concerning Human Understanding — David Hume',score:60.56,
+   facetRanks:[{facet:0,rank:1}],text:'Necessity arises from constant conjunction and custom-based inference.'},
+  {...page(24,'40'),title:'Critique of Pure Reason — Immanuel Kant',score:61.9957,
+   facetRanks:[{facet:2,rank:1}],text:'How is metaphysics possible as a science? The critique of reason sets limits to speculative assertions.'},
+  {...page(41,'35'),title:'An Enquiry Concerning Human Understanding — David Hume',score:60.55,
+   facetRanks:[{facet:0,rank:2}],text:'Section VIII introduces liberty and necessity.'},
+  {...page(53,'40'),title:'Critique of Pure Reason — Immanuel Kant',score:71,
+   facetRanks:[{facet:1,rank:2}],text:'The table of categories includes causality and dependence.'},
+  {...page(47,'35'),title:'An Enquiry Concerning Human Understanding — David Hume',score:48.94,
+   facetRanks:[{facet:0,rank:3}],text:'Constant conjunction and inference define necessity.'},
+  {...page(23,'40'),title:'Critique of Pure Reason — Immanuel Kant',score:61.9857,
+   facetRanks:[{facet:2,rank:2}],text:'Kant discusses Hume’s claim that a priori knowledge of cause and effect is impossible and habit gives necessity its appearance.'}
+ ].map(source=>({...source,globalPageId:source.page}));
+ const chosen=selectAnswerSources(candidates,question,'token',{
+  maxSources:6,plannedFacetCount:2});
+ assert(chosen.some(source=>source.bookId==='40'&&source.page===23),JSON.stringify(chosen.map(s=>s.bookId+':'+s.page)));
+});
 test('six-source packets use the available Worker body budget',()=>{
  const candidates=Array.from({length:6},(_,index)=>({...page(index+1,String(index+1)),
   title:'Work '+(index+1),score:90-index,text:'x'.repeat(5800),
