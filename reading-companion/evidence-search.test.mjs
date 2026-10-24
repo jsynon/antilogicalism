@@ -467,6 +467,29 @@ test('part queries keep matching page IDs linked to each question part through s
  assert.deepEqual(new Set(selected.flatMap(source=>source.candidatePartIds)),new Set(['P1','P2']));
 });
 
+test('reused comparison queries may link to more than six parts while unique searches stay bounded',async()=>{
+ const books=[{id:'35',title:'An Enquiry Concerning Human Understanding — David Hume'},
+  {id:'40',title:'Critique of Pure Reason — Immanuel Kant'}];
+ const allowedBookIds=new Set(['35','40']);
+ const byBook=new Map(books.map((book,index)=>[book.id,{bookId:book.id,title:book.title,
+  page:index?54:41,globalPageId:index?53:40,score:80}]));
+ const humeQuery='Hume Enquiry causal necessity custom habit';
+ const kantQuery='Kant Critique causal necessity category a priori';
+ const question='How do Hume and Kant differ over causal necessity?';
+ const result=await retrieveEvidence({question,queries:[humeQuery,kantQuery],
+  partQueries:[{partId:'P1',query:humeQuery},{partId:'P1',query:'How does Hume explain causal necessity?'},
+   {partId:'P2',query:kantQuery},{partId:'P2',query:'How does Kant explain causal necessity?'},
+   {partId:'P3',query:humeQuery},{partId:'P3',query:kantQuery},{partId:'P3',query:question}],
+  library:{search:async(_query,options)=>({sources:options.bookId?[byBook.get(options.bookId)]:[...byBook.values()]})},
+  books,allowedBookIds,pageLoader:async source=>({text:`Verified full page ${source.page} explains the account of causal necessity with enough context for evidence.`})});
+ assert.equal(result.partFacetIndices.length,7);
+ assert.ok(result.searches.length<=6,'reused planner queries are searched only once');
+ assert.ok(result.candidates.some(source=>source.bookId==='35'&&
+  source.candidatePartIds.includes('P1')&&source.candidatePartIds.includes('P3')));
+ assert.ok(result.candidates.some(source=>source.bookId==='40'&&
+  source.candidatePartIds.includes('P2')&&source.candidatePartIds.includes('P3')));
+});
+
 test('source-specific planner queries also link their results to the matching part',async()=>{
  const books=[{id:'40',title:'Critique of Pure Reason — Immanuel Kant'}],allowedBookIds=new Set(['40']);
  const library={search:async(query)=>({sources:[{bookId:'40',title:books[0].title,
