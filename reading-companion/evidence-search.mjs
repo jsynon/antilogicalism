@@ -5,7 +5,7 @@ import {catalogIdentity} from './reader-contract.mjs';
  * for source selection and manual inspection.
  * No generated claim or PDF locator is trusted by this component.
  */
-export function mergeFacetSearches(results,limit=8){
+export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[]){
  if(!Array.isArray(results))return [];
  const groups=results.map(r=>{
    const sources=Array.isArray(r?.sources)?r.sources:[];
@@ -84,10 +84,30 @@ export function mergeFacetSearches(results,limit=8){
      }
    }
  }
- return [...byPage.values()].sort((a,b)=>
+ const ranked=[...byPage.values()].sort((a,b)=>
    b.rankScore-a.rankScore||b.bestScore-a.bestScore||a.firstSeen-b.firstSeen)
-   .slice(0,limit).map(({entry,facet,facets,facetRanks})=>({...entry,facet,
+   .map(({entry,facet,facets,facetRanks})=>({...entry,facet,
      matchedFacets:facets.size,facetRanks}));
+ // Keep the top two results from every facet that is explicitly linked to a
+ // question part. A decisive passage can rank second on its best query while
+ // several weaker rank-one pages from other facets crowd it out globally.
+ const reserved=[],reservedKeys=new Set();
+ for(const facet of [...new Set(reserveFacetIndexes)]){
+   for(const entry of (groups[facet]||[]).slice(0,2)){
+     const key=String(entry.bookId)+':'+entry.page;
+     const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
+     if(candidate&&!reservedKeys.has(key)&&reserved.length<limit){
+       reserved.push(candidate);reservedKeys.add(key);
+     }
+   }
+ }
+ for(const candidate of ranked){
+   const key=String(candidate.bookId)+':'+candidate.page;
+   if(reservedKeys.has(key))continue;
+   if(reserved.length>=limit)break;
+   reserved.push(candidate);reservedKeys.add(key);
+ }
+ return reserved;
 }
 
 /* Shared browser/evaluator retrieval assembly. Both callers search the same
@@ -142,7 +162,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   return {sources:targeted.flatMap(set=>Array.isArray(set?.sources)?set.sources:[])
    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
  }));
- const results=searchSets.length>1?mergeFacetSearches(searchSets,maxCandidates):
+ const linkedFacets=[...new Set(partFacetIndices.map(item=>item.facet).filter(index=>index>=0))];
+ const results=searchSets.length>1?mergeFacetSearches(searchSets,maxCandidates,linkedFacets):
   (searchSets[0]?.sources||[]).map((source,index)=>({...source,facet:0,
     facetRanks:[{facet:0,rank:index+1}]}));
  const filtered=results.filter(source=>allowedPage(source)&&
@@ -348,7 +369,10 @@ function directFacetTitleMatch(question,title){
 }
 
 function directFacetTextMatch(question,text){
- const stop=new Set(['what','when','where','which','who','whom','whose','why','how','does','did','has','have','had','are','was','were','the','and','for','from','with','into','about','between','this','that','these','those','there','their','they','them','than','then','your','our','also','only','could','would','should']);
+ const stop=new Set(['what','when','where','which','who','whom','whose','why','how','does','did','has','have','had','are','was','were','the','and','for','from','with','into','about','between','this','that','these','those','there','their','they','them','than','then','your','our','also','only','could','would','should',
+  // In a cross-work comparison, author/title names and the comparison verb
+  // identify bibliographic scope, not the passage's topical relevance.
+  'hume','kant','enquiry','critique','pure','reason','differ','differs','different','difference','differences','compare','comparison','contrast','versus']);
  const normalize=term=>/^(?:cause|causal|causality|causes|caused|causing)$/.test(term)?'caus':
   term.startsWith('necess')?'necess':term.startsWith('experienc')?'experienc':term;
  const questionTerms=new Set((String(question||'').toLowerCase().match(/[a-z0-9]+/g)||[])
@@ -496,8 +520,14 @@ export function selectAnswerSources(candidates,question,turnstileToken,
  const partRepresentatives=[],reservedPartPages=new Set();
  const partIds=[...new Set(candidates.flatMap(candidate=>candidate.candidatePartIds||[]))];
  for(const partId of partIds){
-  const candidate=candidates.find(value=>value.candidatePartIds?.includes(partId)&&
+  const eligible=candidates.filter(value=>value.candidatePartIds?.includes(partId)&&
    !reservedPartPages.has(value));
+  // For a comparison's synthesis part, choose the linked page whose wording
+  // best matches the exact question, rather than blindly taking the first
+  // aggregate-ranked result. Ties retain retrieval order.
+  const candidate=comparisonIntent&&eligible.length?eligible.reduce((best,value)=>
+    directFacetTextMatch(question,value.text??value.preview)>
+      directFacetTextMatch(question,best.text??best.preview)?value:best,eligible[0]):eligible[0];
   if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
  }
  if(partRepresentatives.length)ordered=[...partRepresentatives,...ordered.filter(value=>!reservedPartPages.has(value))];
