@@ -4,10 +4,10 @@
  * fingerprints before any inference. The verified scope comes from the
  * owner-published cohort manifest; expanding it does not change v47 OCR.
  */
-import {RemoteLibrary,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
+import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet} from './evidence-search.mjs';
+import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence} from './evidence-search.mjs';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -47,6 +47,7 @@ let pendingTurnstile=null;
 let candidates=[], searching=false, answering=false;
 let diagnosticState=null;
 let conversationHistory=[];
+let conversationBookScope='';
 
 function boundedHistoryMessage(role,content){
   let text=String(content||'').trim();
@@ -68,6 +69,7 @@ function rememberTurn(questionText,answerText){
 function startNewConversation(){
   if(answering)return;
   conversationHistory=[];
+  conversationBookScope=bookFilter.value||'all';
   answerBox.replaceChildren();
   question.value='';
   newConversationButton.hidden=true;
@@ -217,7 +219,7 @@ async function bookShard(id){
   }
   return sourceShards.get(id);
 }
-async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
+async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=null}={}){
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   candidates=[];
@@ -253,47 +255,22 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false}={}){
       if(diagnosticState)diagnosticState.searches=[{query:q,
         resultCount:populated.length,sources:populated.slice(0,8)}];
     }else{
-      const searches=buildSearchFacets(q,plannedQueries,bookFilter.value);
-      const namedBookIds=bookFilter.value?[bookFilter.value]:
-        matchExplicitBookIds(q,bookList);
-      const targetBookIds=namedBookIds.length?namedBookIds:[null];
-      const foundSets=await Promise.all(searches.map(async term=>{
-        const facetBookIds=targetBooksForFacet(term,bookList,targetBookIds[0]===null?null:targetBookIds);
-        const targeted=await Promise.all(facetBookIds.map(bookId=>
-          library.search(term,{...(bookId?{bookId}:{}),allowedBookIds:allowed,
-            maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK})));
-        return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])
-          .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
-      }));
-
-      if(diagnosticState)diagnosticState.searches=foundSets.map((set,index)=>({
-        query:searches[index]+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
-        resultCount:Array.isArray(set.sources)?set.sources.length:0,
-        sources:(set.sources||[]).slice(0,8)
-      }));
-      // Keep a wider evidence pool for the final passage selector. The
-      // The six-page answer packet keeps distinct facets and works available
-      // for broader questions while staying within the request-size budget.
-      const results=foundSets.length>1?
-        mergeFacetSearches(foundSets,12).filter(allowedPage):
-        foundSets[0].sources.filter(allowedPage);
-      // Preserve one page for each distinct facet before filling from other
-      // candidates. The answer can use up to six verified full pages.
-      const representatives=[],others=[],visited=new Set();
-      for(const r of results){
-        const group=plannedQueries?String(r.facet):r.bookId;
-        if(visited.has(group))others.push(r);
-        else {visited.add(group);representatives.push(r);}
+      const retrieval=await retrieveEvidence({question:q,
+        queries:plannerFallback||!plannedQueries?[q]:plannedQueries,
+        directFallback:plannerFallback||!plannedQueries,
+        library,books:bookList,allowedBookIds:allowed,
+        selectedBookIds:bookFilter.value?[bookFilter.value]:[],allowedPage,
+        maxCandidates:12,pageLimit:PDF_PAGE_LIMIT,
+        pageLoader:async source=>{
+          const shard=await bookShard(source.bookId);
+          const page=shard.pages?.find(item=>item.id===source.globalPageId&&item.page===source.page);
+          return page&&typeof page.text==='string'?{text:page.text}:null;
+        }});
+      populated=retrieval.candidates;
+      if(diagnosticState){
+        diagnosticState.searches=retrieval.searches;
       }
-      const ordered=[...representatives,...others];
-      for(const s of ordered){
-        const shard=await bookShard(s.bookId);
-        const original=shard.pages?.find(p=>p.id===s.globalPageId && p.page===s.page);
-        if(!original || typeof original.text!=='string')continue;
-        const byteLength=new TextEncoder().encode(original.text).byteLength;
-        if(byteLength<25||byteLength>PDF_PAGE_LIMIT)continue;
-        populated.push({...s,text:original.text,byteLength});
-      }
+      if(diagnosticState&&plan)diagnosticState.plannerPlan=plan;
     }
     candidates=populated.slice(0,12);
     if(diagnosticState){
@@ -461,6 +438,8 @@ function renderResponse(data,turnQuestion=''){
     diagnosticState.outcome=data.outcome;
     diagnosticState.coverage=data.coverage;
     diagnosticState.reviewStatus=data.reviewStatus;
+    diagnosticState.pipeline=data.pipeline||null;
+    diagnosticState.usage=data.usage||null;
     diagnosticState.reviewedEvidence=data.evidenceMap;
     diagnosticState.questionParts=data.questionParts;
     diagnosticState.answer=data.answer;
@@ -511,8 +490,10 @@ async function requestSourcePlan(q,verificationToken,history){
     if(diagnosticState)diagnosticState.failureCode='search-planning-failed';
     throw Error('The evidence search plan was incomplete.');
   }
-  if(diagnosticState){diagnosticState.plannerQueries=data.queries;refreshDiagnostic();}
-  return data.queries;
+  const plan=data.plan&&typeof data.plan==='object'&&!Array.isArray(data.plan)?data.plan:null;
+  if(diagnosticState){diagnosticState.plannerQueries=data.queries;
+    diagnosticState.plannerPlan=plan;refreshDiagnostic();}
+  return {queries:data.queries,plan};
 }
 async function nextTurnstileToken(){
   if(!window.turnstile||turnstileId===null)
@@ -543,6 +524,9 @@ async function askQuestion(questionText){
   if(questionText!==undefined)question.value=q;
   if(!pilotEnabled){setStatus('Answering is temporarily unavailable.');return;}
   if(q.length<5||q.length>400){setStatus('Please enter a question of 5–400 characters.');return;}
+  const currentScope=bookFilter.value||'all';
+  if(conversationBookScope&&conversationBookScope!==currentScope)conversationHistory=[];
+  conversationBookScope=currentScope;
   beginDiagnostic(q);
   answering=true;updateButtons();sourceReader.reset();
   try{
@@ -555,8 +539,8 @@ async function askQuestion(questionText){
       // fresh verification is required for the fingerprint-protected answer.
       turnstileToken='';
       setStatus('Looking across the collection for useful passages…');
-      let queries=null,plannerFallback=false;
-      try{queries=await requestSourcePlan(q,token,history);}
+      let planned=null,plannerFallback=false;
+      try{planned=await requestSourcePlan(q,token,history);}
       catch(error){
         if(!canFallbackToDirectSearch(diagnosticState?.failureHttpStatus,
           diagnosticState?.failureCode))throw error;
@@ -567,8 +551,8 @@ async function askQuestion(questionText){
           diagnosticState.failureCode='';
         }
       }
-      if(queries)setStatus('Gathering passages from across the collection…');
-      const found=await retrieveSources(queries,{plannerFallback});
+      if(planned)setStatus('Gathering passages from across the collection…');
+      const found=await retrieveSources(planned?.queries||null,{plannerFallback,plan:planned?.plan||null});
       if(!found)return;
       token=await nextTurnstileToken();
     }else{
@@ -589,7 +573,7 @@ async function askQuestion(questionText){
     const response=await fetch(API+'/api/pilot-answer',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
-        history,
+        history,bookId:bookFilter.value||'',plan:diagnosticState?.plannerPlan||undefined,
         sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))})
     });
     let data;
@@ -639,7 +623,8 @@ async function askQuestion(questionText){
       return;
     }
     renderResponse(data,q);
-    rememberTurn(q,data.answer||'');
+    if(data.outcome==='verified-source-draft'&&typeof data.answer==='string'&&data.answer.trim())
+      rememberTurn(q,data.answer);
     setStatus(data.outcome==='insufficient-evidence'?
       'These passages don’t provide enough evidence for a complete answer. Try different wording or choose another book.':'');
   }catch(error){
@@ -681,6 +666,12 @@ question.addEventListener('keydown',event=>{
 });
 bookSearch.addEventListener('input',updateBookOptions);
 bookFilter.addEventListener('change',()=>{
+  const nextScope=bookFilter.value||'all';
+  if(conversationBookScope&&conversationBookScope!==nextScope){
+    conversationHistory=[];
+    setStatus('Book scope changed; conversation context cleared.');
+  }
+  conversationBookScope=nextScope;
   if(bookFilter.value===''){
     bookSearch.value='';
     updateBookOptions();
@@ -689,3 +680,4 @@ bookFilter.addEventListener('change',()=>{
 });
 question.addEventListener('input',updateButtons);
 (async()=>{await loadCoverage();await loadStatus();})();
+

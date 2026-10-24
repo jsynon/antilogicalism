@@ -22,6 +22,12 @@ test('query terms keep source concepts while dropping question framing',()=>{
    ['caused','peloponnesian','war']);
 });
 
+test('long questions retain later discriminating terms after early author and title names',()=>{
+ const terms=queryTerms('According to Friedrich Nietzsche in The Portable Nietzsche, what did he think about Plato, and how does that differ from the editor Walter Kaufmann’s discussion of science and morality?');
+ assert.ok(terms.length>8);
+ assert.ok(terms.includes('morality'));
+});
+
 test('page ranking favors clustered topic evidence over scattered mentions',()=>{
  const terms=['virtue','practical','wisdom','happiness','justice','character'];
  const filler=Array(140).fill('ordinary').join(' ');
@@ -364,3 +370,4 @@ test('an ellipsis-truncated final connector retains the relevant next page',asyn
  assert.deepEqual(result.sources.map(source=>source.page),[453,454]);
  assert(result.sources[1].preview.includes('Dreams after death'));
 });
+

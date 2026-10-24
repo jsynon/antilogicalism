@@ -93,7 +93,7 @@ function phraseMatchCount(text,phrase) {
 }
 export function queryTerms(question) {
   return [...new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || [])]
-    .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 8);
+    .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 24);
 }
 
 // Correct a single-character typo only when it uniquely matches a catalog
@@ -613,3 +613,4 @@ export class RemoteLibrary {
       booksScanned, discardedNavigation, elapsedMs:Math.round(performance.now() - started)};
   }
 }
+

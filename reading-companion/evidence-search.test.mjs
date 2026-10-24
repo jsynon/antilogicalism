@@ -177,7 +177,8 @@ test('author-only mentions search across the named author’s catalog works',()=
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence} from './evidence-search.mjs';
+import {catalogIdentity} from './reader-contract.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
  preview:'Authentic indexed excerpt',url:'https://drive.google.com/file/d/X/view#page='+page});
@@ -389,14 +390,40 @@ test('answer source byte budget includes recent conversation context',()=>{
 });
 
 
+test('edited author collections stay discoverable by their author, not editor',()=>{
+ const portable='The Portable Nietzsche — Friedrich Nietzsche (edited by Walter Kaufmann)';
+ const identity=catalogIdentity(portable);
+ assert.deepEqual(identity.authors,['Friedrich Nietzsche']);
+ assert.deepEqual(identity.editors,['Walter Kaufmann']);
+ const books=[{id:'239',title:portable},
+  {id:'640',title:'Nietzsche and the Modern Mind — Walter Kaufmann'}];
+ assert.deepEqual(matchExplicitBookIds('What did Nietzsche think about Plato?',books),['239']);
+ assert.deepEqual(matchExplicitBookIds('What did Walter Kaufmann argue?',books),['640']);
+});
+
+test('shared retrieval hydrates bounded full pages and returns one reproducible facet pool',async()=>{
+ const books=[{id:'239',title:'The Portable Nietzsche — Friedrich Nietzsche (edited by Walter Kaufmann)'}];
+ const allowedBookIds=new Set(['239']);let calls=0;
+ const library={search:async(query,options)=>{calls++;assert.equal(options.allowedBookIds,allowedBookIds);
+  return {sources:[{bookId:'239',title:books[0].title,page:570,globalPageId:569,
+   score:4,facet:query,url:'https://drive.google.com/file/d/ABCDEFGHIJK/view#page=570'}]};}};
+ const result=await retrieveEvidence({question:'What did Nietzsche think about Plato?',
+  queries:['Nietzsche Plato idealism critique','Nietzsche Plato Christianity idealism'],library,books,
+  allowedBookIds,pageLoader:async()=>({text:'A verified full source passage with complete context and claims.'})});
+ assert.equal(calls,3);
+ assert.equal(result.searches.length,3);
+ assert.equal(result.candidates.length,1);
+ assert.match(result.candidates[0].text,/complete context/);
+});
+
 test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
  const {readFileSync}=await import('node:fs');
  const js=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
  assert.match(js,/API\+'\/api\/pilot-plan'/);
  assert.match(js,/data\.searchPlanning===true/);
  assert.match(js,/validSearchPlan\(data\.queries\)/);
- assert.match(js,/buildSearchFacets\(q,plannedQueries,bookFilter\.value\)/);
- assert.match(js,/const found=await retrieveSources\(queries,\{plannerFallback\}\)/);
+ assert.match(js,/retrieveEvidence\(\{question:q/);
+ assert.match(js,/const found=await retrieveSources\(planned\?\.queries\|\|null,\{plannerFallback,plan:planned\?\.plan\|\|null\}\)/);
  assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
  assert.match(js,/diagnosticState\.fallbackMode=true/);
  assert.match(js,/Search planning is temporarily unavailable; searching directly with your question/);
@@ -408,3 +435,4 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/data\.outcome==='insufficient-evidence'/);
  assert.doesNotMatch(js,/innerHTML\s*=/);
 });
+

@@ -168,7 +168,7 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(html,/id="companion-diagnostic-copy" type="button">Copy diagnostic report/);
  assert.doesNotMatch(html,/The report includes your question and retrieval details|shared only if you copy it/);
  assert.match(client,/navigator\.clipboard\.writeText\(diagnosticOutput\.textContent\)/);
- assert.match(client,/foundSets\.map\(\(set,index\)=>/);
+ assert.match(client,/diagnosticState\.searches=retrieval\.searches/);
  assert.match(client,/diagnosticState\.evidenceHighlights=highlights\.map/);
  assert.match(client,/diagnosticState\.failureHttpStatus=res\.status/);
  assert.match(client,/diagnosticState\.failureHttpStatus=response\.status/);
@@ -176,7 +176,7 @@ test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
  assert.match(client,/diagnosticState\.failureProviderClass=data\.failureProviderClass/);
  assert.match(client,/diagnosticState\.failureAnswerCharacters=data\.failureAnswerCharacters/);
  assert.match(client,/diagnosticState\.failureDetail=data\.failureDetail/);
- assert.match(client,/body:JSON\.stringify\(\{question:q,turnstileToken:token,\s*history,\s*sources:chosen\.map/);
+ assert.match(client,/body:JSON\.stringify\(\{question:q,turnstileToken:token,\s*history,bookId:bookFilter\.value\|\|'',plan:diagnosticState\?\.plannerPlan\|\|undefined,/);
 });
 
 
@@ -199,6 +199,14 @@ test('diagnostics expose only bounded reviewed points tied to submitted sources'
  ]);
 });
 
+test('diagnostics summarize v2 validated claim spans without exposing full pages',()=>{
+ const report=createDiagnosticReport({submittedSources:[{id:'S1',text:'PRIVATE FULL PAGE'}],
+  reviewedEvidence:[{id:'S1',claimId:'C2',quote:'A validated exact passage from this source.',start:10,end:51}]});
+ assert.deepEqual(report.answer.reviewedEvidence,[{id:'S1',point:'Claim C2',quoteVerified:true,
+  anchorQuote:'A validated exact passage from this source.'}]);
+ assert.equal(JSON.stringify(report).includes('PRIVATE FULL PAGE'),false);
+});
+
 test('diagnostics retain complete sentence context around a verified quote anchor',()=>{
  const sentence='If a great multitude could observe justice without a common power to keep them in awe, there would be peace without subjection and no need for civil government.';
  const report=createDiagnosticReport({
@@ -208,3 +216,4 @@ test('diagnostics retain complete sentence context around a verified quote ancho
  });
  assert.equal(report.answer.reviewedEvidence[0].anchorQuote,sentence);
 });
+
