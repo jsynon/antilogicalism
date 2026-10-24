@@ -178,7 +178,7 @@ test('author-only mentions search across the named author’s catalog works',()=
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence} from './evidence-search.mjs';
-import {catalogIdentity} from './reader-contract.mjs';
+import {catalogIdentity,normalizePlan} from './reader-contract.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
  preview:'Authentic indexed excerpt',url:'https://drive.google.com/file/d/X/view#page='+page});
@@ -488,6 +488,24 @@ test('reused comparison queries may link to more than six parts while unique sea
   source.candidatePartIds.includes('P1')&&source.candidatePartIds.includes('P3')));
  assert.ok(result.candidates.some(source=>source.bookId==='40'&&
   source.candidatePartIds.includes('P2')&&source.candidatePartIds.includes('P3')));
+});
+
+test('synthetic comparison coverage reuses source searches instead of spending a facet on generic wording',()=>{
+ const question='How do Hume’s Enquiry and Kant’s Critique of Pure Reason differ over causal necessity?';
+ const humeQuery='Hume Enquiry causal necessity custom habit';
+ const kantQuery='Kant Critique causal necessity category a priori';
+ const plan=normalizePlan({intent:'compare',resolvedQuestion:question,sources:[
+  {label:'David Hume',role:'primary',bookIds:['35']},
+  {label:'Critique of Pure Reason',role:'primary',bookIds:['40']}],parts:[
+   'How does Hume explain causal necessity in the Enquiry?',
+   'How does Kant explain causal necessity in the Critique of Pure Reason?'],
+  queries:[humeQuery,kantQuery]},question,{
+   '35':'An Enquiry Concerning Human Understanding — David Hume',
+   '40':'Critique of Pure Reason — Immanuel Kant'});
+ const comparison=plan.parts[2];
+ assert.match(comparison.question,/compare in response to this question/i);
+ assert.deepEqual(comparison.searchQueries,[humeQuery,kantQuery]);
+ assert.ok(!comparison.searchQueries.includes(comparison.question));
 });
 
 test('source-specific planner queries also link their results to the matching part',async()=>{
