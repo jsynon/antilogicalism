@@ -406,8 +406,9 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   plannerFailure={httpStatus:failure.httpStatus,failureCode:failure.failureCode};
   queries=[item.question];
  }
- const partQueries=!plannerFallback&&Array.isArray(plan?.plan?.parts)?plan.plan.parts.map(part=>({
-  partId:part.id,query:part.question})):[];
+ const partQueries=!plannerFallback&&Array.isArray(plan?.plan?.parts)?plan.plan.parts.flatMap(part=>
+  (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
+   .map(query=>({partId:part.id,query}))):[];
  let loaded;
  try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,partQueries});}
  catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};

@@ -257,8 +257,9 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
     }else{
       const retrieval=await retrieveEvidence({question:q,
         queries:plannerFallback||!plannedQueries?[q]:plannedQueries,
-        partQueries:!plannerFallback&&Array.isArray(plan?.parts)?plan.parts.map(part=>({
-          partId:part.id,query:part.question})):[],
+        partQueries:!plannerFallback&&Array.isArray(plan?.parts)?plan.parts.flatMap(part=>
+          (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
+            .map(query=>({partId:part.id,query}))):[],
         directFallback:plannerFallback||!plannedQueries,
         library,books:bookList,allowedBookIds:allowed,
         selectedBookIds:bookFilter.value?[bookFilter.value]:[],allowedPage,

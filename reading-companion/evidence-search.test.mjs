@@ -467,6 +467,23 @@ test('part queries keep matching page IDs linked to each question part through s
  assert.deepEqual(new Set(selected.flatMap(source=>source.candidatePartIds)),new Set(['P1','P2']));
 });
 
+test('source-specific planner queries also link their results to the matching part',async()=>{
+ const books=[{id:'40',title:'Critique of Pure Reason — Immanuel Kant'}],allowedBookIds=new Set(['40']);
+ const library={search:async(query)=>({sources:[{bookId:'40',title:books[0].title,
+  page:query.includes('categories a priori')?54:105,globalPageId:query.includes('categories a priori')?53:104,
+  score:80,facet:query}]})};
+ const result=await retrieveEvidence({question:'How does Kant explain causal necessity?',
+  queries:['Kant Critique causality categories a priori synthetic','Kant causal necessity experience'],
+  partQueries:[{partId:'P2',query:'Kant Critique causality categories a priori synthetic'},
+   {partId:'P2',query:'How does Kant explain the origin and justification of causal necessity?'}],
+  library,books,allowedBookIds,
+  pageLoader:async source=>({text:`A complete verified page ${source.page} explains the category of causality and its role in experience.`})});
+ const page54=result.candidates.find(source=>source.page===54);
+ assert.ok(page54);
+ assert.deepEqual(page54.candidatePartIds,['P2']);
+ assert.ok(result.searches.some(search=>search.query.includes('categories a priori')&&search.partIds.includes('P2')));
+});
+
 test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
  const {readFileSync}=await import('node:fs');
  const js=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
