@@ -119,7 +119,11 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
     // support the synthesis once the Worker links them to this part.
     const syntheticComparison=/^How do the named sources compare in response to this question:/i.test(part.question);
     return {...part,sourceBookIds:partSourceGroups[index],
-      searchQueries:[...new Set([...matchingQueries,...(syntheticComparison?[]:[part.question])])].slice(0,5)};
+      // The exact reader question is already a retrieval facet. Link it to a
+      // synthetic comparison part without issuing another search, so a direct
+      // result discovered by that facet can survive into the synthesis packet.
+      searchQueries:[...new Set([...matchingQueries,
+        ...(syntheticComparison?[resolvedQuestion]:[part.question])])].slice(0,5)};
   });
   return {version:CONTRACT_VERSION,resolvedQuestion,intent,
     sources,parts:partsWithSources,scope:bounded(raw?.scope,200),
