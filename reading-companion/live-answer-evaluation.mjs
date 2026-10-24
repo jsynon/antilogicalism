@@ -24,8 +24,8 @@ const QUALITY_CASES=[
  {id:'quality-history-thucydides-causes',discipline:'history',question:'According to Thucydides, what were the underlying causes of the Peloponnesian War, and how did they differ from the immediate disputes that preceded it?',selected_book_ids:['152'],planner_queries:['Thucydides real cause growth Athenian power fear Lacedaemon','Thucydides immediate disputes Corcyra Potidaea grievances'],required_source_groups:[{label:'Thucydides',book_ids:['152']}],review_focus:['Separate the underlying cause from the immediate disputes.','Support both parts with passages from Thucydides, without treating them as interchangeable.']},
  {id:'quality-literature-dostoevsky-raskolnikov',discipline:'literature',question:'In Crime and Punishment, how does Raskolnikov try to justify murder, and how does the novel test or undermine his reasoning?',selected_book_ids:['114'],planner_queries:['Raskolnikov extraordinary men right to transgress law murder','Crime and Punishment Raskolnikov guilt suffering confession theory'],required_source_groups:[{label:'Dostoevsky, Crime and Punishment',book_ids:['114']}],review_focus:['Describe Raskolnikov’s theory as the character’s argument, not as Dostoevsky’s endorsed view.','Explain how later events in the novel complicate that theory.']},
  {id:'quality-philosophy-aristotle-practical-wisdom',discipline:'philosophy',question:"According to Aristotle's Nicomachean Ethics, what is practical wisdom, and how does it differ from scientific knowledge and skill?",selected_book_ids:['7'],planner_queries:['Aristotle Nicomachean Ethics definition phronesis practical wisdom deliberation human good','Aristotle Nicomachean Ethics phronesis episteme techne variable action making'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']}],review_focus:['Define practical wisdom as a reasoned capacity concerned with human good and action.','Explain why it is not science (variable, deliberable matters rather than necessary demonstrations) or craft (action differs from making).']},
- {id:'quality-all-books-cross-work-science',discipline:'science',question:'How does Darwin explain natural selection preserving favorable variations in On the Origin of Species, and how does Hawking use astronomical observations to support an explanation of black-hole phenomena in A Brief History of Time?',selected_book_ids:[],planner_queries:['Darwin Origin of Species natural selection favorable inherited variations struggle for existence','Hawking Cygnus X-1 unseen companion strong X-rays evidence black hole'],required_source_groups:[{label:'Darwin',book_ids:['529']},{label:'Hawking',book_ids:['102']}],review_focus:['Compare each author’s use of observation and explanation.','Cite evidence from both named works; avoid implying the authors use identical methods.']},
- {id:'quality-all-books-cross-discipline-order',discipline:'philosophy',question:'How does Aristotle describe the aim of political science in the Nicomachean Ethics, and what role does Hobbes give common power in Leviathan? How do these accounts differ?',selected_book_ids:[],planner_queries:['Aristotle Nicomachean Ethics political science human good citizens good obedient laws','Hobbes Leviathan state of nature common power keep them in awe war every man against every man'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']},{label:'Hobbes, Leviathan',book_ids:['163']}],review_focus:['Represent each author’s account in its own terms and identify a meaningful difference.','Ground the comparison in both works instead of importing unsupported modern claims.']},
+ {id:'quality-all-books-cross-work-science',discipline:'science',question:'How does Darwin explain natural selection preserving favorable variations in On the Origin of Species, and how does Hawking use astronomical observations to support an explanation of black-hole phenomena in A Brief History of Time?',selected_book_ids:[],planner_queries:['Darwin Origin of Species natural selection favorable inherited variations struggle for existence','Hawking Cygnus X-1 unseen companion strong X-rays evidence black hole'],required_source_groups:[{label:'Darwin',book_ids:['529']},{label:'Hawking',book_ids:['102']}],required_part_source_groups:[{partIncludes:'Darwin',book_ids:['529']},{partIncludes:'Hawking',book_ids:['102']}],review_focus:['Compare each author’s use of observation and explanation.','Cite evidence from both named works; avoid implying the authors use identical methods.']},
+ {id:'quality-all-books-cross-discipline-order',discipline:'philosophy',question:'How does Aristotle describe the aim of political science in the Nicomachean Ethics, and what role does Hobbes give common power in Leviathan? How do these accounts differ?',selected_book_ids:[],planner_queries:['Aristotle Nicomachean Ethics political science human good citizens good obedient laws','Hobbes Leviathan state of nature common power keep them in awe war every man against every man'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']},{label:'Hobbes, Leviathan',book_ids:['163']}],required_part_source_groups:[{partIncludes:'Aristotle',book_ids:['7']},{partIncludes:'Hobbes',book_ids:['163']}],review_focus:['Represent each author’s account in its own terms and identify a meaningful difference.','Ground the comparison in both works instead of importing unsupported modern claims.']},
  {id:'quality-all-books-religion-scripture',discipline:'religion',question:'According to 1 John 4:7–12, what does “God is love” mean, and how does the passage connect God’s love with loving one another?',selected_book_ids:[],planner_queries:['1 John 4:7-12 God is love sent Son love one another passage','1 John 4:7-12 love of God revealed in Christ command love one another'],required_source_groups:[{label:'1 John 4:7–12',book_ids:['335']}],review_focus:['Explain the passage’s connection between God’s prior love and the command to love one another.','Stay close to the passage and distinguish its claims from later theological interpretation.']},
 ];
 const HOLDOUT_CASES=[
@@ -33,9 +33,20 @@ const HOLDOUT_CASES=[
  {id:'holdout-literature-hamlet-soliloquy',discipline:'literature',question:'In Hamlet’s “To be, or not to be” soliloquy, what alternatives does he weigh, and how does uncertainty about what follows death affect his reasoning?',selected_book_ids:['212'],planner_queries:['Hamlet to be or not to be soliloquy sleep death fear unknown country','Hamlet soliloquy conscience makes cowards of us all after death'],required_source_groups:[{label:'Shakespeare, Hamlet',book_ids:['212','564']}],review_focus:['Describe Hamlet’s alternatives and reasoning in the soliloquy without treating them as the play’s settled doctrine.','Connect the fear of the unknown after death to his hesitation, citing the soliloquy.']},
  {id:'holdout-philosophy-aristotle-soul-body',discipline:'philosophy',question:'According to Aristotle’s De Anima, how is the soul related to a living body, and how does the form-and-matter comparison clarify that relation?',selected_book_ids:['4'],planner_queries:['Aristotle De Anima soul actuality form natural body organ life','De Anima soul form matter body first actuality Aristotle'],required_source_groups:[{label:'Aristotle, De Anima',book_ids:['4']}],review_focus:['Explain the soul as the actuality or form of a natural body with life potentially.','Use the form-and-matter comparison without reducing soul to a separate bodily part.']},
  {id:'holdout-religion-james-faith-works',discipline:'religion',question:'According to James 2:14–26, how does James relate faith to works, and what do Abraham and Rahab illustrate in his argument?',selected_book_ids:['335'],planner_queries:['James 2:14-26 faith without works Abraham Rahab justified works','James faith works body without spirit Abraham offered Isaac Rahab received messengers'],required_source_groups:[{label:'James 2:14–26',book_ids:['335']}],review_focus:['Explain James’s argument about living faith and works using the passage’s examples.','Represent Abraham and Rahab as distinct illustrations and avoid importing a broader doctrinal resolution not stated in the passage.']},
- {id:'holdout-all-books-hume-kant-causation',discipline:'philosophy',question:'How do Hume’s Enquiry and Kant’s Critique of Pure Reason differ over how we can know causal necessity?',selected_book_ids:[],planner_queries:['Hume Enquiry cause effect necessary connection constant conjunction custom','Kant Critique Pure Reason causality category understanding a priori experience'],required_source_groups:[{label:'Hume, Enquiry Concerning Human Understanding',book_ids:['35']},{label:'Kant, Critique of Pure Reason',book_ids:['40']}],review_focus:['Explain each author’s account on its own terms and distinguish Hume’s account of experience and habit from Kant’s account of a priori understanding.','Cite evidence from both books and avoid presenting the comparison as a direct exchange between the authors.']},
- {id:'holdout-all-books-plato-rousseau-order',discipline:'politics',question:'How do Plato’s Republic and Rousseau’s Social Contract explain what makes political order legitimate, and how does each connect it to the common good?',selected_book_ids:[],planner_queries:['Plato Republic justice city common good political order rulers knowledge','Rousseau Social Contract general will common good legitimate political authority'],required_source_groups:[{label:'Plato, Republic',book_ids:['74']},{label:'Rousseau, Social Contract',book_ids:['245']}],review_focus:['Identify the basis of political order in each work, keeping Plato’s and Rousseau’s concepts distinct.','Explain how each account relates to collective good using passages from both works.']},
- {id:'holdout-all-books-wollstonecraft-dubois',discipline:'society',question:'How do Wollstonecraft’s Vindication of the Rights of Woman and Du Bois’s Souls of Black Folk describe the effects of unequal social conditions on people’s development and self-understanding?',selected_book_ids:[],planner_queries:['Wollstonecraft Vindication education dependence reason virtue women social conditions','Du Bois Souls of Black Folk veil double consciousness self understanding social conditions'],required_source_groups:[{label:'Wollstonecraft, Vindication of the Rights of Woman',book_ids:['87']},{label:'Du Bois, The Souls of Black Folk',book_ids:['454']}],review_focus:['Explain each author’s account of how social conditions shape development or self-understanding without flattening their distinct historical arguments.','Use evidence from both works and mark any comparative synthesis as a reader’s synthesis.']},
+ {id:'holdout-all-books-hume-kant-causation',discipline:'philosophy',question:'How do Hume’s Enquiry and Kant’s Critique of Pure Reason differ over how we can know causal necessity?',selected_book_ids:[],planner_queries:['Hume Enquiry cause effect necessary connection constant conjunction custom','Kant Critique Pure Reason causality category understanding a priori experience'],required_source_groups:[{label:'Hume, Enquiry Concerning Human Understanding',book_ids:['35']},{label:'Kant, Critique of Pure Reason',book_ids:['40']}],required_part_source_groups:[{partIncludes:'Hume',book_ids:['35']},{partIncludes:'Kant',book_ids:['40']}],review_focus:['Explain each author’s account on its own terms and distinguish Hume’s account of experience and habit from Kant’s account of a priori understanding.','Cite evidence from both books and avoid presenting the comparison as a direct exchange between the authors.']},
+ {id:'holdout-all-books-plato-rousseau-order',discipline:'politics',question:'How do Plato’s Republic and Rousseau’s Social Contract explain what makes political order legitimate, and how does each connect it to the common good?',selected_book_ids:[],planner_queries:['Plato Republic justice city common good political order rulers knowledge','Rousseau Social Contract general will common good legitimate political authority'],required_source_groups:[{label:'Plato, Republic',book_ids:['74']},{label:'Rousseau, Social Contract',book_ids:['245']}],required_part_source_groups:[{partIncludes:'Plato',book_ids:['74']},{partIncludes:'Rousseau',book_ids:['245']}],review_focus:['Identify the basis of political order in each work, keeping Plato’s and Rousseau’s concepts distinct.','Explain how each account relates to collective good using passages from both works.']},
+ {id:'holdout-all-books-wollstonecraft-dubois',discipline:'society',question:'How do Wollstonecraft’s Vindication of the Rights of Woman and Du Bois’s Souls of Black Folk describe the effects of unequal social conditions on people’s development and self-understanding?',selected_book_ids:[],planner_queries:['Wollstonecraft Vindication education dependence reason virtue women social conditions','Du Bois Souls of Black Folk veil double consciousness self understanding social conditions'],required_source_groups:[{label:'Wollstonecraft, Vindication of the Rights of Woman',book_ids:['87']},{label:'Du Bois, The Souls of Black Folk',book_ids:['454']}],required_part_source_groups:[{partIncludes:'Wollstonecraft',book_ids:['87']},{partIncludes:'Du Bois',book_ids:['454']}],review_focus:['Explain each author’s account of how social conditions shape development or self-understanding without flattening their distinct historical arguments.','Use evidence from both works and mark any comparative synthesis as a reader’s synthesis.']},
+];
+// This untouched suite is reserved for acceptance after changes have been
+// frozen. Do not use it while tuning prompts or retrieval.
+const ACCEPTANCE_CASES=[
+ {id:'acceptance-descartes-cogito',discipline:'philosophy',question:'In Meditations on First Philosophy, what does Descartes conclude about his existence while doubting, and why does the act of doubting establish it?',selected_book_ids:[],planner_queries:['Descartes Meditations on First Philosophy doubt cogito existence thinking deceiver','Descartes I am I exist whenever thought conceived meditation certainty'],required_source_groups:[{label:'Descartes, Meditations on First Philosophy',book_ids:['25']}],review_focus:['Explain the cogito as established in the act of thinking or doubting, not as an inference from a trusted sense.','Keep the demon hypothesis and the certainty of the thinking self in their proper relation.']},
+ {id:'acceptance-mill-harm-principle',discipline:'politics',question:'What principle does Mill use to limit society’s power over an individual, and what condition does he place on coercion to prevent harm?',selected_book_ids:[],planner_queries:['John Stuart Mill On Liberty harm to others only purpose power rightfully exercised','Mill On Liberty self regarding conduct society coercion harm prevention'],required_source_groups:[{label:'Mill, On Liberty',book_ids:['51']}],review_focus:['State the harm principle and distinguish harm to others from the person’s own good.','Preserve Mill’s qualifications about the maturity or capacity of the person governed.']},
+ {id:'acceptance-epictetus-freedom',discipline:'philosophy',question:'What distinction does Epictetus draw between what is up to us and what is not, and how does he connect that distinction with freedom?',selected_book_ids:[],planner_queries:['Epictetus Enchiridion what is up to us judgment impulse desire aversion','Epictetus freedom depends on choice opinions external things'],required_source_groups:[{label:'Epictetus, Enchiridion',book_ids:['28']}],review_focus:['Identify judgment, impulse, desire, and aversion as within our control and external things as not.','Explain how freedom depends on governing one’s own choices rather than controlling externals.']},
+ {id:'acceptance-augustine-memory',discipline:'religion',question:'In the Confessions, how does Augustine search for God through memory, and what limits of memory does he encounter?',selected_book_ids:[],planner_queries:['Augustine Confessions Book X memory search for God vast palace memory','Augustine Confessions memory limits God not contained in memory'],required_source_groups:[{label:'Augustine, Confessions',book_ids:['17']}],review_focus:['Explain why Augustine turns to memory in seeking God.','Do not claim that God is simply one remembered object or contained within memory.']},
+ {id:'acceptance-aristotle-tragedy-plot',discipline:'literature',question:'In the Poetics, why does Aristotle treat plot as the chief element of tragedy, and how do reversal and recognition contribute to its structure?',selected_book_ids:[],planner_queries:['Aristotle Poetics plot chief element tragedy action unity','Aristotle Poetics reversal recognition change to opposite events plot'],required_source_groups:[{label:'Aristotle, Poetics',book_ids:['11']}],review_focus:['Explain plot as the organization of action and why tragedy imitates action rather than people alone.','Describe reversal and recognition as developments within the plot, not as independent decorations.']},
+ {id:'acceptance-boethius-fortune',discipline:'philosophy',question:'Why does Boethius argue that Fortune’s gifts cannot secure happiness, and what does their instability reveal?',selected_book_ids:[],planner_queries:['Boethius Consolation of Philosophy Fortune gifts cannot make happy unstable','Boethius Fortune wheel prosperity adversity true good happiness'],required_source_groups:[{label:'Boethius, Consolation of Philosophy',book_ids:['21']}],review_focus:['Distinguish external goods that Fortune can take away from the stable good Boethius associates with happiness.','Attribute the argument to the dialogue’s reasoning and preserve its qualifications.']},
+ {id:'acceptance-locke-political-authority',discipline:'politics',question:'According to Locke’s Second Treatise of Government, what makes political authority legitimate, and under what conditions may the people resist or replace it?',selected_book_ids:[],planner_queries:['John Locke Second Treatise political power consent governed legitimate authority','Locke Second Treatise dissolution government breach trust people resistance replacement'],required_source_groups:[{label:'Locke, Second Treatise of Government',book_ids:['49']}],review_focus:['Ground legitimacy in consent and explain the role of the community’s political power.','Distinguish ordinary disagreement from a breach of trust that dissolves government.']},
 ];
 const PLANNER_CASE_IDS=[
  'quality-philosophy-aristotle-practical-wisdom',
@@ -46,6 +57,7 @@ const CALL_GAP_MS=30_500;
 function copyEvaluationCase(item){
  return {...item,selected_book_ids:[...item.selected_book_ids],planner_queries:[...item.planner_queries],
   required_source_groups:item.required_source_groups.map(group=>({...group,book_ids:[...group.book_ids]})),
+  required_part_source_groups:(item.required_part_source_groups||[]).map(group=>({...group,book_ids:[...group.book_ids]})),
   review_focus:[...item.review_focus]};
 }
 
@@ -55,15 +67,16 @@ function sourceRevision(){
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
- const evaluationCases=mode==='holdout'?HOLDOUT_CASES:QUALITY_CASES;
+ const evaluationCases=mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:QUALITY_CASES;
  if(caseId&&caseId!=='all'){
-  if(!['quality','holdout'].includes(mode))throw Error('A specific case can be selected only in quality or holdout mode.');
+  if(!['quality','holdout','acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, holdout or acceptance mode.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
  }
  if(mode==='quality')return QUALITY_CASES.map(copyEvaluationCase);
  if(mode==='holdout')return HOLDOUT_CASES.map(copyEvaluationCase);
+ if(mode==='acceptance')return ACCEPTANCE_CASES.map(copyEvaluationCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
   const item=QUALITY_CASES.find(value=>value.id===id);
   if(!item)throw Error('The planner-only cases are missing from the quality suite.');
@@ -75,7 +88,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, holdout, or full.');
+ throw Error('Mode must be smoke, planner, quality, holdout, acceptance, or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(!['selected-books','all-books'].includes(scope))
@@ -111,7 +124,7 @@ function answerDeniesSupportedComparison(part,answer){
  const givesContrast=/\b(?:whereas|by contrast|in contrast|unlike|differs? from|different from|the difference is|differ in|contrasts? with)\b/i.test(text);
  return explicitGap&&!givesContrast;
 }
-export function auditLiveAnswer(data,submitted,requiredGroups){
+export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSources=[]){
  const citations=Array.isArray(data?.citations)?data.citations:[];
  const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
  const workerSourceBuild=typeof data?.workerSourceBuild==='string'&&data.workerSourceBuild.length<=128?data.workerSourceBuild:null;
@@ -177,6 +190,22 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
   supported:questionParts.filter(item=>item?.status==='supported').length,
   partial:questionParts.filter(item=>item?.status==='partial').length,
   unsupported:questionParts.filter(item=>item?.status==='unsupported').length};
+ const sourcePartAlignment=(requiredPartSources||[]).map(expected=>{
+  const needle=normalizeDiagnosticExcerpt(expected.partIncludes);
+  const part=questionParts.find(item=>normalizeDiagnosticExcerpt(item?.part).includes(needle));
+  const allowedBookIds=expected.book_ids.map(String);
+  if(!part)return {partIncludes:expected.partIncludes,allowedBookIds,aligned:false,reason:'expected-part-not-found'};
+  const evidenceIds=Array.isArray(part.evidenceIds)?part.evidenceIds.map(String):[];
+  const linkedBooks=[...new Set(citations.filter(source=>evidenceIds.includes(String(source?.id||'')))
+   .map(source=>String(source?.bookId||'')))];
+  const misalignedBookIds=linkedBooks.filter(id=>!allowedBookIds.includes(id));
+  const hasExpectedBook=linkedBooks.some(id=>allowedBookIds.includes(id));
+  const aligned=misalignedBookIds.length===0&&
+   (part.status==='unsupported'||hasExpectedBook);
+  return {partIncludes:expected.partIncludes,part:String(part.part||''),status:String(part.status||''),
+   allowedBookIds,linkedBookIds:linkedBooks,misalignedBookIds,aligned,
+   reason:aligned?'':'evidence-does-not-match-expected-part-source'};
+ });
  const evidenceHighlights=highlights.map(item=>({sourceId:String(item?.source_id||item?.sourceId||''),
   title:String(item?.title||''),page:Number.isSafeInteger(item?.page)?item.page:null,
   quote:typeof item?.quote==='string'?item.quote:'',
@@ -193,19 +222,59 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
  const partEvidenceComplete=questionParts.length===0?null:
   partEvidenceAudit.every(part=>part.structurallyComplete!==false);
  const evidenceAuditScope='Evidence IDs are checked for consistent linkage across question parts, the reviewed evidence map, cited sources, and submitted pages. This is a structural check, not a semantic judge of whether a passage truly supports a claim; review the answer and source text.';
- return {workerVersionId,workerSourceBuild,outcome:String(data?.outcome||''),coverage,reviewStatus:String(data?.reviewStatus||''),
+ const outcome=String(data?.outcome||'');
+ const reviewStatus=String(data?.reviewStatus||'');
+ const failureCode=typeof data?.failureCode==='string'?data.failureCode:'';
+ const failureStage=typeof data?.failureStage==='string'?data.failureStage:'';
+ const manualReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
+  accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
+ const structuralPassed=coverage==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
+  missingInline.length===0&&citations.length>0&&answerCoverageConsistent!==false&&partEvidenceComplete!==false&&
+  sourcePartAlignment.every(item=>item.aligned)&&!failureCode&&reviewStatus!=='pipeline-failed'&&
+  reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed';
+ return {workerVersionId,workerSourceBuild,outcome,coverage,reviewStatus,failureCode,failureStage,
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
   sourceGroups,questionParts,questionPartCoverage,partEvidenceAudit,partEvidenceComplete,
+  sourcePartAlignment,
   answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
   evidenceHighlightCount:highlights.length,evidenceHighlights,
-  passed:coverage==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
-   missingInline.length===0&&citations.length>0&&answerCoverageConsistent!==false&&partEvidenceComplete!==false};
+  manualReview,structuralPassed,
+  passed:reviewStatus==='answer-draft-unverified'?null:structuralPassed};
+}
+const MANUAL_REVIEW_DIMENSIONS=['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness'];
+export function summarizeManualReviews(cases){
+ const entries=(cases||[]).flatMap(item=>Array.isArray(item?.reviewAblation?.variants)?
+  item.reviewAblation.variants.map(variant=>({id:item.id,answerVariant:variant.answerVariant,review:variant.manualReview})):
+  [{id:item.id,answerVariant:item.answerVariant||'with-review',review:item.manualReview}]);
+ const completed=entries.filter(entry=>MANUAL_REVIEW_DIMENSIONS.every(key=>
+  Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2));
+ const averageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,completed.length?
+  Number((completed.reduce((sum,entry)=>sum+entry.review.scores[key],0)/completed.length).toFixed(2)):null]));
+ return {scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,reviewed:completed.length,
+  pending:entries.length-completed.length,entries:entries.map(entry=>({id:entry.id,
+   answerVariant:entry.answerVariant,status:MANUAL_REVIEW_DIMENSIONS.every(key=>
+    Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2)?'complete':'pending'})),
+  averageScores,qualityPass:null,
+  note:'Human scores are independent of automated structural pass/fail. No semantic score is inferred from model review.'};
+}
+export function summarizeAnswerVariants(cases){
+ const entries=(cases||[]).flatMap(item=>Array.isArray(item?.reviewAblation?.variants)?
+  item.reviewAblation.variants.map(variant=>({id:item.id,...variant})):
+  [{id:item.id,answerVariant:item.answerVariant||'with-review',structuralPassed:item.structuralPassed}]);
+ return Object.fromEntries(['with-review','compose-only'].map(answerVariant=>{
+  const selected=entries.filter(item=>item.answerVariant===answerVariant);
+  return [answerVariant,{cases:selected.length,
+   structuralPassed:selected.filter(item=>item.structuralPassed===true).length,
+   structuralFailed:selected.filter(item=>item.structuralPassed===false).length,
+   structuralUnknown:selected.filter(item=>typeof item.structuralPassed!=='boolean').length,
+   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,manualReview:item.manualReview}))) }];
+ }));
 }
 export function recheckQualityReport(report){
  if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
- const definitions=new Map(QUALITY_CASES.map(item=>[item.id,item]));
+ const definitions=new Map([...QUALITY_CASES,...HOLDOUT_CASES,...ACCEPTANCE_CASES].map(item=>[item.id,item]));
  const cases=report.cases.map(item=>{
   const definition=definitions.get(String(item?.id||''));
   if(!definition)return {...item,offlineRecheck:null};
@@ -214,8 +283,18 @@ export function recheckQualityReport(report){
    questionParts:item.questionParts,evidenceMap:item.evidenceMap,
    evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
    workerSourceBuild:item.answerWorkerSourceBuild
-  },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups);
-  return {...item,offlineRecheck:{passed:audit.passed,sourceGroups:audit.sourceGroups,
+  },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups,
+   definition.required_part_source_groups||[]);
+  const reviewAblation=Array.isArray(item.reviewAblation?.variants)?{...item.reviewAblation,
+   variants:item.reviewAblation.variants.map(variant=>{
+    const variantAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
+     citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
+     evidenceHighlights:variant.evidenceHighlights,workerVersionId:variant.workerVersionId,
+     workerSourceBuild:variant.workerSourceBuild},Array.isArray(item.submittedSources)?item.submittedSources:[],
+     definition.required_source_groups,definition.required_part_source_groups||[]);
+    return {...variant,...variantAudit,manualReview:variant.manualReview};
+   })}:item.reviewAblation;
+  return {...item,...(reviewAblation?{reviewAblation}:{}),offlineRecheck:{passed:audit.passed,sourceGroups:audit.sourceGroups,
    questionPartCoverage:audit.questionPartCoverage,partEvidenceAudit:audit.partEvidenceAudit,
    partEvidenceComplete:audit.partEvidenceComplete,
    answerCoverageConsistent:audit.answerCoverageConsistent,
@@ -223,7 +302,7 @@ export function recheckQualityReport(report){
    inlineIdsWithoutSource:audit.inlineIdsWithoutSource}};
  });
  const checked=cases.filter(item=>item.offlineRecheck);
- return {...report,cases,offlineRecheck:{checkedAt:new Date().toISOString(),
+ return {...report,cases,humanReview:summarizeManualReviews(cases),answerVariants:summarizeAnswerVariants(cases),offlineRecheck:{checkedAt:new Date().toISOString(),
   evaluator:'local-structural-recheck-v1',networkCalls:0,aiCalls:0,
   checkedCases:checked.length,
   passedCases:checked.filter(item=>item.offlineRecheck.passed).length,
@@ -297,7 +376,9 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
  }
  return {selected,searches:retrieval.searches};
 }
-export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false}){
+export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,answerVariant='with-review'}){
+ if(!['with-review','compose-only','paired-review-ablation'].includes(answerVariant))
+  throw Error('Answer variant must be with-review, compose-only, or paired-review-ablation.');
  const startTime=Date.now();
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
@@ -334,26 +415,40 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const {selected,searches}=loaded;
- let data;
- try{data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
-  bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
-  sources:selected.map(({bookId,page,text})=>({bookId,page,text}))},beforeCall,'answer');}
- catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
+ const variants=answerVariant==='paired-review-ablation'?['with-review','compose-only']:[answerVariant];
+ const variantResults=[];
+ try{
+  for(const variant of variants){
+   const data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
+    bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
+    answerVariant:variant==='compose-only'?'compose-only':'with-review',
+    sources:selected.map(({bookId,page,text})=>({bookId,page,text}))},beforeCall,'answer');
+   const audit=auditLiveAnswer(data,selected,item.required_source_groups,
+    item.required_part_source_groups||[]);
+   variantResults.push({answerVariant:variant,pipeline:data.pipeline||null,...audit,usage:data.usage||null,
+    ...(data.trace?{evidenceTrace:data.trace}:{})});
+  }
+ }catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   error.requestFailure.plannerFallback=plannerFallback;
   error.requestFailure.plannerSkipped=plannerSkipped;
   error.requestFailure.plannerWorkerVersionId=plannerWorkerVersionId;
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
- const audit=auditLiveAnswer(data,selected,item.required_source_groups);
+ const primary=variantResults.find(result=>result.answerVariant==='with-review')||variantResults[0];
+ const reviewAblation=answerVariant==='paired-review-ablation'?{
+  comparison:'same resolved question, planner result and submitted source pages; only the final model-review call is omitted in compose-only',
+  variants:variantResults
+ }:null;
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerQueries:plannerFallback?[]:queries,plannerFallback,
-  plannerWorkerVersionId,plannerWorkerSourceBuild,answerWorkerVersionId:audit.workerVersionId,answerWorkerSourceBuild:audit.workerSourceBuild,
+  plannerWorkerVersionId,plannerWorkerSourceBuild,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,
   ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,searches,
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview})=>({bookId,title,page,globalPageId,
    excerpt:String(preview||'').slice(0,1200)})),
-  pipeline:data.pipeline||null,usage:data.usage||null,
-  ...(data.trace?{evidenceTrace:data.trace}:{}),
-  ...audit,elapsedMs:Date.now()-startTime};
+  ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,
+  pipeline:variantResults.map(result=>result.pipeline).find(Boolean)||null,
+  answerVariant,...(answerVariant==='paired-review-ablation'?{reviewAblation}:{}),
+  elapsedMs:Date.now()-startTime};
 }
 export async function evaluatePlannerCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}={}){
  const startTime=Date.now();
@@ -437,17 +532,19 @@ export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluate
  }
  return {results,stopReason};
 }
-function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',scope:process.env.LIVE_EVAL_SCOPE||'selected-books',caseId:process.env.LIVE_EVAL_CASE_ID||'',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
+function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',scope:process.env.LIVE_EVAL_SCOPE||'selected-books',caseId:process.env.LIVE_EVAL_CASE_ID||'',answerVariant:process.env.LIVE_EVAL_ANSWER_VARIANT||'with-review',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
  for(let i=0;i<argv.length;i++){const [flag,inline]=argv[i].split('=',2),key=flag.replace(/^--/,'');if(flag==='--help'||flag==='-h'){out.help=true;continue;}
-  if(!['mode','scope','case','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
-  if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
+  if(!['mode','scope','case','answer-variant','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
+  if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|holdout|full] [--scope selected-books|all-books] [--case quality-or-holdout-case-id] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|holdout|acceptance|full] [--scope selected-books|all-books] [--answer-variant with-review|compose-only|paired-review-ablation] [--case case-id] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
- const usesEvaluationMode=['quality','holdout'].includes(args.mode);
- if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality or holdout mode.');
+ if(!['with-review','compose-only','paired-review-ablation'].includes(args.answerVariant))throw Error('Answer variant must be with-review, compose-only, or paired-review-ablation.');
+ const usesEvaluationMode=['quality','holdout','acceptance'].includes(args.mode);
+ if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, holdout or acceptance mode.');
  if(usesEvaluationMode&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The untouched acceptance suite must run in all-books mode.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
@@ -455,13 +552,15 @@ async function main(){
  const cases=usesEvaluationMode?applyQualityScope(selectedCases,args.scope):selectedCases;
  const evaluationUsesPlanner=usesEvaluationMode&&args.scope==='all-books';
  const plannerCalls=usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
- const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:plannerCalls+cases.length*2;
- const report={schema:'antilogicalism-reading-companion-live-answer-eval-v1',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
-  caseCount:cases.length,estimatedWorkerAiCalls,
+ const answerCallsPerCase=args.answerVariant==='paired-review-ablation'?3:
+  args.answerVariant==='compose-only'?1:2;
+ const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:plannerCalls+cases.length*answerCallsPerCase;
+ const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
+  answerVariant:args.answerVariant,caseCount:cases.length,estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
-   usesEvaluationMode&&!evaluationUsesPlanner?'0 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate':'1 planner + 2 baseline answer pipeline calls per case; conditional Worker repair calls may add to this estimate',
+   (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; one bounded malformed-output regeneration may add a call in each answer variant',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
-   'Automated checks distinguish expected-book retrieval from structural evidence-ID linkage and prose/coverage consistency. They do not judge semantic relevance or factual truth; review answer text and source passages manually.',
+   'Automated checks cover source identity, exact evidence links, named-work-to-question-part alignment, and coverage consistency. They do not judge factual truth or whether cited passages semantically support the prose. Each answer includes a blank human rubric: rate accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong).',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  let activeLibrary=null;
@@ -487,25 +586,32 @@ async function main(){
   let previousCall=0;
   const beforeCall=async()=>{if(previousCall){const due=Math.max(0,CALL_GAP_MS-(Date.now()-previousCall));if(due)await new Promise(resolve=>setTimeout(resolve,due));}previousCall=Date.now();};
   const run=await runLiveCases(cases,{evaluateCase:args.mode==='planner'?evaluatePlannerCase:evaluateLiveCase,
-   evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:usesEvaluationMode&&!evaluationUsesPlanner},onResult:async(result,results)=>{
+  evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:usesEvaluationMode&&!evaluationUsesPlanner,
+   answerVariant:args.answerVariant},onResult:async(result,results)=>{
    report.cases=results;report.completedCases=results.length;
    report.notRunCases=cases.length-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
    report.plannerFallbackCases=results.filter(item=>item.plannerFallback).length;
    report.plannerSkippedCases=results.filter(item=>item.plannerSkipped).length;
+   report.humanReview=summarizeManualReviews(results);
+   report.answerVariants=summarizeAnswerVariants(results);
    report.workerVersionIds=[...new Set(results.flatMap(item=>[item.plannerWorkerVersionId,item.answerWorkerVersionId]).filter(value=>typeof value==='string'&&value))];
    await saveReport();
-   const label=args.mode==='planner'?'PLANNER': 'REVIEW';
-   console.log((result.passed?label+'-PASS':result.requestFailure?'REQUEST-FAIL':label+'-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
+   const label=args.mode==='planner'?'PLANNER':'STRUCTURAL';
+   console.log((result.passed===true?label+'-PASS':result.passed===null?'UNSCORED':result.requestFailure?'REQUEST-FAIL':label+'-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
   }});
   report.cases=run.results;report.stopReason=run.stopReason;
   report.notRunCases=cases.length-run.results.length;
   report.requestFailureCases=run.results.filter(item=>item.requestFailure).length;
   report.plannerFallbackCases=run.results.filter(item=>item.plannerFallback).length;
   report.executionStatus=report.requestFailureCases?'completed-with-request-failures':'completed';
-  report.summary={passedCases:report.cases.filter(item=>item.passed).length,
-   failedCases:report.cases.filter(item=>!item.passed).length,requestFailureCases:report.requestFailureCases,
+  report.summary={passedCases:report.cases.filter(item=>item.passed===true).length,
+   failedCases:report.cases.filter(item=>item.passed===false).length,
+   unscoredCases:report.cases.filter(item=>item.passed===null||item.passed===undefined).length,
+   requestFailureCases:report.requestFailureCases,
    plannerFallbackCases:report.plannerFallbackCases,
+   humanReview:summarizeManualReviews(report.cases),
+   answerVariants:summarizeAnswerVariants(report.cases),
    questionPartStatusCounts:report.cases.reduce((totals,item)=>{
     const counts=item.questionPartCoverage||{};
     for(const status of ['supported','partial','unsupported'])
@@ -516,8 +622,9 @@ async function main(){
   await saveReport();
   console.log(args.mode==='planner'?
    'Done: '+report.summary.passedCases+'/'+report.caseCount+' planner plans retrieved at least one expected book; no answers were generated.':
-   'Done: '+report.summary.passedCases+'/'+report.caseCount+' cases met coverage, citation, and structural evidence-link checks; '+report.completedCases+' completed, '+report.notRunCases+' not run. This is not a semantic or factual truth grader.');
-  return report.requestFailureCases||(args.mode==='planner'&&report.summary.failedCases)?1:0;
+   'Done: '+report.summary.passedCases+'/'+report.caseCount+' reviewed answers met structural gates; '+report.summary.failedCases+' failed and '+report.summary.unscoredCases+' are unscored. Semantic answer quality requires the separate human rubric.');
+  return report.requestFailureCases||(args.mode==='planner'&&report.summary.failedCases)||
+   (usesEvaluationMode&&report.summary.failedCases>0)?1:0;
  }catch(error){
   report.executionStatus=report.cases.length?'interrupted':'setup-failed';
   report.setupFailure={message:String(error?.message||error).slice(0,240)};
