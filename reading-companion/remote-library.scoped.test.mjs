@@ -22,6 +22,15 @@ test('query terms keep source concepts while dropping question framing',()=>{
    ['caused','peloponnesian','war']);
 });
 
+test('remote library records the exact bytes of each corpus file used',async()=>{
+ const bytes=new TextEncoder().encode('{"version":47,"postings_encoding":"delta-json-v1","prefix_length":2,"page_books":[],"pages":0,"partitions":[],"books":{}}');
+ const library=new RemoteLibrary('https://example.test/data-v47/',async()=>new Response(bytes));
+ await library.jsonGzip('manifest.json');
+ const expected=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))]
+  .map(value=>value.toString(16).padStart(2,'0')).join('');
+ assert.equal(library.contentDigests.get('manifest.json'),expected);
+});
+
 test('long questions retain later discriminating terms after early author and title names',()=>{
  const terms=queryTerms('According to Friedrich Nietzsche in The Portable Nietzsche, what did he think about Plato, and how does that differ from the editor Walter Kaufmann’s discussion of science and morality?');
  assert.ok(terms.length>8);

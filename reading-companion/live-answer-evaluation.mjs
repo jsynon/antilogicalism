@@ -5,6 +5,8 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence} from './evidence-search.mjs';
 import {auditCitationIds} from './diagnostic-report.mjs';
@@ -46,6 +48,12 @@ function copyEvaluationCase(item){
   required_source_groups:item.required_source_groups.map(group=>({...group,book_ids:[...group.book_ids]})),
   review_focus:[...item.review_focus]};
 }
+
+function sourceRevision(){
+ try{return execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim()||null;}
+ catch{return null;}
+}
+function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
  const evaluationCases=mode==='holdout'?HOLDOUT_CASES:QUALITY_CASES;
  if(caseId&&caseId!=='all'){
@@ -456,7 +464,12 @@ async function main(){
    'Automated checks distinguish expected-book retrieval from structural evidence-ID linkage and prose/coverage consistency. They do not judge semantic relevance or factual truth; review answer text and source passages manually.',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
- const saveReport=async()=>{if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');};
+ let activeLibrary=null;
+ const saveReport=async()=>{
+  if(activeLibrary&&report.reproducibility?.corpus)
+   report.reproducibility.corpus.indexFiles=Object.fromEntries(activeLibrary.contentDigests);
+  if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');
+ };
  await saveReport();
  try{
   const results=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v1.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
@@ -465,6 +478,10 @@ async function main(){
   const allowed=new Set(Object.keys(coverage.books));
   for(const item of cases)for(const group of item.required_source_groups)if(!group.book_ids.some(id=>allowed.has(String(id))))throw Error(item.id+': no expected source book is fingerprint-covered.');
   const library=new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT));
+  activeLibrary=library;
+  report.reproducibility={clientSourceRevision:sourceRevision(),corpus:{libraryVersion:manifest.version,
+   indexRoot:DEFAULT_INDEX_ROOT,fingerprintRoot:FINGERPRINT_ROOT,
+   coverageSha256:jsonDigest(coverage),manifestSha256:jsonDigest(manifest),indexFiles:{}}};
   console.log('Starting explicitly confirmed '+args.mode+' live evaluation: '+cases.length+' questions; estimated at least '+report.estimatedWorkerAiCalls+' Worker inference calls, plus conditional repairs.');
   report.executionStatus='running';await saveReport();
   let previousCall=0;
