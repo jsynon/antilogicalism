@@ -324,6 +324,18 @@ function directFacetTitleMatch(question,title){
  return score;
 }
 
+function directFacetTextMatch(question,text){
+ const stop=new Set(['what','when','where','which','who','whom','whose','why','how','does','did','has','have','had','are','was','were','the','and','for','from','with','into','about','between','this','that','these','those','there','their','they','them','than','then','your','our','also','only','could','would','should']);
+ const normalize=term=>/^(?:cause|causal|causality|causes|caused|causing)$/.test(term)?'caus':
+  term.startsWith('necess')?'necess':term.startsWith('experienc')?'experienc':term;
+ const questionTerms=new Set((String(question||'').toLowerCase().match(/[a-z0-9]+/g)||[])
+  .filter(term=>term.length>=4&&!stop.has(term)).map(normalize));
+ const textTerms=new Set((String(text||'').toLowerCase().match(/[a-z0-9]+/g)||[]).map(normalize));
+ let score=0;
+ for(const term of questionTerms)if(textTerms.has(term))score++;
+ return score;
+}
+
 function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
  const count=Math.max(0,Math.floor(Number(plannedFacetCount)||0));
  if(count<2||!candidates.some(candidate=>Array.isArray(candidate?.facetRanks)))
@@ -343,12 +355,16 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
   // is often a better direct source than a higher-scoring bibliographic or
   // incidental mention of that work. Consider every direct-query candidate
   // already in the shortlist, not only its top-ranked passage: an exact-title
-  // source can rank just below a bibliographic mention. Retain retrieval order
-  // for title-overlap ties.
+  // source can rank just below a bibliographic mention. For same-title pages,
+  // use question-text overlap to break ties with retrieval order.
   const candidate=facet===count&&facetCandidates.length
-   ?facetCandidates.reduce((best,value)=>
-     directFacetTitleMatch(question,value.title)>directFacetTitleMatch(question,best.title)
-      ?value:best,facetCandidates[0])
+   ?facetCandidates.reduce((best,value)=>{
+     const titleMatch=directFacetTitleMatch(question,value.title);
+     const bestTitleMatch=directFacetTitleMatch(question,best.title);
+     if(titleMatch!==bestTitleMatch)return titleMatch>bestTitleMatch?value:best;
+     return directFacetTextMatch(question,value.text??value.preview)>
+       directFacetTextMatch(question,best.text??best.preview)?value:best;
+    },facetCandidates[0])
    :facetCandidates[0];
   if(candidate){used.add(candidate);ordered.push(candidate);}
  }
