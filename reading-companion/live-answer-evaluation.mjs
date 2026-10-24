@@ -350,10 +350,10 @@ function makeCachedFetch(root){
  };
 }
 async function fetchJson(url){const response=await fetch(url,{headers:{accept:'application/json'},cache:'no-store'});if(!response.ok)throw Error(url+' returned HTTP '+response.status);return response.json();}
-async function loadSources(item,queries,{library,manifest,allowed,directFallback=false}){
+async function loadSources(item,queries,{library,manifest,allowed,directFallback=false,partQueries=[]}){
  const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
- const retrieval=await retrieveEvidence({question:item.question,queries,directFallback,
+ const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,directFallback,
   library,books:bookCatalog,allowedBookIds:allowed,selectedBookIds,
   maxCandidates:12,maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK,
   pageLoader:async source=>{
@@ -406,8 +406,10 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   plannerFailure={httpStatus:failure.httpStatus,failureCode:failure.failureCode};
   queries=[item.question];
  }
+ const partQueries=!plannerFallback&&Array.isArray(plan?.plan?.parts)?plan.plan.parts.map(part=>({
+  partId:part.id,query:part.question})):[];
  let loaded;
- try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback});}
+ try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,partQueries});}
  catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   error.requestFailure.plannerFallback=plannerFallback;
   error.requestFailure.plannerSkipped=plannerSkipped;
@@ -422,7 +424,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    const data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
     bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
     answerVariant:variant==='compose-only'?'compose-only':'with-review',
-    sources:selected.map(({bookId,page,text})=>({bookId,page,text}))},beforeCall,'answer');
+    sources:selected.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds}))},beforeCall,'answer');
    const audit=auditLiveAnswer(data,selected,item.required_source_groups,
     item.required_part_source_groups||[]);
    variantResults.push({answerVariant:variant,pipeline:data.pipeline||null,...audit,usage:data.usage||null,
@@ -443,7 +445,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,
   ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,searches,
-  submittedSources:selected.map(({bookId,title,page,globalPageId,preview})=>({bookId,title,page,globalPageId,
+  submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
   ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,
   pipeline:variantResults.map(result=>result.pipeline).find(Boolean)||null,

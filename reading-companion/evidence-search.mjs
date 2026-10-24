@@ -96,7 +96,7 @@ export function mergeFacetSearches(results,limit=8){
  * difference (the browser has a shard cache; the evaluator reads the shard
  * through RemoteLibrary directly).
  */
-export async function retrieveEvidence({question,queries,library,books,allowedBookIds,
+export async function retrieveEvidence({question,queries,partQueries=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,
  maxCandidates=12,maxBooks=3,pagesPerBook=4,pageLimit=14000}={}){
  const direct=String(question||'').trim();
@@ -109,7 +109,19 @@ export async function retrieveEvidence({question,queries,library,books,allowedBo
   if(!Array.isArray(queries)||queries.length!==1||String(queries[0]||'').trim()!==direct)
    throw Error('Direct fallback must use the unchanged question.');
  }else if(!validSearchPlan(queries))throw Error('Planner returned an invalid search plan.');
- const searchQueries=buildSearchFacets(direct,useDirect?[direct]:queries);
+ if(!Array.isArray(partQueries)||partQueries.length>6||partQueries.some(item=>
+   !item||typeof item.partId!=='string'||!/^P[1-9]\d*$/.test(item.partId)||
+   typeof item.query!=='string'||item.query.trim().length<5||item.query.trim().length>400))
+  throw Error('Part-specific retrieval queries are invalid.');
+ const baseQueries=buildSearchFacets(direct,useDirect?[direct]:queries);
+ const searchQueries=[...baseQueries];
+ for(const item of partQueries){
+  const query=item.query.trim();
+  if(!searchQueries.some(value=>value.trim().toLocaleLowerCase()===query.toLocaleLowerCase()))
+   searchQueries.push(query);
+ }
+ const partFacetIndices=partQueries.map(item=>({partId:item.partId,
+  facet:searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===item.query.trim().toLocaleLowerCase())}));
  const selected=selectedBookIds.map(String);
  const selectedAllowed=new Set(selected.filter(id=>allowedBookIds.has(id)));
  if(selected.length&&selected.some(id=>!allowedBookIds.has(id)))
@@ -126,7 +138,8 @@ export async function retrieveEvidence({question,queries,library,books,allowedBo
    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
  }));
  const results=searchSets.length>1?mergeFacetSearches(searchSets,maxCandidates):
-  (searchSets[0]?.sources||[]);
+  (searchSets[0]?.sources||[]).map((source,index)=>({...source,facet:0,
+    facetRanks:[{facet:0,rank:index+1}]}));
  const filtered=results.filter(source=>allowedPage(source)&&
   allowedBookIds.has(String(source.bookId))&&
   (!selected.length||selectedAllowed.has(String(source.bookId))));
@@ -136,18 +149,23 @@ export async function retrieveEvidence({question,queries,library,books,allowedBo
   if(visited.has(group))others.push(source);
   else{visited.add(group);representatives.push(source);}
  }
+ const partIdsForFacet=facet=>partFacetIndices.filter(item=>item.facet===facet).map(item=>item.partId);
  const populated=[];
  for(const source of [...representatives,...others]){
   const page=await pageLoader(source);
   if(!page||typeof page.text!=='string')continue;
   const byteLength=new TextEncoder().encode(page.text).byteLength;
   if(byteLength<25||byteLength>pageLimit)continue;
-  populated.push({...source,text:page.text,byteLength});
+  const matchedFacets=new Set((source.facetRanks||[]).map(item=>item.facet));
+  const candidatePartIds=partFacetIndices.filter(item=>matchedFacets.has(item.facet))
+   .map(item=>item.partId);
+  populated.push({...source,text:page.text,byteLength,
+    ...(partFacetIndices.length?{candidatePartIds}:{})});
   if(populated.length>=maxCandidates)break;
  }
- return {candidates:populated,searches:searchSets.map((set,index)=>({
+ return {candidates:populated,partFacetIndices,searches:searchSets.map((set,index)=>({
   query:searchQueries[index]+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
-  resultCount:set.sources.length,sources:set.sources.slice(0,8)
+  resultCount:set.sources.length,partIds:partIdsForFacet(index),sources:set.sources.slice(0,8)
  })),searchQueries,namedBookIds};
 }
 export function validSearchPlan(value){
@@ -467,6 +485,17 @@ export function selectAnswerSources(candidates,question,turnstileToken,
      ordered=[...firstPerBook,...facetBalanced.filter(candidate=>!firstPerBook.includes(candidate))];
    }
  }
+ // Reserve a directly matched page for each requested part before ordinary
+ // facet balancing. This keeps the six-page budget from dropping an entire
+ // question part when a broad planner query dominates the shortlist.
+ const partRepresentatives=[],reservedPartPages=new Set();
+ const partIds=[...new Set(candidates.flatMap(candidate=>candidate.candidatePartIds||[]))];
+ for(const partId of partIds){
+  const candidate=candidates.find(value=>value.candidatePartIds?.includes(partId)&&
+   !reservedPartPages.has(value));
+  if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
+ }
+ if(partRepresentatives.length)ordered=[...partRepresentatives,...ordered.filter(value=>!reservedPartPages.has(value))];
  let selectedSourceBytes=0;
  for(const candidate of ordered){
    if(chosen.length>=maxSources)break;
@@ -477,7 +506,8 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    if(selectedSourceBytes+candidateBytes>maxSourceBytes)continue;
    const next=[...chosen,candidate];
    const bytes=new TextEncoder().encode(JSON.stringify({question,turnstileToken,history,
-     sources:next.map(({bookId,page,text})=>({bookId,page,text}))})).byteLength;
+     sources:next.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
+      ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{})}))})).byteLength;
    if(bytes<=maxBytes){chosen.push(candidate);selectedSourceBytes+=candidateBytes;}
  }
  return chosen;

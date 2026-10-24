@@ -257,6 +257,8 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
     }else{
       const retrieval=await retrieveEvidence({question:q,
         queries:plannerFallback||!plannedQueries?[q]:plannedQueries,
+        partQueries:!plannerFallback&&Array.isArray(plan?.parts)?plan.parts.map(part=>({
+          partId:part.id,query:part.question})):[],
         directFallback:plannerFallback||!plannedQueries,
         library,books:bookList,allowedBookIds:allowed,
         selectedBookIds:bookFilter.value?[bookFilter.value]:[],allowedPage,
@@ -574,7 +576,7 @@ async function askQuestion(questionText){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
         history,bookId:bookFilter.value||'',plan:diagnosticState?.plannerPlan||undefined,
-        sources:chosen.map(({bookId,page,text})=>({bookId,page,text}))})
+        sources:chosen.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds}))})
     });
     let data;
     try{data=await response.json();}catch{

@@ -370,7 +370,9 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  const item={question:'Explain the source question with enough detail.',selected_book_ids:['638'],required_source_groups:[{label:'Bible',book_ids:['638']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
   beforeCall:async()=>{},fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body),authorization:options.headers.authorization});
-   return new Response(JSON.stringify(url.endsWith('pilot-plan')?{queries:['first distinct search concept','second distinct search concept'],workerVersionId:'plan-worker-3',workerSourceBuild:'gateway-build-3'}:
+   return new Response(JSON.stringify(url.endsWith('pilot-plan')?{queries:['first distinct search concept','second distinct search concept'],
+    plan:{parts:[{id:'P1',question:'Explain the source question with enough detail.'}]},
+    workerVersionId:'plan-worker-3',workerSourceBuild:'gateway-build-3'}:
     {outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',workerVersionId:'answer-worker-3',workerSourceBuild:'gateway-build-3',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(calls.length,2);
  assert.match(calls[0].url,/pilot-plan$/);assert.match(calls[1].url,/pilot-answer$/);
@@ -382,6 +384,8 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  assert.deepEqual(searched,['first distinct search concept','second distinct search concept',item.question]);
  assert.equal(result.searches[2].query,item.question+' [named books: 638]');
  assert.equal(calls[1].body.bookId,'638');
+ assert.deepEqual(calls[1].body.sources[0].candidatePartIds,['P1']);
+ assert.deepEqual(result.submittedSources[0].candidatePartIds,['P1']);
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
 });
 
