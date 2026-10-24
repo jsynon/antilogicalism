@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 16540)
-Total output lines: 697
-
 #!/usr/bin/env node
 /* Explicit, metered end-to-end evaluation against the public Reading Companion
  * Worker. This is never run by the PR or scheduled retrieval-only workflow.
@@ -258,7 +255,39 @@ export function summarizeManualReviews(cases){
  return {scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,reviewed:completed.length,
   pending:entries.length-completed.length,entries:entries.map(entry=>({id:entry.id,
    answerVariant:entry.answerVariant,status:MANUAL_REVIEW_DIMENSIONS.every(key=>
-    Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scor…540 tokens truncated…antAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
+    Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2)?'complete':'pending'})),
+  averageScores,qualityPass:null,
+  note:'Human scores are independent of automated structural pass/fail. No semantic score is inferred from model review.'};
+}
+export function summarizeAnswerVariants(cases){
+ const entries=(cases||[]).flatMap(item=>Array.isArray(item?.reviewAblation?.variants)?
+  item.reviewAblation.variants.map(variant=>({id:item.id,...variant})):
+  [{id:item.id,answerVariant:item.answerVariant||'with-review',structuralPassed:item.structuralPassed}]);
+ return Object.fromEntries(['with-review','compose-only'].map(answerVariant=>{
+  const selected=entries.filter(item=>item.answerVariant===answerVariant);
+  return [answerVariant,{cases:selected.length,
+   structuralPassed:selected.filter(item=>item.structuralPassed===true).length,
+   structuralFailed:selected.filter(item=>item.structuralPassed===false).length,
+   structuralUnknown:selected.filter(item=>typeof item.structuralPassed!=='boolean').length,
+   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,manualReview:item.manualReview}))) }];
+ }));
+}
+export function recheckQualityReport(report){
+ if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
+ const definitions=new Map([...QUALITY_CASES,...HOLDOUT_CASES,...ACCEPTANCE_CASES].map(item=>[item.id,item]));
+ const cases=report.cases.map(item=>{
+  const definition=definitions.get(String(item?.id||''));
+  if(!definition)return {...item,offlineRecheck:null};
+  const audit=auditLiveAnswer({
+   answer:item.answerText,coverage:item.coverage,citations:item.citationSources,
+   questionParts:item.questionParts,evidenceMap:item.evidenceMap,
+   evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
+   workerSourceBuild:item.answerWorkerSourceBuild
+  },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups,
+   definition.required_part_source_groups||[]);
+  const reviewAblation=Array.isArray(item.reviewAblation?.variants)?{...item.reviewAblation,
+   variants:item.reviewAblation.variants.map(variant=>{
+    const variantAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
      citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
      evidenceHighlights:variant.evidenceHighlights,workerVersionId:variant.workerVersionId,
      workerSourceBuild:variant.workerSourceBuild},Array.isArray(item.submittedSources)?item.submittedSources:[],
