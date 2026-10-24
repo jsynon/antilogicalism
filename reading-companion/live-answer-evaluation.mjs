@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 16540)
+Total output lines: 697
+
 #!/usr/bin/env node
 /* Explicit, metered end-to-end evaluation against the public Reading Companion
  * Worker. This is never run by the PR or scheduled retrieval-only workflow.
@@ -255,39 +258,7 @@ export function summarizeManualReviews(cases){
  return {scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,reviewed:completed.length,
   pending:entries.length-completed.length,entries:entries.map(entry=>({id:entry.id,
    answerVariant:entry.answerVariant,status:MANUAL_REVIEW_DIMENSIONS.every(key=>
-    Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2)?'complete':'pending'})),
-  averageScores,qualityPass:null,
-  note:'Human scores are independent of automated structural pass/fail. No semantic score is inferred from model review.'};
-}
-export function summarizeAnswerVariants(cases){
- const entries=(cases||[]).flatMap(item=>Array.isArray(item?.reviewAblation?.variants)?
-  item.reviewAblation.variants.map(variant=>({id:item.id,...variant})):
-  [{id:item.id,answerVariant:item.answerVariant||'with-review',structuralPassed:item.structuralPassed}]);
- return Object.fromEntries(['with-review','compose-only'].map(answerVariant=>{
-  const selected=entries.filter(item=>item.answerVariant===answerVariant);
-  return [answerVariant,{cases:selected.length,
-   structuralPassed:selected.filter(item=>item.structuralPassed===true).length,
-   structuralFailed:selected.filter(item=>item.structuralPassed===false).length,
-   structuralUnknown:selected.filter(item=>typeof item.structuralPassed!=='boolean').length,
-   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,manualReview:item.manualReview}))) }];
- }));
-}
-export function recheckQualityReport(report){
- if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
- const definitions=new Map([...QUALITY_CASES,...HOLDOUT_CASES,...ACCEPTANCE_CASES].map(item=>[item.id,item]));
- const cases=report.cases.map(item=>{
-  const definition=definitions.get(String(item?.id||''));
-  if(!definition)return {...item,offlineRecheck:null};
-  const audit=auditLiveAnswer({
-   answer:item.answerText,coverage:item.coverage,citations:item.citationSources,
-   questionParts:item.questionParts,evidenceMap:item.evidenceMap,
-   evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
-   workerSourceBuild:item.answerWorkerSourceBuild
-  },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups,
-   definition.required_part_source_groups||[]);
-  const reviewAblation=Array.isArray(item.reviewAblation?.variants)?{...item.reviewAblation,
-   variants:item.reviewAblation.variants.map(variant=>{
-    const variantAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
+    Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scor…540 tokens truncated…antAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
      citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
      evidenceHighlights:variant.evidenceHighlights,workerVersionId:variant.workerVersionId,
      workerSourceBuild:variant.workerSourceBuild},Array.isArray(item.submittedSources)?item.submittedSources:[],
@@ -599,9 +570,9 @@ async function main(){
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   answerVariant:args.answerVariant,caseCount:cases.length,estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
-   (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; one bounded malformed-output regeneration may add a call in each answer variant',
+   (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; the simplified answer path has no automatic composer regeneration',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
-   'Automated checks cover source identity, exact evidence links, named-work-to-question-part alignment, and coverage consistency. They do not judge factual truth or whether cited passages semantically support the prose. Each answer includes a blank human rubric: rate accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong).',
+   'Automated checks cover source identity, per-part citation linkage, named-work-to-question-part alignment, and coverage consistency. They do not judge factual truth or whether cited passages semantically support the prose. Each answer includes a blank human rubric: rate accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong).',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  let activeLibrary=null;
@@ -611,8 +582,13 @@ async function main(){
   if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');
  };
  await saveReport();
+ console.log('Initializing '+args.mode+' evaluation for '+cases.length+' question'+(cases.length===1?'':'s')+
+  '; loading the published fingerprint coverage and corpus manifest before retrieval.');
+ const startupHeartbeat=setInterval(()=>console.log('['+new Date().toISOString()+
+  '] SETUP WAIT: still loading the published fingerprint coverage and corpus manifest.'),15_000);
  try{
   const results=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v1.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
+  clearInterval(startupHeartbeat);
   const coverage=results[0],manifest=results[1];
   if(coverage?.schema!=='antilogicalism-reader-coverage-v1'||coverage?.libraryVersion!==47||manifest.version!==47)throw Error('Published v47 coverage or corpus is incompatible.');
   const allowed=new Set(Object.keys(coverage.books));
@@ -681,6 +657,7 @@ async function main(){
   return report.requestFailureCases||(args.mode==='planner'&&report.summary.failedCases)||
    (usesEvaluationMode&&report.summary.failedCases>0)?1:0;
  }catch(error){
+  clearInterval(startupHeartbeat);
   report.executionStatus=report.cases.length?'interrupted':'setup-failed';
   report.setupFailure={message:String(error?.message||error).slice(0,240)};
   report.completedCases=report.cases.length;report.notRunCases=cases.length-report.cases.length;
