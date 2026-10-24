@@ -5,8 +5,11 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {execFileSync} from 'node:child_process';
+import {createHash} from 'node:crypto';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet} from './evidence-search.mjs';
+import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence} from './evidence-search.mjs';
+import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
@@ -39,13 +42,18 @@ const PLANNER_CASE_IDS=[
  'quality-all-books-cross-work-science',
 ];
 const CALL_GAP_MS=30_500;
-const MAX_PAGE_BYTES=14_000;
 
 function copyEvaluationCase(item){
  return {...item,selected_book_ids:[...item.selected_book_ids],planner_queries:[...item.planner_queries],
   required_source_groups:item.required_source_groups.map(group=>({...group,book_ids:[...group.book_ids]})),
   review_focus:[...item.review_focus]};
 }
+
+function sourceRevision(){
+ try{return execFileSync('git',['rev-parse','HEAD'],{cwd:ROOT,encoding:'utf8'}).trim()||null;}
+ catch{return null;}
+}
+function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
  const evaluationCases=mode==='holdout'?HOLDOUT_CASES:QUALITY_CASES;
  if(caseId&&caseId!=='all'){
@@ -108,9 +116,10 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
  const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
  const workerSourceBuild=typeof data?.workerSourceBuild==='string'&&data.workerSourceBuild.length<=128?data.workerSourceBuild:null;
  const answer=String(data?.answer||'');
- const inline=[...answer.matchAll(/\[(S\d+)\]/g)].map(match=>match[1]);
  const citationIds=new Set(citations.map(source=>String(source?.id||'')));
- const missingInline=[...new Set(inline.filter(id=>!citationIds.has(id)))];
+ const citationAudit=auditCitationIds(answer,citations);
+ const inline=citationAudit.inlineIds;
+ const missingInline=citationAudit.inlineIdsWithoutSource;
  const citationBookIds=[...new Set(citations.map(source=>String(source?.bookId||'')))];
  const submittedBookIds=[...new Set(submitted.map(source=>String(source?.bookId||'')))];
  const questionParts=Array.isArray(data?.questionParts)?data.questionParts:[];
@@ -186,6 +195,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups){
  const evidenceAuditScope='Evidence IDs are checked for consistent linkage across question parts, the reviewed evidence map, cited sources, and submitted pages. This is a structural check, not a semantic judge of whether a passage truly supports a claim; review the answer and source text.';
  return {workerVersionId,workerSourceBuild,outcome:String(data?.outcome||''),coverage,reviewStatus:String(data?.reviewStatus||''),
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
+  inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
   sourceGroups,questionParts,questionPartCoverage,partEvidenceAudit,partEvidenceComplete,
   answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
@@ -262,52 +272,30 @@ function makeCachedFetch(root){
 }
 async function fetchJson(url){const response=await fetch(url,{headers:{accept:'application/json'},cache:'no-store'});if(!response.ok)throw Error(url+' returned HTTP '+response.status);return response.json();}
 async function loadSources(item,queries,{library,manifest,allowed,directFallback=false}){
- if(directFallback){
-  if(!Array.isArray(queries)||queries.length!==1||typeof queries[0]!=='string'||queries[0].trim().length<5||queries[0].trim().length>400)
-   throw Error('Direct fallback requires the original 5–400 character question.');
- }else if(!validSearchPlan(queries))throw Error('Planner returned an invalid two-query plan.');
- const searchQueries=buildSearchFacets(item.question,queries);
  const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
- const selectedAllowed=new Set(selectedBookIds.filter(id=>allowed.has(id)));
- if(selectedBookIds.length&&selectedAllowed.size!==selectedBookIds.length)
-  throw Error('The selected-book scope contains a book absent from the published corpus.');
- const namedBookIds=matchExplicitBookIds(item.question,bookCatalog);
- const targetBookIds=selectedBookIds.length?selectedBookIds:(namedBookIds.length?namedBookIds:[null]);
- const retrievalAllowed=selectedBookIds.length?selectedAllowed:allowed;
- const searchSets=await Promise.all(searchQueries.map(async query=>{
-  const facetBookIds=targetBooksForFacet(query,bookCatalog,targetBookIds[0]===null?null:targetBookIds);
-  const targeted=await Promise.all(facetBookIds.map(bookId=>
-   library.search(query,{...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,
-    maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK})));
-  return {sources:targeted.flatMap(set=>Array.isArray(set.sources)?set.sources:[])
-   .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
- }));
- const candidates=mergeFacetSearches(searchSets,8),populated=[];
- for(const source of candidates){
-  if(!retrievalAllowed.has(String(source.bookId)))continue;
-  const shard=await library.jsonGzip('book-'+String(source.bookId)+'.json');
-  const pages=shard.pages?.filter(page=>page.id===source.globalPageId&&page.page===source.page)||[];
-  if(pages.length!==1||typeof pages[0].text!=='string')continue;
-  const bytes=Buffer.byteLength(pages[0].text,'utf8');
-  if(bytes<25||bytes>MAX_PAGE_BYTES)continue;
-  populated.push({...source,text:pages[0].text,byteLength:bytes});
- }
+ const retrieval=await retrieveEvidence({question:item.question,queries,directFallback,
+  library,books:bookCatalog,allowedBookIds:allowed,selectedBookIds,
+  maxCandidates:12,maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK,
+  pageLoader:async source=>{
+   const shard=await library.jsonGzip('book-'+String(source.bookId)+'.json');
+   const pages=shard.pages?.filter(page=>page.id===source.globalPageId&&page.page===source.page)||[];
+   return pages.length===1&&typeof pages[0].text==='string'?{text:pages[0].text}:null;
+  }});
+ const populated=retrieval.candidates;
  if(!populated.length)throw Error('Retrieval returned no fingerprint-eligible source pages.');
  // Match the public companion's answer packet limits. A four-page / 30 KB
  // evaluation can omit a strong passage that the website itself would send,
  // especially when an all-books question needs evidence from several facets.
  const selected=selectAnswerSources(populated,item.question,'evaluation-runner-token',{
   maxSources:6,maxBytes:39_000,maxSourceBytes:35_000,history:[],
-  plannedFacetCount:Math.max(0,searchQueries.length-1)});
+  plannedFacetCount:Math.max(0,retrieval.searchQueries.length-1)});
  if(!selected.length)throw Error('No source pages fit the Worker request limit.');
  for(const source of selected){
   const book=manifest.books[String(source.bookId)];
   if(!book)throw Error('A selected source is absent from the published manifest.');
  }
- return {selected,searches:searchSets.map((set,index)=>({query:searchQueries[index]+
-  (namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
-  resultCount:set.sources?.length||0}))};
+ return {selected,searches:retrieval.searches};
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false}){
  const startTime=Date.now();
@@ -347,7 +335,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const {selected,searches}=loaded;
  let data;
- try{data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,history:[],turnstileToken:'evaluation-runner-token',
+ try{data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
+  bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
   sources:selected.map(({bookId,page,text})=>({bookId,page,text}))},beforeCall,'answer');}
  catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   error.requestFailure.plannerFallback=plannerFallback;
@@ -359,9 +348,11 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,answerWorkerVersionId:audit.workerVersionId,answerWorkerSourceBuild:audit.workerSourceBuild,
-  ...(plannerFailure?{plannerFailure}:{}),searches,
+  ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,searches,
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview})=>({bookId,title,page,globalPageId,
    excerpt:String(preview||'').slice(0,1200)})),
+  pipeline:data.pipeline||null,usage:data.usage||null,
+  ...(data.trace?{evidenceTrace:data.trace}:{}),
   ...audit,elapsedMs:Date.now()-startTime};
 }
 export async function evaluatePlannerCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{}}={}){
@@ -473,7 +464,12 @@ async function main(){
    'Automated checks distinguish expected-book retrieval from structural evidence-ID linkage and prose/coverage consistency. They do not judge semantic relevance or factual truth; review answer text and source passages manually.',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
- const saveReport=async()=>{if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');};
+ let activeLibrary=null;
+ const saveReport=async()=>{
+  if(activeLibrary&&report.reproducibility?.corpus)
+   report.reproducibility.corpus.indexFiles=Object.fromEntries(activeLibrary.contentDigests);
+  if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');
+ };
  await saveReport();
  try{
   const results=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v1.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
@@ -482,6 +478,10 @@ async function main(){
   const allowed=new Set(Object.keys(coverage.books));
   for(const item of cases)for(const group of item.required_source_groups)if(!group.book_ids.some(id=>allowed.has(String(id))))throw Error(item.id+': no expected source book is fingerprint-covered.');
   const library=new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT));
+  activeLibrary=library;
+  report.reproducibility={clientSourceRevision:sourceRevision(),corpus:{libraryVersion:manifest.version,
+   indexRoot:DEFAULT_INDEX_ROOT,fingerprintRoot:FINGERPRINT_ROOT,
+   coverageSha256:jsonDigest(coverage),manifestSha256:jsonDigest(manifest),indexFiles:{}}};
   console.log('Starting explicitly confirmed '+args.mode+' live evaluation: '+cases.length+' questions; estimated at least '+report.estimatedWorkerAiCalls+' Worker inference calls, plus conditional repairs.');
   report.executionStatus='running';await saveReport();
   let previousCall=0;
@@ -526,3 +526,4 @@ async function main(){
  }
 }
 if(import.meta.url===`file://${process.argv[1]}`)main().then(code=>{process.exitCode=code;}).catch(error=>{console.error(error.message);process.exitCode=1;});
+

@@ -83,15 +83,18 @@ function reviewedEvidenceSummary(value,submittedSources=[]){
   const out=[],seen=new Set();
   for(const item of value.slice(0,8)){
     const id=typeof item?.id==='string'?item.id:'';
-    const point=typeof item?.point==='string'?item.point.trim().slice(0,220):'';
+    const point=typeof item?.point==='string'?item.point.trim().slice(0,220):
+      (typeof item?.claimId==='string'&&/^C[1-9][0-9]*$/.test(item.claimId)?'Claim '+item.claimId:'');
     const key=JSON.stringify([id,point]);
     if(!allowed.has(id)||seen.has(key)||!point)continue;
-    const anchorQuote=typeof item?.anchorQuote==='string'?
-      item.anchorQuote.trim().slice(0,320):'';
+    const anchorQuote=typeof item?.anchorQuote==='string'?item.anchorQuote.trim().slice(0,320):
+      (typeof item?.quote==='string'?item.quote.trim().slice(0,320):'');
     const speaker=typeof item?.speaker==='string'?item.speaker.trim().slice(0,80):'';
     const qualifier=typeof item?.qualifier==='string'?item.qualifier.trim().slice(0,160):'';
-    seen.add(key);out.push({id,point,quoteVerified:item?.quoteVerified===true,
-      ...(anchorQuote&&item?.quoteVerified===true?{anchorQuote}:{}),
+    const quoteVerified=item?.quoteVerified===true||
+      (typeof item?.quote==='string'&&Number.isSafeInteger(item?.start)&&Number.isSafeInteger(item?.end)&&item.end>item.start);
+    seen.add(key);out.push({id,point,quoteVerified,
+      ...(anchorQuote&&quoteVerified?{anchorQuote}:{}),
       ...(speaker?{speaker}:{}),...(qualifier?{qualifier}:{})});
     if(out.length===6)break;
   }
@@ -151,6 +154,24 @@ export function createDiagnosticReport(input={}){
     failureDetail:input.stage==='complete'?null:safeDiagnosticToken(input.failureDetail),
     plannerQueries:Array.isArray(input.plannerQueries)?
       input.plannerQueries.filter(x=>typeof x==='string').slice(0,4).map(x=>x.slice(0,240)):[],
+    plannerPlan:input.plannerPlan&&typeof input.plannerPlan==='object'?{
+      version:string(input.plannerPlan.version,40),
+      resolvedQuestion:string(input.plannerPlan.resolvedQuestion,600),
+      intent:['explain','compare','interpret','locate'].includes(input.plannerPlan.intent)?input.plannerPlan.intent:'explain',
+      scope:string(input.plannerPlan.scope,200),
+      sources:Array.isArray(input.plannerPlan.sources)?input.plannerPlan.sources.slice(0,8).map(source=>({
+        label:string(source?.label,120),role:['primary','subject','commentary'].includes(source?.role)?source.role:'primary',
+        bookIds:Array.isArray(source?.bookIds)?source.bookIds.map(id=>string(id,12)).slice(0,8):[]})):[],
+      parts:Array.isArray(input.plannerPlan.parts)?input.plannerPlan.parts.slice(0,6).map(part=>({
+        id:string(part?.id,8),question:string(part?.question,240)})):[],
+    }:null,
+    pipeline:string(input.pipeline,48)||null,
+    usage:input.usage&&typeof input.usage==='object'?{
+      calls:Number.isSafeInteger(input.usage.calls)?input.usage.calls:null,
+      neurons:Number.isFinite(input.usage.neurons)?input.usage.neurons:null,
+      inputTokens:Number.isFinite(input.usage.inputTokens)?input.usage.inputTokens:null,
+      outputTokens:Number.isFinite(input.usage.outputTokens)?input.usage.outputTokens:null,
+    }:null,
     searches:Array.isArray(input.searches)?input.searches.slice(0,4).map(search=>({
       query:string(search?.query,240),
       resultCount:Number.isSafeInteger(search?.resultCount)?search.resultCount:null,
@@ -181,3 +202,4 @@ export function createDiagnosticReport(input={}){
       })):[]
   };
 }
+

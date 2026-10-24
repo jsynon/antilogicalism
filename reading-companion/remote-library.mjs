@@ -93,7 +93,7 @@ function phraseMatchCount(text,phrase) {
 }
 export function queryTerms(question) {
   return [...new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || [])]
-    .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 8);
+    .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 24);
 }
 
 // Correct a single-character typo only when it uniquely matches a catalog
@@ -335,6 +335,7 @@ export class RemoteLibrary {
     this.fetcher = fetcher;
     this.manifestPromise = null;
     this.partitions = new Map();
+    this.contentDigests = new Map();
   }
   async jsonGzip(filename) {
     if (!/^(?:manifest|terms-[a-z0-9]{2}|book-[0-9]+)\.json$/.test(filename)) {
@@ -343,6 +344,8 @@ export class RemoteLibrary {
     const response = await this.fetcher(this.root + filename + '.gz', {cache:'no-store'});
     if (!response.ok) throw new Error('Corpus request returned HTTP ' + response.status + '.');
     const bytes = new Uint8Array(await response.arrayBuffer());
+    const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes));
+    this.contentDigests.set(filename, [...digest].map(value=>value.toString(16).padStart(2,'0')).join(''));
     // GitHub Pages may transmit the compressed bytes or already decode them.
     let raw;
     if (bytes[0] === 0x1f && bytes[1] === 0x8b) {
@@ -613,3 +616,4 @@ export class RemoteLibrary {
       booksScanned, discardedNavigation, elapsedMs:Math.round(performance.now() - started)};
   }
 }
+

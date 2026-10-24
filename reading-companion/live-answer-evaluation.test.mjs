@@ -108,6 +108,15 @@ test('audit requires expected-source coverage and citations with no orphan marke
  assert.deepEqual(bad.inlineIdsWithoutSource,['S2']);
 });
 
+test('grouped citations cannot hide an unknown source ID from the evaluation audit',()=>{
+ const result=auditLiveAnswer({coverage:'full',answer:'Claim supported by both sources [S1, S99].',
+  citations:[{id:'S1',bookId:'638'}],questionParts:[],evidenceMap:[]},
+  [{bookId:'638'}],[{label:'Bible',book_ids:['638']}]);
+ assert.deepEqual(result.inlineIds,['S1','S99']);
+ assert.deepEqual(result.inlineIdsWithoutSource,['S99']);
+ assert.equal(result.passed,false);
+});
+
 test('audit maps Worker evidence IDs to submitted locators by their request order',()=>{
  const result=auditLiveAnswer({coverage:'full',answer:'A sourced claim [S1].',
   citations:[{id:'S1',bookId:'638'}],
@@ -312,7 +321,8 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  assert.equal(result.plannerWorkerVersionId,'plan-worker-3');
  assert.equal(result.answerWorkerVersionId,'answer-worker-3');
  assert.deepEqual(searched,['first distinct search concept','second distinct search concept',item.question]);
- assert.equal(result.searches[2].query,item.question);
+ assert.equal(result.searches[2].query,item.question+' [named books: 638]');
+ assert.equal(calls[1].body.bookId,'638');
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
 });
 
@@ -422,3 +432,4 @@ test('live runner stops after two consecutive Worker failures and keeps prior re
  assert.equal(run.results[0].passed,true);
  assert.equal(run.results[1].requestFailure.httpStatus,502);
 });
+

@@ -1,4 +1,5 @@
 import {hasExplicitScriptureReference} from './remote-library.mjs';
+import {catalogIdentity} from './reader-contract.mjs';
 
 /* Merge two independently retrieved question facets, retaining alternatives
  * for source selection and manual inspection.
@@ -88,6 +89,67 @@ export function mergeFacetSearches(results,limit=8){
    .slice(0,limit).map(({entry,facet,facets,facetRanks})=>({...entry,facet,
      matchedFacets:facets.size,facetRanks}));
 }
+
+/* Shared browser/evaluator retrieval assembly. Both callers search the same
+ * facet pool, hydrate the same canonical page text, and hand the same candidate
+ * ordering to selectAnswerSources. `pageLoader` is the only environment
+ * difference (the browser has a shard cache; the evaluator reads the shard
+ * through RemoteLibrary directly).
+ */
+export async function retrieveEvidence({question,queries,library,books,allowedBookIds,
+ selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,
+ maxCandidates=12,maxBooks=3,pagesPerBook=4,pageLimit=14000}={}){
+ const direct=String(question||'').trim();
+ if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
+ if(!library||typeof library.search!=='function'||!Array.isArray(books)||
+   !(allowedBookIds instanceof Set)||typeof pageLoader!=='function')
+  throw Error('Retrieval requires the shared library, catalog, allowlist, and page loader.');
+ const useDirect=directFallback||!Array.isArray(queries);
+ if(useDirect){
+  if(!Array.isArray(queries)||queries.length!==1||String(queries[0]||'').trim()!==direct)
+   throw Error('Direct fallback must use the unchanged question.');
+ }else if(!validSearchPlan(queries))throw Error('Planner returned an invalid search plan.');
+ const searchQueries=buildSearchFacets(direct,useDirect?[direct]:queries);
+ const selected=selectedBookIds.map(String);
+ const selectedAllowed=new Set(selected.filter(id=>allowedBookIds.has(id)));
+ if(selected.length&&selected.some(id=>!allowedBookIds.has(id)))
+  throw Error('Selected book is not present in the published corpus.');
+ const namedBookIds=selected.length?selected:matchExplicitBookIds(direct,books);
+ const targetBookIds=namedBookIds.length?namedBookIds:[null];
+ const retrievalAllowed=selected.length?selectedAllowed:allowedBookIds;
+ const searchSets=await Promise.all(searchQueries.map(async query=>{
+  const facetBookIds=targetBooksForFacet(query,books,targetBookIds[0]===null?null:targetBookIds);
+  const targeted=await Promise.all(facetBookIds.map(bookId=>library.search(query,{
+   ...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook
+  })));
+  return {sources:targeted.flatMap(set=>Array.isArray(set?.sources)?set.sources:[])
+   .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
+ }));
+ const results=searchSets.length>1?mergeFacetSearches(searchSets,maxCandidates):
+  (searchSets[0]?.sources||[]);
+ const filtered=results.filter(source=>allowedPage(source)&&
+  allowedBookIds.has(String(source.bookId))&&
+  (!selected.length||selectedAllowed.has(String(source.bookId))));
+ const representatives=[],others=[],visited=new Set();
+ for(const source of filtered){
+  const group=searchQueries.length>1?String(source.facet):String(source.bookId);
+  if(visited.has(group))others.push(source);
+  else{visited.add(group);representatives.push(source);}
+ }
+ const populated=[];
+ for(const source of [...representatives,...others]){
+  const page=await pageLoader(source);
+  if(!page||typeof page.text!=='string')continue;
+  const byteLength=new TextEncoder().encode(page.text).byteLength;
+  if(byteLength<25||byteLength>pageLimit)continue;
+  populated.push({...source,text:page.text,byteLength});
+  if(populated.length>=maxCandidates)break;
+ }
+ return {candidates:populated,searches:searchSets.map((set,index)=>({
+  query:searchQueries[index]+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
+  resultCount:set.sources.length,sources:set.sources.slice(0,8)
+ })),searchQueries,namedBookIds};
+}
 export function validSearchPlan(value){
  return Array.isArray(value)&&value.length>=2&&value.length<=4&&
    value.every(q=>typeof q==='string'&&q.trim().length>=12&&q.trim().length<=160)&&
@@ -121,18 +183,10 @@ function questionContainsPhrase(question,phrase){
  return p.length>=4&&q.includes(' '+p+' ');
 }
 function catalogWorkTitles(title){
- const work=String(title||'').split(' — ')[0];
- const variants=[work,...work.split(':').slice(1)];
- const cleaned=variants.map(value=>value.replace(/\([^)]*\)/g,' ').trim());
- return [...new Set(cleaned.flatMap(value=>[value,value.replace(/^(the|a|an)\s+/i,'')])
-  .filter(value=>normalizeCatalogText(value).length>=4))];
+ return catalogIdentity(title).aliases.filter(value=>normalizeCatalogText(value).length>=4);
 }
 function catalogAuthorNames(title){
- const parts=String(title||'').split(' — ');
- if(parts.length<2)return [];
- const author=parts.slice(1).join(' ').trim();
- if(/\bedited by\b/i.test(author))return [];
- return author.split(/\s+and\s+/i).filter(Boolean);
+ return catalogIdentity(title).authors;
 }
 function explicitlyNamedAuthorGroups(question,candidates){
  const groups=new Map();
@@ -412,3 +466,4 @@ export function selectAnswerSources(candidates,question,turnstileToken,
  }
  return chosen;
 }
+
