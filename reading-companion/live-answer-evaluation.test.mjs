@@ -1,9 +1,38 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluateLiveCase,evaluatePlannerCase,runLiveCases,summarizeManualReviews,summarizeAnswerVariants} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluateLiveCase,evaluatePlannerCase,runLiveCases,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan} from './live-answer-evaluation.mjs';
 import {PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
+
+test('malformed optional planner facets are dropped or fall back without blocking base retrieval',()=>{
+ const result=partFacetsFromPlan([
+  {id:'P1',question:'What did the priests say about Helen?',searchQueries:['']},
+  {id:'P2',question:'How did Herodotus judge the account?',searchQueries:['valid search query for credibility',null]},
+  {id:'bad',question:'Invalid planner part identifier',searchQueries:['another valid query']},
+  {id:'P3',question:'Tiny',searchQueries:['valid but unusable query']},
+ ]);
+ assert.deepEqual(result.partQueries,[
+  {partId:'P1',query:'What did the priests say about Helen?'},
+  {partId:'P2',query:'valid search query for credibility'},
+ ]);
+ assert.deepEqual(result.partQuestions,[
+  {partId:'P1',question:'What did the priests say about Helen?'},
+  {partId:'P2',question:'How did Herodotus judge the account?'},
+ ]);
+ assert.ok(result.warnings.includes('invalid-part-query-fallback'));
+ assert.ok(result.warnings.includes('invalid-part-query-dropped'));
+ assert.ok(result.warnings.includes('invalid-part'));
+});
+
+test('planner facet links obey the shared unique-query and total-link budgets',()=>{
+ const parts=Array.from({length:8},(_,index)=>({id:`P${index+1}`,
+  question:`Question part ${index+1} with enough text`,searchQueries:[`shared query ${index+1} enough`]}));
+ const result=partFacetsFromPlan(parts);
+ assert.ok(result.partQueries.length<=12);
+ assert.ok(new Set(result.partQueries.map(item=>item.query.toLowerCase())).size<=6);
+ assert.ok(result.warnings.includes('part-query-budget-exceeded'));
+});
 
 test('smoke mode is exactly scripture plus two representative existing cases',()=>{
  const cases=selectLiveCases(suite,'smoke');

@@ -575,6 +575,23 @@ test('source-specific planner queries also link their results to the matching pa
  assert.ok(result.searches.some(search=>search.query.includes('categories a priori')&&search.partIds.includes('P2')));
 });
 
+test('a passage found for one facet can link to another part when its full text covers both',async()=>{
+ const books=[{id:'149',title:'The Histories — Herodotus'}],allowedBookIds=new Set(['149']);
+ const question='What happened in the story of Helen at Troy?';
+ const sharedText='The Egyptian priests say Paris took Helen to Egypt, and Herodotus explains he trusts their account because they kept the sanctuary records and gave a coherent account of the events.';
+ const result=await retrieveEvidence({question,queries:['Herodotus Helen Troy Egyptian priests','Herodotus Egyptian account credibility'],
+  partQueries:[{partId:'P1',query:'What did the Egyptian priests say about Helen?'},
+   {partId:'P2',query:'Why did Herodotus find the Egyptian account more credible?'}],
+  library:{search:async query=>({sources:query.includes('priests')?[{
+   bookId:'149',title:books[0].title,page:146,globalPageId:145,score:90,facet:query
+  }]:[]})},books,allowedBookIds,
+  pageLoader:async()=>({text:sharedText})});
+ const page=result.candidates[0];
+ assert.ok(page.candidatePartIds.includes('P1'));
+ assert.ok(page.candidatePartIds.includes('P2'),
+  'hydrated page text supports the second part even though only the first facet found it');
+});
+
 test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
  const {readFileSync}=await import('node:fs');
  const js=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
