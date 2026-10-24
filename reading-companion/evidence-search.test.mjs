@@ -450,6 +450,23 @@ test('shared retrieval hydrates bounded full pages and returns one reproducible 
  assert.match(result.candidates[0].text,/complete context/);
 });
 
+test('part queries keep matching page IDs linked to each question part through selection',async()=>{
+ const books=[{id:'74',title:'The Republic — Plato'}],allowedBookIds=new Set(['74']);
+ const library={search:async(query)=>({sources:[{bookId:'74',title:books[0].title,
+  page:query.includes('common good')?110:28,globalPageId:query.includes('common good')?109:27,
+  score:80,facet:query}]})};
+ const result=await retrieveEvidence({question:'How does Plato explain political order?',
+  queries:['Plato Republic political legitimacy','Plato Republic justice in the soul'],
+  partQueries:[{partId:'P1',query:'Plato Republic political legitimacy'},
+   {partId:'P2',query:'Plato Republic political order common good'}],library,books,allowedBookIds,
+  pageLoader:async source=>({text:`A complete verified page for ${source.page} with more than enough text.`})});
+ assert.ok(result.candidates.some(source=>source.page===28&&source.candidatePartIds.includes('P1')));
+ assert.ok(result.candidates.some(source=>source.page===110&&source.candidatePartIds.includes('P2')));
+ const selected=selectAnswerSources(result.candidates,'How does Plato explain political order?','token',{
+  maxSources:2,maxBytes:5000,maxSourceBytes:5000,plannedFacetCount:result.searchQueries.length-1});
+ assert.deepEqual(new Set(selected.flatMap(source=>source.candidatePartIds)),new Set(['P1','P2']));
+});
+
 test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
  const {readFileSync}=await import('node:fs');
  const js=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
@@ -463,7 +480,7 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/Search planning is temporarily unavailable; searching directly with your question/);
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
- assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text\}\)=>\(\{bookId,page,text\}\)\)/);
+ assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text,candidatePartIds\}\)=>\(\{bookId,page,text,candidatePartIds\}\)\)/);
  assert.match(js,/selectAnswerSources\(candidates,q,token,\{history,\s*maxSources:MAX_ANSWER_SOURCES,\s*plannedFacetCount:/);
  assert.doesNotMatch(js,/searchPages\(|lastSearch|checked passages will guide/i);
  assert.match(js,/data\.outcome==='insufficient-evidence'/);
