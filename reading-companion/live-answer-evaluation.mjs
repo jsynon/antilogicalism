@@ -15,6 +15,50 @@ const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
 const FINGERPRINT_ROOT='https://jsynon.github.io/antilogicalism-library-data/reader-fingerprints-v1/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
+const PART_ID=/^P[1-9]\d*$/;
+const validPartText=value=>typeof value==='string'&&value.trim().length>=5&&value.trim().length<=400;
+
+/* Planner part facets are optional retrieval hints. A malformed hint should
+ * be visible in the trace and dropped, never allowed to abort the base search
+ * for the reader's complete question. Keep the same bounded contract as the
+ * shared retriever: at most 12 links and 6 distinct part queries. */
+export function partFacetsFromPlan(parts){
+ const partQueries=[],partQuestions=[],warnings=[];
+ if(!Array.isArray(parts))return {partQueries,partQuestions,warnings};
+ const seenQueries=new Set();
+ for(const part of parts){
+  const partId=typeof part?.id==='string'?part.id.trim():'';
+  const question=part?.question;
+  if(!PART_ID.test(partId)||!validPartText(question)){
+   warnings.push('invalid-part');
+   continue;
+  }
+  partQuestions.push({partId,question:question.trim()});
+  const proposed=Array.isArray(part.searchQueries)&&part.searchQueries.length
+   ?part.searchQueries:[question];
+  let candidates=proposed.filter(validPartText).map(value=>value.trim());
+  if(candidates.length!==proposed.length)warnings.push('invalid-part-query-dropped');
+  if(!candidates.length){
+   candidates=[question.trim()];
+   warnings.push('invalid-part-query-fallback');
+  }
+  for(const query of candidates){
+   const key=query.toLocaleLowerCase();
+   if(seenQueries.has(key)){
+    if(partQueries.length<12)partQueries.push({partId,query});
+    else warnings.push('part-query-budget-exceeded');
+    continue;
+   }
+   if(seenQueries.size>=6||partQueries.length>=12){
+    warnings.push('part-query-budget-exceeded');
+    continue;
+   }
+   seenQueries.add(key);
+   partQueries.push({partId,query});
+  }
+ }
+ return {partQueries,partQuestions,warnings:[...new Set(warnings)]};
+}
 const LIVE_CASES=[
  {id:'live-scripture-god-is-love',question:'According to 1 John 4:7–12, what does “God is love” mean, and how does the passage connect God’s love with loving one another?',planner_queries:['1 John 4:7–12 text God is love and love one another','1 John 4:7–12 God sent his Son love one another'],required_source_groups:[{label:'1 John Bible passage',book_ids:['335']}]},
 ];
@@ -432,14 +476,12 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   queries=[item.question];
   await progress('planner','fallback','Planner was unavailable; continuing with the reader’s exact question.',{failureCode:failure.failureCode});
  }
- const partQueries=!plannerFallback&&Array.isArray(plan?.plan?.parts)?plan.plan.parts.flatMap(part=>
-  (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
-   .map(query=>({partId:part.id,query}))):[];
+ const partFacets=!plannerFallback?partFacetsFromPlan(plan?.plan?.parts):
+  {partQueries:[],partQuestions:[],warnings:[]};
+ const {partQueries,partQuestions}=partFacets;
  let loaded;
  await progress('retrieval','started',`Searching ${new Set([...queries,...partQueries.map(value=>value.query)]).size} distinct facets and assembling source pages.`,
-  {queryCount:queries.length,partFacetCount:partQueries.length});
- const partQuestions=!plannerFallback&&Array.isArray(plan?.plan?.parts)?plan.plan.parts.map(part=>
-  ({partId:part.id,question:part.question})):[];
+  {queryCount:queries.length,partFacetCount:partQueries.length,partFacetWarnings:partFacets.warnings});
  try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,
   partQueries,partQuestions});}
  catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
@@ -487,6 +529,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    excerpt:String(preview||'').slice(0,1200)})),
   ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,
   pipeline:variantResults.map(result=>result.pipeline).find(Boolean)||null,
+  partFacetWarnings:partFacets.warnings,
   answerVariant,...(answerVariant==='paired-review-ablation'?{reviewAblation}:{}),
   elapsedMs:Date.now()-startTime};
 }
@@ -504,12 +547,10 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
    httpStatus:200,failureCode:'invalid-response',workerFailure:false,
    workerVersionId:plan?.workerVersionId,workerSourceBuild:plan?.workerSourceBuild});
  let loaded;
- await progress('retrieval','started',`Searching ${plan.queries.length} planner queries against the library.`,{queryCount:plan.queries.length});
- const partQueries=Array.isArray(plan?.plan?.parts)?plan.plan.parts.flatMap(part=>
-  (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
-   .map(query=>({partId:part.id,query}))):[];
- const partQuestions=Array.isArray(plan?.plan?.parts)?plan.plan.parts.map(part=>
-  ({partId:part.id,question:part.question})):[];
+ const partFacets=partFacetsFromPlan(plan?.plan?.parts);
+ const {partQueries,partQuestions}=partFacets;
+ await progress('retrieval','started',`Searching ${new Set([...plan.queries,...partQueries.map(value=>value.query)]).size} planner and part facets.`,
+  {queryCount:plan.queries.length,partFacetCount:partQueries.length,partFacetWarnings:partFacets.warnings});
  try{loaded=await loadSources(item,plan.queries,{library,manifest,allowed,partQueries,partQuestions});}
  catch(error){
   const wrapped=attachRequestFailure(error,'retrieval',{failureCode:'retrieval-failed',workerFailure:false,
@@ -531,10 +572,10 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
  const passed=sourceGroups.every(group=>group.retrieved);
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds,
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped:false,
-  plannerQueries:plan.queries,plannerFallback:false,
+  plannerQueries:plan.queries,plannerFallback:false,partFacetWarnings:partFacets.warnings,
   plannerWorkerVersionId:plan.workerVersionId||null,plannerWorkerSourceBuild:plan.workerSourceBuild||null,
   answerWorkerVersionId:null,answerWorkerSourceBuild:null,searches,
-  submittedSources:selected.map(({bookId,title,page,globalPageId,preview})=>({bookId,title,page,globalPageId,
+  submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
   submittedSourceCount:selected.length,sourceGroups,passed,
   outcome:passed?'planner-retrieval-ready':'planner-retrieval-miss',

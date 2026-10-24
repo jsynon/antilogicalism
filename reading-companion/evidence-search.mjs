@@ -183,10 +183,25 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   const byteLength=new TextEncoder().encode(page.text).byteLength;
   if(byteLength<25||byteLength>pageLimit)continue;
   const matchedFacets=new Set((source.facetRanks||[]).map(item=>item.facet));
-  const candidatePartIds=partFacetIndices.filter(item=>matchedFacets.has(item.facet))
-   .map(item=>item.partId);
+  const candidatePartIds=new Set(partFacetIndices.filter(item=>matchedFacets.has(item.facet))
+   .map(item=>item.partId));
+  // A page can answer more than the one planner facet that found it. Add a
+  // second part link only when the hydrated page shares at least two
+  // distinctive terms with that part's own query. This broadens eligibility
+  // without treating a generic topical hit as proof; the Worker still checks
+  // source scope, citations, and semantic support before it can be answered.
+  const partText=new Map();
+  for(const item of partQueries){
+   const queries=partText.get(item.partId)||[];
+   queries.push(item.query);
+   partText.set(item.partId,queries);
+  }
+  for(const [partId,queries] of partText){
+   if(candidatePartIds.has(partId))continue;
+   if(queries.some(query=>directFacetTextMatch(query,page.text)>=2))candidatePartIds.add(partId);
+  }
   populated.push({...source,text:page.text,byteLength,
-    ...(partFacetIndices.length?{candidatePartIds}:{})});
+    ...(partFacetIndices.length?{candidatePartIds:[...candidatePartIds]}:{})});
   if(populated.length>=maxCandidates)break;
  }
  return {candidates:populated,partFacetIndices,searches:searchSets.map((set,index)=>({
