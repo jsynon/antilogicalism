@@ -117,7 +117,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[]){
  * through RemoteLibrary directly).
  */
 export async function retrieveEvidence({question,queries,partQueries=[],library,books,allowedBookIds,
- selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,
+ selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
  maxCandidates=12,maxBooks=3,pagesPerBook=4,pageLimit=14000}={}){
  const direct=String(question||'').trim();
  if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
@@ -198,7 +198,10 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   }
   for(const [partId,queries] of partText){
    if(candidatePartIds.has(partId))continue;
-   if(queries.some(query=>directFacetTextMatch(query,page.text)>=2))candidatePartIds.add(partId);
+   const partQuestion=(Array.isArray(partQuestions)?partQuestions:[])
+    .find(item=>item?.partId===partId)?.question||'';
+   if(queries.some(query=>directFacetTextMatch(query,page.text)>=2)||
+      hasQuotedPhraseMatch(partQuestion,page.text))candidatePartIds.add(partId);
   }
   populated.push({...source,text:page.text,byteLength,
     ...(partFacetIndices.length?{candidatePartIds:[...candidatePartIds]}:{})});
@@ -398,6 +401,50 @@ function directFacetTextMatch(question,text){
  return score;
 }
 
+/* A quoted passage title or phrase can be stronger evidence of part relevance
+ * than ordinary term overlap. Match only longer quoted phrases, in order, and
+ * allow OCR to split one word into adjacent one-letter tokens (e.g. “T o be”).
+ * This grants a source eligibility link; it does not certify semantic support.
+ */
+function hasQuotedPhraseMatch(question,text){
+ const value=String(question||'');
+ const phrases=[];
+ for(const match of value.matchAll(/[“"]([^”"]{8,120})[”"]|‘([^’]{8,120})’|'([^']{8,120})'/gu))
+  phrases.push(match[1]||match[2]||match[3]||'');
+ const sourceWords=String(text||'').toLocaleLowerCase().normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]+/gu)||[];
+ for(const phrase of phrases){
+  const target=phrase.toLocaleLowerCase().normalize('NFKD')
+   .replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]+/gu)||[];
+  if(target.length<4||target.join('').length<12)continue;
+  for(let start=0;start<sourceWords.length;start++){
+   let at=start,matched=true,usedSplit=false;
+   for(const word of target){
+    let joined='';
+    for(let count=0;count<3&&at+count<sourceWords.length;count++){
+     const next=sourceWords[at+count];
+     joined+=next;
+     if(joined===word){
+      if(count)usedSplit=true;
+      at+=count+1;
+      break;
+     }
+     if(joined.length>=word.length||!word.startsWith(joined)){matched=false;break;}
+    }
+    if(!matched||at>sourceWords.length){matched=false;break;}
+    // No source token was consumed when the concatenated fragments did not
+    // equal this target word.
+    if(joined!==word){matched=false;break;}
+   }
+   if(matched&&usedSplit)return true;
+   // Ordinary exact phrase matches are useful too, but only when the page
+   // contains the full multiword phrase, not a short generic quotation.
+   if(matched)return true;
+  }
+ }
+ return false;
+}
+
 function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
  const count=Math.max(0,Math.floor(Number(plannedFacetCount)||0));
  if(count<2||!candidates.some(candidate=>Array.isArray(candidate?.facetRanks)))
@@ -547,9 +594,13 @@ export function selectAnswerSources(candidates,question,turnstileToken,
   // prefer the one whose actual prose covers more of the part's distinctive
   // terms. The original question remains the fallback and comparison target.
   const targetQuestion=partQuestionById.get(partId)||question;
-  const candidate=eligible.length?eligible.reduce((best,value)=>
-    directFacetTextMatch(targetQuestion,value.text??value.preview)>
-      directFacetTextMatch(targetQuestion,best.text??best.preview)?value:best,eligible[0]):null;
+  const candidate=eligible.length?eligible.reduce((best,value)=>{
+    const valuePhrase=hasQuotedPhraseMatch(targetQuestion,value.text??value.preview);
+    const bestPhrase=hasQuotedPhraseMatch(targetQuestion,best.text??best.preview);
+    if(valuePhrase!==bestPhrase)return valuePhrase?value:best;
+    return directFacetTextMatch(targetQuestion,value.text??value.preview)>
+      directFacetTextMatch(targetQuestion,best.text??best.preview)?value:best;
+  },eligible[0]):null;
   if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
  }
  if(partRepresentatives.length)ordered=[...partRepresentatives,...ordered.filter(value=>!reservedPartPages.has(value))];

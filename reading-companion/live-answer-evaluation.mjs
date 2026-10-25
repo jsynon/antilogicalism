@@ -417,7 +417,7 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
  partQueries=[],partQuestions=[]}){
  const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
- const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,directFallback,
+ const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,partQuestions,directFallback,
   library,books:bookCatalog,allowedBookIds:allowed,selectedBookIds,
   maxCandidates:12,maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK,
   pageLoader:async source=>{
