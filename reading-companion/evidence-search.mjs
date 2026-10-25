@@ -147,6 +147,25 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  }
  const partFacetIndices=partQueries.map(item=>({partId:item.partId,
   facet:searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===item.query.trim().toLocaleLowerCase())}));
+ // The planner's main queries can be more useful than the part's natural-
+ // language search query. Associate a focused planner facet with a part when
+ // they share at least two distinctive terms. This lets a page found by that
+ // facet keep its eligibility link through selection; the Worker still checks
+ // source scope, citations, and semantic support. Do not map the verbatim
+ // question or direct-fallback query to every part.
+ if(!useDirect){
+  const linked=new Set(partFacetIndices.map(item=>item.partId+':'+item.facet));
+  for(let facet=0;facet<queries.length;facet++)for(const item of partQuestions){
+   const partId=typeof item?.partId==='string'?item.partId:'';
+   const partQuestion=typeof item?.question==='string'?item.question:'';
+   if(!/^P[1-9]\d*$/.test(partId)||partQuestion.trim().length<5)continue;
+   const key=partId+':'+facet;
+   if(!linked.has(key)&&directFacetTextMatch(searchQueries[facet],partQuestion)>=2){
+    partFacetIndices.push({partId,facet});
+    linked.add(key);
+   }
+  }
+ }
  const selected=selectedBookIds.map(String);
  const selectedAllowed=new Set(selected.filter(id=>allowedBookIds.has(id)));
  if(selected.length&&selected.some(id=>!allowedBookIds.has(id)))
@@ -177,13 +196,19 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  }
  const partIdsForFacet=facet=>partFacetIndices.filter(item=>item.facet===facet).map(item=>item.partId);
  const populated=[];
+ const partAllowsBook=(partId,bookId)=>{
+  const part=Array.isArray(partQuestions)?partQuestions.find(item=>item?.partId===partId):null;
+  return !Array.isArray(part?.sourceBookIds)||!part.sourceBookIds.length||
+   part.sourceBookIds.map(String).includes(String(bookId));
+ };
  for(const source of [...representatives,...others]){
   const page=await pageLoader(source);
   if(!page||typeof page.text!=='string')continue;
   const byteLength=new TextEncoder().encode(page.text).byteLength;
   if(byteLength<25||byteLength>pageLimit)continue;
   const matchedFacets=new Set((source.facetRanks||[]).map(item=>item.facet));
-  const candidatePartIds=new Set(partFacetIndices.filter(item=>matchedFacets.has(item.facet))
+  const candidatePartIds=new Set(partFacetIndices.filter(item=>matchedFacets.has(item.facet)&&
+   partAllowsBook(item.partId,source.bookId))
    .map(item=>item.partId));
   // A page can answer more than the one planner facet that found it. Add a
   // second part link only when the hydrated page shares at least two
@@ -197,7 +222,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
    partText.set(item.partId,queries);
   }
   for(const [partId,queries] of partText){
-   if(candidatePartIds.has(partId))continue;
+   if(candidatePartIds.has(partId)||!partAllowsBook(partId,source.bookId))continue;
    const partQuestion=(Array.isArray(partQuestions)?partQuestions:[])
     .find(item=>item?.partId===partId)?.question||'';
    if(queries.some(query=>directFacetTextMatch(query,page.text)>=2||
