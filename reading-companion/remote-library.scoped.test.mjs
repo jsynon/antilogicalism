@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {gzipSync} from 'node:zlib';
-import {RemoteLibrary,queryTerms,substantivePageEvidence} from './remote-library.mjs';
+import {RemoteLibrary,queryTerms,substantivePageEvidence,isNavigationPage} from './remote-library.mjs';
 
 const driveId='ABCDEFGHIJKLMNOPQRSTUVWXY123456';
 const question="How do moral virtue, practical wisdom (phronesis), and happiness (eudaimonia) fit together in Aristotle's Nicomachean Ethics?";
@@ -20,6 +20,13 @@ test('query terms keep source concepts while dropping question framing',()=>{
    ['virtue','practical','wisdom']);
  assert.deepEqual(queryTerms('What caused the Peloponnesian War?'),
    ['caused','peloponnesian','war']);
+});
+
+test('OCR index pages with a folio before the heading are excluded while prose index mentions remain searchable',()=>{
+ const index='intrinsic, 14f Vedanta, 55, 170: advaita, 58n Vedas, 105; Vedic, 147, 168 Virgin Mother, 148; virtue: as synonym for quality or being, 2nf 182 / INDEX traditio, 146 Transformist Illusion, 111 transpersonal: journal of Psychology, 156n; Trauma of Birth, 162, 165; trikaya, 58n; Tristes Tropiques, 126; truth: as not needing us, 58; objective, 7, 10; subjective, 7';
+ assert.equal(isNavigationPage(index),true);
+ assert.equal(substantivePageEvidence(index,['sunyata','void']),null);
+ assert.equal(isNavigationPage('An index of the evidence can be useful. The author then explains how the argument depends on experience and judgment.'),false);
 });
 
 test('Kant causal-necessity search adds the Critique’s indexed Second Analogy vocabulary',async()=>{
