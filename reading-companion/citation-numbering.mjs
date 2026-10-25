@@ -27,3 +27,18 @@ export function sortCitationsByNumber(citations=[],numbering=new Map()){
     (numbering.get(String(b.source?.id||''))||Number.MAX_SAFE_INTEGER)||a.index-b.index)
   .map(entry=>entry.source);
 }
+
+export function sourceAttributionLabel(provenance={}){
+ const voice=provenance?.pageVoice;
+ if(voice?.kind==='editorial-introduction'&&voice.name)
+  return 'Editorial introduction by '+voice.name+
+   (voice.creditedAuthor?' · Work credited to '+voice.creditedAuthor:'');
+ const workVoice=provenance?.workVoice;
+ if(workVoice?.kind==='pseudonymous-author'&&workVoice.name)
+  return 'Published under pseudonym: '+workVoice.name+
+   (workVoice.creditedAuthor?' · Credited author: '+workVoice.creditedAuthor:'');
+ if(['introduction','preface','commentary','notes'].includes(provenance?.pageSectionHint)&&
+   provenance?.pageVoiceHint==='editorial-or-front-matter; verify against the passage')
+  return (provenance.pageSectionHint[0].toUpperCase()+provenance.pageSectionHint.slice(1))+': page speaker not confirmed';
+ return '';
+}
