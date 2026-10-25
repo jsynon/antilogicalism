@@ -73,7 +73,7 @@ function startNewConversation(){
   answerBox.replaceChildren();
   question.value='';
   newConversationButton.hidden=true;
-  diagnosticPanel.hidden=true;
+  if(diagnosticPanel)diagnosticPanel.hidden=true;
   sourceReader.reset();
   setStatus('New conversation started.');
   updateButtons();
@@ -92,7 +92,7 @@ function refreshStatusState(){
 }
 function setStatus(message){status.textContent=message;refreshStatusState();}
 function refreshDiagnostic(){
-  if(!diagnosticState)return;
+  if(!diagnosticState||!diagnosticOutput)return;
   diagnosticOutput.textContent=JSON.stringify(createDiagnosticReport(diagnosticState),null,2);
 }
 function beginDiagnostic(questionText){
@@ -105,12 +105,14 @@ function beginDiagnostic(questionText){
     plannerWorkerVersionId:null,plannerWorkerVersionTag:null,plannerWorkerVersionTimestamp:null,
     plannerWorkerSourceBuild:null,answerWorkerVersionId:null,answerWorkerVersionTag:null,
     answerWorkerVersionTimestamp:null,answerWorkerSourceBuild:null};
-  diagnosticPanel.hidden=false;
-  diagnosticToggle.checked=false;
-  diagnosticDetails.hidden=true;
-  diagnosticDetails.open=false;
-  diagnosticCopyStatus.textContent='';
-  refreshDiagnostic();
+  if(diagnosticPanel&&diagnosticToggle&&diagnosticDetails&&diagnosticCopyStatus){
+    diagnosticPanel.hidden=false;
+    diagnosticToggle.checked=false;
+    diagnosticDetails.hidden=true;
+    diagnosticDetails.open=false;
+    diagnosticCopyStatus.textContent='';
+    refreshDiagnostic();
+  }
 }
 function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
@@ -654,11 +656,11 @@ async function askQuestion(questionText){
     updateButtons();
   }
 }
-diagnosticToggle.addEventListener('change',()=>{
+if(diagnosticToggle&&diagnosticDetails)diagnosticToggle.addEventListener('change',()=>{
   diagnosticDetails.hidden=!diagnosticToggle.checked;
   if(diagnosticToggle.checked){diagnosticDetails.open=true;refreshDiagnostic();}
 });
-diagnosticCopy.addEventListener('click',async()=>{
+if(diagnosticCopy&&diagnosticOutput&&diagnosticCopyStatus)diagnosticCopy.addEventListener('click',async()=>{
   try{
     await navigator.clipboard.writeText(diagnosticOutput.textContent);
     diagnosticCopyStatus.textContent='Diagnostic report copied.';
