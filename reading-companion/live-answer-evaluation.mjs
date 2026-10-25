@@ -60,6 +60,24 @@ export function partFacetsFromPlan(parts){
  }
  return {partQueries,partQuestions,warnings:[...new Set(warnings)]};
 }
+function reportProvenance(value){
+ if(!value||typeof value!=='object')return undefined;
+ const strings=(items)=>Array.isArray(items)?items.filter(item=>typeof item==='string').slice(0,8).map(item=>item.slice(0,160)):[];
+ const result={work:typeof value.work==='string'?value.work.slice(0,180):'',
+  creditedAuthors:strings(value.creditedAuthors),creditedEditors:strings(value.creditedEditors),
+  creditedTranslators:strings(value.creditedTranslators),
+  plannerSourceRole:['primary','subject','commentary','unspecified'].includes(value.plannerSourceRole)?value.plannerSourceRole:'unspecified',
+  pageSectionHint:typeof value.pageSectionHint==='string'?value.pageSectionHint.slice(0,40):'undetermined',
+  pageVoiceHint:typeof value.pageVoiceHint==='string'?value.pageVoiceHint.slice(0,120):'undetermined'};
+ for(const key of ['workVoice','pageVoice']){
+  const voice=value[key];
+  if(voice&&typeof voice==='object'&&typeof voice.name==='string'&&
+    ['pseudonymous-author','editorial-introduction'].includes(voice.kind))
+   result[key]={kind:voice.kind,name:voice.name.slice(0,120),
+    ...(typeof voice.creditedAuthor==='string'?{creditedAuthor:voice.creditedAuthor.slice(0,160)}:{})};
+ }
+ return result;
+}
 const LIVE_CASES=[
  {id:'live-scripture-god-is-love',question:'According to 1 John 4:7–12, what does “God is love” mean, and how does the passage connect God’s love with loving one another?',planner_queries:['1 John 4:7–12 text God is love and love one another','1 John 4:7–12 God sent his Son love one another'],required_source_groups:[{label:'1 John Bible passage',book_ids:['335']}]},
 ];
@@ -243,7 +261,8 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const citationSources=citations.map(source=>({id:String(source?.id||''),bookId:String(source?.bookId||''),
   title:String(source?.title||''),page:Number.isSafeInteger(source?.page)?source.page:null,
   globalPageId:Number.isSafeInteger(source?.globalPageId)?source.globalPageId:null,
-  url:typeof source?.url==='string'?source.url:''}));
+  url:typeof source?.url==='string'?source.url:'',
+  ...(reportProvenance(source?.provenance)?{provenance:reportProvenance(source.provenance)}:{})}));
  const questionPartCoverage={total:questionParts.length,
   supported:questionParts.filter(item=>item?.status==='supported').length,
   partial:questionParts.filter(item=>item?.status==='partial').length,
