@@ -22,6 +22,47 @@ test('query terms keep source concepts while dropping question framing',()=>{
    ['caused','peloponnesian','war']);
 });
 
+test('Kant causal-necessity search adds the Critique’s indexed Second Analogy vocabulary',async()=>{
+ const query='Kant Critique of Pure Reason causal necessity transcendental deduction categories';
+ const aliases=['second','analogy','succession','rule','cause','effect','experience','objective'];
+ const base=queryTerms(query);
+ const terms=[...new Set([...base,...aliases])];
+ const prefixes=[...new Set(terms.map(term=>term.slice(0,2)))];
+ const corpus={
+  'manifest.json':{
+   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
+   page_books:[40,40],partitions:prefixes,
+   books:{'40':{title:'Critique of Pure Reason — Immanuel Kant',
+    drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
+  },
+  'book-40.json':{pages:[
+   {id:0,page:58,text:'Kant explains that pure concepts of understanding require a transcendental deduction to establish the objective validity of categories.'},
+   {id:1,page:98,text:'B. SECOND ANALOGY. All changes take place according to the law of causality. Objective succession is determined by a rule connecting cause and effect, making necessary experience possible.'}
+  ]}
+ };
+ for(const term of terms){
+  const pageIds=[];
+  if(base.includes(term))pageIds.push(0);
+  if(aliases.includes(term))pageIds.push(1);
+  const prefix=term.slice(0,2);
+  const key='terms-'+prefix+'.json';
+  corpus[key]||={};
+  corpus[key][term]=pageIds;
+ }
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const result=await finder.search(query,{bookId:'40',allowedBookIds:new Set(['40']),
+  maxBooks:1,pagesPerBook:2});
+ assert.ok(aliases.every(term=>result.terms.includes(term)),
+  'the reader’s terms are retained alongside the source-native query vocabulary');
+ assert.equal(result.sources[0]?.page,98,
+  'the passage explaining causal succession and its rule should outrank a general deduction passage');
+});
+
 test('remote library records the exact bytes of each corpus file used',async()=>{
  const bytes=new TextEncoder().encode('{"version":47,"postings_encoding":"delta-json-v1","prefix_length":2,"page_books":[],"pages":0,"partitions":[],"books":{}}');
  const library=new RemoteLibrary('https://example.test/data-v47/',async()=>new Response(bytes));

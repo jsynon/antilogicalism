@@ -6,7 +6,7 @@ import {catalogIdentity} from './reader-contract.mjs';
  * No generated claim or PDF locator is trusted by this component.
  */
 export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
- directQuestionFacetIndex=-1,partQuestions=[],preferPrimaryBible=false
+ directQuestionFacetIndex=-1,partQuestions=[],partFacetScopes=[],preferPrimaryBible=false
 }={}){
  if(!Array.isArray(results))return [];
  const groups=results.map(r=>{
@@ -53,6 +53,32 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
    }
    return reservations;
  };
+ const partFacetReservations=()=>{
+   if(!Array.isArray(partFacetScopes))return [];
+   const reservations=[],reserved=new Set();
+   for(const item of partFacetScopes){
+     const facet=item?.facet;
+     if(!Number.isInteger(facet)||facet<0||facet>=groups.length)continue;
+     const sourceIds=Array.isArray(item.sourceBookIds)?[...new Set(item.sourceBookIds.map(String))]:[];
+     if(!sourceIds.length)continue;
+     for(const sourceId of sourceIds){
+       // A focused part facet can return several pages from one work before
+       // the best page from another explicitly resolved work. Keep two from
+       // each source so a relevant second-ranked passage survives the global
+       // candidate cap without expanding the evidence packet.
+       let kept=0;
+       for(const entry of groups[facet]){
+         if(!valid(entry)||String(entry.bookId)!==sourceId)continue;
+         const key=sourceId+':'+entry.page;
+         if(reserved.has(key))continue;
+         reservations.push({entry,facet});
+         reserved.add(key);
+         if(++kept>=2)break;
+       }
+     }
+   }
+   return reservations;
+ };
  const hasScores=groups.some(group=>group.some(entry=>Number.isFinite(entry?.score)));
  if(!hasScores){
    // Retain deterministic round-robin behavior for legacy callers without
@@ -73,7 +99,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
      const value={...entry,facet,facetRanks:[{facet,rank}]};
      seen.set(key,value);out.push(value);return true;
    }
-   for(const {entry,facet} of directPartReservations()){
+   for(const {entry,facet} of [...partFacetReservations(),...directPartReservations()]){
      if(out.length>=limit)break;
      add(entry,facet);
    }
@@ -124,6 +150,13 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  // question part. A decisive passage can rank second on its best query while
  // several weaker rank-one pages from other facets crowd it out globally.
  const reserved=[],reservedKeys=new Set();
+ for(const {entry} of partFacetReservations()){
+   const key=String(entry.bookId)+':'+entry.page;
+   const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
+   if(candidate&&!reservedKeys.has(key)&&reserved.length<limit){
+     reserved.push(candidate);reservedKeys.add(key);
+   }
+ }
  for(const {entry} of directPartReservations()){
    const key=String(entry.bookId)+':'+entry.page;
    const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
@@ -236,13 +269,33 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
    ...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook
   })));
   return {sources:targeted.flatMap(set=>Array.isArray(set?.sources)?set.sources:[])
-   .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)),executedQuery,scopeReference};
+   .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)),executedQuery,scopeReference,
+   targetBookIds:facetBookIds.filter(Boolean).map(String)};
  }));
  const linkedFacets=[...new Set(partFacetIndices.map(item=>item.facet).filter(index=>index>=0))];
+ // A planner part may omit sourceBookIds even when its focused query resolves
+ // an author or work to specific catalog entries. Carry those trusted resolved
+ // IDs into evidence eligibility so a global, secondary mention of the same
+ // passage cannot replace the requested primary source.
+ const partSourceBookIds=new Map();
+ for(const part of partQuestions){
+  if(typeof part?.partId!=='string')continue;
+  const explicit=Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):[];
+  const resolved=partFacetIndices.filter(item=>item.partId===part.partId)
+   .flatMap(item=>searchSets[item.facet]?.targetBookIds||[]);
+  const ids=[...new Set(explicit.length?explicit:resolved)];
+  if(ids.length)partSourceBookIds.set(part.partId,ids);
+ }
+ const scopedPartQuestions=partQuestions.map(part=>({
+  ...part,...(partSourceBookIds.has(part?.partId)?{sourceBookIds:partSourceBookIds.get(part.partId)}:{})
+ }));
+ const partFacetScopes=partQuestions.length?partFacetIndices.map(item=>({partId:item.partId,facet:item.facet,
+  sourceBookIds:partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[]})):[];
  const directQuestionFacetIndex=searchQueries.findIndex(value=>
   value.trim().toLocaleLowerCase()===direct.toLocaleLowerCase());
  const results=searchSets.length>1?mergeFacetSearches(searchSets,maxCandidates,linkedFacets,{
-  directQuestionFacetIndex,partQuestions,preferPrimaryBible:scriptureReferences.length===1
+  directQuestionFacetIndex,partQuestions:scopedPartQuestions,partFacetScopes,
+  preferPrimaryBible:scriptureReferences.length===1
  }):
   (searchSets[0]?.sources||[]).map((source,index)=>({...source,facet:0,
     facetRanks:[{facet:0,rank:index+1}]}));
@@ -258,9 +311,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  const partIdsForFacet=facet=>partFacetIndices.filter(item=>item.facet===facet).map(item=>item.partId);
  const populated=[];
  const partAllowsBook=(partId,bookId)=>{
-  const part=Array.isArray(partQuestions)?partQuestions.find(item=>item?.partId===partId):null;
-  return !Array.isArray(part?.sourceBookIds)||!part.sourceBookIds.length||
-   part.sourceBookIds.map(String).includes(String(bookId));
+  const sourceIds=partSourceBookIds.get(partId)||[];
+  return !sourceIds.length||sourceIds.includes(String(bookId));
  };
  for(const source of [...representatives,...others]){
   const page=await pageLoader(source);
@@ -297,7 +349,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  return {candidates:populated,partFacetIndices,searches:searchSets.map((set,index)=>({
   query:searchSets[index].executedQuery+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
   ...(searchSets[index].scopeReference?{originalQuery:searchQueries[index],scopeInherited:true}:{}),
-  resultCount:set.sources.length,partIds:partIdsForFacet(index),sources:set.sources.slice(0,8)
+  resultCount:set.sources.length,partIds:partIdsForFacet(index),
+  ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),sources:set.sources.slice(0,8)
  })),searchQueries,namedBookIds};
 }
 export function validSearchPlan(value){
