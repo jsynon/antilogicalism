@@ -56,27 +56,31 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  const partFacetReservations=()=>{
    if(!Array.isArray(partFacetScopes))return [];
    const reservations=[],reserved=new Set();
+   const eligibleScopes=[];
    for(const item of partFacetScopes){
      const facet=item?.facet;
      if(!Number.isInteger(facet)||facet<0||facet>=groups.length)continue;
      const sourceIds=Array.isArray(item.sourceBookIds)?[...new Set(item.sourceBookIds.map(String))]:[];
      if(!sourceIds.length)continue;
-     for(const sourceId of sourceIds){
-       // A focused part facet can return several pages from one work before
-       // the best page from another explicitly resolved work. Keep two from
-       // each source so a relevant second-ranked passage survives the global
-       // candidate cap without expanding the evidence packet.
-       let kept=0;
-       for(const entry of groups[facet]){
-         if(!valid(entry)||String(entry.bookId)!==sourceId)continue;
-         const key=sourceId+':'+entry.page;
-         if(reserved.has(key))continue;
-         reservations.push({entry,facet});
-         reserved.add(key);
-         if(++kept>=2)break;
-       }
-     }
+     eligibleScopes.push({facet,sourceIds});
    }
+   // Reserve one best page per distinct work before spending a second slot
+   // within any work. Broad author facets can resolve to many books; reserving
+   // two pages from each of the first few books used to crowd out the best
+   // evidence from later works before page hydration.
+   const reservePass=(pageOffset)=>{
+     for(const {facet,sourceIds} of eligibleScopes)for(const sourceId of sourceIds){
+       const matches=groups[facet].filter(entry=>valid(entry)&&String(entry.bookId)===sourceId);
+       const entry=matches[pageOffset];
+       if(!entry)continue;
+       const key=sourceId+':'+entry.page;
+       if(reserved.has(key))continue;
+       reservations.push({entry,facet});
+       reserved.add(key);
+     }
+   };
+   reservePass(0);
+   reservePass(1);
    return reservations;
  };
  const hasScores=groups.some(group=>group.some(entry=>Number.isFinite(entry?.score)));
@@ -165,7 +169,25 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
    }
  }
  for(const facet of [...new Set(reserveFacetIndexes)]){
-   for(const entry of (groups[facet]||[]).slice(0,2)){
+   const facetPages=groups[facet]||[];
+   const pagesToReserve=[];
+   if(facet===directQuestionFacetIndex){
+     // Preserve the verbatim-question facet's top alternatives. A directly
+     // relevant second page can be crucial even when a different work has a
+     // higher lexical rank; the final selector applies its own direct-title
+     // and text-relevance rules.
+     pagesToReserve.push(...facetPages.slice(0,2));
+   }else{
+     const firstByBook=[],seenFacetBooks=new Set();
+     for(const entry of facetPages){
+       const bookId=String(entry?.bookId||'');
+       if(bookId&&!seenFacetBooks.has(bookId)){seenFacetBooks.add(bookId);firstByBook.push(entry);}
+     }
+     // Distinct works get their best page before a repeated page from the
+     // same work can consume the bounded candidate pool.
+     pagesToReserve.push(...firstByBook.slice(0,2));
+   }
+   for(const entry of pagesToReserve){
      const key=String(entry.bookId)+':'+entry.page;
      const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
      if(candidate&&!reservedKeys.has(key)&&reserved.length<limit){

@@ -289,6 +289,24 @@ test('stronger passage evidence outranks a higher-ranked but weaker work match',
  ]}],2);
  assert.deepEqual(out.map(x=>x.page),[14,117]);
 });
+test('linked planner facets reserve one strong page per work before a second page from one work',()=>{
+ const copleston={...page(126,'616'),title:'A History of Philosophy, Volume VI — Frederick Copleston',score:70.89,
+  preview:'Kant distinguishes appearances and things in themselves.'};
+ const coplestonSecond={...page(142,'616'),title:copleston.title,score:69.1,
+  preview:'A further passage from Copleston on Kant.'};
+ const prolegomena={...page(22,'44'),title:'Prolegomena to Any Future Metaphysics — Immanuel Kant',score:63.66,
+  preview:'Appearances are modes of representation, not things in themselves.'};
+ const prolegomenaSecond={...page(21,'44'),title:prolegomena.title,score:63.65,
+  preview:'A second Prolegomena passage on appearances.'};
+ const candidates=mergeFacetSearches([{sources:[copleston,coplestonSecond,prolegomena,prolegomenaSecond]}],4,[],{
+  partFacetScopes:[{partId:'P1',facet:0,sourceBookIds:['616','44']}]
+ });
+ assert.deepEqual(candidates.slice(0,2).map(source=>source.bookId+':'+source.page),['616:126','44:22']);
+ const selected=selectAnswerSources(candidates.map(source=>({...source,text:source.preview})),'What is transcendental idealism?',
+  'token',{maxSources:2});
+ assert.ok(selected.some(source=>source.bookId==='44'&&source.page===22),
+  'the Prolegomena passage must reach the bounded packet after surviving candidate reservation');
+});
 test('a strong passage later in a facet reaches the bounded answer context',()=>{
  const out=mergeFacetSearches([
   {sources:[
