@@ -1,6 +1,6 @@
-/* Reader-only OCR formatting and exact quoted-passage location.
- * The trusted v47 corpus remains unchanged. The readable NKJV display applies
- * only two well-established OCR font substitutions; raw layout remains exact.
+/* Reader-only display cleanup and exact quoted-passage location.
+ * The trusted v47 corpus remains unchanged. Recognized Acrobat footer lines
+ * are hidden, and known NKJV OCR substitutions apply only to the readable view.
  */
 // Remove only standalone Acrobat Web Capture footer lines. Requiring the
 // page counter and timestamp avoids deleting ordinary URLs in book prose.
