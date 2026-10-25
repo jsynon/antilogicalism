@@ -17,7 +17,7 @@ export function catalogIdentity(title){
     translators:translator?[translator]:[],
     aliases:[...new Set(aliases.flatMap(v=>{const clean=v.trim();return [clean,clean.replace(/^(the|a|an)\s+/i,'').trim()];}).filter(v=>v.length>=4))]};
 }
-// Corpus-specific voice notes are deliberately guarded by both the stable v47
+// Corpus-specific voice notes are deliberately guarded by both the stable v48
 // book ID and its exact title. They describe publication/section context, not
 // proof that every sentence on a page is spoken by that voice.
 const CURATED_VOICE_IDENTITIES=Object.freeze({
@@ -25,7 +25,9 @@ const CURATED_VOICE_IDENTITIES=Object.freeze({
   '192':{title:'Philosophical Fragments — Søren Kierkegaard',workVoice:{kind:'pseudonymous-author',name:'Johannes Climacus',creditedAuthor:'Søren Kierkegaard'}},
   '253':{title:'The Sickness Unto Death — Søren Kierkegaard',workVoice:{kind:'pseudonymous-author',name:'Anti-Climacus',creditedAuthor:'Søren Kierkegaard'}},
   '185':{title:'Last Writings: Nothingness and the Religious Worldview — Kitarō Nishida',
-    editorialPages:{18:{kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'}}}
+    editorialPages:{18:{kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'}}},
+  '239':{title:'The Portable Nietzsche — Friedrich Nietzsche (edited by Walter Kaufmann)',
+    editorialPages:{578:{kind:'editorial-commentary',name:'Walter Kaufmann',creditedAuthor:'Friedrich Nietzsche'}}}
 });
 export function sourceProvenance(source,plan,pageText=''){
   const identity=catalogIdentity(source?.title||'');

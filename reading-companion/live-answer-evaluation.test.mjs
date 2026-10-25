@@ -207,6 +207,18 @@ test('audit requires expected-source coverage and citations with no orphan marke
  assert.deepEqual(bad.inlineIdsWithoutSource,['S2']);
 });
 
+test('review truncation reason remains visible in the saved answer audit',()=>{
+ const result=auditLiveAnswer({outcome:'unverified-source-draft',coverage:'partial',
+  reviewStatus:'review-format-failed',failureCode:'review-output-truncated',failureStage:'review',
+  answer:'A citation-checked draft [S1].',citations:[{id:'S1',bookId:'35'}],
+  questionParts:[{part:'the requested claim',status:'partial',evidenceIds:['S1']}],evidenceMap:[]},
+  [{bookId:'35',page:42}],[]);
+ assert.equal(result.failureCode,'review-output-truncated');
+ assert.equal(result.failureStage,'review');
+ assert.equal(result.reviewStatus,'review-format-failed');
+ assert.equal(result.passed,false);
+});
+
 test('grouped citations cannot hide an unknown source ID from the evaluation audit',()=>{
  const result=auditLiveAnswer({coverage:'full',answer:'Claim supported by both sources [S1, S99].',
   citations:[{id:'S1',bookId:'638'}],questionParts:[],evidenceMap:[]},

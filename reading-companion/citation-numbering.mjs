@@ -30,8 +30,8 @@ export function sortCitationsByNumber(citations=[],numbering=new Map()){
 
 export function sourceAttributionLabel(provenance={}){
  const voice=provenance?.pageVoice;
- if(voice?.kind==='editorial-introduction'&&voice.name)
-  return 'Editorial introduction by '+voice.name+
+ if(['editorial-introduction','editorial-commentary'].includes(voice?.kind)&&voice.name)
+  return (voice.kind==='editorial-introduction'?'Editorial introduction by ':'Editorial commentary by ')+voice.name+
    (voice.creditedAuthor?' · Work credited to '+voice.creditedAuthor:'');
  const workVoice=provenance?.workVoice;
  if(workVoice?.kind==='pseudonymous-author'&&workVoice.name)
