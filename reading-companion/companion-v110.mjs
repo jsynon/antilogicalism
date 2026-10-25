@@ -402,14 +402,15 @@ function renderResponse(data,turnQuestion=''){
   const reply=node('div',undefined,'companion-answer-text');
   putMarkdownBlocks(reply,answer,citations,highlights,numbering);
   turn.append(reply);
-  const missing=String(data.missing||'').trim();
+  const missing=String(data.missing||'').trim()
+    .replace(/^Not fully established by the retrieved evidence:\\s*/i,'');
   const normalizeNotice=value=>String(value||'').normalize('NFKC').toLocaleLowerCase()
     .replace(/[’']/g,"'").replace(/[^\p{L}\p{N}]+/gu,' ').trim();
   const answerAlreadyContainsMissing=!!missing&&
     normalizeNotice(answer).includes(normalizeNotice(missing));
   if(missing&&!answerAlreadyContainsMissing){
     const label=data.reviewStatus==='answer-draft-unverified'?
-      'Evidence check: ':'What these passages don’t establish: ';
+      'Evidence check: ':'Evidence gaps: ';
     turn.append(node('p',label+missing,'companion-hint'));
   }
 
