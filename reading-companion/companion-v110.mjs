@@ -404,11 +404,7 @@ function renderResponse(data,turnQuestion=''){
   turn.append(reply);
   const missing=String(data.missing||'').trim()
     .replace(/^Not fully established by the retrieved evidence:\s*/i,'');
-  const normalizeNotice=value=>String(value||'').normalize('NFKC').toLocaleLowerCase()
-    .replace(/[’']/g,"'").replace(/[^\p{L}\p{N}]+/gu,' ').trim();
-  const answerAlreadyContainsMissing=!!missing&&
-    normalizeNotice(answer).includes(normalizeNotice(missing));
-  if(missing&&!answerAlreadyContainsMissing){
+  if(missing){
     const label=data.reviewStatus==='answer-draft-unverified'?
       'Evidence check: ':'Evidence gaps: ';
     turn.append(node('p',label+missing,'companion-hint'));
