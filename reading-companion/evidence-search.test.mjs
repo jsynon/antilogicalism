@@ -135,6 +135,81 @@ test('canonical Bible references do not resolve James as William James in all-bo
  assert.deepEqual(targetBooksForFacet(
   'James 2:14-26 faith without works being dead Bible',books,['39']),['39']);
 });
+test('a James passage found only by the full-question facet reaches its answer parts',async()=>{
+ const question='According to James 2:14–26, how does James relate faith to works, and what do Abraham and Rahab illustrate?';
+ const queries=[
+  'James 2:14-26 relationship between faith and works definition Bible',
+  'James 2:14-26 Abraham illustrating faith and works argument Bible',
+  'James 2:14-26 Rahab illustrating faith and works argument Bible'
+ ];
+ const parts=[
+  {partId:'P1',question:'How does James 2:14–26 define the relationship between faith and works?',
+   sourceBookIds:null},
+  {partId:'P2',question:"What specific point does the example of Abraham illustrate in James's argument regarding faith and works?",
+   sourceBookIds:null},
+  {partId:'P3',question:"What specific point does the example of Rahab illustrate in James's argument regarding faith and works?",
+   sourceBookIds:null}
+ ];
+ const bibleText='JAMES 2 19 You believe that there is one God. You do well. Even the demons believe and tremble. '+
+  'Faith without works is dead. 21 Was not Abraham justified by works when he offered Isaac his son on the altar? '+
+  'Faith was working together with his works. 25 Likewise, was not Rahab justified by works when she received the messengers?';
+ const bible={...page(5493,'335'),title:'New King James Version Bible — Various authors',score:50,
+  preview:bibleText};
+ const directResults=[
+  {...page(1883,'638'),title:'The New Oxford Annotated Bible, Fully Revised Fifth Edition',score:62,
+   preview:'Introduction to English Bible translations and their history.'},
+  {...page(2233,'646'),title:'The New Oxford Annotated Bible, Fourth Edition',score:62,
+   preview:'Notes on other books and the history of biblical interpretation.'},
+  {...page(2149,'646'),title:'The New Oxford Annotated Bible, Fourth Edition',score:61,
+   preview:'Commentary on other chapters and passages.'},
+  {...page(1797,'638'),title:'The New Oxford Annotated Bible, Fully Revised Fifth Edition',score:61,
+   preview:'Commentary on a different chapter in James.'},
+  {...page(1889,'638'),title:'The New Oxford Annotated Bible, Fully Revised Fifth Edition',score:54,
+   preview:'Bible introduction discussing Abraham in Genesis.'},
+  bible,
+  {...page(37,'638'),title:'The New Oxford Annotated Bible, Fully Revised Fifth Edition',score:50,
+   preview:'Notes on another Old Testament passage.'},
+  {...page(37,'646'),title:'The New Oxford Annotated Bible, Fourth Edition',score:49,
+   preview:'Notes on another Old Testament passage.'}
+ ];
+ const queryResults=new Map([
+  [queries[0],{sources:[...directResults.slice(0,5)]}],
+  [queries[1],{sources:[]}],[queries[2],{sources:[]}],
+  [question,{sources:directResults}],
+  [parts[0].question,{sources:directResults.slice(0,5)}],
+  [parts[1].question,{sources:[{...page(230,'39'),title:'The Varieties of Religious Experience — William James',
+   score:50,preview:'William James discusses religious belief and faith.'}] }],
+  [parts[2].question,{sources:[{...page(230,'39'),title:'The Varieties of Religious Experience — William James',
+   score:50,preview:'William James discusses religious belief and faith.'}] }]
+ ]);
+ const seenQueries=[];
+ const books=[
+  {id:'335',title:bible.title},
+  {id:'638',title:'The New Oxford Annotated Bible, Fully Revised Fifth Edition'},
+  {id:'646',title:'The New Oxford Annotated Bible, Fourth Edition'},
+  {id:'39',title:'The Varieties of Religious Experience — William James'}
+ ];
+ const result=await retrieveEvidence({question,queries,partQuestions:parts,
+  partQueries:parts.map(part=>({partId:part.partId,query:part.question})),
+  library:{search:async query=>{
+   seenQueries.push(query);
+   return queryResults.get(query)||{sources:[]};
+  }},books,allowedBookIds:new Set(books.map(book=>book.id)),maxCandidates:12,
+  pageLoader:async source=>({text:source.bookId==='335'?bibleText:source.preview||'Unrelated source page with enough text to load.'})
+ });
+ const found=result.candidates.find(source=>source.bookId==='335'&&source.page===5493);
+ assert.ok(found,'the sixth-ranked full-question hit survives the bounded candidate merge');
+ assert.deepEqual(found.candidatePartIds,['P1','P2','P3']);
+ assert.ok(seenQueries.includes(`James 2:14–26 ${parts[1].question}`));
+ assert.ok(seenQueries.includes(`James 2:14–26 ${parts[2].question}`));
+ assert.ok(!result.candidates.some(source=>source.bookId==='39'&&source.candidatePartIds?.length),
+  'the inherited Bible reference prevents William James from becoming eligible evidence');
+ const selected=selectAnswerSources(result.candidates,question,'token',{
+  maxSources:6,maxBytes:39000,maxSourceBytes:35000,partQuestions:parts
+ });
+ assert.ok(selected.some(source=>source.bookId==='335'&&source.page===5493),
+  'the part-linked scripture passage reaches the Worker answer packet');
+});
 test('explicitly named planner facets search their own work inside the question scope',()=>{
  const books=[
   {id:'529',title:'The Origin of Species — Charles Darwin'},

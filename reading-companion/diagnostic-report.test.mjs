@@ -178,11 +178,9 @@ test('diagnostics preserve bounded per-part search and selected-page mappings',(
  assert.deepEqual(report.submittedSources[0].candidatePartIds,['P1','P2']);
 });
 
-test('diagnostics are opt-in, copyable, and kept out of answer requests',()=>{
- assert.match(html,/id="companion-diagnostic-panel"[^>]+hidden/);
- assert.match(html,/id="companion-diagnostic-toggle" type="checkbox"/);
- assert.match(html,/id="companion-diagnostic-details" hidden/);
- assert.match(html,/id="companion-diagnostic-copy" type="button">Copy diagnostic report/);
+test('diagnostic data stays out of answer requests',()=>{
+ assert.doesNotMatch(html,/companion-diagnostic-(?:panel|toggle|details|copy)/,
+  'diagnostic controls are not included in the current public page markup');
  assert.doesNotMatch(html,/The report includes your question and retrieval details|shared only if you copy it/);
  assert.match(client,/navigator\.clipboard\.writeText\(diagnosticOutput\.textContent\)/);
  assert.match(client,/diagnosticState\.searches=retrieval\.searches/);
