@@ -297,8 +297,10 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  // In a two-source comparison, one author's query can miss because its wording
  // does not occur in that author's books even when the other side retrieved a
  // clear topic. Reuse that existing topic query once, scoped to the missing
- // side's trusted book IDs. This adds no model call and never broadens evidence
- // to the other author's works.
+ // side's trusted book IDs. A hit from the broad question facet is not enough
+ // to suppress this retry: it may be an incidental mention that never becomes
+ // eligible evidence for the missing side's answer part. This adds no model
+ // call and never broadens evidence to the other author's works.
  const sides=crossSourceSides(partQuestions);
  if(sides.length===2){
   const sideFacets=sides.map(side=>{
@@ -311,8 +313,6 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
    const side=sides[sideIndex],facet=sideFacets[sideIndex],counterpartFacet=sideFacets[1-sideIndex];
    if(facet<0||counterpartFacet<0||searchSets[facet]?.sources.length||
       !searchSets[counterpartFacet]?.sources.length)continue;
-   const alreadyFound=searchSets.some(set=>set.sources.some(source=>side.bookIds.includes(String(source.bookId))));
-   if(alreadyFound)continue;
    const counterpartQuery=searchQueries[counterpartFacet];
    const activeIds=side.bookIds.filter(id=>allowedBookIds.has(String(id)));
    const retryQuery=scopedCounterpartQuery(counterpartQuery,direct,activeIds,
