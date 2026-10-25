@@ -14,7 +14,7 @@ on:
         default: smoke
         required: true
       case_id:
-        description: In quality mode, optionally run just one case; all seven are the default
+        description: In quality mode, optionally run one case; all seven baseline questions remain the default
         type: choice
         options:
           - all
@@ -25,6 +25,7 @@ on:
           - quality-all-books-cross-work-science
           - quality-all-books-cross-discipline-order
           - quality-all-books-religion-scripture
+          - focused-kant-transcendental-idealism
         default: all
         required: true
       scope:
