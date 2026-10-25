@@ -222,6 +222,34 @@ test('explicitly named planner facets search their own work inside the question 
  assert.deepEqual(targetBooksForFacet('Hawking black holes',books,['7']),['7']);
  assert.deepEqual(targetBooksForFacet('Black holes and evolution',books),[null]);
 });
+test('hypothetical thinker source-side facets search only the named author’s works',async()=>{
+ const question='What would Nietzsche think about the thought of Kierkegaard?';
+ const books=[
+  {id:'239',title:'The Antichrist — Friedrich Nietzsche'},
+  {id:'140',title:'Fear and Trembling — Søren Kierkegaard'}
+ ];
+ const queries=[
+  'Friedrich Nietzsche religious existentialism individual faith',
+  'Søren Kierkegaard religious faith individual existence'
+ ];
+ const parts=[
+  {partId:'P1',question:'What position does Nietzsche take on the ideas under discussion?',sourceBookIds:['239']},
+  {partId:'P2',question:'What position does Kierkegaard take on the ideas under discussion?',sourceBookIds:['140']},
+  {partId:'P3',question:'How do the two positions compare, and what response can cautiously be inferred?',sourceBookIds:['239','140']}
+ ];
+ const calls=[];
+ const result=await retrieveEvidence({question,queries,partQueries:parts.slice(0,2).map(part=>({
+  partId:part.partId,query:part.partId==='P1'?queries[0]:queries[1]
+ })),partQuestions:parts,library:{search:async(query,options={})=>{
+  calls.push({query,bookId:options.bookId||''});return {sources:[]};
+ }},books,allowedBookIds:new Set(['239','140']),pageLoader:async()=>null});
+ assert.deepEqual(calls.filter(call=>call.query===queries[0]).map(call=>call.bookId),['239']);
+ assert.deepEqual(calls.filter(call=>call.query===queries[1]).map(call=>call.bookId),['140']);
+ assert.ok(calls.some(call=>call.query===queries[0]&&call.bookId==='239'));
+ assert.ok(!calls.some(call=>call.query===queries[0]&&call.bookId==='140'));
+ assert.ok(calls.some(call=>call.query===queries[1]&&call.bookId==='140'));
+ assert.ok(!calls.some(call=>call.query===queries[1]&&call.bookId==='239'));
+});
 test('comparison author targeting retains a work for each named author',()=>{
  const books=[
   {id:'7',title:'Nicomachean Ethics — Aristotle'},
@@ -683,10 +711,10 @@ test('hypothetical author responses plan evidence from both thinkers and a synth
   '253':'The Sickness Unto Death — Søren Kierkegaard',
   '436':'Kierkegaard’s Attack Upon “Christendom,” 1854–1855 — Søren Kierkegaard'
  });
- assert.ok(plan.parts.some(part=>part.sourceBookIds?.includes('239')&&part.sourceBookIds?.includes('140')));
- assert.ok(plan.parts.some(part=>part.sourceBookIds?.includes('140')&&!part.sourceBookIds.includes('239')));
- assert.match(plan.parts.at(-1).question,/compare in response to this question/i);
- assert.deepEqual(plan.parts.at(-1).sourceBookIds,['54','144','239','140','192','253','436']);
+ assert.deepEqual(plan.parts[0].sourceBookIds,['54','144','239']);
+ assert.deepEqual(plan.parts[1].sourceBookIds,['140','192','253','436']);
+ assert.deepEqual(plan.parts[2].sourceBookIds,['54','144','239','140','192','253','436']);
+ assert.match(plan.parts.at(-1).question,/positions compare.*cautiously be inferred/i);
 });
 
 test('source-specific planner queries also link their results to the matching part',async()=>{
