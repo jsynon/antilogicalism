@@ -78,6 +78,10 @@ const QUALITY_CASES=[
 // reviewer to judge source sufficiency and highlight relevance qualitatively.
 const FOCUSED_CASES=[
  {id:'focused-kant-transcendental-idealism',discipline:'philosophy',question:'What is transcendental idealism?',selected_book_ids:[],planner_queries:['Kant transcendental idealism definition appearances things in themselves space time','Kant Prolegomena transcendental idealism empirical reality appearances things in themselves','Kant Critique of Pure Reason transcendental idealism phenomena noumena space time'],required_source_groups:[{label:'Kant on transcendental idealism',book_ids:['40','44']}],review_focus:['Explain the core operation of transcendental idealism: space and time are forms of human sensibility that structure appearances, while things in themselves are not known through those forms. Avoid implying that Kant simply denies the empirical reality of external objects.','Assess whether the answer cites enough distinct, relevant passages to establish both the definition and the appearance/thing-in-itself distinction. Judge adequacy by coverage and support, not by an arbitrary citation count.','For every displayed highlight, compare the exact passage text with the claim or question part it is linked to. Exact quote location alone is not evidence of semantic support; flag irrelevant, overly broad, fragmentary, or weakly connected highlights.']},
+ {id:'focused-kierkegaard-faith',discipline:'philosophy',question:'What did Kierkegaard have to say about faith?',selected_book_ids:[],planner_queries:['Kierkegaard faith Fear and Trembling Abraham paradox individual relation to God','Kierkegaard faith Philosophical Fragments leap historical knowledge contemporary follower','Kierkegaard faith Sickness Unto Death self before God'],required_source_groups:[],review_focus:['Explain Kierkegaard’s account of faith using passages from his works, while distinguishing the works’ speakers and argumentative contexts.','Avoid reducing faith to generic belief or treating one famous formulation as a complete summary of Kierkegaard’s authorship.','Check that citations and highlights support the specific account given and represent the relevant passage in context.']},
+ {id:'focused-nietzsche-christianity',discipline:'philosophy',question:'What did Nietzsche think about Christianity?',selected_book_ids:[],planner_queries:['Nietzsche critique Christianity morality ressentiment life affirmation Genealogy of Morals','Nietzsche The Antichrist Christianity life denial priestly morality','Nietzsche Christianity historical psychological critique works'],required_source_groups:[],review_focus:['Present Nietzsche’s critique of Christianity in his own terms and support the main claims with relevant passages.','Do not flatten different works or arguments into one slogan; distinguish moral, psychological, and historical claims where the evidence allows.','Check that each cited passage and highlight supports the attached claim rather than merely mentioning Christianity.']},
+ {id:'focused-sunyata',discipline:'philosophy',question:'What is sunyata?',selected_book_ids:[],planner_queries:['śūnyatā sunyata emptiness lack inherent existence Madhyamaka Buddhism','Nagarjuna emptiness dependent origination Mulamadhyamakakarika','Buddhist sunyata not nihilism conventional truth dependent arising'],required_source_groups:[],review_focus:['Explain śūnyatā in its Buddhist philosophical context, using the retrieved texts’ own distinctions and terminology.','Avoid equating emptiness with absolute nonexistence or nihilism; clarify dependence or lack of inherent existence only where the cited text supports it.','Check whether the passages establish a definition and its implications, and whether displayed highlights semantically support the linked claims.']},
+ {id:'focused-nietzsche-kierkegaard',discipline:'philosophy',question:'What would Nietzsche think about the thought of Kierkegaard?',selected_book_ids:[],planner_queries:['Nietzsche Kierkegaard faith Christianity individual religious commitment','Nietzsche critique Christianity morality faith priestly psychology','Kierkegaard faith Christianity subjectivity individual God'],required_source_groups:[],review_focus:['Do not invent a direct exchange or claim Nietzsche wrote about Kierkegaard unless the sources establish that fact.','Separate textual evidence for Nietzsche’s views from any explicitly labeled, cautious inference about how he might respond to Kierkegaard.','Use evidence from both thinkers where available and make the inference traceable to the cited passages.']},
 ];
 const HOLDOUT_CASES=[
  {id:'holdout-history-herodotus-helen',discipline:'history',question:'When Herodotus recounts the story of Helen’s journey to Troy, what do the Egyptian priests tell him, and how does he explain why he finds their account more credible?',selected_book_ids:['149'],planner_queries:['Herodotus Histories Helen Egypt priests account Troy credibility','Herodotus Helen Paris Egypt Egyptian priests story judgment'],required_source_groups:[{label:'Herodotus, Histories',book_ids:['149']}],review_focus:['Keep the Egyptian priests’ account distinct from Herodotus’s own reasoning and reported Greek traditions.','Explain the basis he gives for preferring one account without turning his inference into a directly witnessed fact.']},
@@ -119,14 +123,16 @@ function sourceRevision(){
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
  const evaluationCases=mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
-  mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:QUALITY_CASES;
+  mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
+  mode==='focused'?FOCUSED_CASES:QUALITY_CASES;
  if(caseId&&caseId!=='all'){
-  if(!['quality','holdout','acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, holdout or acceptance mode.');
+  if(!['quality','focused','holdout','acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, focused, holdout or acceptance mode.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
  }
  if(mode==='quality')return QUALITY_CASES.map(copyEvaluationCase);
+ if(mode==='focused')return FOCUSED_CASES.map(copyEvaluationCase);
  if(mode==='holdout')return HOLDOUT_CASES.map(copyEvaluationCase);
  if(mode==='acceptance')return ACCEPTANCE_CASES.map(copyEvaluationCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
@@ -140,7 +146,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, holdout, acceptance, or full.');
+ throw Error('Mode must be smoke, planner, quality, focused, holdout, acceptance, or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(!['selected-books','all-books'].includes(scope))
@@ -447,7 +453,10 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   const book=manifest.books[String(source.bookId)];
   if(!book)throw Error('A selected source is absent from the published manifest.');
  }
- return {selected,searches:retrieval.searches};
+ const retrievalCandidates=populated.map(({bookId,title,page,globalPageId,score,facet,facetRanks,
+  matchedFacets,candidatePartIds,preview,text})=>({bookId,title,page,globalPageId,score,facet,facetRanks,
+  matchedFacets,candidatePartIds,excerpt:String(preview||text||'').slice(0,1200)}));
+ return {selected,searches:retrieval.searches,retrievalCandidates};
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,answerVariant='with-review',onProgress=async()=>{}}){
  if(!['with-review','compose-only','paired-review-ablation'].includes(answerVariant))
@@ -498,9 +507,10 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerVersionId=plannerWorkerVersionId;
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
- const {selected,searches}=loaded;
+ const {selected,searches,retrievalCandidates}=loaded;
  await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; selected ${selected.length} verified pages.`,
-  {searchCount:searches.length,selectedPages:selected.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]}))});
+  {searchCount:searches.length,candidatePages:retrievalCandidates.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]})),
+   selectedPages:selected.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]}))});
  const variants=answerVariant==='paired-review-ablation'?['with-review','compose-only']:[answerVariant];
  const variantResults=[];
  try{
@@ -532,7 +542,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,
-  ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,searches,
+  ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,searches,retrievalCandidates,
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
   ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,
@@ -566,9 +576,10 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
   wrapped.requestFailure.plannerSkipped=false;
   throw wrapped;
  }
- const {selected,searches}=loaded;
+ const {selected,searches,retrievalCandidates}=loaded;
  await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; selected ${selected.length} verified pages.`,
-  {searchCount:searches.length,selectedPages:selected.map(source=>({bookId:source.bookId,page:source.page}))});
+  {searchCount:searches.length,candidatePages:retrievalCandidates.map(source=>({bookId:source.bookId,page:source.page})),
+   selectedPages:selected.map(source=>({bookId:source.bookId,page:source.page}))});
  const retrievedBookIds=[...new Set(selected.map(source=>String(source.bookId)))];
  const sourceGroups=(item.required_source_groups||[]).map(group=>{
   const expectedBookIds=group.book_ids.map(String);
@@ -582,7 +593,7 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped:false,
   plannerQueries:plan.queries,plannerFallback:false,partFacetWarnings:partFacets.warnings,
   plannerWorkerVersionId:plan.workerVersionId||null,plannerWorkerSourceBuild:plan.workerSourceBuild||null,
-  answerWorkerVersionId:null,answerWorkerSourceBuild:null,searches,
+  answerWorkerVersionId:null,answerWorkerSourceBuild:null,searches,retrievalCandidates,
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
   submittedSourceCount:selected.length,sourceGroups,passed,
@@ -638,11 +649,11 @@ function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',sco
   if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|holdout|acceptance|full] [--scope selected-books|all-books] [--answer-variant with-review|compose-only|paired-review-ablation] [--case case-id] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|holdout|acceptance|full] [--scope selected-books|all-books] [--answer-variant with-review|compose-only|paired-review-ablation] [--case case-id] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation'].includes(args.answerVariant))throw Error('Answer variant must be with-review, compose-only, or paired-review-ablation.');
- const usesEvaluationMode=['quality','holdout','acceptance'].includes(args.mode);
- if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, holdout or acceptance mode.');
+ const usesEvaluationMode=['quality','focused','holdout','acceptance'].includes(args.mode);
+ if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, holdout or acceptance mode.');
  if(usesEvaluationMode&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The untouched acceptance suite must run in all-books mode.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
@@ -650,12 +661,12 @@ async function main(){
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
  const selectedCases=selectLiveCases(suite,args.mode,args.caseId);
  const cases=usesEvaluationMode?applyQualityScope(selectedCases,args.scope):selectedCases;
- const evaluationUsesPlanner=usesEvaluationMode&&args.scope==='all-books';
+ const evaluationUsesPlanner=usesEvaluationMode&&(args.scope==='all-books'||args.mode==='focused');
  const plannerCalls=usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
  const answerCallsPerCase=args.answerVariant==='paired-review-ablation'?3:
   args.answerVariant==='compose-only'?1:2;
  const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:plannerCalls+cases.length*answerCallsPerCase;
- const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
+ const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?(args.mode==='focused'?'all-books':args.scope):null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   answerVariant:args.answerVariant,caseCount:cases.length,estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
    (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; the simplified answer path has no automatic composer regeneration',
@@ -699,6 +710,7 @@ async function main(){
    if(Number.isFinite(event.citations))details.push('citations='+event.citations);
    if(event.usage&&Number.isFinite(event.usage.calls))details.push('worker-calls='+event.usage.calls);
    if(event.usage&&Number.isFinite(event.usage.neurons))details.push('neurons='+event.usage.neurons);
+   if(Array.isArray(event.candidatePages))details.push('candidates='+event.candidatePages.map(page=>page.bookId+':'+page.page).join(','));
    if(Array.isArray(event.selectedPages))details.push('selected='+event.selectedPages.map(page=>page.bookId+':'+page.page).join(','));
    console.log('['+new Date().toISOString()+'] ['+String(event.caseId||'case')+'] '+
     String(event.stage||'progress').toUpperCase()+' '+String(event.status||'update').toUpperCase()+': '+

@@ -4,15 +4,16 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Development regression cases or the untouched acceptance set
+        description: Development regression cases, focused user questions, or the untouched acceptance set
         type: choice
         options:
           - holdout
+          - focused
           - acceptance
         default: holdout
         required: true
       case_id:
-        description: Run one case from the selected suite or all seven
+        description: Run one case from the selected suite or all cases in that suite
         type: choice
         options:
           - all
@@ -23,6 +24,11 @@ on:
           - holdout-all-books-hume-kant-causation
           - holdout-all-books-plato-rousseau-order
           - holdout-all-books-wollstonecraft-dubois
+          - focused-kant-transcendental-idealism
+          - focused-kierkegaard-faith
+          - focused-nietzsche-christianity
+          - focused-sunyata
+          - focused-nietzsche-kierkegaard
           - acceptance-descartes-cogito
           - acceptance-mill-harm-principle
           - acceptance-epictetus-freedom
@@ -42,7 +48,7 @@ on:
         default: with-review
         required: true
       scope:
-        description: Acceptance requires All Books; All Books adds a planner call per question
+        description: Acceptance requires All Books; focused cases always use All Books and the live planner
         type: choice
         options:
           - selected-books

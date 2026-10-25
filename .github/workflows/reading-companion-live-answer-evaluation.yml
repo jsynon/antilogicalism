@@ -4,17 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: Run a 2-case planner check, 3 smoke questions, answer-quality checks, or all 30 benchmark questions
+        description: Run planner checks, smoke or quality baselines, five focused source cases, or all 30 benchmark questions
         type: choice
         options:
           - planner
           - smoke
           - quality
+          - focused
           - full
         default: smoke
         required: true
       case_id:
-        description: In quality mode, optionally run one case; all seven baseline questions remain the default
+        description: In quality mode all seven baseline questions remain the default; focused mode runs the focused questions or one selected case
         type: choice
         options:
           - all
@@ -26,10 +27,14 @@ on:
           - quality-all-books-cross-discipline-order
           - quality-all-books-religion-scripture
           - focused-kant-transcendental-idealism
+          - focused-kierkegaard-faith
+          - focused-nietzsche-christianity
+          - focused-sunyata
+          - focused-nietzsche-kierkegaard
         default: all
         required: true
       scope:
-        description: In quality mode, keep each case's selected-book scope or run every case in All Books mode (adds one planner call per question)
+        description: Quality mode can use selected-book or All Books scope; focused cases always use All Books and the live planner
         type: choice
         options:
           - selected-books

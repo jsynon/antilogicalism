@@ -65,6 +65,43 @@ test('the focused Kant case is selectable without changing the seven-case qualit
  assert.throws(()=>selectLiveCases({cases:[]},'holdout','focused-kant-transcendental-idealism'),/Unknown holdout case/);
 });
 
+test('focused live cases include the four requested user questions and keep the quality baseline unchanged',()=>{
+ const baseline=selectLiveCases({cases:[]},'quality');
+ const focused=selectLiveCases({cases:[]},'focused');
+ assert.equal(baseline.length,7);
+ assert.equal(focused.length,5);
+ assert.deepEqual(focused.map(item=>item.id),[
+  'focused-kant-transcendental-idealism','focused-kierkegaard-faith',
+  'focused-nietzsche-christianity','focused-sunyata','focused-nietzsche-kierkegaard'
+ ]);
+ assert.deepEqual(focused.slice(1).map(item=>item.question),[
+  'What did Kierkegaard have to say about faith?',
+  'What did Nietzsche think about Christianity?',
+  'What is sunyata?',
+  'What would Nietzsche think about the thought of Kierkegaard?'
+ ]);
+ assert.ok(focused.every(item=>item.selected_book_ids.length===0),
+  'focused cases must use All Books retrieval');
+ assert.ok(focused.slice(1).every(item=>item.required_source_groups.length===0),
+  'exploratory focused cases must not claim unverified expected corpus IDs');
+ assert.equal(selectLiveCases({cases:[]},'focused','focused-sunyata').length,1);
+ assert.throws(()=>selectLiveCases({cases:[]},'focused','not-a-focused-case'),/Unknown focused case/);
+ assert.throws(()=>selectLiveCases({cases:[]},'focused','quality-science-darwin-selection'),/Unknown focused case/);
+});
+
+test('both manual answer workflows expose every registered focused case',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const focusedIds=selectLiveCases({cases:[]},'focused').map(item=>item.id);
+ for(const path of [
+  new URL('../.github/workflows/reading-companion-live-answer-evaluation.yml',import.meta.url),
+  new URL('../.github/workflows/reading-companion-holdout-answer-evaluation.yml',import.meta.url)
+ ]){
+  const workflow=readFileSync(path,'utf8');
+  assert.match(workflow,/^\s+- focused\s*$/m);
+  for(const id of focusedIds)assert.ok(workflow.includes(id),`${id} must be selectable in ${path.pathname}`);
+ }
+});
+
 test('holdout mode selects a separate seven-question set across disciplines',()=>{
  const cases=selectLiveCases({cases:[]},'holdout');
  assert.equal(cases.length,7);
@@ -95,7 +132,7 @@ test('holdout all-books scope and single-case selection behave independently of 
  assert.equal(selected.length,1);
  assert.deepEqual(selected[0].required_source_groups[0].book_ids,['335']);
  assert.throws(()=>selectLiveCases({cases:[]},'holdout','quality-history-thucydides-causes'),/Unknown holdout case/);
- assert.throws(()=>selectLiveCases({cases:[]},'smoke','holdout-religion-james-faith-works'),/only in quality, holdout or acceptance mode/);
+ assert.throws(()=>selectLiveCases({cases:[]},'smoke','holdout-religion-james-faith-works'),/only in quality, focused, holdout or acceptance mode/);
 });
 
 test('all-books quality scope runs every question without a selected-book restriction',()=>{
@@ -116,7 +153,7 @@ test('quality mode can select exactly one named case for a low-cost live check',
  assert.equal(cases[0].id,id);
  assert.deepEqual(cases[0].required_source_groups.map(group=>group.book_ids),[['529'],['102']]);
  assert.throws(()=>selectLiveCases({cases:[]},'quality','not-a-quality-case'),/Unknown quality case/);
- assert.throws(()=>selectLiveCases({cases:[]},'smoke',id),/only in quality, holdout or acceptance mode/);
+ assert.throws(()=>selectLiveCases({cases:[]},'smoke',id),/only in quality, focused, holdout or acceptance mode/);
 });
 
 test('planner mode selects one selected-book case and one All Books cross-work case',()=>{
@@ -307,6 +344,9 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  assert.equal(result.answerWorkerSourceBuild,'gateway-build-9');
  assert.equal(result.selectedBookIds[0],'529');assert.equal(result.reviewFocus[0],'Check causal explanation.');
  assert.equal(result.submittedSources[0].excerpt,'A sufficiently long preview passage for testing.');
+ assert.equal(result.retrievalCandidates.length,1);
+ assert.equal(result.retrievalCandidates[0].bookId,'529');
+ assert.equal(result.retrievalCandidates[0].excerpt,'A sufficiently long preview passage for testing.');
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
  assert.ok(searchOptions.every(({options})=>options.maxBooks===3&&
   options.pagesPerBook===PRODUCTION_PAGES_PER_BOOK));
@@ -429,10 +469,14 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  assert.equal(calls[1].body.bookId,'638');
  assert.deepEqual(calls[1].body.sources[0].candidatePartIds,['P1']);
  assert.deepEqual(result.submittedSources[0].candidatePartIds,['P1']);
+ assert.deepEqual(result.retrievalCandidates.map(source=>source.bookId+':'+source.page),['638:10']);
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
  assert.deepEqual(progress.filter(event=>['case','planner','retrieval'].includes(event.stage))
   .map(event=>event.stage+':'+event.status),[
    'case:started','planner:started','planner:completed','retrieval:started','retrieval:completed']);
+ const retrievalCompleted=progress.find(event=>event.stage==='retrieval'&&event.status==='completed');
+ assert.deepEqual(retrievalCompleted.candidatePages,[{bookId:'638',page:10,partIds:['P1']}]);
+ assert.deepEqual(retrievalCompleted.selectedPages,[{bookId:'638',page:10,partIds:['P1']}]);
  assert.ok(progress.some(event=>event.stage==='answer'&&event.status==='started'&&/waiting for the Worker/.test(event.message)));
  assert.ok(progress.some(event=>event.stage==='answer'&&event.status==='completed'&&/verified-source-draft/.test(event.message)));
  assert.ok(!JSON.stringify(progress).includes('x'.repeat(40)));
