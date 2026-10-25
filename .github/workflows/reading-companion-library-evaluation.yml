@@ -8,6 +8,7 @@ on:
     paths:
       - 'benchmarks/reading-companion-public-v1.json'
       - 'benchmarks/reading-companion-selected-book-v1.json'
+      - 'benchmarks/reading-companion-selected-book-v1.json'
       - 'reading-companion/remote-library.mjs'
       - 'reading-companion/evidence-search.mjs'
       - 'reading-companion/public-library-evaluation.mjs'
@@ -28,11 +29,17 @@ jobs:
           node-version: 24
       - name: Test the production retrieval and evaluation contracts
         run: node --test reading-companion/public-library-evaluation.test.mjs reading-companion/evidence-search.test.mjs reading-companion/remote-library*.test.mjs
+      - name: Defer live corpus evaluation for pull requests
+        if: github.event_name == 'pull_request'
+        run: echo "Live evaluation requires deployed corpus and fingerprints; run it manually after publication."
       - name: Run all global retrieval cases
+        if: github.event_name != 'pull_request'
         run: node reading-companion/public-library-evaluation.mjs --output "$RUNNER_TEMP/reading-companion-public-evaluation.json"
       - name: Run selected-book retrieval cases
+        if: github.event_name != 'pull_request'
         run: node reading-companion/public-library-evaluation.mjs --suite benchmarks/reading-companion-selected-book-v1.json --output "$RUNNER_TEMP/reading-companion-selected-book-evaluation.json"
       - name: Save evaluation report
+        if: github.event_name != 'pull_request'
         uses: actions/upload-artifact@v4
         with:
           name: reading-companion-public-evaluation

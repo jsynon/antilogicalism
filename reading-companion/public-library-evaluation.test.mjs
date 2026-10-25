@@ -54,8 +54,8 @@ test('selected-book evaluation constrains every search facet to the requested bo
   url:drive+'?usp=sharing#page=14',preview:text,score:10};
  const manifest={page_books:['7'],books:{'7':{title:source.title,drive_url:drive}}};
  const sha256=createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
- const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
-  libraryVersion:47,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
+ const packet={schema:'antilogicalism-reader-fingerprints-v2',hashAlgorithm:'SHA-256-utf8-exact',
+  libraryVersion:48,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
  const scopeArgs=[];
  const library={search:async(query,options)=>{scopeArgs.push(options);return {sources:[source],booksScanned:1};},
   jsonGzip:async()=>({pages:[{id:0,page:14,text}]})};
@@ -79,8 +79,8 @@ test('selected-book evaluation fails if retrieval leaks a passage from another b
   url:drive+'?usp=sharing#page=14',preview:text,score:10};
  const manifest={page_books:['12'],books:{'12':{title:source.title,drive_url:drive}}};
  const sha256=createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
- const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
-  libraryVersion:47,bookId:'12',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
+ const packet={schema:'antilogicalism-reader-fingerprints-v2',hashAlgorithm:'SHA-256-utf8-exact',
+  libraryVersion:48,bookId:'12',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
  const library={search:async()=>({sources:[source],booksScanned:1}),jsonGzip:async()=>({pages:[{id:0,page:14,text}]})};
  const item={id:'selected-book-scope-leak',discipline:'philosophy',task:'scope-check',
   selected_book_id:'7',question:'How does Aristotle explain becoming virtuous through repeated actions?',
@@ -115,8 +115,8 @@ test('public retrieval evaluation searches both planner facets and exact questio
  const library={search:async(query)=>{searched.push(query);return {sources:[source],booksScanned:1};},
   jsonGzip:async()=>({pages:[{id:0,page:14,text}]})};
  const sha256=createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
- const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
-  libraryVersion:47,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
+ const packet={schema:'antilogicalism-reader-fingerprints-v2',hashAlgorithm:'SHA-256-utf8-exact',
+  libraryVersion:48,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
  const item={id:'aristotle-habituation',discipline:'philosophy',task:'mechanism-explanation',
   question,planner_queries:plan,required_source_groups:[{label:'Aristotle',book_ids:['7']}],
   evidence_targets:[{label:'Habituation passage',book_id:'7',pages:[14]}]};
@@ -140,8 +140,8 @@ test('fourth per-book search result can reach the verified answer-source set',as
  const pageBooks=Array(11233).fill('102');
  const manifest={page_books:pageBooks,books:{'102':{title:source.title,drive_url:drive}}};
  const sha256=createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
- const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
-  libraryVersion:47,bookId:'102',chunk:1,pages:[{page:53,globalPageId:11232,utf8Bytes:Buffer.byteLength(text),sha256}]};
+ const packet={schema:'antilogicalism-reader-fingerprints-v2',hashAlgorithm:'SHA-256-utf8-exact',
+  libraryVersion:48,bookId:'102',chunk:1,pages:[{page:53,globalPageId:11232,utf8Bytes:Buffer.byteLength(text),sha256}]};
  const optionsSeen=[];
  const library={search:async(_query,options)=>{optionsSeen.push(options);return options.pagesPerBook===4?{sources:[source],booksScanned:1}:{sources:[],booksScanned:1};},
   jsonGzip:async()=>({pages:[{id:11232,page:53,text}]})};
@@ -176,8 +176,8 @@ test('exact page fingerprint is checked against the retrieved indexed text',asyn
   assert.equal(name,'book-7.json');
   return {pages:[page]};
  }};
- const packet={schema:'antilogicalism-reader-fingerprints-v1',hashAlgorithm:'SHA-256-utf8-exact',
-  libraryVersion:47,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
+ const packet={schema:'antilogicalism-reader-fingerprints-v2',hashAlgorithm:'SHA-256-utf8-exact',
+  libraryVersion:48,bookId:'7',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
  const fetcher=async()=>new Response(JSON.stringify(packet),{status:200,headers:{'Content-Type':'application/json'}});
  const source={bookId:'7',page:14,globalPageId:0};
  assert.deepEqual(await verifyFingerprint(source,library,new Set(['7']),fetcher),
