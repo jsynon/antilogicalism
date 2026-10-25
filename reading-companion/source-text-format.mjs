@@ -4,7 +4,7 @@
  */
 // Remove only standalone Acrobat Web Capture footer lines. Requiring the
 // page counter and timestamp avoids deleting ordinary URLs in book prose.
-const WEB_CAPTURE_FOOTER = /^[ \\t\\f]*(?:file:\\s*\\/{1,3}|https?:\\/\\/|www\\.)[^\\r\\n]*?\\(\\s*\\d+\\s+of\\s+\\d+\\s*\\)\\s*\\[\\s*\\d{1,2}\\/\\d{1,2}\\/\\d{4}\\s+\\d{1,2}:\\d{2}:\\d{2}\\s*(?:AM|PM)\\s*\\][ \\t\\f]*$/gim;
+const WEB_CAPTURE_FOOTER = /^[ \t\f]*(?:file:\s*\/{1,3}|https?:\/\/|www\.)[^\r\n]*?\(\s*\d+\s+of\s+\d+\s*\)\s*\[\s*\d{1,2}\/\d{1,2}\/\d{4}\s+\d{1,2}:\d{2}:\d{2}\s*(?:AM|PM)\s*\][ \t\f]*$/gim;
 
 function stripWebCaptureFooters(text) {
   return String(text == null ? '' : text).replace(WEB_CAPTURE_FOOTER, '');
@@ -129,4 +129,4 @@ function locateCitedExcerpt(displayText, excerptText) {
 }
 
 
-export {normalizeKnownOcrArtifacts,readableParagraphs, locateCitedExcerpt, readablePageWithHighlight};
+export {normalizeKnownOcrArtifacts,stripWebCaptureFooters,readableParagraphs, locateCitedExcerpt, readablePageWithHighlight};
