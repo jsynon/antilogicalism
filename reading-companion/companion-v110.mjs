@@ -402,14 +402,6 @@ function renderResponse(data,turnQuestion=''){
   const reply=node('div',undefined,'companion-answer-text');
   putMarkdownBlocks(reply,answer,citations,highlights,numbering);
   turn.append(reply);
-  const missing=String(data.missing||'').trim()
-    .replace(/^Not fully established by the retrieved evidence:\s*/i,'');
-  if(missing){
-    const label=data.reviewStatus==='answer-draft-unverified'?
-      'Evidence check: ':'Evidence gaps: ';
-    turn.append(node('p',label+missing,'companion-hint'));
-  }
-
   if(orderedCitations.length){
     const panel=node('section',undefined,'companion-highlights');
     panel.append(node('h3','Key passages from the source books'));
