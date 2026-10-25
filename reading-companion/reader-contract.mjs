@@ -29,13 +29,19 @@ export function auditFinalAnswer(answer,sources){
   const ids=citationIds(answer),unknownIds=ids.filter(id=>!byId.has(id));
   const quoteFailures=[];
   for(const quote of quotations(answer)){
+    const quoteText=quote.text.replace(/[.,!?;:]+$/u,'');
+    // Short, single-token quotation marks usually mark a term of art rather
+    // than claim to reproduce a source sentence (for example, Aristotle's
+    // "whatness"). The cited source and all multiword quoted text remain
+    // subject to exact substring validation.
+    if(!/\s/u.test(quoteText)&&quoteText.length<=24)continue;
     // Bind to the first following citation group in this sentence/paragraph.
     // Do not allow an unrelated quote anywhere in the packet to validate it.
     const tail=answer.slice(quote.end);
     const next=tail.match(/^[^\n.!?]*(?:[.!?]\s*)?(\[\s*S\d+(?:\s*,\s*S\d+)*\s*\])/);
     const ownIds=next?citationIds(next[1]):[];
     if(!ownIds.length||!ownIds.some(id=>normalizeQuote(byId.get(id)?.text??byId.get(id)?.preview)
-      .includes(normalizeQuote(quote.text))))quoteFailures.push({...quote,sourceIds:ownIds});
+      .includes(normalizeQuote(quoteText))))quoteFailures.push({...quote,sourceIds:ownIds});
   }
   return {ok:!unknownIds.length&&!quoteFailures.length,ids,unknownIds,quoteFailures};
 }
@@ -119,11 +125,7 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
     // support the synthesis once the Worker links them to this part.
     const syntheticComparison=/^How do the named sources compare in response to this question:/i.test(part.question);
     return {...part,sourceBookIds:partSourceGroups[index],
-      // The exact reader question is already a retrieval facet. Link it to a
-      // synthetic comparison part without issuing another search, so a direct
-      // result discovered by that facet can survive into the synthesis packet.
-      searchQueries:[...new Set([...matchingQueries,
-        ...(syntheticComparison?[resolvedQuestion]:[part.question])])].slice(0,5)};
+      searchQueries:[...new Set([...matchingQueries,...(syntheticComparison?[]:[part.question])])].slice(0,5)};
   });
   return {version:CONTRACT_VERSION,resolvedQuestion,intent,
     sources,parts:partsWithSources,scope:bounded(raw?.scope,200),
