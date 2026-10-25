@@ -51,9 +51,10 @@ test('renders normalized NKJV text as readable paragraphs',()=>{
 });
 test('removes standalone Acrobat capture footers while preserving ordinary web links',()=>{
  const footer='file:///C|/WINDOWS/Desktop/blahh/i.html (4 of 5) [2/20/2001 3:15:45 AM]';
- const raw='See https://example.org/history for more.\n'+footer+'\nA final sentence.';
- assert.equal(stripWebCaptureFooters(raw),'See https://example.org/history for more.\n\nA final sentence.');
- const page=readablePageWithHighlight(raw,'See https://example.org/history for more.');
+ const quote='See https://example.org/history for more about the original account and its records.';
+ const raw=quote+'\n'+footer+'\nA final sentence.';
+ assert.equal(stripWebCaptureFooters(raw),quote+'\n\nA final sentence.');
+ const page=readablePageWithHighlight(raw,quote);
  assert.match(page.displayText,/https:\/\/example\.org\/history/);
  assert.doesNotMatch(page.displayText,/file:\/\/\/C\|/);
  assert(page.match,'the cited passage still aligns after footer removal');
