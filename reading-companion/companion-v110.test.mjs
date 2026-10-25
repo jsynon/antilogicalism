@@ -136,10 +136,8 @@ test('public companion copy explains cited sources and keeps source reading cont
  assert.doesNotMatch(html,/Complete the quick check below before asking a question/);
  assert.doesNotMatch(html,/Verified search scope|books available/);
  assert.doesNotMatch(html,/The report includes your question and retrieval details/);
- assert.match(html,/id="companion-diagnostic-toggle" type="checkbox"/);
- assert.match(html,/Show diagnostic report for this result/);
- assert.match(html,/id="companion-diagnostic-copy" type="button"/);
- assert.match(html,/border-top:1px solid #dfe2e3/);
+ assert.doesNotMatch(html,/companion-diagnostic-(?:panel|toggle|details|copy)/,
+  'the current public page keeps diagnostic controls out of visitor markup');
  assert.match(client,/matches\.length\+' matching books\.'/);
  assert.match(client,/turnstile\.render\(challengeBox/);
  assert.match(client,/callback:token=>/);
