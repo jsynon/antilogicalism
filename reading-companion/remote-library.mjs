@@ -100,6 +100,21 @@ export function queryTerms(question) {
     .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 24);
 }
 
+// Kant's Critique states its account of causal necessity under the heading
+// "Second Analogy" and explains it through succession, a rule, and cause and
+// effect. A reader's modern wording may not contain those indexed terms. Add
+// this source-native vocabulary only inside the named primary work, keeping
+// the reader's own terms and the same local search call.
+function sourceNativeQueryTerms(question,title){
+  const isKantCritique=/\bcritique of pure reason\b/i.test(String(title||''))&&
+    /\bkant\b/i.test(String(title||''));
+  const asksAboutCausality=/\b(?:causal|causality|causation|cause(?:s|d|ing)?\s+and\s+effect|necessary\s+connection)\b/i
+    .test(String(question||''));
+  return isKantCritique&&asksAboutCausality
+    ?['second','analogy','succession','rule','cause','effect','experience','objective']
+    :[];
+}
+
 // Correct a single-character typo only when it uniquely matches a catalog
 // author's surname. Keep this metadata correction separate from page evidence.
 function editDistanceOne(left,right){
@@ -414,7 +429,7 @@ export class RemoteLibrary {
     const hasTopicTerm=queryTokens.some(term=>!fuzzyAuthorCandidates.has(term)&&
       !authorTerms.has(wordStem(term))&&manifest.partitions.includes(term.slice(0,2)));
     const fuzzyAuthorMatches=hasTopicTerm?fuzzyAuthorCandidates:new Map();
-    const terms=queryTokens
+    const terms=[...new Set([...queryTokens,...sourceNativeQueryTerms(question,selectedTitle)])]
       .filter(term=>!fuzzyAuthorMatches.has(term))
       .filter(term=>!authorTerms.has(wordStem(term)))
       .filter(term=>manifest.partitions.includes(term.slice(0,2)));

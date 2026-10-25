@@ -737,6 +737,54 @@ test('a planner facet clearly focused on a part carries its found page to that p
  assert.equal(selected[0]?.page,152,'part-linked evidence should survive source selection');
 });
 
+test('named-source facet keeps the relevant second page and excludes a global secondary quotation',async()=>{
+ const question='In Hamlet’s “To be, or not to be” soliloquy, what alternatives does he weigh, and how does uncertainty about what follows death affect his reasoning?';
+ const p1Query='In Hamlet’s “To be, or not to be” soliloquy, what alternatives does he weigh, and how does uncertainty about what follows death affect his reasoning? What alternatives does Hamlet weigh in his "To be, or not to be" soliloquy in William Shakespeare’s Hamlet?';
+ const p2Query='How does uncertainty about what follows death affect Hamlet’s reasoning in the "To be, or not to be" soliloquy in William Shakespeare’s Hamlet?';
+ const books=[
+  {id:'212',title:'The Complete Works of William Shakespeare — William Shakespeare'},
+  {id:'564',title:'Elizabethan Drama, Vol. I: Marlowe and Shakespeare — Christopher Marlowe and William Shakespeare'},
+  {id:'552',title:'French and English Philosophers — René Descartes, Jean-Jacques Rousseau, Voltaire, and Thomas Hobbes'}
+ ];
+ const parts=[
+  {partId:'P1',question:'What alternatives does Hamlet weigh in his "To be, or not to be" soliloquy in William Shakespeare’s Hamlet?'},
+  {partId:'P2',question:'How does uncertainty about what follows death affect Hamlet’s reasoning in the "To be, or not to be" soliloquy in William Shakespeare’s Hamlet?'}
+ ];
+ const irrelevant='A Shakespeare scene about Hamlet speaking with Polonius; this page does not contain the soliloquy or discuss its reasoning.';
+ const soliloquy='To be, or not to be: that is the question: whether it is nobler in the mind to suffer the slings and arrows of outrageous fortune, or to take arms against a sea of troubles, and by opposing end them. To die, to sleep; perchance to dream. For in that sleep of death what dreams may come must give us pause. The undiscovered country makes us rather bear those ills we have than fly to others that we know not of.';
+ const result=await retrieveEvidence({question,queries:[
+  'Hamlet Shakespeare weigh alternatives to being in To be or not to be soliloquy',
+  'uncertainty about the undiscovered country after death affect Hamlet reasoning in To be or not to be'
+ ],partQueries:[{partId:'P1',query:p1Query},{partId:'P2',query:p2Query}],partQuestions:parts,
+  library:{search:async(_query,{bookId}={})=>{
+   if(bookId==='212')return {sources:[
+    {bookId:'212',title:books[0].title,page:472,score:90},
+    {bookId:'212',title:books[0].title,page:432,score:85}
+   ]};
+   if(bookId==='564')return {sources:[
+    {bookId:'564',title:books[1].title,page:118,score:72},
+    {bookId:'564',title:books[1].title,page:152,score:68}
+   ]};
+   return {sources:[{bookId:'552',title:books[2].title,page:140,score:99}]};
+  }},books,allowedBookIds:new Set(['212','564','552']),maxCandidates:8,
+  pageLoader:async source=>({text:source.bookId==='564'&&source.page===152?soliloquy:
+   source.bookId==='552'?soliloquy:irrelevant})});
+ const primary=result.candidates.find(source=>source.bookId==='564'&&source.page===152);
+ assert.ok(primary,'the relevant second result from the named Shakespeare volume must survive the candidate cap');
+ assert.deepEqual(new Set(primary.candidatePartIds),new Set(['P1','P2']));
+ const globalQuote=result.candidates.find(source=>source.bookId==='552'&&source.page===140);
+ assert.ok(globalQuote,'the broad exact-question facet remains available for diagnostics');
+ assert.deepEqual(globalQuote.candidatePartIds,[],
+  'a quotation in an unrelated anthology cannot satisfy parts scoped by the planner to Shakespeare');
+ const selected=selectAnswerSources(result.candidates,question,'token',{maxSources:2,
+  maxBytes:12000,maxSourceBytes:12000,plannedFacetCount:result.searchQueries.length-1,
+  partQuestions:parts});
+ assert.ok(selected.some(source=>source.bookId==='564'&&source.page===152),
+  'the source-bounded answer packet must include the direct Shakespeare passage');
+ assert.ok(!selected.some(source=>source.bookId==='552'),
+  'a secondary quotation cannot displace the requested primary source');
+});
+
 test('a planner facet sharing only one distinctive term does not gain a part link',async()=>{
  const question='What alternatives does Hamlet weigh?';
  const plannerQuery='Hamlet dramatic scene';
