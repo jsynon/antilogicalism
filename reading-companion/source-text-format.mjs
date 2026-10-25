@@ -38,8 +38,8 @@ function readableParagraphs(text) {
 // the cited words. This keeps its highlight offsets aligned with what readers
 // actually see without changing the stored OCR text.
 function readablePageWithHighlight(text, excerptText, bookId='') {
-  const displayText = readableParagraphs(normalizeKnownOcrArtifacts(text,bookId)).join('\n\n');
-  const displayQuote = normalizeKnownOcrArtifacts(excerptText,bookId);
+  const displayText = readableParagraphs(normalizeKnownOcrArtifacts(stripWebCaptureFooters(text),bookId)).join('\n\n');
+  const displayQuote = normalizeKnownOcrArtifacts(stripWebCaptureFooters(excerptText),bookId);
   const match = excerptText ? locateCitedExcerpt(displayText, displayQuote) : null;
   return {displayText, match};
 }
