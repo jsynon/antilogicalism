@@ -199,7 +199,7 @@ export function createDiagnosticReport(input={}){
       questionParts:questionPartSummary(input.questionParts,input.submittedSources)
     },
     evidenceHighlights:Array.isArray(input.evidenceHighlights)?
-      input.evidenceHighlights.slice(0,3).map(item=>({
+      input.evidenceHighlights.slice(0,6).map(item=>({
         sourceId:string(item?.source_id,24),
         page:Number.isSafeInteger(item?.page)?item.page:null,
         quote:string(item?.quote,320),

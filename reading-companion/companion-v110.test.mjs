@@ -40,7 +40,7 @@ test('companion introduction explains how to use it and links to Library Search'
 });
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');
- const passages=client.indexOf('Key passages from the source books',answer);
+ const passages=client.indexOf('Cited sources and verified passages',answer);
  assert(answer>=0);
  assert.equal(client.includes('Explore further'),false);
  assert.doesNotMatch(client,/companion-follow-ups|companion-follow-up-buttons|followUpQuestions/);
@@ -48,8 +48,11 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.equal(client.includes("'Additional sources'"),false);
  assert.ok(client.includes('if(orderedCitations.length)'));
  assert.ok(client.includes('for(const source of orderedCitations)'));
- assert.ok(client.includes("node('p',excerpt||'No verified passage highlight is available for this citation.'"));
+ assert.ok(client.includes("node('p',excerpt||'No reviewer-approved excerpt is available for this source.'"));
  assert.ok(client.includes('highlight?.quote'));
+ assert.ok(client.includes("excerpt?'Read highlighted passage':'Read source'"));
+ assert.doesNotMatch(client,/original\?\.preview\|\|source\.preview/,
+  'generic page previews are never promoted to reviewer-approved highlights');
  assert.ok(client.includes('sourceAttributionLabel(source.provenance)'));
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
@@ -137,7 +140,8 @@ test('v1.10 never claims unsupported books are ready if fingerprint index missin
 test('public companion copy explains cited sources and keeps source reading controls',()=>{
  assert.match(html,/citation link opens the original scanned book/);
  assert.doesNotMatch(html,/Open PDF/);
- assert.match(client,/Read passage/);
+ assert.match(client,/Read highlighted passage/);
+ assert.match(client,/Read source/);
  assert.ok(client.includes("link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · p. '+source.page;"));
  assert.doesNotMatch(client,/Citations link to the original PDF pages/);
  assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);

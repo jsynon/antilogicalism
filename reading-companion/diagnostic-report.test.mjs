@@ -49,8 +49,8 @@ test('diagnostic output is bounded and excludes full source text and challenge d
   reviewedEvidence:[{id:'S1',point:'The speaker makes a conditional claim.',
     quoteVerified:true,anchorQuote:'If they could observe justice',speaker:'Hobbes',
     qualifier:'If they could observe justice without common power'}],
-  evidenceHighlights:[{source_id:'S1',page:12,quoteLocated:true,partialMatch:false,
-    quote:'PRIVATE QUOTE'}]
+  evidenceHighlights:Array.from({length:6},(_,index)=>({source_id:'S'+(index+1),page:12+index,
+    quoteLocated:true,partialMatch:false,quote:index===0?'PRIVATE QUOTE':'QUOTE '+index}))
  });
  const serialized=JSON.stringify(report);
  assert.equal(report.schema,'antilogicalism-reading-companion-diagnostic-v1');
@@ -67,6 +67,7 @@ test('diagnostic output is bounded and excludes full source text and challenge d
  assert.equal(report.candidates[0].score,2.5);
  assert.equal(report.evidenceHighlights[0].quoteLocated,true);
  assert.equal(report.evidenceHighlights[0].quote,'PRIVATE QUOTE');
+ assert.equal(report.evidenceHighlights.length,6,'diagnostics retain the public six-source highlight window');
  assert.deepEqual(report.answer.reviewedEvidence,[{id:'S1',
   point:'The speaker makes a conditional claim.',quoteVerified:true,
   anchorQuote:'If they could observe justice',speaker:'Hobbes',
