@@ -200,8 +200,9 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
    if(candidatePartIds.has(partId))continue;
    const partQuestion=(Array.isArray(partQuestions)?partQuestions:[])
     .find(item=>item?.partId===partId)?.question||'';
-   if(queries.some(query=>directFacetTextMatch(query,page.text)>=2)||
-      hasQuotedPhraseMatch(partQuestion,page.text))candidatePartIds.add(partId);
+   if(queries.some(query=>directFacetTextMatch(query,page.text)>=2||
+      hasQuotedPhraseMatch(query,page.text))||hasQuotedPhraseMatch(partQuestion,page.text))
+      candidatePartIds.add(partId);
   }
   populated.push({...source,text:page.text,byteLength,
     ...(partFacetIndices.length?{candidatePartIds:[...candidatePartIds]}:{})});
