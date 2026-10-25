@@ -15,15 +15,9 @@ test('response citation labels are plain ordered numbers while IDs stay internal
  assert.match(client,/putMarkdownBlocks\(reply,answer,citations,highlights,numbering\)/);
 });
 
-test('a nonempty missing-evidence notice remains visible even if the answer mentions the gap',()=>{
- assert.ok(client.includes('if(missing){'));
- assert.ok(client.includes("replace(/^Not fully established by the retrieved evidence:\\s*/i,'')"));
- assert.ok(client.includes("'Evidence gaps: '"));
- assert.doesNotMatch(client,/answerAlreadyContainsMissing|normalizeNotice\\(answer\\)/);
-});
-test('unverified answer drafts get an evidence-check label instead of a source-gap claim',()=>{
- assert.match(client,/data\\.reviewStatus==='answer-draft-unverified'\\?\\s*'Evidence check: '/);
- assert.match(client,/'Evidence gaps: '/);
+test('public response renderer omits the structured missing-evidence notice',()=>{
+ assert.doesNotMatch(client,/data\\.missing/);
+ assert.doesNotMatch(client,/Evidence gaps:|Evidence check:/);
 });
 test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);
