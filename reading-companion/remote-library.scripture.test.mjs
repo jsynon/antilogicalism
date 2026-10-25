@@ -7,7 +7,7 @@ const driveId='ABCDEFGHIJKLMNOPQRSTUVWXY123456';
 const biblePassage='1 John 4 7 12 Beloved let us love one another because love is from God and God sent his Son.';
 const fixture={
  'manifest.json':{
-  version:47,postings_encoding:'delta-json-v1',prefix_length:2,
+  version:48,postings_encoding:'delta-json-v1',prefix_length:2,
   pages:5,page_books:[16,427,638,639,335],
   partitions:['jo','go','lo','an'],
   books:{
@@ -45,7 +45,7 @@ test('explicit Bible book chapter-and-verse references are recognized',()=>{
 });
 
 test('a cited Bible passage prefers unannotated verse text over topical and annotated books',async()=>{
- const library=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const library=new RemoteLibrary('https://example.test/v48/',fakeFetch);
  const result=await library.search('1 John 4:7-12 God love another',{maxBooks:2,pagesPerBook:2});
  assert(result.sources.some(source=>source.bookId==='335'&&source.page===5546));
  assert.match(result.sources.find(source=>source.bookId==='335').preview,/love one another/i);
@@ -54,7 +54,7 @@ test('a cited Bible passage prefers unannotated verse text over topical and anno
 test('a James chapter-and-verse question cannot be narrowed to William James works',async()=>{
  const jamesFixture={
   'manifest.json':{
-   version:47,postings_encoding:'delta-json-v1',prefix_length:2,
+   version:48,postings_encoding:'delta-json-v1',prefix_length:2,
    pages:2,page_books:[39,335],partitions:['fa'],
    books:{
     '39':{title:'The Will to Believe — William James',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
@@ -65,7 +65,7 @@ test('a James chapter-and-verse question cannot be narrowed to William James wor
   'book-39.json':{pages:[{id:0,page:12,text:'William James discusses religious faith and practical belief in his philosophical writing.'}]},
   'book-335.json':{pages:[{id:1,page:5546,text:'James 2 14 My brethren what does it profit if someone says he has faith but does not have works? Faith without works is dead. Abraham and Rahab illustrate this teaching.'}]}
  };
- const library=new RemoteLibrary('https://example.test/v47/',url=>{
+ const library=new RemoteLibrary('https://example.test/v48/',url=>{
   const key=String(url).split('/').pop().replace(/\.gz$/,'');
   return Promise.resolve(key in jamesFixture?
    new Response(gzipSync(JSON.stringify(jamesFixture[key])),{status:200}):

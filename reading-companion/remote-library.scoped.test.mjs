@@ -37,7 +37,7 @@ test('Kant causal-necessity search adds the Critique’s indexed Second Analogy 
  const prefixes=[...new Set(terms.map(term=>term.slice(0,2)))];
  const corpus={
   'manifest.json':{
-   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
+   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
    page_books:[40,40],partitions:prefixes,
    books:{'40':{title:'Critique of Pure Reason — Immanuel Kant',
     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
@@ -61,7 +61,7 @@ test('Kant causal-necessity search adds the Critique’s indexed Second Analogy 
   return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
- const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',localFetch);
  const result=await finder.search(query,{bookId:'40',allowedBookIds:new Set(['40']),
   maxBooks:1,pagesPerBook:2});
  assert.ok(aliases.every(term=>result.terms.includes(term)),
@@ -72,7 +72,7 @@ test('Kant causal-necessity search adds the Critique’s indexed Second Analogy 
 
 test('remote library records the exact bytes of each corpus file used',async()=>{
  const bytes=new TextEncoder().encode('{"version":47,"postings_encoding":"delta-json-v1","prefix_length":2,"page_books":[],"pages":0,"partitions":[],"books":{}}');
- const library=new RemoteLibrary('https://example.test/data-v47/',async()=>new Response(bytes));
+ const library=new RemoteLibrary('https://example.test/data-v48/',async()=>new Response(bytes));
  await library.jsonGzip('manifest.json');
  const expected=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))]
   .map(value=>value.toString(16).padStart(2,'0')).join('');
@@ -110,7 +110,7 @@ test('an explicitly requested phrase boosts pages containing it in the source te
 
 const fixture={
  'manifest.json':{
-  version:47,postings_encoding:'delta-json-v1',prefix_length:2,
+  version:48,postings_encoding:'delta-json-v1',prefix_length:2,
   pages:7,page_books:[7,7,89,89,114,114,529],
   partitions:['mo','vi','pr','wi','ph','ha','eu','fi','ar','ni','et','ra','ex','ma','th','na','mu','da','ch','hu','li','po'],
   books:{
@@ -167,7 +167,7 @@ function fakeFetch(url) {
 }
 
 test('long Aristotle synthesis question retrieves evidence from explicitly selected Aristotle book',async()=>{
- const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',fakeFetch);
  const result=await finder.search(question,{
    bookId:'7',allowedBookIds:new Set(['7','89']),
    maxBooks:2,pagesPerBook:2
@@ -179,7 +179,7 @@ test('long Aristotle synthesis question retrieves evidence from explicitly selec
 });
 
 test('explicit book scope must never leak evidence from another book',async()=>{
- const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',fakeFetch);
  const result=await finder.search(question,{
    bookId:'7',allowedBookIds:new Set(['89']),
    maxBooks:2,pagesPerBook:2
@@ -188,7 +188,7 @@ test('explicit book scope must never leak evidence from another book',async()=>{
 });
 
 test('selected-book mode still rejects irrelevant text instead of citing an arbitrary page',async()=>{
- const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',fakeFetch);
  const result=await finder.search('Quantum field entanglement experiment?',{
    bookId:'7',allowedBookIds:new Set(['7']),
    maxBooks:2,pagesPerBook:2
@@ -197,7 +197,7 @@ test('selected-book mode still rejects irrelevant text instead of citing an arbi
 });
 
 test('selected work running title alone is not passage evidence',async()=>{
- const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',fakeFetch);
  const result=await finder.search('Nicomachean Ethics',{
    bookId:'7',allowedBookIds:new Set(['7']),maxBooks:1,pagesPerBook:2
  });
@@ -205,7 +205,7 @@ test('selected work running title alone is not passage evidence',async()=>{
 });
 
 test('theory question excludes a plot page with only incidental character and event overlap',async()=>{
- const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',fakeFetch);
  const result=await finder.search('Raskolnikov extraordinary man theory Napoleon morality murder',{
    bookId:'114',allowedBookIds:new Set(['114']),maxBooks:1,pagesPerBook:2
  });
@@ -213,7 +213,7 @@ test('theory question excludes a plot page with only incidental character and ev
 });
 
 test('all-books comparison retrieves topical evidence for both named authors',async()=>{
- const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',fakeFetch);
  const result=await finder.search('How do Aristotle and Darwin explain change in human character and living populations?',{
    allowedBookIds:new Set(['7','89','114','529']),maxBooks:2,pagesPerBook:2
  });
@@ -246,7 +246,7 @@ test('a neighboring page cannot displace a stronger direct evidence page',async(
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
- const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',localFetch);
  const result=await finder.search('Aristotle teleology human virtue and character development',{
   allowedBookIds:new Set(['7']),maxBooks:1,pagesPerBook:3
  });
@@ -254,7 +254,7 @@ test('a neighboring page cannot displace a stronger direct evidence page',async(
 });
 
 test('all-books search honors an explicitly named author when limiting candidate sources',async()=>{
- const finder=new RemoteLibrary('https://example.test/v47/',fakeFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',fakeFetch);
  const result=await finder.search('How did Aristotle describe virtue and the soul?',{
    allowedBookIds:new Set(['7','89','114','529']),maxBooks:2,pagesPerBook:2
  });
@@ -265,7 +265,7 @@ test('all-books search honors an explicitly named author when limiting candidate
 test('a named scene routed through its canonical author prefers the primary collected work',async()=>{
  const corpus={
   'manifest.json':{
-   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
+   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
    page_books:[212,552],partitions:['ha','sh'],
    books:{
     '212':{title:'The Complete Works of William Shakespeare — William Shakespeare',
@@ -289,7 +289,7 @@ test('a named scene routed through its canonical author prefers the primary coll
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
- const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',localFetch);
  const result=await finder.search("Hamlet William Shakespeare 'To be, or not to be'",{
   maxBooks:2,pagesPerBook:2
  });
@@ -302,7 +302,7 @@ test('an OCR-joined page ending can retrieve the relevant adjacent continuation'
  const first='Hamlet. To be, or not to be: that is the question. To die, to sleepNo';
  const second='more; and by a sleep to say we end the heartache. To sleep, perchance to dream; for in that sleep of death what dreams may come must give us pause.';
  const corpus={
-  'manifest.json':{version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+  'manifest.json':{version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
    page_books:[212,212,212],partitions:['ha','wi','sh','de'],books:{
     '212':{title:'The Complete Works of William Shakespeare — William Shakespeare',
      drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}},
@@ -321,7 +321,7 @@ test('an OCR-joined page ending can retrieve the relevant adjacent continuation'
   return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
- const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',localFetch);
  const result=await finder.search("Hamlet William Shakespeare 'To be, or not to be' death",{
   allowedBookIds:new Set(['212']),maxBooks:1,pagesPerBook:2
  });
@@ -332,7 +332,7 @@ test('an OCR-joined page ending can retrieve the relevant adjacent continuation'
 test('a thinker named as the subject of another author’s view is not searched as its source',async()=>{
  const corpus={
   'manifest.json':{
-   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
+   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
    page_books:[54,74],partitions:['ni','th','pl'],
    books:{
     '54':{title:'Thus Spake Zarathustra — Friedrich Nietzsche',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
@@ -355,7 +355,7 @@ test('a thinker named as the subject of another author’s view is not searched 
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
- const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',localFetch);
  const result=await finder.search('What did Nietzsche think about Plato?',{
   maxBooks:2,pagesPerBook:2
  });
@@ -367,7 +367,7 @@ test('a thinker named as the subject of another author’s view is not searched 
 test('a relevant previous page is retained when the strongest passage starts mid-sentence',async()=>{
  const corpus={
   'manifest.json':{
-   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
    page_books:[149,149,149],partitions:['eg','pr','he','tr'],
    books:{'149':{title:'The Histories — Herodotus',
     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
@@ -388,7 +388,7 @@ test('a relevant previous page is retained when the strongest passage starts mid
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
- const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',localFetch);
  const result=await finder.search('Herodotus Egyptian priests Helen Troy account',{
   allowedBookIds:new Set(['149']),maxBooks:1,pagesPerBook:2
  });
@@ -399,7 +399,7 @@ test('a relevant previous page is retained when the strongest passage starts mid
 test('uppercase proper-name fragments also retain a relevant previous page',async()=>{
  const corpus={
   'manifest.json':{
-   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
    page_books:[149,149,149],partitions:['eg','pr','he','tr'],
    books:{'149':{title:'The Histories — Herodotus',
     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
@@ -420,7 +420,7 @@ test('uppercase proper-name fragments also retain a relevant previous page',asyn
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
- const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',localFetch);
  const result=await finder.search('Herodotus Egyptian priests Helen Troy account',{
   allowedBookIds:new Set(['149']),maxBooks:1,pagesPerBook:2
  });
@@ -431,7 +431,7 @@ test('uppercase proper-name fragments also retain a relevant previous page',asyn
 test('an ellipsis-truncated final connector retains the relevant next page',async()=>{
  const corpus={
   'manifest.json':{
-   version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
    page_books:[212,212,212],partitions:['ha','so','dr'],
    books:{'212':{title:'The Complete Works of William Shakespeare — William Shakespeare',
     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
@@ -451,7 +451,7 @@ test('an ellipsis-truncated final connector retains the relevant next page',asyn
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
- const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const finder=new RemoteLibrary('https://example.test/v48/',localFetch);
  const result=await finder.search("Hamlet soliloquy dreams: 'To be, or not to be'",{
   allowedBookIds:new Set(['212']),maxBooks:1,pagesPerBook:2
  });

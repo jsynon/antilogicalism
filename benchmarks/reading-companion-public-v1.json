@@ -2,7 +2,7 @@
   "schema_version": 1,
   "suite_id": "antilogicalism-reading-companion-public-v1",
   "purpose": "A read-only live-library evaluation using the public Reading Companion production retrieval and facet-merging modules. Each fixed two-query plan tests source discovery and page identity; it does not generate or grade AI answers.",
-  "corpus_version": 47,
+  "corpus_version": 48,
   "cases": [
     {
       "id": "science-hawking-black-holes",
