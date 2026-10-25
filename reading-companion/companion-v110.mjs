@@ -405,21 +405,21 @@ function renderResponse(data,turnQuestion=''){
   turn.append(reply);
   if(orderedCitations.length){
     const panel=node('section',undefined,'companion-highlights');
-    panel.append(node('h3','Key passages from the source books'));
+    panel.append(node('h3','Cited sources and verified passages'));
     for(const source of orderedCitations){
       const highlight=highlights.find(item=>
         item.source_id===source.id&&Number(item.page)===Number(source.page));
       const excerpt=(typeof highlight?.quote==='string'&&highlight.quote.trim())?
         highlight.quote:'';
       const card=node('article',undefined,'companion-key-passage');
-      const quote=node('p',excerpt||'No verified passage highlight is available for this citation.',
+      const quote=node('p',excerpt||'No reviewer-approved excerpt is available for this source.',
         'companion-key-quote');
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
       link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · p. '+source.page;
       const attribution=sourceAttributionLabel(source.provenance);
       if(attribution)card.append(node('p',attribution,'companion-source-attribution'));
-      const read=node('button','Read passage','companion-inline-read');
+      const read=node('button',excerpt?'Read highlighted passage':'Read source','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
         try{await sourceReader.open({...source,excerpt},read);}
