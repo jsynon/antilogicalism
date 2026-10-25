@@ -2,7 +2,7 @@
  * It reads canonical v47 shards already hosted on GitHub Pages and only
  * displays excerpts. No AI calls, no secrets, no mutation of cited book text.
  */
-import {normalizeKnownOcrArtifacts,readableParagraphs,locateCitedExcerpt} from './source-text-format.mjs';
+import {normalizeKnownOcrArtifacts,stripWebCaptureFooters,readableParagraphs,locateCitedExcerpt} from './source-text-format.mjs';
 
 const PDF=/^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:view|preview)(?:[?#]|$)/;
 const byId=id=>document.getElementById(id);
@@ -22,8 +22,8 @@ export function eligiblePages(shard){
   }).sort((a,b)=>a.page-b.page);
 }
 export function renderHighlightedText(container,text,quote,bookId=''){
-  const sourceText=normalizeKnownOcrArtifacts(text,bookId);
-  const displayQuote=normalizeKnownOcrArtifacts(quote,bookId);
+  const sourceText=normalizeKnownOcrArtifacts(stripWebCaptureFooters(text),bookId);
+  const displayQuote=normalizeKnownOcrArtifacts(stripWebCaptureFooters(quote),bookId);
   const paragraphs=readableParagraphs(sourceText);
   const separator='\n\n';
   const display=paragraphs.join(separator);
