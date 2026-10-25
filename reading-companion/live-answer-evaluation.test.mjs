@@ -562,12 +562,20 @@ test('evaluation report preserves planner fallback when the later answer request
 test('audit report preserves answer text, citation locations, and Worker quote highlights',()=>{
  const result=auditLiveAnswer({answer:'Supported claim [S1].',citations:[{
    id:'S1',bookId:'638',title:'Bible',page:1821,globalPageId:274264,
-   url:'https://drive.google.com/file/d/abcdefghijk/view#page=1821'
+   url:'https://drive.google.com/file/d/abcdefghijk/view#page=1821',provenance:{
+    work:'Bible',creditedAuthors:['Unknown','A'.repeat(300)],creditedEditors:[],creditedTranslators:[],
+    plannerSourceRole:'primary',pageSectionHint:'undetermined',pageVoiceHint:'undetermined',
+    workVoice:{kind:'pseudonymous-author',name:'Johannes de Silentio',creditedAuthor:'Søren Kierkegaard'},
+    pageVoice:{kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'}}
   }],evidenceHighlights:[{source_id:'S1',title:'Bible',page:1821,quote:'A passage excerpt.'}]},
   [{}],[{label:'Bible',book_ids:['638']}]);
  assert.equal(result.answerText,'Supported claim [S1].');
  assert.deepEqual(result.citationSources,[{id:'S1',bookId:'638',title:'Bible',page:1821,
-  globalPageId:274264,url:'https://drive.google.com/file/d/abcdefghijk/view#page=1821'}]);
+  globalPageId:274264,url:'https://drive.google.com/file/d/abcdefghijk/view#page=1821',provenance:{
+   work:'Bible',creditedAuthors:['Unknown','A'.repeat(160)],creditedEditors:[],creditedTranslators:[],
+   plannerSourceRole:'primary',pageSectionHint:'undetermined',pageVoiceHint:'undetermined',
+   workVoice:{kind:'pseudonymous-author',name:'Johannes de Silentio',creditedAuthor:'Søren Kierkegaard'},
+   pageVoice:{kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'}}}]);
  assert.deepEqual(result.evidenceHighlights,[{sourceId:'S1',title:'Bible',page:1821,
   quote:'A passage excerpt.',quoteLocated:null}]);
  assert.equal('evidenceHighlightsLocated' in result,false);

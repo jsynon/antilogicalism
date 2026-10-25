@@ -3,6 +3,7 @@
  * displays excerpts. No AI calls, no secrets, no mutation of cited book text.
  */
 import {normalizeKnownOcrArtifacts,stripWebCaptureFooters,readableParagraphs,locateCitedExcerpt} from './source-text-format.mjs';
+import {sourceAttributionLabel} from './citation-numbering.mjs';
 
 const PDF=/^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:view|preview)(?:[?#]|$)/;
 const byId=id=>document.getElementById(id);
@@ -74,7 +75,8 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     const onCitedPage=page.page===source.page;
     const quotation=onCitedPage && typeof source.excerpt==='string'?source.excerpt:'';
     title.textContent=source.title||'Original source';
-    meta.textContent='Physical PDF page '+page.page;
+    const attribution=sourceAttributionLabel(source.provenance);
+    meta.textContent='Physical PDF page '+page.page+(attribution?' · '+attribution:'');
     const shown=renderHighlightedText(viewer,page.text,quotation,source.bookId);
     if(quotation){
       status.textContent=shown.matched?

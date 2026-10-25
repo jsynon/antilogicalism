@@ -46,8 +46,9 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.equal(client.includes("'Additional sources'"),false);
  assert.ok(client.includes('if(orderedCitations.length)'));
  assert.ok(client.includes('for(const source of orderedCitations)'));
- assert.ok(client.includes("node('p',excerpt,'companion-key-quote')"));
+ assert.ok(client.includes("node('p',excerpt||'No verified passage highlight is available for this citation.'"));
  assert.ok(client.includes('highlight?.quote'));
+ assert.ok(client.includes('sourceAttributionLabel(source.provenance)'));
  assert.doesNotMatch(html,/companion-suggested-questions|companion-find-button|Review passages/);
  assert.match(html,/id="companion-book-filter"/);
  assert.match(html,/id="companion-book-search" type="search"/);
