@@ -2,6 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {gzipSync} from 'node:zlib';
 import {RemoteLibrary,queryTerms,substantivePageEvidence,isNavigationPage} from './remote-library.mjs';
+import {retrieveEvidence,selectAnswerSources} from './evidence-search.mjs';
 
 const driveId='ABCDEFGHIJKLMNOPQRSTUVWXY123456';
 const question="How do moral virtue, practical wisdom (phronesis), and happiness (eudaimonia) fit together in Aristotle's Nicomachean Ethics?";
@@ -68,6 +69,75 @@ test('Kant causal-necessity search adds the Critique’s indexed Second Analogy 
   'the reader’s terms are retained alongside the source-native query vocabulary');
  assert.equal(result.sources[0]?.page,98,
   'the passage explaining causal succession and its rule should outrank a general deduction passage');
+});
+
+test('a five-term Sunyata facet reaches and links the v48 Nagarjuna introduction page',async()=>{
+ const question='What is sunyata?';
+ const firstQuery='definition and essential nature of sunyata in Buddhist texts';
+ const secondQuery='how sunyata operates through dependent origination and emptiness';
+ const driveUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
+ const books=[
+  {id:'183',title:'The Self-Overcoming of Nihilism — Keiji Nishitani'},
+  {id:'185',title:'Last Writings: Nothingness and the Religious Worldview — Kitarō Nishida'},
+  {id:'178',title:'Mūlamadhyamakakārikā — Nāgārjuna'},
+  {id:'400',title:'Buddhist Studies Reader — Various authors'}
+ ];
+ const pages={
+  '183:224':'The locus of Buddhist emptiness opens a world of dependent origination in which everything is related to everything else.',
+  '185:18':'INTRODUCTION. This account connects sunyata with dependent co-arising and describes co-origination in Nagarjuna’s text.',
+  // OCR excerpt from v48 book 178, PDF page 88. This is Kalupahana's
+  // introduction discussing Nagarjuna, not a Nagarjuna verse.
+  '178:88':'With that analysis, Nagarjuna was ready to defend the four noble truths, reconciling it with his conception of emptiness. Whoever perceives dependent arising also perceives suffering, its arising, its ceasing and the path leading to its ceasing.',
+  '400:41':'This page mentions dependent Buddhist thought but does not discuss emptiness or sunyata.'
+ };
+ const corpus={
+  'manifest.json':{
+   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:4,
+   page_books:[183,185,178,400],
+   partitions:['bu','de','em','es','na','op','or','su','te'],
+   books:Object.fromEntries(books.map(book=>[book.id,{
+    title:book.title,drive_url:driveUrl(driveId)
+   }]))
+  },
+  'terms-bu.json':{},'terms-de.json':{dependent:[0,1,1,1]},
+  'terms-em.json':{emptiness:[0,2]},'terms-es.json':{},'terms-na.json':{},
+  'terms-op.json':{},'terms-or.json':{origination:[0,1]},
+  'terms-su.json':{sunyata:[1]},'terms-te.json':{},
+  'book-183.json':{pages:[{id:0,page:224,text:pages['183:224']}]},
+  'book-185.json':{pages:[{id:1,page:18,text:pages['185:18']}]},
+  'book-178.json':{pages:[{id:2,page:88,text:pages['178:88']}]},
+  'book-400.json':{pages:[{id:3,page:41,text:pages['400:41']}]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const library=new RemoteLibrary('https://example.test/data-v48/',localFetch);
+ const allowedBookIds=new Set(books.map(book=>book.id));
+ const partQuestions=[{partId:'P1',question}];
+ const retrieved=await retrieveEvidence({question,queries:[firstQuery,secondQuery],
+  partQueries:[{partId:'P1',query:secondQuery}],partQuestions,library,books,
+  allowedBookIds,pageLoader:async source=>({text:pages[`${source.bookId}:${source.page}`]||''})});
+ const nagaPage=retrieved.candidates.find(source=>source.bookId==='178'&&source.page===88);
+ assert.ok(nagaPage,'the v48 page matching dependent + emptiness should pass the generic two-term floor');
+ assert.ok(nagaPage.candidatePartIds.includes('P1'),
+  'the page found by the dependent-origination planner facet must remain linked to the Sunyata part');
+ const answerPacket=selectAnswerSources(retrieved.candidates,question,'token',{
+  maxSources:6,maxBytes:39000,maxSourceBytes:35000,
+  plannedFacetCount:retrieved.searchQueries.length-1,partQuestions
+ });
+ assert.ok(answerPacket.some(source=>source.bookId==='178'&&source.page===88),
+  'the passage must survive the existing bounded source-packet selector');
+ assert.match(nagaPage.text,/reconciling it with his conception of emptiness/u);
+ assert.match(nagaPage.text,/Whoever perceives dependent arising/u,
+  'the retrieved page retains the actual v48 OCR passage for downstream source-voice review');
+ assert.equal(substantivePageEvidence(
+  'dependent '+Array(140).fill('ordinary').join(' ')+' emptiness',
+  ['sunyata','operates','dependent','origination','emptiness']).localUnique,1,
+  'two terms separated beyond the local evidence window do not qualify');
+ assert.deepEqual(retrieved.candidates.filter(source=>source.bookId==='400'),[],
+  'a page with only one matching topic term remains below the evidence floor');
 });
 
 test('remote library records the exact bytes of each corpus file used',async()=>{

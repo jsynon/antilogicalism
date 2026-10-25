@@ -567,11 +567,14 @@ export class RemoteLibrary {
       const bookEvidenceTerms=termGroups
         .filter((_,index)=>!bookAuthorTerms.has(wordStem(terms[index])))
         .flat();
-      // Author-focused facets and comparisons need to establish relevance
-      // from a couple of local concepts. Longer unscoped questions retain the
-      // stricter threshold that filters incidental character/event overlap.
+      // Require roughly half the facet's terms to occur in one local passage,
+      // with a floor of two and ceiling of three. Four- and five-term facets
+      // otherwise lose useful passages that use a close but different term
+      // (for example, "dependent arising" for a query mentioning
+      // "dependent origination"). Longer unscoped facets retain the stronger
+      // threshold that filters incidental character/event overlap.
       const minimumEvidenceTerms = bookTerms.length >= 2
-        ? (comparison || namedAuthorBookIds.size ? 2 : Math.min(3, Math.floor(bookTerms.length / 2) + 1)) : 1;
+        ? (comparison || namedAuthorBookIds.size ? 2 : Math.max(2, Math.min(3, Math.floor(bookTerms.length / 2)))) : 1;
       if (!bookTerms.length) continue;
       const shard = await this.jsonGzip('book-' + book.id + '.json');
       booksScanned++;
