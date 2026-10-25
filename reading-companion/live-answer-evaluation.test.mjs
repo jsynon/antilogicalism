@@ -185,10 +185,12 @@ test('full mode remains exactly the existing 30-case retrieval suite',()=>{
 test('audit requires expected-source coverage and citations with no orphan markers',()=>{
  const result=auditLiveAnswer({outcome:'verified-source-draft',coverage:'full',reviewStatus:'citations_not_claim_verified',
   answer:'A sourced claim [S1].',workerVersionId:'answer-version-1',workerSourceBuild:'gateway-build-1',
+  workerSourceRevision:'ABCDEF0123456789ABCDEF0123456789ABCDEF01',
   citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[{quoteLocated:true}]},[{bookId:'638'}],[{label:'Bible',book_ids:['638','646']}]);
  assert.equal(result.passed,true);
  assert.equal(result.workerVersionId,'answer-version-1');
  assert.equal(result.workerSourceBuild,'gateway-build-1');
+ assert.equal(result.workerSourceRevision,'abcdef0123456789abcdef0123456789abcdef01');
  assert.deepEqual(result.sourceGroups[0].foundBookIds,['638']);
  assert.deepEqual(result.sourceGroups[0].retrievedBookIds,['638']);
  assert.deepEqual(result.sourceGroups[0].citedBookIds,['638']);
@@ -359,12 +361,13 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
   planner_queries:['first distinct fixed search concept','second distinct fixed search concept'],review_focus:['Check causal explanation.'],
   required_source_groups:[{label:'Darwin',book_ids:['529']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{529:{title:'On the Origin of Species'}}},allowed:new Set(['529','102']),token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,
-  fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',workerVersionId:'answer-worker-9',workerSourceBuild:'gateway-build-9',citations:[{id:'S1',bookId:'529'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+  fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',workerVersionId:'answer-worker-9',workerSourceBuild:'gateway-build-9',workerSourceRevision:'abcdef0123456789abcdef0123456789abcdef01',citations:[{id:'S1',bookId:'529'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(calls.length,1);assert.match(calls[0].url,/pilot-answer$/);
  assert.equal(result.plannerSkipped,true);assert.deepEqual(result.plannerQueries,item.planner_queries);
  assert.equal(result.plannerWorkerVersionId,null);
  assert.equal(result.answerWorkerVersionId,'answer-worker-9');
  assert.equal(result.answerWorkerSourceBuild,'gateway-build-9');
+ assert.equal(result.answerWorkerSourceRevision,'abcdef0123456789abcdef0123456789abcdef01');
  assert.equal(result.selectedBookIds[0],'529');assert.equal(result.reviewFocus[0],'Check causal explanation.');
  assert.equal(result.submittedSources[0].excerpt,'A sufficiently long preview passage for testing.');
  assert.equal(result.retrievalCandidates.length,1);
@@ -439,7 +442,7 @@ test('planner-only evaluation checks selected and All Books retrieval without an
    fetcher:async(url,options)=>{
     calls.push({url,body:JSON.parse(options.body)});
     return new Response(JSON.stringify({queries:['first distinct query concept','second distinct query concept'],
-     workerVersionId:'planner-worker-7',workerSourceBuild:'gateway-build-7'}),
+     workerVersionId:'planner-worker-7',workerSourceBuild:'gateway-build-7',workerSourceRevision:'abcdef0123456789abcdef0123456789abcdef01'}),
      {status:200,headers:{'content-type':'application/json'}});
    }}));
  }
@@ -448,6 +451,7 @@ test('planner-only evaluation checks selected and All Books retrieval without an
  assert.equal(calls[0].body.bookId,'7');
  assert.equal(calls[1].body.bookId,'');
  assert.ok(results.every(result=>result.passed&&result.coverage==='not-evaluated'));
+ assert.equal(results[0].plannerWorkerSourceRevision,'abcdef0123456789abcdef0123456789abcdef01');
  assert.ok(results.every(result=>result.reviewStatus==='planner-only'&&!result.answerWorkerVersionId));
  assert.deepEqual(results[0].sourceGroups[0].retrievedBookIds,['7']);
  assert.deepEqual(results[1].sourceGroups.map(group=>group.retrievedBookIds),[['529'],['102']]);

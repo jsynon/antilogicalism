@@ -215,6 +215,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const citations=Array.isArray(data?.citations)?data.citations:[];
  const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
  const workerSourceBuild=typeof data?.workerSourceBuild==='string'&&data.workerSourceBuild.length<=128?data.workerSourceBuild:null;
+ const workerSourceRevision=typeof data?.workerSourceRevision==='string'&&/^[a-f0-9]{40}$/i.test(data.workerSourceRevision)?data.workerSourceRevision.toLowerCase():null;
  const answer=String(data?.answer||'');
  const citationIds=new Set(citations.map(source=>String(source?.id||'')));
  const citationAudit=auditCitationIds(answer,citations);
@@ -320,7 +321,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   missingInline.length===0&&citations.length>0&&answerCoverageConsistent!==false&&partEvidenceComplete!==false&&
   sourcePartAlignment.every(item=>item.aligned)&&!failureCode&&reviewStatus!=='pipeline-failed'&&
   reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed';
- return {workerVersionId,workerSourceBuild,outcome,coverage,reviewStatus,failureCode,failureStage,
+ return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,reviewStatus,failureCode,failureStage,
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
@@ -370,7 +371,7 @@ export function recheckQualityReport(report){
    answer:item.answerText,coverage:item.coverage,citations:item.citationSources,
    questionParts:item.questionParts,evidenceMap:item.evidenceMap,
    evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
-   workerSourceBuild:item.answerWorkerSourceBuild
+   workerSourceBuild:item.answerWorkerSourceBuild,workerSourceRevision:item.answerWorkerSourceRevision
   },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups,
    definition.required_part_source_groups||[]);
   const reviewAblation=Array.isArray(item.reviewAblation?.variants)?{...item.reviewAblation,
@@ -378,7 +379,7 @@ export function recheckQualityReport(report){
     const variantAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
      citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
      evidenceHighlights:variant.evidenceHighlights,workerVersionId:variant.workerVersionId,
-     workerSourceBuild:variant.workerSourceBuild},Array.isArray(item.submittedSources)?item.submittedSources:[],
+     workerSourceBuild:variant.workerSourceBuild,workerSourceRevision:variant.workerSourceRevision},Array.isArray(item.submittedSources)?item.submittedSources:[],
      definition.required_source_groups,definition.required_part_source_groups||[]);
     return {...variant,...variantAudit,manualReview:variant.manualReview};
    })}:item.reviewAblation;
@@ -411,7 +412,8 @@ function attachRequestFailure(error,stage,details={}){
   ...(typeof details.failureDetail==='string'&&/^[a-z_]{1,48}$/.test(details.failureDetail)?
    {failureDetail:details.failureDetail}:{}),
   workerVersionId:typeof details.workerVersionId==='string'&&details.workerVersionId.length<=128?details.workerVersionId:null,
-  workerSourceBuild:typeof details.workerSourceBuild==='string'&&details.workerSourceBuild.length<=128?details.workerSourceBuild:null};
+  workerSourceBuild:typeof details.workerSourceBuild==='string'&&details.workerSourceBuild.length<=128?details.workerSourceBuild:null,
+  workerSourceRevision:typeof details.workerSourceRevision==='string'&&/^[a-f0-9]{40}$/i.test(details.workerSourceRevision)?details.workerSourceRevision.toLowerCase():null};
  return wrapped;
 }
 async function callJson(fetcher,url,token,body,beforeCall=async()=>{},stage='worker-request',onProgress=async()=>{}){
@@ -441,7 +443,7 @@ async function callJson(fetcher,url,token,body,beforeCall=async()=>{},stage='wor
   throw attachRequestFailure(new Error(String(data?.failureCode||data?.error||'Worker request failed').slice(0,240)),stage,{
   httpStatus:response.status,failureCode:String(data?.failureCode||'http-error'),
   failureDetail:data?.failureDetail,workerFailure:true,
-  workerVersionId:data?.workerVersionId,workerSourceBuild:data?.workerSourceBuild});
+  workerVersionId:data?.workerVersionId,workerSourceBuild:data?.workerSourceBuild,workerSourceRevision:data?.workerSourceRevision});
  }
  await onProgress({stage,status:'completed',elapsedMs:Date.now()-started,
   message:`Worker response received in ${((Date.now()-started)/1000).toFixed(1)}s.`});
@@ -498,7 +500,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
  let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false,
-  plannerWorkerVersionId=null,plannerWorkerSourceBuild=null;
+  plannerWorkerVersionId=null,plannerWorkerSourceBuild=null,plannerWorkerSourceRevision=null;
  if(useFixedQueries&&validSearchPlan(item.planner_queries)){
   queries=item.planner_queries;
   plannerSkipped=true;
@@ -512,11 +514,13 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   queries=plan.queries;
   plannerWorkerVersionId=plan.workerVersionId||null;
   plannerWorkerSourceBuild=plan.workerSourceBuild||null;
+  plannerWorkerSourceRevision=plan.workerSourceRevision||null;
  }catch(error){
   if(!error.requestFailure)error.requestFailure={stage:'planner',httpStatus:null,failureCode:'planner-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   const failure=error.requestFailure;
   plannerWorkerVersionId=failure.workerVersionId||null;
   plannerWorkerSourceBuild=failure.workerSourceBuild||null;
+  plannerWorkerSourceRevision=failure.workerSourceRevision||null;
   if(!canFallbackToDirectSearch(failure.httpStatus,failure.failureCode))throw error;
   plannerFallback=true;
   plannerFailure={httpStatus:failure.httpStatus,failureCode:failure.failureCode};
@@ -536,6 +540,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerSkipped=plannerSkipped;
   error.requestFailure.plannerWorkerVersionId=plannerWorkerVersionId;
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
+  error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const {selected,searches,retrievalCandidates}=loaded;
  const retrievalFallbackCount=searches.filter(value=>value.fallbackFrom).length;
@@ -565,6 +570,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerSkipped=plannerSkipped;
   error.requestFailure.plannerWorkerVersionId=plannerWorkerVersionId;
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
+  error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const primary=variantResults.find(result=>result.answerVariant==='with-review')||variantResults[0];
  const reviewAblation=answerVariant==='paired-review-ablation'?{
@@ -573,11 +579,11 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  }:null;
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerQueries:plannerFallback?[]:queries,plannerFallback,
-  plannerWorkerVersionId,plannerWorkerSourceBuild,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,
+  plannerWorkerVersionId,plannerWorkerSourceBuild,plannerWorkerSourceRevision,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
   ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,searches,retrievalCandidates,
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
-  ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,
+  ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
   pipeline:variantResults.map(result=>result.pipeline).find(Boolean)||null,
   partFacetWarnings:partFacets.warnings,
   answerVariant,...(answerVariant==='paired-review-ablation'?{reviewAblation}:{}),
@@ -595,7 +601,7 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
  if(!validSearchPlan(plan?.queries))
   throw attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{
    httpStatus:200,failureCode:'invalid-response',workerFailure:false,
-   workerVersionId:plan?.workerVersionId,workerSourceBuild:plan?.workerSourceBuild});
+   workerVersionId:plan?.workerVersionId,workerSourceBuild:plan?.workerSourceBuild,workerSourceRevision:plan?.workerSourceRevision});
  let loaded;
  const partFacets=partFacetsFromPlan(plan?.plan?.parts);
  const {partQueries,partQuestions}=partFacets;
@@ -604,7 +610,7 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
  try{loaded=await loadSources(item,plan.queries,{library,manifest,allowed,partQueries,partQuestions});}
  catch(error){
   const wrapped=attachRequestFailure(error,'retrieval',{failureCode:'retrieval-failed',workerFailure:false,
-   workerVersionId:plan.workerVersionId,workerSourceBuild:plan.workerSourceBuild});
+   workerVersionId:plan.workerVersionId,workerSourceBuild:plan.workerSourceBuild,workerSourceRevision:plan.workerSourceRevision});
   wrapped.requestFailure.plannerSkipped=false;
   throw wrapped;
  }
@@ -626,7 +632,7 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds,
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped:false,
   plannerQueries:plan.queries,plannerFallback:false,partFacetWarnings:partFacets.warnings,
-  plannerWorkerVersionId:plan.workerVersionId||null,plannerWorkerSourceBuild:plan.workerSourceBuild||null,
+  plannerWorkerVersionId:plan.workerVersionId||null,plannerWorkerSourceBuild:plan.workerSourceBuild||null,plannerWorkerSourceRevision:plan.workerSourceRevision||null,
   answerWorkerVersionId:null,answerWorkerSourceBuild:null,searches,retrievalCandidates,
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
@@ -645,8 +651,10 @@ function failedCaseResult(item,error){
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],requestFailure:failure,plannerQueries:[],plannerSkipped:failure.plannerSkipped===true,
   plannerWorkerVersionId:failure.plannerWorkerVersionId|| (failure.stage==='planner'?failure.workerVersionId:null),
   plannerWorkerSourceBuild:failure.plannerWorkerSourceBuild|| (failure.stage==='planner'?failure.workerSourceBuild:null),
+  plannerWorkerSourceRevision:failure.plannerWorkerSourceRevision|| (failure.stage==='planner'?failure.workerSourceRevision:null),
   answerWorkerVersionId:failure.stage==='answer'?failure.workerVersionId:null,
   answerWorkerSourceBuild:failure.stage==='answer'?failure.workerSourceBuild:null,
+  answerWorkerSourceRevision:failure.stage==='answer'?failure.workerSourceRevision:null,
   plannerFallback:failure.plannerFallback===true,...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),searches:[],
   submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',
   answerText:'',citationCount:0,citationBookIds:[],citationSources:[],inlineCitationCount:0,
@@ -706,7 +714,7 @@ async function main(){
    (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; the simplified answer path has no automatic composer regeneration',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
    'Automated checks cover source identity, per-part citation linkage, named-work-to-question-part alignment, and coverage consistency. They do not judge factual truth or whether cited passages semantically support the prose. Each answer includes a blank human rubric: rate accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong).',
-  executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],stopReason:'',cases:[]};
+  executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],workerSourceRevisions:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  let activeLibrary=null;
  const saveReport=async()=>{
@@ -762,6 +770,7 @@ async function main(){
    report.humanReview=summarizeManualReviews(results);
    report.answerVariants=summarizeAnswerVariants(results);
    report.workerVersionIds=[...new Set(results.flatMap(item=>[item.plannerWorkerVersionId,item.answerWorkerVersionId]).filter(value=>typeof value==='string'&&value))];
+   report.workerSourceRevisions=[...new Set(results.flatMap(item=>[item.plannerWorkerSourceRevision,item.answerWorkerSourceRevision]).filter(value=>typeof value==='string'&&/^[a-f0-9]{40}$/.test(value)))];
    await saveReport();
    const label=args.mode==='planner'?'PLANNER':'STRUCTURAL';
    console.log((result.passed===true?label+'-PASS':result.passed===null?'UNSCORED':result.requestFailure?'REQUEST-FAIL':label+'-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
