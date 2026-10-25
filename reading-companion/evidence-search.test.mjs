@@ -554,7 +554,7 @@ test('synthetic comparison coverage reuses source searches instead of spending a
    '40':'Critique of Pure Reason — Immanuel Kant'});
  const comparison=plan.parts[2];
  assert.match(comparison.question,/compare in response to this question/i);
- assert.deepEqual(comparison.searchQueries,[humeQuery,kantQuery,question]);
+ assert.deepEqual(comparison.searchQueries,[humeQuery,kantQuery]);
  assert.ok(!comparison.searchQueries.includes(comparison.question));
 });
 
