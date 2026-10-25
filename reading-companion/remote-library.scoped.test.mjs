@@ -250,6 +250,37 @@ test('a named scene routed through its canonical author prefers the primary coll
  assert.match(result.sources[0].title,/Complete Works of William Shakespeare/);
 });
 
+test('an OCR-joined page ending can retrieve the relevant adjacent continuation',async()=>{
+ const first='Hamlet. To be, or not to be: that is the question. To die, to sleepNo';
+ const second='more; and by a sleep to say we end the heartache. To sleep, perchance to dream; for in that sleep of death what dreams may come must give us pause.';
+ const corpus={
+  'manifest.json':{version:47,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+   page_books:[212,212,212],partitions:['ha','wi','sh','de'],books:{
+    '212':{title:'The Complete Works of William Shakespeare — William Shakespeare',
+     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}},
+  'terms-ha.json':{hamlet:[0]},
+  'terms-wi.json':{william:[0]},
+  'terms-sh.json':{shakespeare:[0]},
+  'terms-de.json':{death:[2]},
+  'book-212.json':{pages:[
+   {id:0,page:453,text:first},
+   {id:1,page:454,text:second},
+   {id:2,page:600,text:'Death appears as an unrelated topic on this later page.'}
+  ]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v47/',localFetch);
+ const result=await finder.search("Hamlet William Shakespeare 'To be, or not to be' death",{
+  allowedBookIds:new Set(['212']),maxBooks:1,pagesPerBook:2
+ });
+ assert.ok(result.sources.some(source=>source.page===454),
+  'an adjacent continuation ending with the requested death reasoning should be retained');
+});
+
 test('a thinker named as the subject of another author’s view is not searched as its source',async()=>{
  const corpus={
   'manifest.json':{
