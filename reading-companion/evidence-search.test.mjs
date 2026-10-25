@@ -327,6 +327,55 @@ test('an empty comparison-side facet retries with the other side’s topic insid
   search.fallbackFrom===queries[0]&&search.resultCount>0));
  assert.ok(result.candidates.some(source=>source.bookId==='239'&&source.candidatePartIds.includes('P1')));
 });
+test('an incidental broad-query hit on the missing author does not suppress the scoped side retry',async()=>{
+ const question='What would Nietzsche think about the thought of Kierkegaard?';
+ const books=[{id:'239',title:'The Antichrist — Friedrich Nietzsche'},
+  {id:'140',title:'Fear and Trembling — Søren Kierkegaard'}];
+ const queries=['Friedrich Nietzsche critique of religious existentialism and subjectivity',
+  'Søren Kierkegaard definition of faith and the individual relationship to God'];
+ const parts=[
+  {partId:'P1',question:'What position does Friedrich Nietzsche take?',sourceBookIds:['239']},
+  {partId:'P2',question:'What position does Søren Kierkegaard take?',sourceBookIds:['140']},
+  {partId:'P3',question:'How do the positions compare?',sourceBookIds:['239','140']}
+ ];
+ const incidental={bookId:'239',title:books[0].title,page:310,globalPageId:309,score:82,
+  preview:'A brief index-like mention lists Kierkegaard beside Nietzsche without discussing either position.'};
+ const nietzsche={bookId:'239',title:books[0].title,page:12,globalPageId:11,score:70,
+  preview:'Nietzsche examines faith, religion, and Christian morality.'};
+ const kierkegaard={bookId:'140',title:books[1].title,page:25,globalPageId:24,score:75,
+  preview:'Kierkegaard explains faith and the individual before God.'};
+ const calls=[];
+ const library={search:async(query,options={})=>{
+  const allowed=[...(options.allowedBookIds||[]).values()].map(String);
+  calls.push({query,bookId:options.bookId||'',allowed});
+  if(query===queries[0])return {sources:[]};
+  if(query===queries[1])return {sources:[kierkegaard]};
+  if(query===question)return {sources:options.bookId==='239'?[incidental]:
+   options.bookId==='140'?[kierkegaard]:[]};
+  if(query.includes('Friedrich Nietzsche')&&query.includes('faith')&&allowed.includes('239'))
+   return {sources:[nietzsche]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question,queries,
+  partQueries:parts.slice(0,2).map((part,index)=>({partId:part.partId,query:queries[index]})),
+  partQuestions:parts,library,books,allowedBookIds:new Set(['239','140']),
+  pageLoader:async source=>({text:source.bookId==='239'&&source.page===12?nietzsche.preview:
+   source.bookId==='239'?incidental.preview:kierkegaard.preview})});
+ const retry=calls.find(call=>call.query.includes('Friedrich Nietzsche')&&call.query.includes('faith'));
+ assert.ok(retry,'an incidental broad-facet result must not suppress the scoped retry');
+ assert.deepEqual(retry.allowed,['239']);
+ assert.ok(result.searches.some(search=>search.fallbackReason==='empty-source-side-facet'&&
+  search.fallbackFrom===queries[0]&&search.resultCount>0));
+ const recovered=result.candidates.find(source=>source.bookId==='239'&&source.page===12);
+ assert.ok(recovered?.candidatePartIds.includes('P1'));
+ const selected=selectAnswerSources(result.candidates,question,'token',{maxSources:6,
+  maxBytes:39000,maxSourceBytes:35000,plannedFacetCount:result.searchQueries.length-1,
+  partQuestions:parts});
+ assert.ok(selected.some(source=>source.bookId==='239'&&source.page===12),
+  'the recovered source-side evidence should reach the bounded answer packet');
+ assert.ok(selected.some(source=>source.bookId==='140'),
+  'the counterpart evidence should remain in the packet');
+});
 test('comparison author targeting retains a work for each named author',()=>{
  const books=[
   {id:'7',title:'Nicomachean Ethics — Aristotle'},
