@@ -219,7 +219,7 @@ async function bookShard(id){
   }
   return sourceShards.get(id);
 }
-async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=null}={}){
+async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=null,partQuestions=[]}={}){
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   candidates=[];
@@ -257,6 +257,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
     }else{
       const retrieval=await retrieveEvidence({question:q,
         queries:plannerFallback||!plannedQueries?[q]:plannedQueries,
+        partQuestions,
         partQueries:!plannerFallback&&Array.isArray(plan?.parts)?plan.parts.flatMap(part=>
           (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
             .map(query=>({partId:part.id,query}))):[],
@@ -558,7 +559,8 @@ async function askQuestion(questionText){
       partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>
         ({partId:part.id,question:part.question})):[];
       if(planned)setStatus('Gathering passages from across the collection…');
-      const found=await retrieveSources(planned?.queries||null,{plannerFallback,plan:planned?.plan||null});
+      const found=await retrieveSources(planned?.queries||null,{plannerFallback,
+        plan:planned?.plan||null,partQuestions});
       if(!found)return;
       token=await nextTurnstileToken();
     }else{
