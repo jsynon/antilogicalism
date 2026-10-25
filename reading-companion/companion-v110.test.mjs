@@ -5,6 +5,7 @@ import {RemoteLibrary} from './remote-library.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
+const clientV48=readFileSync(new URL('./companion-v111.mjs',import.meta.url),'utf8');
 const bookOrder=await import('./book-order.mjs');
 
 test('response citation labels are plain ordered numbers while IDs stay internal',()=>{
@@ -23,11 +24,12 @@ test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);
  assert.match(client,/maxSources:MAX_ANSWER_SOURCES/);
 });
-test('v1.10 retains Book Lite and the site navigation',()=>{
+test('v48 Reading Companion page retains Book Lite and loads the v48 client',()=>{
  assert.match(html,/wp-content\/themes\/book-lite/);
  assert.match(html,/id="masthead"/);
  assert.match(html,/id="secondary"/);
- assert.match(html,/companion-v110\.mjs/);
+ assert.match(html,/companion-v111\.mjs/);
+ assert.doesNotMatch(html,/companion-v110\.mjs/);
 });
 test('companion introduction explains how to use it and links to Library Search',()=>{
  assert.match(html,/Ask questions about books in the Antilogicalism library/);
@@ -104,6 +106,13 @@ test('book selector search matches title or author without changing source entri
  assert.deepEqual(bookOrder.filterBooksByText(books,'dostoevsky'),[books[1]]);
  assert.deepEqual(bookOrder.filterBooksByText(books,'nicomachean'),[books[0]]);
  assert.deepEqual(bookOrder.filterBooksByText(books,''),books);
+});
+
+test('v48 browser client validates the v2 fingerprint coverage manifest',()=>{
+ assert(clientV48.includes("reader-fingerprints-v2/coverage-v2.json"));
+ assert.match(clientV48,/antilogicalism-reader-coverage-v2/);
+ assert.match(clientV48,/libraryVersion!==48/);
+ assert.doesNotMatch(clientV48,/coverage-v1|libraryVersion:47/);
 });
 
 test('v1.10 uses original v47 retrieval, verified pilot endpoint and safe Markdown rendering',()=>{
