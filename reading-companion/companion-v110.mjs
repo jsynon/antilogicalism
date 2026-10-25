@@ -403,7 +403,7 @@ function renderResponse(data,turnQuestion=''){
   putMarkdownBlocks(reply,answer,citations,highlights,numbering);
   turn.append(reply);
   const missing=String(data.missing||'').trim()
-    .replace(/^Not fully established by the retrieved evidence:\\s*/i,'');
+    .replace(/^Not fully established by the retrieved evidence:\s*/i,'');
   const normalizeNotice=value=>String(value||'').normalize('NFKC').toLocaleLowerCase()
     .replace(/[’']/g,"'").replace(/[^\p{L}\p{N}]+/gu,' ').trim();
   const answerAlreadyContainsMissing=!!missing&&
