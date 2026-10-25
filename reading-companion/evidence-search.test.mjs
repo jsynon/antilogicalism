@@ -407,7 +407,8 @@ test('author-only mentions search across the named author’s catalog works',()=
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence} from './evidence-search.mjs';
-import {catalogIdentity,normalizePlan} from './reader-contract.mjs';
+import {catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
+import {sourceAttributionLabel} from './citation-numbering.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
  preview:'Authentic indexed excerpt',url:'https://drive.google.com/file/d/X/view#page='+page});
@@ -685,6 +686,19 @@ test('edited author collections stay discoverable by their author, not editor',(
   {id:'640',title:'Nietzsche and the Modern Mind — Walter Kaufmann'}];
  assert.deepEqual(matchExplicitBookIds('What did Nietzsche think about Plato?',books),['239']);
  assert.deepEqual(matchExplicitBookIds('What did Walter Kaufmann argue?',books),['640']);
+});
+
+test('Last Writings page provenance separates Dilworth introduction from Nishida text',()=>{
+ const title='Last Writings: Nothingness and the Religious Worldview — Kitarō Nishida';
+ const plan={sources:[{role:'primary',bookIds:['185']}]};
+ const intro=sourceProvenance({bookId:'185',title,page:17},plan);
+ assert.deepEqual(intro.pageVoice,
+  {kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'});
+ assert.deepEqual(sourceProvenance({bookId:'185',title,page:18},plan).pageVoice,
+  {kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'});
+ assert.equal(sourceProvenance({bookId:'185',title,page:48},plan).pageVoice,undefined);
+ assert.equal(sourceAttributionLabel(intro),
+  'Editorial introduction by David A. Dilworth · Work credited to Kitarō Nishida');
 });
 
 test('shared retrieval hydrates bounded full pages and returns one reproducible facet pool',async()=>{
