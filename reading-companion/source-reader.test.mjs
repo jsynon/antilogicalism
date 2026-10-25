@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {normalizeKnownOcrArtifacts,readableParagraphs,locateCitedExcerpt,readablePageWithHighlight} from './source-text-format.mjs';
+import {normalizeKnownOcrArtifacts,stripWebCaptureFooters,readableParagraphs,locateCitedExcerpt,readablePageWithHighlight} from './source-text-format.mjs';
 import {eligiblePages,renderHighlightedText} from './source-reader.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
@@ -48,6 +48,15 @@ test('renders normalized NKJV text as readable paragraphs',()=>{
   if(originalDocument===undefined)delete globalThis.document;
   else globalThis.document=originalDocument;
  }
+});
+test('removes standalone Acrobat capture footers while preserving ordinary web links',()=>{
+ const footer='file:///C|/WINDOWS/Desktop/blahh/i.html (4 of 5) [2/20/2001 3:15:45 AM]';
+ const raw='See https://example.org/history for more.\\n'+footer+'\\nA final sentence.';
+ assert.equal(stripWebCaptureFooters(raw),'See https://example.org/history for more.\\n\\nA final sentence.');
+ const page=readablePageWithHighlight(raw,'See https://example.org/history for more.');
+ assert.match(page.displayText,/https:\\/\\/example\\.org\\/history/);
+ assert.doesNotMatch(page.displayText,/file:\\/\\/\\/C\\|/);
+ assert(page.match,'the cited passage still aligns after footer removal');
 });
 test('identifies an exact quoted evidence passage despite OCR line wrapping',()=>{
  const raw='A short introductory sentence.\nThe nature of virtue and the role of practical wisdom\nin shaping good character and making our lives happy\nbecome clear through the actions a person chooses.';
