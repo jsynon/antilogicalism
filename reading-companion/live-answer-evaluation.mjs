@@ -33,7 +33,8 @@ export function partFacetsFromPlan(parts){
    warnings.push('invalid-part');
    continue;
   }
-  partQuestions.push({partId,question:question.trim()});
+  partQuestions.push({partId,question:question.trim(),
+   sourceBookIds:Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):null});
   const proposed=Array.isArray(part.searchQueries)&&part.searchQueries.length
    ?part.searchQueries:[question];
   let candidates=proposed.filter(validPartText).map(value=>value.trim());

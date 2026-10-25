@@ -557,7 +557,7 @@ async function askQuestion(questionText){
         }
       }
       partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>
-        ({partId:part.id,question:part.question})):[];
+        ({partId:part.id,question:part.question,sourceBookIds:part.sourceBookIds})):[];
       if(planned)setStatus('Gathering passages from across the collection…');
       const found=await retrieveSources(planned?.queries||null,{plannerFallback,
         plan:planned?.plan||null,partQuestions});

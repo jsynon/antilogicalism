@@ -17,8 +17,8 @@ test('malformed optional planner facets are dropped or fall back without blockin
   {partId:'P2',query:'valid search query for credibility'},
  ]);
  assert.deepEqual(result.partQuestions,[
-  {partId:'P1',question:'What did the priests say about Helen?'},
-  {partId:'P2',question:'How did Herodotus judge the account?'},
+  {partId:'P1',question:'What did the priests say about Helen?',sourceBookIds:null},
+  {partId:'P2',question:'How did Herodotus judge the account?',sourceBookIds:null},
  ]);
  assert.ok(result.warnings.includes('invalid-part-query-fallback'));
  assert.ok(result.warnings.includes('invalid-part-query-dropped'));

@@ -634,6 +634,93 @@ test('quoted part phrase links an otherwise unassigned page through OCR spacing 
  assert.equal(selected[0]?.page,152,'the linked full source page should reach the answer packet');
 });
 
+test('a planner facet clearly focused on a part carries its found page to that part',async()=>{
+ const question='In Hamlet’s “To be, or not to be” soliloquy, what alternatives does he weigh, and how does uncertainty about what follows death affect his reasoning?';
+ const books=[{id:'564',title:'Elizabethan Drama, Vol. I: Marlowe and Shakespeare'}];
+ const plannerQuery="Shakespeare Hamlet 'To be, or not to be' uncertainty of death's aftereffects deterring action";
+ const pageText='Who would fardels bear, to grunt and sweat under a weary life, but that the dread of something after death, the undiscovered country from whose bourn no traveller returns, puzzles the will and makes us rather bear those ills we have than fly to others that we know not of? Thus conscience does make cowards of us all.';
+ const parts=[
+  {partId:'P1',question:"What alternatives does Hamlet weigh in the 'To be, or not to be' soliloquy?"},
+  {partId:'P2',question:"How does uncertainty about the afterlife affect Hamlet's reasoning in the 'To be, or not to be' soliloquy?"}
+ ];
+ const result=await retrieveEvidence({question,queries:[
+  "Shakespeare Hamlet 'To be, or not to be' weighing life versus death alternatives",plannerQuery],
+  partQueries:parts.map(part=>({partId:part.partId,query:part.question})),
+  partQuestions:parts,
+  library:{search:async query=>query===plannerQuery?{sources:[{bookId:'564',title:books[0].title,
+   page:152,globalPageId:241919,score:78}]}:{sources:[]}},
+  books,allowedBookIds:new Set(['564']),pageLoader:async()=>({text:pageText})});
+ const page=result.candidates.find(source=>source.page===152);
+ assert.ok(page);
+ assert.ok(result.searches.some(search=>search.partIds.includes('P2')&&search.query.includes('uncertainty of death')),
+  'the planner facet should be linked to the afterlife question part');
+ assert.ok(page.candidatePartIds.includes('P2'),
+  'the page need not contain the soliloquy opening phrase when the focused query found its afterlife passage');
+ const selected=selectAnswerSources(result.candidates,question,'token',{maxSources:1,
+  maxBytes:5000,maxSourceBytes:5000,plannedFacetCount:result.searchQueries.length-1,
+  partQuestions:parts});
+ assert.equal(selected[0]?.page,152,'part-linked evidence should survive source selection');
+});
+
+test('a planner facet sharing only one distinctive term does not gain a part link',async()=>{
+ const question='What alternatives does Hamlet weigh?';
+ const plannerQuery='Hamlet dramatic scene';
+ const result=await retrieveEvidence({question,queries:['Shakespeare Hamlet dramatic scene',plannerQuery],
+  partQueries:[{partId:'P2',query:'How does uncertainty about the afterlife affect his reasoning?'}],
+  partQuestions:[{partId:'P2',question:'How does uncertainty about the afterlife affect his reasoning?'}],
+  library:{search:async query=>query===plannerQuery?{sources:[{bookId:'564',title:'Hamlet',
+   page:152,globalPageId:241919,score:78}]}:{sources:[]}},
+  books:[{id:'564',title:'Hamlet'}],allowedBookIds:new Set(['564']),
+  pageLoader:async()=>({text:'Hamlet speaks in a dramatic scene about the moon and stars.'})});
+ const page=result.candidates.find(source=>source.page===152);
+ assert.ok(page);
+ assert.ok(!page.candidatePartIds.includes('P2'));
+});
+
+test('planner-facet part links preserve named-source scope and the decisive Kant page',async()=>{
+ const question='How do Hume’s Enquiry and Kant’s Critique of Pure Reason differ over how we can know causal necessity?';
+ const humeQuery='Hume Enquiry causal necessity constant conjunction custom experience';
+ const kantQuery='Kant Critique of Pure Reason causal necessity categories synthetic a priori';
+ const kantPartQuery='How does Kant establish causal necessity through the Second Analogy?';
+ const books=[{id:'35',title:'An Enquiry Concerning Human Understanding — David Hume'},
+  {id:'40',title:'Critique of Pure Reason — Immanuel Kant'}];
+ const parts=[
+  {partId:'P1',question:'How does Hume explain causal necessity?',sourceBookIds:['35']},
+  {partId:'P2',question:'How does Kant establish causal necessity through the Second Analogy?',sourceBookIds:['40']},
+  {partId:'P3',question:'How do Hume and Kant differ over causal necessity?',sourceBookIds:['35','40']}
+ ];
+ const humePages=[42,47,46].map((page,index)=>({bookId:'35',title:books[0].title,page,
+  globalPageId:2700+page,score:90-index}));
+ const kantPages=[54,86,157,24].map((page,index)=>({bookId:'40',title:books[1].title,page,
+  globalPageId:3100+page,score:80-index}));
+ const library={search:async query=>{
+  if(query===humeQuery)return {sources:humePages};
+  if(query===kantQuery)return {sources:[...kantPages]};
+  if(query===kantPartQuery)return {sources:[kantPages[0],kantPages[2],kantPages[3]]};
+  if(query===question)return {sources:[humePages[0],kantPages[2],kantPages[3]]};
+  if(query.includes('Hume'))return {sources:humePages.slice(0,2)};
+  return {sources:[...kantPages.slice(2)]};
+ }};
+ const partQueries=[{partId:'P1',query:humeQuery},{partId:'P1',query:parts[0].question},
+  {partId:'P2',query:kantPartQuery},{partId:'P3',query:humeQuery},{partId:'P3',query:kantQuery}];
+ const result=await retrieveEvidence({question,queries:[humeQuery,kantQuery],partQueries,
+  partQuestions:parts,library,books,allowedBookIds:new Set(['35','40']),
+  maxCandidates:12,maxBooks:3,pagesPerBook:4,
+  pageLoader:async source=>({text:source.page===86?
+   'The Second Analogy argues every change follows a rule; objective temporal succession requires a cause and grounds causal necessity in experience.':
+   `Kant page ${source.page} discusses categories, causality, metaphysics, and experience.`})});
+ const decisive=result.candidates.find(source=>source.bookId==='40'&&source.page===86);
+ assert.ok(decisive,'the second-ranked page from the linked Kant planner facet must survive the candidate cap');
+ assert.ok(decisive.candidatePartIds.includes('P2'));
+ assert.ok(!decisive.candidatePartIds.includes('P1'),
+  'a Kant source must not receive eligibility for Hume’s source-restricted part');
+ const selected=selectAnswerSources(result.candidates,question,'token',{maxSources:6,
+  maxBytes:39000,maxSourceBytes:35000,plannedFacetCount:result.searchQueries.length-1,
+  partQuestions:parts});
+ assert.ok(selected.some(source=>source.bookId==='40'&&source.page===86),
+  'the part-linked Kant page must reach the bounded answer packet');
+});
+
 test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
  const {readFileSync}=await import('node:fs');
  const js=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
