@@ -1,9 +1,20 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluateLiveCase,evaluatePlannerCase,runLiveCases,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluateLiveCase,evaluatePlannerCase,runLiveCases,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan,validatePublishedCorpus} from './live-answer-evaluation.mjs';
 import {PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
+
+test('live evaluation preflight accepts only matching v48 corpus and fingerprint coverage',()=>{
+ const coverage={schema:'antilogicalism-reader-coverage-v2',libraryVersion:48,
+  books:{'7':{title:'Nicomachean Ethics — Aristotle'}}};
+ const allowed=validatePublishedCorpus(coverage,{version:48});
+ assert.deepEqual([...allowed],['7']);
+ assert.throws(()=>validatePublishedCorpus({...coverage,libraryVersion:47},{version:48}),
+  /expected v48; fingerprint coverage v47, corpus v48/);
+ assert.throws(()=>validatePublishedCorpus(coverage,{version:47}),
+  /expected v48; fingerprint coverage v48, corpus v47/);
+});
 
 test('malformed optional planner facets are dropped or fall back without blocking base retrieval',()=>{
  const result=partFacetsFromPlan([

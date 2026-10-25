@@ -13,10 +13,21 @@ import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
-const FINGERPRINT_ROOT='https://jsynon.github.io/antilogicalism-library-data/reader-fingerprints-v1/';
+const FINGERPRINT_ROOT='https://jsynon.github.io/antilogicalism-library-data/reader-fingerprints-v2/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
 const PART_ID=/^P[1-9]\d*$/;
 const validPartText=value=>typeof value==='string'&&value.trim().length>=5&&value.trim().length<=400;
+
+export function validatePublishedCorpus(coverage,manifest){
+ if(coverage?.schema!=='antilogicalism-reader-coverage-v2'||coverage?.libraryVersion!==48||
+    !coverage.books||typeof coverage.books!=='object'||Array.isArray(coverage.books)||
+    manifest?.version!==48){
+  const coverageVersion=Number.isInteger(coverage?.libraryVersion)?coverage.libraryVersion:'unknown';
+  const corpusVersion=Number.isInteger(manifest?.version)?manifest.version:'unknown';
+  throw Error(`Published library version mismatch (expected v48; fingerprint coverage v${coverageVersion}, corpus v${corpusVersion}).`);
+ }
+ return new Set(Object.keys(coverage.books));
+}
 
 /* Planner part facets are optional retrieval hints. A malformed hint should
  * be visible in the trace and dropped, never allowed to abort the base search
@@ -709,11 +720,10 @@ async function main(){
  const startupHeartbeat=setInterval(()=>console.log('['+new Date().toISOString()+
   '] SETUP WAIT: still loading the published fingerprint coverage and corpus manifest.'),15_000);
  try{
-  const results=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v1.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
+  const results=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v2.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
   clearInterval(startupHeartbeat);
   const coverage=results[0],manifest=results[1];
-  if(coverage?.schema!=='antilogicalism-reader-coverage-v1'||coverage?.libraryVersion!==47||manifest.version!==47)throw Error('Published v47 coverage or corpus is incompatible.');
-  const allowed=new Set(Object.keys(coverage.books));
+  const allowed=validatePublishedCorpus(coverage,manifest);
   for(const item of cases)for(const group of item.required_source_groups)if(!group.book_ids.some(id=>allowed.has(String(id))))throw Error(item.id+': no expected source book is fingerprint-covered.');
   const library=new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT));
   activeLibrary=library;
