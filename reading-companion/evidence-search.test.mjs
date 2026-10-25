@@ -592,6 +592,30 @@ test('a passage found for one facet can link to another part when its full text 
   'hydrated page text supports the second part even though only the first facet found it');
 });
 
+test('quoted part phrase links an otherwise unassigned page through OCR spacing and reserves it',async()=>{
+ const question='What does Hamlet weigh in the famous soliloquy?';
+ const books=[{id:'564',title:'Elizabethan Drama, Vol I'}],allowedBookIds=new Set(['564']);
+ const text='T o be, or not to be, that is the question: whether it is nobler in the mind to suffer the slings and arrows of outrageous fortune, or to take arms against a sea of troubles and by opposing end them.';
+ const result=await retrieveEvidence({question,
+  queries:['Hamlet Elizabethan drama soliloquy existence','Hamlet weigh suffering action death'],
+  partQueries:[{partId:'P1',query:'Hamlet Elizabethan drama soliloquy existence'},
+   {partId:'P1',query:'Hamlet weigh suffering action death'}],
+  partQuestions:[{partId:'P1',question:'What alternatives does Hamlet weigh in the “To be, or not to be” soliloquy?'}],
+  library:{search:async query=>query===question?{sources:[{bookId:'564',title:books[0].title,
+   page:152,globalPageId:151,score:85,facet:query,candidatePartIds:[]}]}:{sources:[]}},
+  books,allowedBookIds,pageLoader:async()=>({text})});
+ const page=result.candidates.find(source=>source.page===152);
+ assert.ok(page);
+ assert.ok(page.candidatePartIds.includes('P1'),
+  'the quoted distinctive phrase should link the full page to its question part despite OCR spacing');
+ const selected=selectAnswerSources([...result.candidates,{bookId:'564',title:books[0].title,
+  page:151,score:99,candidatePartIds:['P1'],
+  text:'Hamlet considers the fear of death, the unknown afterlife, and uncertainty about what comes after death.'}],question,'token',{maxSources:1,
+  maxBytes:5000,maxSourceBytes:5000,partQuestions:[{partId:'P1',
+   question:'What alternatives does Hamlet weigh in the “To be, or not to be” soliloquy?'}]});
+ assert.equal(selected[0]?.page,152,'the linked full source page should reach the answer packet');
+});
+
 test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
  const {readFileSync}=await import('node:fs');
  const js=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
@@ -599,7 +623,8 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/data\.searchPlanning===true/);
  assert.match(js,/validSearchPlan\(data\.queries\)/);
  assert.match(js,/retrieveEvidence\(\{question:q/);
- assert.match(js,/const found=await retrieveSources\(planned\?\.queries\|\|null,\{plannerFallback,plan:planned\?\.plan\|\|null\}\)/);
+ assert.match(js,/const found=await retrieveSources\(planned\?\.queries\|\|null,\{plannerFallback,/);
+ assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions\}/);
  assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
  assert.match(js,/diagnosticState\.fallbackMode=true/);
  assert.match(js,/Search planning is temporarily unavailable; searching directly with your question/);
