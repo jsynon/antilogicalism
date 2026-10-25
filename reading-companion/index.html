@@ -400,14 +400,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot .companion-source-text{max-height:65vh;overflow-y:auto;overflow-wrap:anywhere;border-top:1px solid #dfe2e3;padding-top:.8em;line-height:1.8;font-size:1em}
 #companion-pilot .companion-source-text p{margin:0 0 1em;text-indent:0;white-space:normal}
 #companion-pilot .companion-source-text mark.cited-highlight{background:#fff0a5;color:#111;box-decoration-break:clone;-webkit-box-decoration-break:clone;padding:1px 0}
-#companion-pilot .companion-diagnostics{margin:1rem 0;padding:.65rem 0;border-top:0}
-#companion-pilot .companion-diagnostic-toggle{display:flex;align-items:flex-start;gap:.5em;font-size:.92em}
-#companion-pilot .companion-diagnostic-toggle input{margin-top:.35em}
-#companion-pilot #companion-diagnostic-details{margin:.7em 0}
-#companion-pilot #companion-diagnostic-details summary{cursor:pointer;text-decoration:underline;text-underline-offset:2px}
-#companion-pilot #companion-diagnostic-details button{font:inherit;margin:.7em 0;padding:6px 10px}
-#companion-pilot #companion-diagnostic-output{max-height:28em;overflow:auto;padding:.8em;border:1px solid #dfe2e3;background:#f6f7f7;color:#333;font:13px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace;white-space:pre-wrap;overflow-wrap:anywhere}
-#companion-pilot .companion-diagnostics[hidden],#companion-pilot #companion-diagnostic-details[hidden]{display:none!important}
+
 @media(max-width:650px){#companion-pilot .companion-source-reader{padding:.7em}#companion-pilot .companion-source-text{max-height:55vh}}
 </style>
 </head>
@@ -467,16 +460,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 </form>
 <p id="companion-status" aria-live="polite" aria-atomic="true" aria-busy="false" role="status"></p>
 <section id="companion-answer" aria-live="polite" aria-label="Reading Companion response"></section>
-<section id="companion-diagnostic-panel" class="companion-diagnostics" aria-label="Optional diagnostic report" hidden>
-<label class="companion-diagnostic-toggle" for="companion-diagnostic-toggle"><input id="companion-diagnostic-toggle" type="checkbox" aria-controls="companion-diagnostic-details"> Show diagnostic report for this result</label>
-
-<details id="companion-diagnostic-details" hidden>
-<summary>Diagnostic report</summary>
-<button id="companion-diagnostic-copy" type="button">Copy diagnostic report</button>
-<p id="companion-diagnostic-copy-status" class="companion-hint" role="status" aria-live="polite"></p>
-<pre id="companion-diagnostic-output"></pre>
-</details>
-</section>
 <section id="companion-source-reader" class="companion-source-reader" aria-label="Read original source passage" hidden>
 <div class="companion-source-actions"><button type="button" id="companion-close-source">← Return to answer</button></div>
 <h2 id="companion-source-title">Original source</h2>
