@@ -627,6 +627,11 @@ test('edited author collections stay discoverable by their author, not editor',(
  const identity=catalogIdentity(portable);
  assert.deepEqual(identity.authors,['Friedrich Nietzsche']);
  assert.deepEqual(identity.editors,['Walter Kaufmann']);
+ assert.deepEqual(identity.translators,[]);
+ const translated=catalogIdentity('Collected Texts — Immanuel Kant (translated by Mary Translator)');
+ assert.deepEqual(translated.authors,['Immanuel Kant']);
+ assert.deepEqual(translated.editors,[]);
+ assert.deepEqual(translated.translators,['Mary Translator']);
  const books=[{id:'239',title:portable},
   {id:'640',title:'Nietzsche and the Modern Mind — Walter Kaufmann'}];
  assert.deepEqual(matchExplicitBookIds('What did Nietzsche think about Plato?',books),['239']);
