@@ -109,7 +109,7 @@ test('book selector search matches title or author without changing source entri
 });
 
 test('v48 browser client validates the v2 fingerprint coverage manifest',()=>{
- assert.match(clientV48,/reader-fingerprints-v2\\/coverage-v2\\.json/);
+ assert(clientV48.includes("reader-fingerprints-v2/coverage-v2.json"));
  assert.match(clientV48,/antilogicalism-reader-coverage-v2/);
  assert.match(clientV48,/libraryVersion!==48/);
  assert.doesNotMatch(clientV48,/coverage-v1|libraryVersion:47/);
