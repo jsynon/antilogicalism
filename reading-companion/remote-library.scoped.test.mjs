@@ -87,7 +87,7 @@ test('a five-term Sunyata facet reaches and links the v48 Nagarjuna introduction
   '185:18':'INTRODUCTION. This account connects sunyata with dependent co-arising and describes co-origination in Nagarjuna’s text.',
   // OCR excerpt from v48 book 178, PDF page 88. This is Kalupahana's
   // introduction discussing Nagarjuna, not a Nagarjuna verse.
-  '178:88':'With that analysis, Nagarjuna was ready to defend the four noble truths, reconciling it with his conception of emptiness. Whoever perceives dependent arising also perceives suffering, its arising, its ceasing and the path leading to its ceasing.',
+  '178:88':`With that analys.is, Nagarjuna was ready to defend the four noble truths, reconciling it with his cooception of emptiness (ibid. 20-21). 'Whoever perceives dependent arising also perceives sufferiag, its arising, its ceasing and the patb [leadiog to its ceasing]," (ibid 40).`,
   '400:41':'This page mentions dependent Buddhist thought but does not discuss emptiness or sunyata.'
  };
  const corpus={
@@ -129,7 +129,7 @@ test('a five-term Sunyata facet reaches and links the v48 Nagarjuna introduction
  });
  assert.ok(answerPacket.some(source=>source.bookId==='178'&&source.page===88),
   'the passage must survive the existing bounded source-packet selector');
- assert.match(nagaPage.text,/reconciling it with his conception of emptiness/u);
+ assert.match(nagaPage.text,/reconciling it with his cooception of emptiness/u);
  assert.match(nagaPage.text,/Whoever perceives dependent arising/u,
   'the retrieved page retains the actual v48 OCR passage for downstream source-voice review');
  assert.equal(substantivePageEvidence(
