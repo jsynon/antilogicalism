@@ -508,8 +508,10 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const {selected,searches,retrievalCandidates}=loaded;
- await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; selected ${selected.length} verified pages.`,
-  {searchCount:searches.length,candidatePages:retrievalCandidates.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]})),
+ const retrievalFallbackCount=searches.filter(value=>value.fallbackFrom).length;
+ await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; selected ${selected.length} verified pages.`+
+  (retrievalFallbackCount?` Recovered ${retrievalFallbackCount} empty source-side search using the counterpart topic within the planned source scope.`:''),
+  {searchCount:searches.length,retrievalFallbackCount,candidatePages:retrievalCandidates.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]})),
    selectedPages:selected.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]}))});
  const variants=answerVariant==='paired-review-ablation'?['with-review','compose-only']:[answerVariant];
  const variantResults=[];
@@ -577,8 +579,10 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
   throw wrapped;
  }
  const {selected,searches,retrievalCandidates}=loaded;
- await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; selected ${selected.length} verified pages.`,
-  {searchCount:searches.length,candidatePages:retrievalCandidates.map(source=>({bookId:source.bookId,page:source.page})),
+ const retrievalFallbackCount=searches.filter(value=>value.fallbackFrom).length;
+ await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; selected ${selected.length} verified pages.`+
+  (retrievalFallbackCount?` Recovered ${retrievalFallbackCount} empty source-side search using the counterpart topic within the planned source scope.`:''),
+  {searchCount:searches.length,retrievalFallbackCount,candidatePages:retrievalCandidates.map(source=>({bookId:source.bookId,page:source.page})),
    selectedPages:selected.map(source=>({bookId:source.bookId,page:source.page}))});
  const retrievedBookIds=[...new Set(selected.map(source=>String(source.bookId)))];
  const sourceGroups=(item.required_source_groups||[]).map(group=>{
@@ -706,6 +710,8 @@ async function main(){
    if(event.variant)details.push('variant='+event.variant);
    if(Number.isFinite(event.queryCount))details.push('queries='+event.queryCount);
    if(Number.isFinite(event.searchCount))details.push('searches='+event.searchCount);
+   if(Number.isFinite(event.retrievalFallbackCount)&&event.retrievalFallbackCount)
+    details.push('retrieval-fallbacks='+event.retrievalFallbackCount);
    if(Number.isFinite(event.sourceCount))details.push('pages='+event.sourceCount);
    if(Number.isFinite(event.citations))details.push('citations='+event.citations);
    if(event.usage&&Number.isFinite(event.usage.calls))details.push('worker-calls='+event.usage.calls);
