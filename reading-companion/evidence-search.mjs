@@ -1,11 +1,13 @@
-import {hasExplicitScriptureReference} from './remote-library.mjs';
+import {explicitScriptureReferences,hasExplicitScriptureReference} from './remote-library.mjs';
 import {catalogIdentity} from './reader-contract.mjs';
 
 /* Merge two independently retrieved question facets, retaining alternatives
  * for source selection and manual inspection.
  * No generated claim or PDF locator is trusted by this component.
  */
-export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[]){
+export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
+ directQuestionFacetIndex=-1,partQuestions=[],preferPrimaryBible=false
+}={}){
  if(!Array.isArray(results))return [];
  const groups=results.map(r=>{
    const sources=Array.isArray(r?.sources)?r.sources:[];
@@ -25,6 +27,32 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[]){
  });
  const valid=(entry)=>entry&&Number.isSafeInteger(entry.page)&&entry.page>=1&&
    /^[1-9]\d{0,3}$/.test(String(entry.bookId));
+ const directPartReservations=()=>{
+   if(!Number.isInteger(directQuestionFacetIndex)||directQuestionFacetIndex<0||
+      directQuestionFacetIndex>=groups.length||!Array.isArray(partQuestions))return [];
+   const directCandidates=groups[directQuestionFacetIndex];
+   const reservations=[],reserved=new Set();
+   for(const part of partQuestions.slice(0,Math.max(0,Math.floor(Number(limit)||0)))){
+     if(typeof part?.partId!=='string'||typeof part?.question!=='string')continue;
+     const sourceIds=Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):[];
+     const best=directCandidates.map((entry,rank)=>({entry,rank,
+       overlap:directFacetTextMatch(part.question,entry?.preview||entry?.text||''),
+       primaryBible:/\bbible\b/i.test(String(entry?.title||''))&&
+        !/\b(?:annotated|study|commentary|notes)\b/i.test(String(entry?.title||''))
+     })).filter(item=>valid(item.entry)&&item.overlap>=2&&
+       (!sourceIds.length||sourceIds.includes(String(item.entry.bookId))))
+       .sort((a,b)=>(preferPrimaryBible&&a.primaryBible!==b.primaryBible
+          ?(b.primaryBible?1:0)-(a.primaryBible?1:0):0)||
+         b.overlap-a.overlap||a.rank-b.rank||
+         (Number(b.entry.score)||0)-(Number(a.entry.score)||0))[0];
+     if(!best)continue;
+     const key=String(best.entry.bookId)+':'+best.entry.page;
+     if(reserved.has(key))continue;
+     reserved.add(key);
+     reservations.push({entry:best.entry,facet:directQuestionFacetIndex});
+   }
+   return reservations;
+ };
  const hasScores=groups.some(group=>group.some(entry=>Number.isFinite(entry?.score)));
  if(!hasScores){
    // Retain deterministic round-robin behavior for legacy callers without
@@ -44,6 +72,10 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[]){
      }
      const value={...entry,facet,facetRanks:[{facet,rank}]};
      seen.set(key,value);out.push(value);return true;
+   }
+   for(const {entry,facet} of directPartReservations()){
+     if(out.length>=limit)break;
+     add(entry,facet);
    }
    for(let facet=0;facet<groups.length;facet++){
      for(const entry of groups[facet])if(add(entry,facet))break;
@@ -92,6 +124,13 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[]){
  // question part. A decisive passage can rank second on its best query while
  // several weaker rank-one pages from other facets crowd it out globally.
  const reserved=[],reservedKeys=new Set();
+ for(const {entry} of directPartReservations()){
+   const key=String(entry.bookId)+':'+entry.page;
+   const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
+   if(candidate&&!reservedKeys.has(key)&&reserved.length<limit){
+     reserved.push(candidate);reservedKeys.add(key);
+   }
+ }
  for(const facet of [...new Set(reserveFacetIndexes)]){
    for(const entry of (groups[facet]||[]).slice(0,2)){
      const key=String(entry.bookId)+':'+entry.page;
@@ -166,6 +205,22 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
    }
   }
  }
+ // Part rewrites can drop an explicit citation from the reader's question.
+ // Carry a single unambiguous scripture reference into each unscoped part
+ // facet so search does not reinterpret a biblical name (James, John, etc.)
+ // as an author's surname. Keep the original facet text for relevance links;
+ // the inherited reference is retrieval scope only.
+ const scriptureReferences=explicitScriptureReferences(direct);
+ const inheritedScriptureReference=scriptureReferences.length===1?scriptureReferences[0]:'';
+ const scriptureScopeByFacet=new Map();
+ if(inheritedScriptureReference){
+  for(const item of partFacetIndices){
+   const part=partQuestions.find(value=>value?.partId===item.partId);
+   const sourceBookIds=Array.isArray(part?.sourceBookIds)?part.sourceBookIds.map(String):[];
+   if(sourceBookIds.length||hasExplicitScriptureReference(searchQueries[item.facet]))continue;
+   scriptureScopeByFacet.set(item.facet,inheritedScriptureReference);
+  }
+ }
  const selected=selectedBookIds.map(String);
  const selectedAllowed=new Set(selected.filter(id=>allowedBookIds.has(id)));
  if(selected.length&&selected.some(id=>!allowedBookIds.has(id)))
@@ -173,16 +228,22 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  const namedBookIds=selected.length?selected:matchExplicitBookIds(direct,books);
  const targetBookIds=namedBookIds.length?namedBookIds:[null];
  const retrievalAllowed=selected.length?selectedAllowed:allowedBookIds;
- const searchSets=await Promise.all(searchQueries.map(async query=>{
-  const facetBookIds=targetBooksForFacet(query,books,targetBookIds[0]===null?null:targetBookIds);
-  const targeted=await Promise.all(facetBookIds.map(bookId=>library.search(query,{
+ const searchSets=await Promise.all(searchQueries.map(async (query,index)=>{
+  const scopeReference=scriptureScopeByFacet.get(index)||'';
+  const executedQuery=scopeReference?`${scopeReference} ${query}`:query;
+  const facetBookIds=targetBooksForFacet(executedQuery,books,targetBookIds[0]===null?null:targetBookIds);
+  const targeted=await Promise.all(facetBookIds.map(bookId=>library.search(executedQuery,{
    ...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook
   })));
   return {sources:targeted.flatMap(set=>Array.isArray(set?.sources)?set.sources:[])
-   .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0))};
+   .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)),executedQuery,scopeReference};
  }));
  const linkedFacets=[...new Set(partFacetIndices.map(item=>item.facet).filter(index=>index>=0))];
- const results=searchSets.length>1?mergeFacetSearches(searchSets,maxCandidates,linkedFacets):
+ const directQuestionFacetIndex=searchQueries.findIndex(value=>
+  value.trim().toLocaleLowerCase()===direct.toLocaleLowerCase());
+ const results=searchSets.length>1?mergeFacetSearches(searchSets,maxCandidates,linkedFacets,{
+  directQuestionFacetIndex,partQuestions,preferPrimaryBible:scriptureReferences.length===1
+ }):
   (searchSets[0]?.sources||[]).map((source,index)=>({...source,facet:0,
     facetRanks:[{facet:0,rank:index+1}]}));
  const filtered=results.filter(source=>allowedPage(source)&&
@@ -234,7 +295,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   if(populated.length>=maxCandidates)break;
  }
  return {candidates:populated,partFacetIndices,searches:searchSets.map((set,index)=>({
-  query:searchQueries[index]+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
+  query:searchSets[index].executedQuery+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
+  ...(searchSets[index].scopeReference?{originalQuery:searchQueries[index],scopeInherited:true}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),sources:set.sources.slice(0,8)
  })),searchQueries,namedBookIds};
 }

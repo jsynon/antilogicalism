@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {gzipSync} from 'node:zlib';
-import {RemoteLibrary,hasExplicitScriptureReference} from './remote-library.mjs';
+import {RemoteLibrary,explicitScriptureReferences,hasExplicitScriptureReference} from './remote-library.mjs';
 
 const driveId='ABCDEFGHIJKLMNOPQRSTUVWXY123456';
 const biblePassage='1 John 4 7 12 Beloved let us love one another because love is from God and God sent his Son.';
@@ -40,6 +40,8 @@ test('explicit Bible book chapter-and-verse references are recognized',()=>{
  assert.equal(hasExplicitScriptureReference('According to 1 John 4:7–12, what does “God is love” mean?'),true);
  assert.equal(hasExplicitScriptureReference('Compare Aristotle, Ethics II.1 with Darwin.'),false);
  assert.equal(hasExplicitScriptureReference('The book of John discusses love.'),false);
+ assert.deepEqual(explicitScriptureReferences('Read James 2:14–26 and John 3:16.'),
+  ['James 2:14–26','John 3:16']);
 });
 
 test('a cited Bible passage prefers unannotated verse text over topical and annotated books',async()=>{

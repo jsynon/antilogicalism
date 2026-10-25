@@ -48,7 +48,11 @@ const STOP = new Set(`
 `.trim().split(/\s+/));
 const PDF = /^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:view|preview)/;
 export function hasExplicitScriptureReference(text) {
-  return SCRIPTURE_REFERENCE.test(String(text || ''));
+  return explicitScriptureReferences(text).length > 0;
+}
+export function explicitScriptureReferences(text) {
+  return [...String(text || '').matchAll(new RegExp(SCRIPTURE_REFERENCE.source, 'gi'))]
+    .map(match => match[0]);
 }
 function requestedPhrase(text) {
   const value=String(text||'').trim();
