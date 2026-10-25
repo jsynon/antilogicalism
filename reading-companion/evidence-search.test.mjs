@@ -651,6 +651,44 @@ test('synthetic comparison coverage reuses source searches instead of spending a
  assert.ok(!comparison.searchQueries.includes(comparison.question));
 });
 
+test('author-wide plans do not narrow to a work because the author name appears in its title',()=>{
+ const catalog={
+  '140':'Fear and Trembling — Søren Kierkegaard',
+  '192':'Philosophical Fragments — Søren Kierkegaard',
+  '253':'The Sickness Unto Death — Søren Kierkegaard',
+  '436':'Kierkegaard’s Attack Upon “Christendom,” 1854–1855 — Søren Kierkegaard'
+ };
+ const raw={intent:'explain',sources:[{label:'Søren Kierkegaard',role:'primary',bookIds:Object.keys(catalog)}],
+  parts:["How does Kierkegaard describe faith?"],queries:['Kierkegaard faith movement']};
+ const broad=normalizePlan(raw,'What did Kierkegaard have to say about faith?',catalog);
+ assert.deepEqual(broad.parts[0].sourceBookIds,['140','192','253','436']);
+ const scoped=normalizePlan(raw,'What did Kierkegaard say about faith in Fear and Trembling?',catalog);
+ assert.deepEqual(scoped.parts[0].sourceBookIds,['140']);
+});
+
+test('hypothetical author responses plan evidence from both thinkers and a synthesis part',()=>{
+ const question='What would Nietzsche think about the thought of Kierkegaard?';
+ const plan=normalizePlan({intent:'compare',resolvedQuestion:question,sources:[
+  {label:'Friedrich Nietzsche',role:'primary',bookIds:['54','144','239']},
+  {label:'Søren Kierkegaard',role:'primary',bookIds:['140','192','253','436']}
+ ],parts:[
+  "How does Nietzsche evaluate Kierkegaard's account of faith and the individual?",
+  "What is Kierkegaard's account of faith and the individual?"
+ ],queries:['Nietzsche critique of Kierkegaard faith','Kierkegaard faith individual relation to God']},question,{
+  '54':'Beyond Good and Evil — Friedrich Nietzsche',
+  '144':'On the Genealogy of Morals — Friedrich Nietzsche',
+  '239':'The Portable Nietzsche — Friedrich Nietzsche (edited by Walter Kaufmann)',
+  '140':'Fear and Trembling — Søren Kierkegaard',
+  '192':'Philosophical Fragments — Søren Kierkegaard',
+  '253':'The Sickness Unto Death — Søren Kierkegaard',
+  '436':'Kierkegaard’s Attack Upon “Christendom,” 1854–1855 — Søren Kierkegaard'
+ });
+ assert.ok(plan.parts.some(part=>part.sourceBookIds?.includes('239')&&part.sourceBookIds?.includes('140')));
+ assert.ok(plan.parts.some(part=>part.sourceBookIds?.includes('140')&&!part.sourceBookIds.includes('239')));
+ assert.match(plan.parts.at(-1).question,/compare in response to this question/i);
+ assert.deepEqual(plan.parts.at(-1).sourceBookIds,['54','144','239','140','192','253','436']);
+});
+
 test('source-specific planner queries also link their results to the matching part',async()=>{
  const books=[{id:'40',title:'Critique of Pure Reason — Immanuel Kant'}],allowedBookIds=new Set(['40']);
  const library={search:async(query)=>({sources:[{bookId:'40',title:books[0].title,
