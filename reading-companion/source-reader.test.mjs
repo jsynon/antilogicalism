@@ -58,6 +58,21 @@ test('removes standalone Acrobat capture footers while preserving ordinary web l
  assert.match(page.displayText,/https:\/\/example\.org\/history/);
  assert.doesNotMatch(page.displayText,/file:\/\/\/C\|/);
  assert(page.match,'the cited passage still aligns after footer removal');
+ const element=tag=>({tag,children:[],append(child){this.children.push(child)},replaceChildren(){this.children=[]},
+  set textContent(value){this._text=String(value);this.children=[]},
+  get textContent(){return this._text??this.children.map(child=>child.textContent||'').join('')}});
+ const originalDocument=globalThis.document;
+ globalThis.document={createElement:element,createTextNode:value=>({textContent:String(value)})};
+ try{
+  const container=element('div');
+  const shown=renderHighlightedText(container,raw,quote);
+  assert.equal(shown.matched,true,'actual source reader renderer keeps citation highlighting aligned');
+  assert.match(container.textContent,/https:\/\/example\.org\/history/);
+  assert.doesNotMatch(container.textContent,/file:\/\/\/C\|/);
+ }finally{
+  if(originalDocument===undefined)delete globalThis.document;
+  else globalThis.document=originalDocument;
+ }
 });
 test('identifies an exact quoted evidence passage despite OCR line wrapping',()=>{
  const raw='A short introductory sentence.\nThe nature of virtue and the role of practical wisdom\nin shaping good character and making our lives happy\nbecome clear through the actions a person chooses.';
