@@ -11,7 +11,7 @@ import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEv
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
-import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber} from './citation-numbering.mjs';
+import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -309,9 +309,10 @@ function appendCitationTokens(target,answer,citations,evidenceHighlights=[],numb
       a.type='button';
       const label=citationDisplayLabel(id,numbering);
       a.textContent=label;a.className='companion-inline-citation';
-      a.title=source.title+' PDF page '+source.page;
+      const attribution=sourceAttributionLabel(source.provenance);
+      a.title=source.title+' PDF page '+source.page+(attribution?' · '+attribution:'');
       a.setAttribute('aria-label','Open ['+label+'] in the page reader: '+
-        source.title+', PDF page '+source.page);
+        source.title+', PDF page '+source.page+(attribution?'. '+attribution:''));
       const evidence=evidenceHighlights.find(item=>item.source_id===source.id&&
         Number(item.page)===Number(source.page));
       a.addEventListener('click',async()=>{
@@ -408,15 +409,16 @@ function renderResponse(data,turnQuestion=''){
     for(const source of orderedCitations){
       const highlight=highlights.find(item=>
         item.source_id===source.id&&Number(item.page)===Number(source.page));
-      const original=sourcePage(source);
       const excerpt=(typeof highlight?.quote==='string'&&highlight.quote.trim())?
-        highlight.quote:String(original?.preview||source.preview||original?.text||'')
-          .replace(/\\s+/g,' ').trim().slice(0,600);
+        highlight.quote:'';
       const card=node('article',undefined,'companion-key-passage');
-      const quote=node('p',excerpt,'companion-key-quote');
+      const quote=node('p',excerpt||'No verified passage highlight is available for this citation.',
+        'companion-key-quote');
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
       link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · p. '+source.page;
+      const attribution=sourceAttributionLabel(source.provenance);
+      if(attribution)card.append(node('p',attribution,'companion-source-attribution'));
       const read=node('button','Read passage','companion-inline-read');
       read.type='button';
       read.addEventListener('click',async()=>{
