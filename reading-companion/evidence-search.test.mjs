@@ -592,6 +592,24 @@ test('a passage found for one facet can link to another part when its full text 
   'hydrated page text supports the second part even though only the first facet found it');
 });
 
+test('a contextual query carries a quoted parent passage into a pronoun-based part link',async()=>{
+ const question='In Hamlet’s “To be, or not to be” soliloquy, what alternatives does he weigh, and how does uncertainty about what follows death affect his reasoning?';
+ const books=[{id:'212',title:'The Complete Works of William Shakespeare — William Shakespeare'}];
+ const result=await retrieveEvidence({question,queries:[
+  'Hamlet Shakespeare To be or not to be alternatives suffering',
+  'Hamlet Shakespeare To be or not to be death uncertainty afterlife'],
+  partQueries:[{partId:'P2',query:'Hamlet To be, or not to be soliloquy how does uncertainty about the afterlife affect his reasoning?'}],
+  partQuestions:[{partId:'P2',question:'How does uncertainty about the afterlife affect his reasoning in this soliloquy?'}],
+  library:{search:async query=>query.includes('To be, or not to be')?{sources:[
+   {bookId:'212',title:books[0].title,page:453,globalPageId:52374,score:90,facet:query}
+  ]}:{sources:[]}},
+  books,allowedBookIds:new Set(['212']),pageLoader:async()=>({text:
+   'Hamlet. To be, or not to be: that is the question. To die, to sleep, perchance to dream.'})});
+ const page=result.candidates.find(source=>source.page===453);
+ assert.ok(page?.candidatePartIds.includes('P2'),
+  'a root-question quote in the contextual part query should connect the source to that part');
+});
+
 test('quoted part phrase links an otherwise unassigned page through OCR spacing and reserves it',async()=>{
  const question='What does Hamlet weigh in the famous soliloquy?';
  const books=[{id:'564',title:'Elizabethan Drama, Vol I'}],allowedBookIds=new Set(['564']);
