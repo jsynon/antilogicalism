@@ -15,6 +15,8 @@ test('source attribution labels distinguish curated pseudonymous and editorial c
   'Published under pseudonym: Johannes de Silentio · Credited author: Søren Kierkegaard');
  assert.equal(sourceAttributionLabel({pageVoice:{kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'}}),
   'Editorial introduction by David A. Dilworth · Work credited to Kitarō Nishida');
+ assert.equal(sourceAttributionLabel({pageVoice:{kind:'editorial-commentary',name:'Walter Kaufmann',creditedAuthor:'Friedrich Nietzsche'}}),
+  'Editorial commentary by Walter Kaufmann · Work credited to Friedrich Nietzsche');
  assert.equal(sourceAttributionLabel({pageSectionHint:'introduction',pageVoiceHint:'editorial-or-front-matter; verify against the passage'}),
   'Introduction: page speaker not confirmed');
  assert.equal(sourceAttributionLabel({pageSectionHint:'undetermined'}),'');
