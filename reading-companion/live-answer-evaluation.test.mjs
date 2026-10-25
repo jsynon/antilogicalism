@@ -51,6 +51,20 @@ test('quality mode selects seven cross-discipline cases across selected-book and
  assert.ok(cases.every(item=>item.planner_queries.length===2&&item.review_focus.length>=2));
 });
 
+test('the focused Kant case is selectable without changing the seven-case quality baseline',()=>{
+ const baseline=selectLiveCases({cases:[]},'quality');
+ assert.equal(baseline.length,7);
+ assert.ok(!baseline.some(item=>item.id==='focused-kant-transcendental-idealism'));
+ const [focused]=selectLiveCases({cases:[]},'quality','focused-kant-transcendental-idealism');
+ assert.equal(focused.question,'What is transcendental idealism?');
+ assert.deepEqual(focused.selected_book_ids,[]);
+ assert.deepEqual(focused.required_source_groups[0].book_ids,['40','44']);
+ assert.equal(focused.planner_queries.length,3);
+ assert.ok(focused.review_focus.some(item=>/enough distinct, relevant passages/.test(item)));
+ assert.ok(focused.review_focus.some(item=>/Exact quote location alone is not evidence of semantic support/.test(item)));
+ assert.throws(()=>selectLiveCases({cases:[]},'holdout','focused-kant-transcendental-idealism'),/Unknown holdout case/);
+});
+
 test('holdout mode selects a separate seven-question set across disciplines',()=>{
  const cases=selectLiveCases({cases:[]},'holdout');
  assert.equal(cases.length,7);
