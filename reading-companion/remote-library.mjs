@@ -322,6 +322,10 @@ function endsMidSentence(text) {
   // still pass the usual relevance check before it is included.
   const content=tail.replace(/(?:…|\.{2,})["'’”)}\]]*$/u,'').trimEnd();
   if(!content||/[.!?]["'’”)}\]]*$/.test(content))return false;
+  // OCR can join the final word on one page to a capitalized first word on
+  // the next (for example, "sleepNo"). The adjacent page still has to pass
+  // the usual relevance test before it can be returned.
+  if(/[\p{Ll}]{2,}[\p{Lu}][\p{Ll}]{1,6}$/u.test(content.slice(-40)))return true;
   return /\b(?:and|but|because|that|which|when|if|while|although|as|with|for|to|of|in|on|by|from|the|a|an)\s*[,;:]?$/i
     .test(content.slice(-80));
 }
