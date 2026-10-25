@@ -209,6 +209,21 @@ test('audit requires expected-source coverage and citations with no orphan marke
  assert.deepEqual(bad.inlineIdsWithoutSource,['S2']);
 });
 
+test('citation highlight coverage is reported separately from structural answer validity',()=>{
+ const citation={id:'S1',bookId:'529',title:'On the Origin of Species',page:18};
+ const without=auditLiveAnswer({coverage:'full',answer:'A supported claim [S1].',citations:[citation]},
+  [{bookId:'529',page:18}],[]);
+ assert.equal(without.structuralPassed,true);
+ assert.deepEqual(without.citationHighlightAudit,{citedSourceCount:1,highlightedSourceCount:0,
+  citedSourcesWithoutLocatedHighlight:['S1']});
+ const withHighlight=auditLiveAnswer({coverage:'full',answer:'A supported claim [S1].',citations:[citation],
+  evidenceHighlights:[{source_id:'S1',page:18,quote:'Exact passage text.',quoteLocated:true}]},
+  [{bookId:'529',page:18}],[]);
+ assert.deepEqual(withHighlight.citationHighlightAudit,{citedSourceCount:1,highlightedSourceCount:1,
+  citedSourcesWithoutLocatedHighlight:[]});
+ assert.equal(withHighlight.structuralPassed,true);
+});
+
 test('review truncation reason remains visible in the saved answer audit',()=>{
  const result=auditLiveAnswer({outcome:'unverified-source-draft',coverage:'partial',
   reviewStatus:'review-format-failed',failureCode:'review-output-truncated',failureStage:'review',

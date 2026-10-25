@@ -300,6 +300,12 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   quote:typeof item?.quote==='string'?item.quote:'',
   quoteLocated:typeof item?.quoteLocated==='boolean'?item.quoteLocated:
    locateHighlightInSubmittedPage(item,citations,submitted)}));
+ const highlightedSourceIds=new Set(evidenceHighlights.filter(item=>item.quoteLocated===true)
+  .map(item=>item.sourceId));
+ const citedSourceIds=[...new Set(inline)].filter(id=>citationIds.has(id));
+ const citationHighlightAudit={citedSourceCount:citedSourceIds.length,
+  highlightedSourceCount:citedSourceIds.filter(id=>highlightedSourceIds.has(id)).length,
+  citedSourcesWithoutLocatedHighlight:citedSourceIds.filter(id=>!highlightedSourceIds.has(id))};
  const coverage=String(data?.coverage||'');
  const partStatusesConsistent=questionParts.length===0?null:
   (coverage==='full'?questionParts.every(part=>part?.status==='supported'):
@@ -328,7 +334,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   sourceGroups,questionParts,questionPartCoverage,partEvidenceAudit,partEvidenceComplete,
   sourcePartAlignment,
   answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
-  evidenceHighlightCount:highlights.length,evidenceHighlights,
+  evidenceHighlightCount:highlights.length,evidenceHighlights,citationHighlightAudit,
   manualReview,structuralPassed,
   passed:reviewStatus==='answer-draft-unverified'?null:structuralPassed};
 }
@@ -388,7 +394,8 @@ export function recheckQualityReport(report){
    partEvidenceComplete:audit.partEvidenceComplete,
    answerCoverageConsistent:audit.answerCoverageConsistent,
    coverageContradictions:audit.coverageContradictions,
-   inlineIdsWithoutSource:audit.inlineIdsWithoutSource}};
+   inlineIdsWithoutSource:audit.inlineIdsWithoutSource,
+   citationHighlightAudit:audit.citationHighlightAudit}};
  });
  const checked=cases.filter(item=>item.offlineRecheck);
  return {...report,cases,humanReview:summarizeManualReviews(cases),answerVariants:summarizeAnswerVariants(cases),offlineRecheck:{checkedAt:new Date().toISOString(),
