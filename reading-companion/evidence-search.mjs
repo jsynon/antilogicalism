@@ -668,7 +668,12 @@ export function selectAnswerSources(candidates,question,turnstileToken,
  // coverage across the author's works, so long as the question does not name
  // one specific work. matchExplicitBookIds resolves this from the candidates'
  // trusted catalog titles and does not add a model call.
- const comparisonIntent=/\b(?:compare|contrast|versus|vs\.?|differences?|similarities?)\b/i.test(question);
+ const hypotheticalAuthorResponse=/\b(?:what|how)\s+would\b[^?!.]{0,120}\b(?:think|say|respond|react|view|regard)\b[^?!.]{0,100}\b(?:about|of|on|regarding|concerning|to)\b/i
+  .test(question);
+ const crossAuthorIntent=hypotheticalAuthorResponse&&
+  explicitlyNamedAuthorGroups(question,candidates).length>=2;
+ const comparisonIntent=/\b(?:compare|contrast|versus|vs\.?|differences?|similarities?)\b/i.test(question)||
+  crossAuthorIntent;
  const explicitlyNamedWorkIds=new Set(candidates.filter(candidate=>{
    const id=String(candidate?.bookId||'');
    return id&&catalogWorkTitles(candidate?.title).some(title=>

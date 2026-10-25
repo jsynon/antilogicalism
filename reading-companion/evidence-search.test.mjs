@@ -97,6 +97,22 @@ test('author comparison reserves each named author and keeps direct-question evi
  assert(chosen.some(item=>item.bookId==='96'));
  assert(chosen.some(item=>['140','192'].includes(item.bookId)));
 });
+test('hypothetical author questions reserve a relevant candidate from each named thinker',()=>{
+ const candidates=[
+  {...page(93,'253'),title:'The Sickness Unto Death — Søren Kierkegaard',score:62,
+   facetRanks:[{facet:0,rank:1}],text:'Kierkegaard on faith and the individual'},
+  {...page(32,'140'),title:'Fear and Trembling — Søren Kierkegaard',score:61,
+   facetRanks:[{facet:0,rank:2}],text:'Kierkegaard on faith'},
+  {...page(159,'239'),title:'The Portable Nietzsche — Friedrich Nietzsche (edited by Walter Kaufmann)',
+   score:24,facetRanks:[{facet:2,rank:1}],text:'A Nietzsche passage found by the broad question facet'},
+ ];
+ const chosen=selectAnswerSources(candidates,
+  'What would Nietzsche think about the thought of Kierkegaard?','token',
+  {maxSources:4,plannedFacetCount:2});
+ assert.deepEqual(new Set(chosen.slice(0,2).map(item=>item.bookId)),new Set(['239','253']));
+ assert(chosen.some(item=>item.bookId==='239'),
+  'the bounded packet must not drop one author merely because the other has higher retrieval scores');
+});
 test('source budget prioritizes distinct books before same-book alternatives',()=>{
  const candidates=[
   {...page(1,'7'),text:'first book'},
@@ -692,6 +708,19 @@ test('author-wide plans do not narrow to a work because the author name appears 
  assert.deepEqual(broad.parts[0].sourceBookIds,['140','192','253','436']);
  const scoped=normalizePlan(raw,'What did Kierkegaard say about faith in Fear and Trembling?',catalog);
  assert.deepEqual(scoped.parts[0].sourceBookIds,['140']);
+});
+
+test('simple definition plans do not add unrequested coverage parts',()=>{
+ const raw={intent:'explain',sources:[],queries:['definition and essential nature of sunyata',
+  'how sunyata operates within Buddhist doctrine'],parts:[
+  'What is the definition and essential nature of sunyata?',
+  'How does sunyata function within Buddhist doctrine?']};
+ const simple=normalizePlan(raw,'What is sunyata?',{});
+ assert.deepEqual(simple.parts.map(part=>part.question),['What is sunyata?']);
+ const explicit=normalizePlan({...raw,parts:['What is sunyata?',
+  'How does sunyata function within Buddhist doctrine?']},
+  'What is sunyata and how does it function within Buddhist doctrine?',{});
+ assert.equal(explicit.parts.length,2);
 });
 
 test('hypothetical author responses plan evidence from both thinkers and a synthesis part',()=>{
