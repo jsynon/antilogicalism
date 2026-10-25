@@ -122,6 +122,31 @@ test('source budget prioritizes distinct books before same-book alternatives',()
  const chosen=selectAnswerSources(candidates,'Compare','token',{maxSources:2});
  assert.deepEqual(chosen.map(item=>item.bookId),['7','529']);
 });
+test('linked definition evidence from distinct books reaches composition before unlinked facet noise',()=>{
+ const question='What is sunyata?';
+ const candidates=[
+  {...page(48,'158'),title:'An Introduction to Zen Buddhism — D. T. Suzuki',score:22,
+   facetRanks:[{facet:3,rank:1}],candidatePartIds:['P1'],text:'Sunyata is a central concept of emptiness in Mahayana literature.'},
+  {...page(47,'158'),title:'An Introduction to Zen Buddhism — D. T. Suzuki',score:21,
+   facetRanks:[{facet:3,rank:2}],candidatePartIds:['P1'],text:'Sunyata is associated with emptiness and no-thought.'},
+  {...page(18,'185'),title:'Last Writings: Nothingness and the Religious Worldview — Kitarō Nishida',score:35,
+   facetRanks:[{facet:0,rank:6}],candidatePartIds:['P1'],text:'The term sunyata names a Buddhist account of emptiness.'},
+  {...page(66,'141'),title:'Forgotten Truth — Huston Smith',score:20,
+   facetRanks:[{facet:3,rank:4}],candidatePartIds:['P1'],text:'Sunyata is a Buddhist idea connected with nirvana.'},
+  {...page(48,'515'),title:'Sacred Books of the East, Volume 48 — Various authors',score:52,
+   facetRanks:[{facet:0,rank:1}],candidatePartIds:[],text:'A page about unrelated metaphysical debates and the self.'},
+  {...page(557,'515'),title:'Sacred Books of the East, Volume 48 — Various authors',score:49,
+   facetRanks:[{facet:1,rank:1}],candidatePartIds:[],text:'A passage about unrelated scriptural doctrines and the self.'},
+  {...page(550,'515'),title:'Sacred Books of the East, Volume 48 — Various authors',score:48,
+   facetRanks:[{facet:2,rank:1}],candidatePartIds:[],text:'A passage about unrelated doctrines and causality.'},
+ ].map(candidate=>({...candidate,globalPageId:candidate.page}));
+ const selected=selectAnswerSources(candidates,question,'token',{maxSources:6,plannedFacetCount:3,
+  partQuestions:[{partId:'P1',question}]});
+ assert.ok(selected.slice(0,4).every(candidate=>candidate.candidatePartIds.includes('P1')),
+  'every directly linked definition page should be considered before unlinked query-facet noise');
+ assert.ok(new Set(selected.slice(0,4).map(candidate=>candidate.bookId)).size>=3,
+  'the extra evidence slot should prefer a separate source book when relevant candidates exist');
+});
 test('explicit work titles narrow searches to matching catalog books',()=>{
  const books=[
   {id:'7',title:'Nicomachean Ethics — Aristotle'},
@@ -265,6 +290,42 @@ test('hypothetical thinker source-side facets search only the named author’s w
  assert.ok(!calls.some(call=>call.query===queries[0]&&call.bookId==='140'));
  assert.ok(calls.some(call=>call.query===queries[1]&&call.bookId==='140'));
  assert.ok(!calls.some(call=>call.query===queries[1]&&call.bookId==='239'));
+});
+test('an empty comparison-side facet retries with the other side’s topic inside the missing source scope',async()=>{
+ const question='What would Nietzsche think about the thought of Kierkegaard?';
+ const books=[{id:'239',title:'The Antichrist — Friedrich Nietzsche'},
+  {id:'140',title:'Fear and Trembling — Søren Kierkegaard'}];
+ const queries=['Friedrich Nietzsche critique of religious existentialism',
+  'Søren Kierkegaard religious existence faith propositions'];
+ const parts=[
+  {partId:'P1',question:'What position does Friedrich Nietzsche take?',sourceBookIds:['239']},
+  {partId:'P2',question:'What position does Søren Kierkegaard take?',sourceBookIds:['140']},
+  {partId:'P3',question:'How do the positions compare?',sourceBookIds:['239','140']}
+ ];
+ const calls=[],nietzsche={bookId:'239',title:books[0].title,page:12,globalPageId:11,score:70,
+  preview:'Nietzsche examines faith, religion, and Christian morality.'};
+ const kierkegaard={bookId:'140',title:books[1].title,page:25,globalPageId:24,score:75,
+  preview:'Kierkegaard explains faith and the individual before God.'};
+ const library={search:async(query,options={})=>{
+  calls.push({query,bookId:options.bookId||'',allowed:[...(options.allowedBookIds||[]).values()].map(String)});
+  if(query===queries[0])return {sources:[]};
+  if(query===queries[1])return {sources:[kierkegaard]};
+  if(query===question)return {sources:options.bookId==='140'?[kierkegaard]:[]};
+  if(query.includes('Friedrich Nietzsche')&&query.includes('faith')&&options.allowedBookIds?.has('239'))
+   return {sources:[nietzsche]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question,queries,partQueries:parts.slice(0,2).map((part,index)=>({
+  partId:part.partId,query:queries[index]})),partQuestions:parts,library,books,
+  allowedBookIds:new Set(['239','140']),pageLoader:async source=>({text:
+   source.bookId==='239'?nietzsche.preview:kierkegaard.preview})});
+ const retry=calls.find(call=>call.query.includes('Friedrich Nietzsche')&&call.query.includes('faith'));
+ assert.ok(retry,'the missing author should be retried using the counterpart query’s topic terms');
+ assert.deepEqual(retry.allowed,['239']);
+ assert.doesNotMatch(retry.query,/Kierkegaard/i);
+ assert.ok(result.searches.some(search=>search.fallbackReason==='empty-source-side-facet'&&
+  search.fallbackFrom===queries[0]&&search.resultCount>0));
+ assert.ok(result.candidates.some(source=>source.bookId==='239'&&source.candidatePartIds.includes('P1')));
 });
 test('comparison author targeting retains a work for each named author',()=>{
  const books=[

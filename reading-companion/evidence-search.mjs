@@ -1,4 +1,4 @@
-import {explicitScriptureReferences,hasExplicitScriptureReference} from './remote-library.mjs';
+import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms} from './remote-library.mjs';
 import {catalogIdentity} from './reader-contract.mjs';
 
 /* Merge two independently retrieved question facets, retaining alternatives
@@ -294,6 +294,46 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)),executedQuery,scopeReference,
    targetBookIds:facetBookIds.filter(Boolean).map(String)};
  }));
+ // In a two-source comparison, one author's query can miss because its wording
+ // does not occur in that author's books even when the other side retrieved a
+ // clear topic. Reuse that existing topic query once, scoped to the missing
+ // side's trusted book IDs. This adds no model call and never broadens evidence
+ // to the other author's works.
+ const sides=crossSourceSides(partQuestions);
+ if(sides.length===2){
+  const sideFacets=sides.map(side=>{
+   const linked=partFacetIndices.filter(item=>item.partId===side.part.partId)
+    .map(item=>item.facet).filter((facet,index,values)=>values.indexOf(facet)===index);
+   return linked.find(facet=>searchSets[facet]?.targetBookIds?.some(id=>side.bookIds.includes(String(id))))??
+    linked[0]??-1;
+  });
+  for(let sideIndex=0;sideIndex<2;sideIndex++){
+   const side=sides[sideIndex],facet=sideFacets[sideIndex],counterpartFacet=sideFacets[1-sideIndex];
+   if(facet<0||counterpartFacet<0||searchSets[facet]?.sources.length||
+      !searchSets[counterpartFacet]?.sources.length)continue;
+   const alreadyFound=searchSets.some(set=>set.sources.some(source=>side.bookIds.includes(String(source.bookId))));
+   if(alreadyFound)continue;
+   const counterpartQuery=searchQueries[counterpartFacet];
+   const activeIds=side.bookIds.filter(id=>allowedBookIds.has(String(id)));
+   const retryQuery=scopedCounterpartQuery(counterpartQuery,direct,activeIds,
+    [...new Set([...sides[0].bookIds,...sides[1].bookIds])],books);
+   if(!retryQuery||retryQuery.toLocaleLowerCase()===searchQueries[facet].toLocaleLowerCase())continue;
+   try{
+    const retry=await library.search(retryQuery,{allowedBookIds:new Set(activeIds),maxBooks,pagesPerBook});
+    const scopedSources=(Array.isArray(retry?.sources)?retry.sources:[])
+     .filter(source=>activeIds.includes(String(source.bookId)))
+     .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+    if(scopedSources.length){
+     searchSets[facet]={...searchSets[facet],sources:scopedSources,executedQuery:retryQuery,
+      fallbackFrom:searchQueries[facet],targetBookIds:activeIds};
+    }
+   }catch{
+    // This is a best-effort recovery. A missing index partition or transient
+    // request must leave the original source-side result empty, not block the
+    // other author's independently retrieved evidence.
+   }
+  }
+ }
  const linkedFacets=[...new Set(partFacetIndices.map(item=>item.facet).filter(index=>index>=0))];
  // A planner part may omit sourceBookIds even when its focused query resolves
  // an author or work to specific catalog entries. Carry those trusted resolved
@@ -371,6 +411,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  return {candidates:populated,partFacetIndices,searches:searchSets.map((set,index)=>({
   query:searchSets[index].executedQuery+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
   ...(searchSets[index].scopeReference?{originalQuery:searchQueries[index],scopeInherited:true}:{}),
+  ...(searchSets[index].fallbackFrom?{fallbackFrom:searchSets[index].fallbackFrom,
+   fallbackReason:'empty-source-side-facet'}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
   ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),sources:set.sources.slice(0,8)
  })),searchQueries,namedBookIds};
@@ -536,6 +578,49 @@ export function canFallbackToDirectSearch(status,code=''){
  if(Number.isInteger(status)&&status>=500)return true;
  if(Number.isInteger(status)&&status>=400)return false;
  return ['invalid-response','search-planning-failed','network-error'].includes(code);
+}
+
+function crossSourceSides(partQuestions){
+ const sides=(Array.isArray(partQuestions)?partQuestions:[]).filter(part=>
+  typeof part?.partId==='string'&&Array.isArray(part.sourceBookIds)&&part.sourceBookIds.length);
+ for(let leftIndex=0;leftIndex<sides.length;leftIndex++)for(let rightIndex=leftIndex+1;rightIndex<sides.length;rightIndex++){
+  const left=sides[leftIndex],right=sides[rightIndex];
+  const leftIds=[...new Set(left.sourceBookIds.map(String))],rightIds=[...new Set(right.sourceBookIds.map(String))];
+  if(leftIds.some(id=>rightIds.includes(id)))continue;
+  const combined=[...leftIds,...rightIds];
+  if(sides.some(part=>part!==left&&part!==right&&combined.every(id=>part.sourceBookIds.map(String).includes(id))))
+   return [{part:left,bookIds:leftIds},{part:right,bookIds:rightIds}];
+ }
+ return [];
+}
+
+function scopedCounterpartQuery(counterpartQuery,question,targetIds,allSideIds,books){
+ const names=[];
+ for(const id of allSideIds){
+  const title=books.find(book=>String(book.id)===String(id))?.title||'';
+  const identity=catalogIdentity(title);
+  names.push(...identity.authors,...identity.authors.map(author=>String(author).split(/\s+/u).at(-1)),
+   identity.work,...identity.aliases);
+ }
+ const escape=value=>String(value||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+ let topicalText=[counterpartQuery,question].filter(Boolean).join(' ');
+ for(const name of [...new Set(names)].sort((a,b)=>b.length-a.length)){
+  if(name.length<4)continue;
+  topicalText=topicalText.replace(new RegExp('(?:^|[^\\p{L}\\p{N}])'+escape(name)+
+   '(?:(?:\\x27s|’s))?(?=$|[^\\p{L}\\p{N}])','giu'),' ');
+ }
+ const generic=new Set(['think','thinks','thought','say','says','said','position','positions','idea','ideas',
+  'account','accounts','view','views','response','respond','would','could','should','might','define','definition']);
+ const terms=[...new Set(queryTerms(topicalText).filter(term=>!generic.has(term)))].slice(0,8);
+ if(!terms.length)return '';
+ const targetAuthors=[...new Set(targetIds.flatMap(id=>{
+  const title=books.find(book=>String(book.id)===String(id))?.title||'';
+  return catalogIdentity(title).authors;
+ }))];
+ const label=targetAuthors.length?targetAuthors.join(' '):targetIds
+  .map(id=>catalogIdentity(books.find(book=>String(book.id)===String(id))?.title||'').work)
+  .filter(Boolean).slice(0,2).join(' ');
+ return [label,...terms].filter(Boolean).join(' ').slice(0,160);
 }
 
 function directFacetTitleMatch(question,title){
@@ -771,7 +856,33 @@ export function selectAnswerSources(candidates,question,turnstileToken,
   },eligible[0]):null;
   if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
  }
- if(partRepresentatives.length)ordered=[...partRepresentatives,...ordered.filter(value=>!reservedPartPages.has(value))];
+ if(partRepresentatives.length){
+  // Once every requested part has one candidate, use spare packet slots for
+  // another linked book when available. This gives a direct definition or
+  // comparison a second independent source before sending pages that have no
+  // question-part link. A link is still only an eligibility signal; the Worker
+  // performs the claim-level evidence review.
+  const diverseRepresentatives=[];
+  for(const partId of partIds){
+   const representedBooks=new Set([...reservedPartPages]
+    .filter(value=>value.candidatePartIds?.includes(partId)).map(value=>String(value.bookId)));
+   const eligible=ordered.filter(value=>!reservedPartPages.has(value)&&
+    value.candidatePartIds?.includes(partId)&&!representedBooks.has(String(value.bookId)));
+   if(!eligible.length)continue;
+   const targetQuestion=partQuestionById.get(partId)||question;
+   const candidate=eligible.reduce((best,value)=>{
+    const overlap=directFacetTextMatch(targetQuestion,value.text??value.preview);
+    const bestOverlap=directFacetTextMatch(targetQuestion,best.text??best.preview);
+    return overlap>bestOverlap||overlap===bestOverlap&&(Number(value.score)||0)>(Number(best.score)||0)?value:best;
+   },eligible[0]);
+   diverseRepresentatives.push(candidate);reservedPartPages.add(candidate);
+  }
+  const remainingLinked=ordered.filter(value=>!reservedPartPages.has(value)&&
+   Array.isArray(value.candidatePartIds)&&value.candidatePartIds.length);
+  const remainingUnlinked=ordered.filter(value=>!reservedPartPages.has(value)&&
+   (!Array.isArray(value.candidatePartIds)||!value.candidatePartIds.length));
+  ordered=[...partRepresentatives,...diverseRepresentatives,...remainingLinked,...remainingUnlinked];
+ }
  let selectedSourceBytes=0;
  for(const candidate of ordered){
    if(chosen.length>=maxSources)break;
