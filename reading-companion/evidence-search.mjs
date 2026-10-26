@@ -243,10 +243,11 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   facet:searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===item.query.trim().toLocaleLowerCase())}));
  // The planner's main queries can be more useful than the part's natural-
  // language search query. Associate a focused planner facet with a part when
- // they share at least two distinctive terms. This lets a page found by that
- // facet keep its eligibility link through selection; the Worker still checks
- // source scope, citations, and semantic support. Do not map the verbatim
- // question or direct-fallback query to every part.
+ // they share at least two distinctive terms. For a single-part plan, one
+ // shared subject term is sufficient after removing generic search framing;
+ // the planner's facets all elaborate that one requested answer. This carries
+ // eligibility only, not semantic proof. Multi-part plans keep the two-term
+ // bar so a shared topic word cannot blur distinct requested parts.
  if(!useDirect){
   const linked=new Set(partFacetIndices.map(item=>item.partId+':'+item.facet));
   for(let facet=0;facet<queries.length;facet++)for(const item of partQuestions){
@@ -254,7 +255,11 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
    const partQuestion=typeof item?.question==='string'?item.question:'';
    if(!/^P[1-9]\d*$/.test(partId)||partQuestion.trim().length<5)continue;
    const key=partId+':'+facet;
-   if(!linked.has(key)&&directFacetTextMatch(searchQueries[facet],partQuestion)>=2){
+   const onePartPlan=partQuestions.length===1;
+   const overlap=onePartPlan
+    ?singlePartFacetTextMatch(searchQueries[facet],partQuestion)
+    :directFacetTextMatch(searchQueries[facet],partQuestion);
+   if(!linked.has(key)&&overlap>=(onePartPlan?1:2)){
     partFacetIndices.push({partId,facet});
     linked.add(key);
    }
@@ -647,6 +652,11 @@ function directFacetTextMatch(question,text){
  let score=0;
  for(const term of questionTerms)if(textTerms.has(term))score++;
  return score;
+}
+function singlePartFacetTextMatch(facet,partQuestion){
+ const searchFraming=/\b(?:definition|nature|concept|concepts|meaning|explain|explains|explained|explaining|philosophy|philosophical|texts|text|account|accounts|theory|theories|role|function)\b/giu;
+ return directFacetTextMatch(String(facet||'').replace(searchFraming,' '),
+  String(partQuestion||'').replace(searchFraming,' '));
 }
 
 /* A quoted passage title or phrase can be stronger evidence of part relevance

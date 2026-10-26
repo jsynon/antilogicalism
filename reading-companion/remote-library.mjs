@@ -100,6 +100,30 @@ export function queryTerms(question) {
     .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 24);
 }
 
+// Some established technical phrases have multiple English translations.
+// Keep each phrase family as one relevance concept: matching both words in
+// "dependent arising" must not count as two independent query concepts, while
+// the index can still find either wording. Add only explicit, source-attested
+// phrase equivalences here; this is not open-ended synonym expansion.
+const SOURCE_PHRASE_EQUIVALENCES=Object.freeze([
+  Object.freeze(['dependent origination','dependent arising'])
+]);
+function sourcePhraseTermGroups(question,terms){
+ const normalized=String(question||'').toLocaleLowerCase().normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+ const remaining=new Set(terms),groups=[];
+ for(const equivalence of SOURCE_PHRASE_EQUIVALENCES){
+  const matched=equivalence.find(phrase=>(' '+normalized+' ').includes(' '+phrase+' '));
+  if(!matched)continue;
+  const matchedWords=matched.split(' ');
+  if(!matchedWords.every(word=>remaining.has(word)))continue;
+  matchedWords.forEach(word=>remaining.delete(word));
+  groups.push([...new Set(equivalence.flatMap(phrase=>phrase.split(' ')))]);
+ }
+ for(const term of remaining)groups.push([term]);
+ return groups;
+}
+
 // Kant's Critique states its account of causal necessity under the heading
 // "Second Analogy" and explains it through succession, a rule, and cause and
 // effect. A reader's modern wording may not contain those indexed terms. Add
@@ -267,13 +291,22 @@ export function substantivePageEvidence(text, terms, headerTerms = new Set(), ph
   if (isNavigationPage(text) || isPublicationPage(text)) return null;
   const words = String(text || '').toLowerCase().match(/[a-z0-9]+/g) || [];
   if (words.length < 10) return null;
-  const roots = [...new Set(terms.map(wordStem))];
-  const wanted = new Set(roots);
+  const termGroups=[],seenTerms=new Set();
+  for(const term of terms){
+    const group=[...new Set((Array.isArray(term)?term:[term]).map(wordStem))]
+      .filter(value=>!seenTerms.has(value));
+    if(!group.length)continue;
+    group.forEach(value=>seenTerms.add(value));
+    termGroups.push(group);
+  }
+  const groupByTerm=new Map();
+  termGroups.forEach((group,index)=>group.forEach(term=>groupByTerm.set(term,index)));
   let hits = 0, best = {score:0, center:0, unique:0}, unique = new Set();
   const normalized = words.map((word, index) =>
     index < 24 && headerTerms.has(wordStem(word)) ? '' : wordStem(word));
   for (let i = 0; i < normalized.length; i++) {
-    if (wanted.has(normalized[i])) { unique.add(normalized[i]); hits++; }
+    const groupIndex=groupByTerm.get(normalized[i]);
+    if(groupIndex!==undefined){unique.add(groupIndex);hits++;}
   }
   if (!hits) return null;
   // Find the most locally concentrated part of the actual page. An isolated
@@ -281,8 +314,11 @@ export function substantivePageEvidence(text, terms, headerTerms = new Set(), ph
   // The small number of query terms keeps this inexpensive on large books.
   for (let i = 0; i < normalized.length; i += 30) {
     const window = normalized.slice(i, i + 110);
-    const present = new Set(window.filter(word => wanted.has(word)));
-    const matched = window.filter(word => wanted.has(word)).length;
+    const present=new Set();let matched=0;
+    for(const word of window){
+      const groupIndex=groupByTerm.get(word);
+      if(groupIndex!==undefined){present.add(groupIndex);matched++;}
+    }
     const score = 9 * present.size + Math.min(8, matched);
     if (score > best.score) best = {
       score, center:Math.min(words.length-1, i+55), unique:present.size
@@ -436,10 +472,14 @@ export class RemoteLibrary {
     const hasTopicTerm=queryTokens.some(term=>!fuzzyAuthorCandidates.has(term)&&
       !authorTerms.has(wordStem(term))&&manifest.partitions.includes(term.slice(0,2)));
     const fuzzyAuthorMatches=hasTopicTerm?fuzzyAuthorCandidates:new Map();
-    const terms=[...new Set([...queryTokens,...sourceNativeQueryTerms(question,selectedTitle)])]
+    const rawBaseTerms=[...new Set([...queryTokens,...sourceNativeQueryTerms(question,selectedTitle)])]
       .filter(term=>!fuzzyAuthorMatches.has(term))
-      .filter(term=>!authorTerms.has(wordStem(term)))
-      .filter(term=>manifest.partitions.includes(term.slice(0,2)));
+      .filter(term=>!authorTerms.has(wordStem(term)));
+    const baseTerms=rawBaseTerms.filter(term=>manifest.partitions.includes(term.slice(0,2)));
+    const queryGroups=sourcePhraseTermGroups(question,rawBaseTerms)
+      .map(group=>group.filter(term=>manifest.partitions.includes(term.slice(0,2))))
+      .filter(group=>group.length);
+    const terms=[...new Set(queryGroups.flat())];
     const phrase=requestedPhrase(question);
     if (!terms.length) return {terms:[], sources:[], elapsedMs:Math.round(performance.now() - started)};
     const questionWords = new Set(String(question || '').toLowerCase().match(/[a-z0-9]+/g) || []);
@@ -477,7 +517,9 @@ export class RemoteLibrary {
     // Keep indexed term matches available for candidate generation; relevance
     // is evaluated per book after separating author metadata from topic terms.
     const data = new Map(await Promise.all(prefixes.map(async p => [p, await this.partition(p)])));
-    const termGroups=terms.map(term=>termFamily(term,data.get(term.slice(0,2))));
+    const termGroups=queryGroups.map(group=>[...new Set(group
+      .flatMap(term=>termFamily(term,data.get(term.slice(0,2)))))])
+      .filter(group=>group.length);
     const evidenceTerms=[...new Set(termGroups.flat())];
     const scores = new Map();
     for (const group of termGroups) {
@@ -519,7 +561,7 @@ export class RemoteLibrary {
       hits.sort((a,b) => b.matched - a.matched || b.score - a.score || a.id - b.id);
       const titleTokens = new Set((String(manifest.books[id].title || '').split(/\s+[—–-]\s+/)[0]
         .toLowerCase().match(/[a-z0-9]+/g) || []).map(titleTermStem));
-      const overlap = terms.filter(term => titleTokens.has(titleTermStem(term))).length;
+      const overlap = baseTerms.filter(term => titleTokens.has(titleTermStem(term))).length;
       // A named Bible book plus a chapter-and-verse locator is a precise
       // source request. Prefer Bible editions among otherwise matching works;
       // still rank their actual pages by the question terms below.
@@ -563,16 +605,15 @@ export class RemoteLibrary {
       const bookTitleTerms = new Set((String(meta.title || '').toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
       const bookAuthorTerms = new Set((String(meta.title || '').split(/\s+[—–-]\s+/).slice(1).join(' ')
         .toLowerCase().match(/[a-z0-9]+/g) || []).map(wordStem));
-      const bookTerms = terms.filter(term => !bookAuthorTerms.has(wordStem(term)));
-      const bookEvidenceTerms=termGroups
-        .filter((_,index)=>!bookAuthorTerms.has(wordStem(terms[index])))
-        .flat();
-      // Require roughly half the facet's terms to occur in one local passage,
-      // with a floor of two and ceiling of three. Four- and five-term facets
-      // otherwise lose useful passages that use a close but different term
-      // (for example, "dependent arising" for a query mentioning
-      // "dependent origination"). Longer unscoped facets retain the stronger
-      // threshold that filters incidental character/event overlap.
+      const bookTerms = baseTerms.filter(term => !bookAuthorTerms.has(wordStem(term)));
+      const bookEvidenceGroups=termGroups.map(group=>group
+        .filter(term=>!bookAuthorTerms.has(wordStem(term))))
+        .filter(group=>group.length);
+      const bookEvidenceTerms=bookEvidenceGroups.flat();
+      // Keep the existing roughly-half relevance floor (minimum two,
+      // maximum three) based on the reader/planner's original indexed terms.
+      // Equivalent source phrases are one local evidence concept, so their
+      // alternate wording cannot inflate the number of independent matches.
       const minimumEvidenceTerms = bookTerms.length >= 2
         ? (comparison || namedAuthorBookIds.size ? 2 : Math.max(2, Math.min(3, Math.floor(bookTerms.length / 2)))) : 1;
       if (!bookTerms.length) continue;
@@ -593,7 +634,7 @@ export class RemoteLibrary {
         }
         if ((item.text.match(/[a-z]+/gi) || []).length >= 10 &&
             !proseByPage.has(item.page)) proseByPage.set(item.page, item);
-        const evidence = substantivePageEvidence(item.text, bookEvidenceTerms, bookTitleTerms,phrase);
+        const evidence = substantivePageEvidence(item.text, bookEvidenceGroups, bookTitleTerms,phrase);
         if (!evidence || (evidence.localUnique < minimumEvidenceTerms&&!evidence.phraseMatches)) continue;
         const hit = relevant.get(item.id);
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
@@ -611,7 +652,7 @@ export class RemoteLibrary {
           endsMidSentence(anchor.item.text)?anchor.item.page+1:0;
         const item=neighborPage?proseByPage.get(neighborPage):null;
         const neighborEvidence=item&&substantivePageEvidence(item.text,
-          bookEvidenceTerms,bookTitleTerms,phrase);
+          bookEvidenceGroups,bookTitleTerms,phrase);
         const relevantNeighbor=neighborEvidence&&
           (neighborEvidence.localUnique>=1||neighborEvidence.phraseMatches>0);
         const phraseContinuesAcrossBoundary=phrase&&exactPhraseMatchCount(
