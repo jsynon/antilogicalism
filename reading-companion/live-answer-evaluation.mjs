@@ -257,7 +257,7 @@ function answerDeniesSupportedComparison(part,answer){
  const givesContrast=/\b(?:whereas|by contrast|in contrast|unlike|differs? from|different from|the difference is|differ in|contrasts? with)\b/i.test(text);
  return explicitGap&&!givesContrast;
 }
-export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSources=[]){
+export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSources=[],options={}){
  const citations=Array.isArray(data?.citations)?data.citations:[];
  const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
  const workerSourceBuild=typeof data?.workerSourceBuild==='string'&&data.workerSourceBuild.length<=128?data.workerSourceBuild:null;
@@ -325,20 +325,33 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   supported:questionParts.filter(item=>item?.status==='supported').length,
   partial:questionParts.filter(item=>item?.status==='partial').length,
   unsupported:questionParts.filter(item=>item?.status==='unsupported').length};
+ const evaluationScope=options.scope==='all-books'?'all-books':
+  options.scope==='selected-books'?'selected-books':'';
+ const plannerParts=Array.isArray(options.plannerPlan?.parts)?options.plannerPlan.parts:[];
  const sourcePartAlignment=(requiredPartSources||[]).map(expected=>{
   const needle=normalizeDiagnosticExcerpt(expected.partIncludes);
   const part=questionParts.find(item=>normalizeDiagnosticExcerpt(item?.part).includes(needle));
   const allowedBookIds=expected.book_ids.map(String);
   if(!part)return {partIncludes:expected.partIncludes,allowedBookIds,aligned:false,reason:'expected-part-not-found'};
+  const plannerPart=plannerParts.find(item=>
+   normalizeDiagnosticExcerpt(item?.question).includes(normalizeDiagnosticExcerpt(part.part))||
+   normalizeDiagnosticExcerpt(part.part).includes(normalizeDiagnosticExcerpt(item?.question)));
+  const plannerBookIds=Array.isArray(plannerPart?.sourceBookIds)?
+   [...new Set(plannerPart.sourceBookIds.map(String))]:[];
+  const eligibilityKnown=evaluationScope==='all-books'&&plannerBookIds.length>0;
+  const eligibleBookIds=eligibilityKnown?plannerBookIds:allowedBookIds;
   const evidenceIds=Array.isArray(part.evidenceIds)?part.evidenceIds.map(String):[];
   const linkedBooks=[...new Set(citations.filter(source=>evidenceIds.includes(String(source?.id||'')))
    .map(source=>String(source?.bookId||'')))];
-  const misalignedBookIds=linkedBooks.filter(id=>!allowedBookIds.includes(id));
+  const misalignedBookIds=linkedBooks.filter(id=>!eligibleBookIds.includes(id));
+  const additionalEligibleBookIds=eligibilityKnown?
+   linkedBooks.filter(id=>!allowedBookIds.includes(id)&&eligibleBookIds.includes(id)):[];
   const hasExpectedBook=linkedBooks.some(id=>allowedBookIds.includes(id));
   const aligned=misalignedBookIds.length===0&&
    (part.status==='unsupported'||hasExpectedBook);
   return {partIncludes:expected.partIncludes,part:String(part.part||''),status:String(part.status||''),
-   allowedBookIds,linkedBookIds:linkedBooks,misalignedBookIds,aligned,
+   scope:evaluationScope||'unspecified',allowedBookIds,eligibleBookIds,eligibilityKnown,
+   linkedBookIds:linkedBooks,additionalEligibleBookIds,misalignedBookIds,aligned,
    reason:aligned?'':'evidence-does-not-match-expected-part-source'};
  });
  const evidenceHighlights=highlights.map(item=>{
@@ -439,17 +452,22 @@ export function recheckQualityReport(report){
    evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
    workerSourceBuild:item.answerWorkerSourceBuild,workerSourceRevision:item.answerWorkerSourceRevision
   },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups,
-   definition.required_part_source_groups||[]);
+   definition.required_part_source_groups||[],{scope:item.scope||
+    (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books'),
+    plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null});
   const reviewAblation=Array.isArray(item.reviewAblation?.variants)?{...item.reviewAblation,
    variants:item.reviewAblation.variants.map(variant=>{
     const variantAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
      citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
      evidenceHighlights:variant.evidenceHighlights,workerVersionId:variant.workerVersionId,
      workerSourceBuild:variant.workerSourceBuild,workerSourceRevision:variant.workerSourceRevision},Array.isArray(item.submittedSources)?item.submittedSources:[],
-     definition.required_source_groups,definition.required_part_source_groups||[]);
+     definition.required_source_groups,definition.required_part_source_groups||[],{scope:item.scope||
+      (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books'),
+      plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null});
     return {...variant,...variantAudit,manualReview:variant.manualReview};
    })}:item.reviewAblation;
   return {...item,...(reviewAblation?{reviewAblation}:{}),offlineRecheck:{passed:audit.passed,sourceGroups:audit.sourceGroups,
+   sourcePartAlignment:audit.sourcePartAlignment,
    questionPartCoverage:audit.questionPartCoverage,partEvidenceAudit:audit.partEvidenceAudit,
    partEvidenceComplete:audit.partEvidenceComplete,
    answerCoverageConsistent:audit.answerCoverageConsistent,
@@ -639,7 +657,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     answerVariant:variant==='compose-only'?'compose-only':'with-review',
     sources:selected.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds}))},beforeCall,'answer',progressEvent);
    const audit=auditLiveAnswer(data,selected,item.required_source_groups,
-    item.required_part_source_groups||[]);
+    item.required_part_source_groups||[],{scope:item.selected_book_ids?.length?'selected-books':'all-books',
+     plannerPlan:plan?.plan||null});
    variantResults.push({answerVariant:variant,pipeline:data.pipeline||null,...audit,usage:data.usage||null,
     ...(data.trace?{evidenceTrace:data.trace}:{})});
    await progress('answer','completed',`${variant} returned ${audit.outcome||'no outcome'} with ${audit.coverage} coverage and ${audit.citationCount} citations.`,
