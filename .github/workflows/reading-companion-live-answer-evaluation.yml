@@ -34,7 +34,7 @@ on:
         default: all
         required: true
       scope:
-        description: Quality mode can use selected-book or All Books scope; focused cases always use All Books and the live planner
+        description: Selected-books honors each case's configured books and queries; All Books removes restrictions and uses the live planner. Acceptance requires All Books
         type: choice
         options:
           - selected-books
