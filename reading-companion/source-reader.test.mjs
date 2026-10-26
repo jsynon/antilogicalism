@@ -6,6 +6,7 @@ import {eligiblePages,renderHighlightedText} from './source-reader.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
+const clientV48=readFileSync(new URL('./companion-v111.mjs',import.meta.url),'utf8');
 const source=readFileSync(new URL('./source-reader.mjs',import.meta.url),'utf8');
 
 test('returns contiguous readable paragraphs without changing stored OCR text',()=>{
@@ -44,6 +45,31 @@ test('renders normalized NKJV text as readable paragraphs',()=>{
   assert.match(readable.textContent,/propitiation/);
   assert.match(readable.textContent,/at any time/);
   assert.doesNotMatch(readable.textContent,/begoƩen|propiƟaƟon|Ɵme|jusƟﬁed|oﬀered|fulﬁlled/);
+ }finally{
+  if(originalDocument===undefined)delete globalThis.document;
+  else globalThis.document=originalDocument;
+ }
+});
+test('renders multiple reviewer-approved exact excerpts from a cited page',()=>{
+ const first='The first source passage explains how reason supports the opening claim in this paragraph.';
+ const second='A separate source passage develops the second claim through a distinct example from history.';
+ const raw=first+' '+second;
+ const element=tag=>({tag,children:[],append(child){this.children.push(child)},replaceChildren(){this.children=[]},
+  set textContent(value){this._text=String(value);this.children=[]},
+  get textContent(){return this._text??this.children.map(child=>child.textContent||'').join('')}});
+ const originalDocument=globalThis.document;
+ globalThis.document={createElement:element,createTextNode:value=>({textContent:String(value)})};
+ try{
+  const readable=element('div');
+  const shown=renderHighlightedText(readable,raw,[
+   first,second
+  ]);
+  const marks=readable.children.flatMap(paragraph=>paragraph.children.filter(child=>child.tag==='mark'));
+  assert.equal(shown.matched,true);
+  assert.equal(shown.matchCount,2);
+  assert.deepEqual(marks.map(mark=>mark.textContent),[
+   first.slice(0,-1),second.slice(0,-1)
+  ]);
  }finally{
   if(originalDocument===undefined)delete globalThis.document;
   else globalThis.document=originalDocument;
@@ -123,10 +149,13 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(client,/link\.href=source\.url/);
  assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
  assert.match(client,/sourceReader\.open\(\{\.\.\.source,excerpt\},read\)/);
+ assert.match(clientV48,/claimQuotesForCitation\(answer,citationGroup\.start,evidence\)/,
+  'the active v48 client must choose excerpts linked to the cited answer claim');
+ assert.match(clientV48,/sourceReader\.open\(\{\.\.\.source,excerpts\},a\)/);
  assert.match(source,/isAllowedBook\(bookId\)/);
  assert.match(source,/getBook\(bookId\)/);
  assert.match(source,/function renderHighlightedText/);
- assert.match(source,/renderHighlightedText\(viewer,page\.text,quotation,source\.bookId\)/);
+ assert.match(source,/renderHighlightedText\(viewer,page\.text,quotations,source\.bookId\)/);
  assert.match(source,/meta\.textContent='Physical PDF page '\+page\.page/);
  assert.doesNotMatch(source,/v47 OCR text formatted as paragraphs|v47 OCR text/);
  assert.match(html,/#companion-pilot \.companion-source-reader\[hidden\]\{display:none!important\}/);

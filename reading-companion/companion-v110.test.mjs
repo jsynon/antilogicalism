@@ -166,10 +166,12 @@ test('public companion copy explains cited sources and keeps source reading cont
 
 
 test('answer citations open in the local page reader while Sources keeps the PDF link',()=>{
- assert.ok(client.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map())'));
- assert.ok(client.includes("sourceReader.open({...source,excerpt:evidence?.quote||''},a)"));
- assert.ok(client.includes("sourceReader.open({...source,excerpt},read)"));
- assert.ok(client.includes('link.href=source.url'));
+ assert.ok(clientV48.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map())'));
+ assert.ok(clientV48.includes('claimQuotesForCitation(answer,citationGroup.start,evidence)'));
+ assert.ok(clientV48.includes('sourceReader.open({...source,excerpts},a)'));
+ assert.ok(clientV48.includes("sourceReader.open({...source,excerpt},read)"));
+ assert.ok(clientV48.includes('link.href=source.url'));
+ assert.ok(clientV48.includes("panel.append(node('h3','Key passages from the source books'))"));
  assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
 });
 

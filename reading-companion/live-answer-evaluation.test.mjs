@@ -609,7 +609,9 @@ test('audit report preserves answer text, citation locations, and Worker quote h
     plannerSourceRole:'primary',pageSectionHint:'undetermined',pageVoiceHint:'undetermined',
     workVoice:{kind:'pseudonymous-author',name:'Johannes de Silentio',creditedAuthor:'Søren Kierkegaard'},
     pageVoice:{kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'}}
-  }],evidenceHighlights:[{source_id:'S1',title:'Bible',page:1821,quote:'A passage excerpt.'}]},
+  }],evidenceHighlights:[{source_id:'S1',title:'Bible',page:1821,quote:'A passage excerpt.',
+   claim_id:'P1-C1',point:'Supported claim.',quotes:[{claim_id:'P1-C1',part_id:'P1',
+    point:'Supported claim.',quote:'A passage excerpt.'}]}]},
   [{}],[{label:'Bible',book_ids:['638']}]);
  assert.equal(result.answerText,'Supported claim [S1].');
  assert.deepEqual(result.citationSources,[{id:'S1',bookId:'638',title:'Bible',page:1821,
@@ -619,7 +621,9 @@ test('audit report preserves answer text, citation locations, and Worker quote h
    workVoice:{kind:'pseudonymous-author',name:'Johannes de Silentio',creditedAuthor:'Søren Kierkegaard'},
    pageVoice:{kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'}}}]);
  assert.deepEqual(result.evidenceHighlights,[{sourceId:'S1',title:'Bible',page:1821,
-  quote:'A passage excerpt.',quoteLocated:null}]);
+  quote:'A passage excerpt.',claimId:'P1-C1',point:'Supported claim.',quoteLocated:null,
+  quotes:[{claimId:'P1-C1',partId:'P1',point:'Supported claim.',quote:'A passage excerpt.',
+   quoteLocated:null,partialMatch:false}]}]);
  assert.equal('evidenceHighlightsLocated' in result,false);
 });
 

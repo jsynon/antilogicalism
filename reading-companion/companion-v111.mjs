@@ -298,6 +298,24 @@ function sourcePage(source){
   return candidates.find(page=>page.bookId===String(source.bookId) &&
     page.page===Number(source.page))||null;
 }
+function normalizeClaimAnchor(value){
+  return String(value||'').normalize('NFKC').toLocaleLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+}
+function claimQuotesForCitation(answer,citationStart,highlight){
+  const quotes=Array.isArray(highlight?.quotes)?highlight.quotes:[];
+  if(!quotes.length)return typeof highlight?.quote==='string'&&highlight.quote.trim()?
+    [highlight.quote]:[];
+  const before=String(answer).slice(0,citationStart);
+  const sentence=before.split(/(?:[.!?]+\s+|\n+)/).at(-1)||before;
+  const anchor=normalizeClaimAnchor(sentence);
+  const linked=quotes.filter(item=>{
+    const point=normalizeClaimAnchor(item?.point);
+    return point&&anchor&&(point===anchor||point.includes(anchor)||anchor.includes(point));
+  });
+  const selected=linked.length?linked:quotes.filter(item=>item?.claim_id===highlight.claim_id);
+  return selected.map(item=>item?.quote).filter(value=>typeof value==='string'&&value.trim()).slice(0,3);
+}
 function appendCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
   const byId=new Map(citations.map(s=>[s.id,s]));
   const groups=inlineCitationGroups(answer);
@@ -315,9 +333,10 @@ function appendCitationTokens(target,answer,citations,evidenceHighlights=[],numb
         source.title+', PDF page '+source.page+(attribution?'. '+attribution:''));
       const evidence=evidenceHighlights.find(item=>item.source_id===source.id&&
         Number(item.page)===Number(source.page));
+      const excerpts=claimQuotesForCitation(answer,citationGroup.start,evidence);
       a.addEventListener('click',async()=>{
         try{
-          await sourceReader.open({...source,excerpt:evidence?.quote||''},a);
+          await sourceReader.open({...source,excerpts},a);
         }catch(error){setStatus('Source reader: '+error.message);}
       });
       citationGroup.append(a);
@@ -409,23 +428,38 @@ function renderResponse(data,turnQuestion=''){
     for(const source of orderedCitations){
       const highlight=highlights.find(item=>
         item.source_id===source.id&&Number(item.page)===Number(source.page));
-      const excerpt=(typeof highlight?.quote==='string'&&highlight.quote.trim())?
-        highlight.quote:'';
+      const excerpts=(Array.isArray(highlight?.quotes)?highlight.quotes.map(item=>item?.quote):[])
+        .filter(value=>typeof value==='string'&&value.trim()).slice(0,3);
+      if(!excerpts.length&&typeof highlight?.quote==='string'&&highlight.quote.trim())excerpts.push(highlight.quote);
       const card=node('article',undefined,'companion-key-passage');
-      const quote=node('p',excerpt||'No verified passage highlight is available for this citation.',
-        'companion-key-quote');
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
       link.textContent='['+citationDisplayLabel(source.id,numbering)+'] '+source.title+' · p. '+source.page;
       const attribution=sourceAttributionLabel(source.provenance);
       if(attribution)card.append(node('p',attribution,'companion-source-attribution'));
-      const read=node('button','Read passage','companion-inline-read');
-      read.type='button';
-      read.addEventListener('click',async()=>{
-        try{await sourceReader.open({...source,excerpt},read);}
-        catch(error){setStatus('Source reader: '+error.message);}
-      });
-      card.append(quote,link,read);
+      if(excerpts.length){
+        excerpts.forEach(excerpt=>{
+          const quote=node('p',excerpt,'companion-key-quote');
+          const read=node('button','Read highlighted passage','companion-inline-read');
+          read.type='button';
+          read.addEventListener('click',async()=>{
+            try{await sourceReader.open({...source,excerpt},read);}
+            catch(error){setStatus('Source reader: '+error.message);}
+          });
+          card.append(quote,read);
+        });
+      }else{
+        card.append(node('p','No verified passage highlight is available for this citation.',
+          'companion-key-quote'));
+        const read=node('button','Read passage','companion-inline-read');
+        read.type='button';
+        read.addEventListener('click',async()=>{
+          try{await sourceReader.open({...source,excerpts:[]},read);}
+          catch(error){setStatus('Source reader: '+error.message);}
+        });
+        card.append(read);
+      }
+      card.append(link);
       panel.append(card);
     }
     turn.append(panel);
@@ -444,9 +478,15 @@ function renderResponse(data,turnQuestion=''){
     diagnosticState.evidenceHighlights=highlights.map(item=>{
       const source=citations.find(s=>s.id===item.source_id&&Number(s.page)===Number(item.page));
       const original=sourcePage(source);
-      const page=original?readablePageWithHighlight(original.text,item.quote):null;
+      const quotes=(Array.isArray(item.quotes)?item.quotes:[{quote:item.quote,claim_id:item.claim_id,point:item.point}])
+        .slice(0,3).map(quote=>{
+          const page=original?readablePageWithHighlight(original.text,quote.quote):null;
+          return {claim_id:quote.claim_id||'',point:quote.point||'',quote:quote.quote||'',
+            quoteLocated:Boolean(page?.match),partialMatch:page?.match?.partial===true};
+        });
       return {source_id:item.source_id,page:Number(item.page),quote:item.quote,
-        quoteLocated:Boolean(page?.match),partialMatch:page?.match?.partial===true};
+        claim_id:item.claim_id||'',point:item.point||'',quotes,
+        quoteLocated:quotes.some(quote=>quote.quoteLocated),partialMatch:quotes.some(quote=>quote.partialMatch)};
     });
     refreshDiagnostic();
   }
@@ -618,7 +658,10 @@ async function askQuestion(questionText){
         diagnosticState.citations=responseCitations;
         diagnosticState.evidenceHighlights=Array.isArray(data.evidenceHighlights)?
           data.evidenceHighlights.map(item=>({source_id:item.source_id,
-            page:Number(item.page),quote:item.quote,quoteLocated:false,partialMatch:false})):[];
+            page:Number(item.page),quote:item.quote,claim_id:item.claim_id||'',point:item.point||'',
+            quotes:(Array.isArray(item.quotes)?item.quotes:[{quote:item.quote,claim_id:item.claim_id,point:item.point}])
+              .slice(0,3).map(quote=>({...quote,quoteLocated:false,partialMatch:false})),
+            quoteLocated:false,partialMatch:false})):[];
         refreshDiagnostic();
       }
       setStatus('The answer included citations without matching sources. Please try again.');
