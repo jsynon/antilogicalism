@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 20226)
-Total output lines: 850
-
 #!/usr/bin/env node
 /* Explicit, metered end-to-end evaluation against the public Reading Companion
  * Worker. This is never run by the PR or scheduled retrieval-only workflow.
@@ -340,7 +337,17 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const citationHighlightAudit={citedSourceCount:citedSourceIds.length,
   highlightedSourceCount:citedSourceIds.filter(id=>highlightedSourceIds.has(id)).length,
   citedSourcesWithoutLocatedHighlight:citedSourceIds.filter(id=>!highlightedSourceIds.has(id))};
- …226 tokens truncated…eview the answer and source text.';
+ const coverage=String(data?.coverage||'');
+ const partStatusesConsistent=questionParts.length===0?null:
+  (coverage==='full'?questionParts.every(part=>part?.status==='supported'):
+   coverage==='partial'?questionParts.some(part=>part?.status!=='supported'):false);
+ const proseContradictions=questionParts.filter(part=>answerDeniesSupportedComparison(part,answer))
+  .map(part=>String(part?.part||''));
+ const answerCoverageConsistent=questionParts.length===0?null:
+  partStatusesConsistent&&!proseContradictions.length;
+ const partEvidenceComplete=questionParts.length===0?null:
+  partEvidenceAudit.every(part=>part.structurallyComplete!==false);
+ const evidenceAuditScope='Evidence IDs are checked for consistent linkage across question parts, the reviewed evidence map, cited sources, and submitted pages. This is a structural check, not a semantic judge of whether a passage truly supports a claim; review the answer and source text.';
  const outcome=String(data?.outcome||'');
  const reviewStatus=String(data?.reviewStatus||'');
  const failureCode=typeof data?.failureCode==='string'?data.failureCode:'';
