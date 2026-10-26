@@ -50,7 +50,10 @@ test('diagnostic output is bounded and excludes full source text and challenge d
     quoteVerified:true,anchorQuote:'If they could observe justice',speaker:'Hobbes',
     qualifier:'If they could observe justice without common power'}],
   evidenceHighlights:Array.from({length:6},(_,index)=>({source_id:'S'+(index+1),page:12+index,
-    quoteLocated:true,partialMatch:false,quote:index===0?'PRIVATE QUOTE':'QUOTE '+index}))
+    quoteLocated:true,partialMatch:false,quote:index===0?'PRIVATE QUOTE':'QUOTE '+index,
+    claim_id:index===0?'P1-C1':'',point:index===0?'The sentence is supported.':'',
+    quotes:index===0?[{claim_id:'P1-C1',part_id:'P1',point:'The sentence is supported.',
+      quote:'PRIVATE QUOTE',quoteLocated:true}]:[]}))
  });
  const serialized=JSON.stringify(report);
  assert.equal(report.schema,'antilogicalism-reading-companion-diagnostic-v1');
@@ -67,6 +70,9 @@ test('diagnostic output is bounded and excludes full source text and challenge d
  assert.equal(report.candidates[0].score,2.5);
  assert.equal(report.evidenceHighlights[0].quoteLocated,true);
  assert.equal(report.evidenceHighlights[0].quote,'PRIVATE QUOTE');
+ assert.equal(report.evidenceHighlights[0].claimId,'P1-C1');
+ assert.deepEqual(report.evidenceHighlights[0].quotes,[{claimId:'P1-C1',partId:'P1',
+  point:'The sentence is supported.',quote:'PRIVATE QUOTE',quoteLocated:true,partialMatch:false}]);
  assert.equal(report.evidenceHighlights.length,6,'diagnostics retain the public six-source highlight window');
  assert.deepEqual(report.answer.reviewedEvidence,[{id:'S1',
   point:'The speaker makes a conditional claim.',quoteVerified:true,
