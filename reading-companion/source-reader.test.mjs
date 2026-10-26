@@ -157,6 +157,7 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(source,/function renderHighlightedText/);
  assert.match(source,/renderHighlightedText\(viewer,page\.text,quotations,source\.bookId\)/);
  assert.match(source,/meta\.textContent='Physical PDF page '\+page\.page/);
+ assert.ok(source.includes('The matching cited passages are highlighted in yellow.'));
  assert.doesNotMatch(source,/v47 OCR text formatted as paragraphs|v47 OCR text/);
  assert.match(html,/#companion-pilot \.companion-source-reader\[hidden\]\{display:none!important\}/);
  assert.doesNotMatch(source,/companion-source-quote|quoteBox/);

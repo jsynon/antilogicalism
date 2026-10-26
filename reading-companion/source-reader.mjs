@@ -91,7 +91,8 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     const shown=renderHighlightedText(viewer,page.text,quotations,source.bookId);
     if(quotations.length){
       status.textContent=shown.matched?
-        'The matching cited passage is highlighted in yellow.':
+        (quotations.length>1?'The matching cited passages are highlighted in yellow.':
+          'The matching cited passage is highlighted in yellow.'):
         'The excerpt could not be located confidently on this page; no text has been highlighted.';
     }else{
       status.textContent=onCitedPage?'No highlighted passage was supplied for this citation.':

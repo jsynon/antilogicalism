@@ -169,7 +169,9 @@ test('answer citations open in the local page reader while Sources keeps the PDF
  assert.ok(clientV48.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map())'));
  assert.ok(clientV48.includes('claimQuotesForCitation(answer,citationGroup.start,evidence)'));
  assert.ok(clientV48.includes('sourceReader.open({...source,excerpts},a)'));
- assert.ok(clientV48.includes("sourceReader.open({...source,excerpt},read)"));
+ assert.match(clientV48,/excerpts\.forEach\(excerpt=>\{\s*const quote=node\('p',excerpt,'companion-key-quote'\);\s*card\.append\(quote\);\s*\}\);\s*const read=node\('button','Read highlighted passages'/,
+  'each citation card renders every excerpt but creates one source-level reader button');
+ assert.ok(clientV48.includes('sourceReader.open({...source,excerpts},read)'));
  assert.ok(clientV48.includes('link.href=source.url'));
  assert.ok(clientV48.includes("panel.append(node('h3','Key passages from the source books'))"));
  assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
