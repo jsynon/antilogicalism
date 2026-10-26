@@ -71,10 +71,11 @@ test('Kant causal-necessity search adds the Critique’s indexed Second Analogy 
   'the passage explaining causal succession and its rule should outrank a general deduction passage');
 });
 
-test('a five-term Sunyata facet reaches and links the v48 Nagarjuna introduction page',async()=>{
+test('run 61 Sunyata query misses the Nagarjuna page until source-native terms are planned',async()=>{
  const question='What is sunyata?';
  const firstQuery='definition and essential nature of sunyata in Buddhist texts';
- const secondQuery='how sunyata operates through dependent origination and emptiness';
+ const failedRun61Query='how sunyata functions as emptiness or lack of inherent existence';
+ const sourceNativeQuery='Nagarjuna dependent arising emptiness';
  const driveUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
  const books=[
   {id:'183',title:'The Self-Overcoming of Nihilism — Keiji Nishitani'},
@@ -94,13 +95,13 @@ test('a five-term Sunyata facet reaches and links the v48 Nagarjuna introduction
   'manifest.json':{
    version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:4,
    page_books:[183,185,178,400],
-   partitions:['bu','de','em','es','na','op','or','su','te'],
+   partitions:['ar','bu','de','em','es','na','op','or','su','te'],
    books:Object.fromEntries(books.map(book=>[book.id,{
     title:book.title,drive_url:driveUrl(driveId)
    }]))
   },
-  'terms-bu.json':{},'terms-de.json':{dependent:[0,1,1,1]},
-  'terms-em.json':{emptiness:[0,2]},'terms-es.json':{},'terms-na.json':{},
+  'terms-ar.json':{arising:[2]},'terms-bu.json':{},'terms-de.json':{dependent:[0,1,1,1]},
+  'terms-em.json':{emptiness:[0,2]},'terms-es.json':{},'terms-na.json':{nagarjuna:[2]},
   'terms-op.json':{},'terms-or.json':{origination:[0,1]},
   'terms-su.json':{sunyata:[1]},'terms-te.json':{},
   'book-183.json':{pages:[{id:0,page:224,text:pages['183:224']}]},
@@ -116,11 +117,15 @@ test('a five-term Sunyata facet reaches and links the v48 Nagarjuna introduction
  const library=new RemoteLibrary('https://example.test/data-v48/',localFetch);
  const allowedBookIds=new Set(books.map(book=>book.id));
  const partQuestions=[{partId:'P1',question}];
- const retrieved=await retrieveEvidence({question,queries:[firstQuery,secondQuery],
-  partQueries:[{partId:'P1',query:secondQuery}],partQuestions,library,books,
+ const retrieveWithFacet=query=>retrieveEvidence({question,queries:[firstQuery,query],
+  partQueries:[{partId:'P1',query}],partQuestions,library,books,
   allowedBookIds,pageLoader:async source=>({text:pages[`${source.bookId}:${source.page}`]||''})});
+ const failedRun61=await retrieveWithFacet(failedRun61Query);
+ assert.equal(failedRun61.candidates.some(source=>source.bookId==='178'&&source.page===88),false,
+  'the exact run-61 wording still has only one indexed match on the page and should remain below the existing floor');
+ const retrieved=await retrieveWithFacet(sourceNativeQuery);
  const nagaPage=retrieved.candidates.find(source=>source.bookId==='178'&&source.page===88);
- assert.ok(nagaPage,'the v48 page matching dependent + emptiness should pass the generic two-term floor');
+ assert.ok(nagaPage,'the source-native query matches Nagarjuna, dependent arising, and emptiness on the v48 page');
  assert.ok(nagaPage.candidatePartIds.includes('P1'),
   'the page found by the dependent-origination planner facet must remain linked to the Sunyata part');
  const answerPacket=selectAnswerSources(retrieved.candidates,question,'token',{

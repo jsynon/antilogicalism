@@ -701,6 +701,19 @@ test('Last Writings page provenance separates Dilworth introduction from Nishida
   'Editorial introduction by David A. Dilworth · Work credited to Kitarō Nishida');
 });
 
+test('Nagarjuna page 88 is attributed to Kalupahana’s introduction',()=>{
+ const title='Mūlamadhyamakakārikā — Nāgārjuna';
+ const plan={sources:[{role:'primary',bookIds:['178']}]};
+ const intro=sourceProvenance({bookId:'178',title,page:88},plan,
+  'THE PHILOSOPHY OF THE MIDDLE WAY\nWith that analysis, Nagarjuna was ready to defend the four noble truths.');
+ assert.deepEqual(intro.pageVoice,
+  {kind:'editorial-introduction',name:'David J. Kalupahana',creditedAuthor:'Nāgārjuna'});
+ assert.equal(sourceAttributionLabel(intro),
+  'Editorial introduction by David J. Kalupahana · Work credited to Nāgārjuna');
+ assert.equal(sourceProvenance({bookId:'178',title,page:100},plan).pageVoice,undefined,
+  'the page-specific note must not transfer to Nagarjuna’s translated text');
+});
+
 test('shared retrieval hydrates bounded full pages and returns one reproducible facet pool',async()=>{
  const books=[{id:'239',title:'The Portable Nietzsche — Friedrich Nietzsche (edited by Walter Kaufmann)'}];
  const allowedBookIds=new Set(['239']);let calls=0;
