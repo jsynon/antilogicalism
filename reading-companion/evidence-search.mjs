@@ -320,7 +320,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
       !searchSets[counterpartFacet]?.sources.length)continue;
    const counterpartQuery=searchQueries[counterpartFacet];
    const activeIds=side.bookIds.filter(id=>allowedBookIds.has(String(id)));
-   const retryQuery=scopedCounterpartQuery(counterpartQuery,direct,activeIds,
+   const retryQuery=scopedCounterpartQuery(searchQueries[facet],counterpartQuery,direct,activeIds,
     [...new Set([...sides[0].bookIds,...sides[1].bookIds])],books);
    if(!retryQuery||retryQuery.toLocaleLowerCase()===searchQueries[facet].toLocaleLowerCase())continue;
    try{
@@ -599,7 +599,7 @@ function crossSourceSides(partQuestions){
  return [];
 }
 
-function scopedCounterpartQuery(counterpartQuery,question,targetIds,allSideIds,books){
+function scopedCounterpartQuery(failedQuery,counterpartQuery,question,targetIds,allSideIds,books){
  const names=[];
  for(const id of allSideIds){
   const title=books.find(book=>String(book.id)===String(id))?.title||'';
@@ -608,7 +608,11 @@ function scopedCounterpartQuery(counterpartQuery,question,targetIds,allSideIds,b
    identity.work,...identity.aliases);
  }
  const escape=value=>String(value||'').replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
- let topicalText=[counterpartQuery,question].filter(Boolean).join(' ');
+ // Keep topic words from both sides. An abstract query for the missing author
+ // may be empty precisely because its wording is not source-native; the other
+ // author's successful topic query supplies a useful anchor, while the failed
+ // facet can contribute a concrete term such as "religious" or "causal".
+ let topicalText=[failedQuery,counterpartQuery,question].filter(Boolean).join(' ');
  for(const name of [...new Set(names)].sort((a,b)=>b.length-a.length)){
   if(name.length<4)continue;
   topicalText=topicalText.replace(new RegExp('(?:^|[^\\p{L}\\p{N}])'+escape(name)+
