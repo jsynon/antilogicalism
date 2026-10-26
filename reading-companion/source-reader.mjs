@@ -24,32 +24,41 @@ export function eligiblePages(shard){
 }
 export function renderHighlightedText(container,text,quote,bookId=''){
   const sourceText=normalizeKnownOcrArtifacts(stripWebCaptureFooters(text),bookId);
-  const displayQuote=normalizeKnownOcrArtifacts(stripWebCaptureFooters(quote),bookId);
+  const displayQuotes=(Array.isArray(quote)?quote:[quote]).map(value=>
+    normalizeKnownOcrArtifacts(stripWebCaptureFooters(value),bookId)).filter(Boolean);
   const paragraphs=readableParagraphs(sourceText);
   const separator='\n\n';
   const display=paragraphs.join(separator);
-  const match=displayQuote?locateCitedExcerpt(display,displayQuote):null;
+  const matches=displayQuotes.map(displayQuote=>locateCitedExcerpt(display,displayQuote))
+    .filter(Boolean).sort((a,b)=>a.start-b.start||a.end-b.end);
   container.replaceChildren();
   let at=0,firstMark=null;
   for(const paragraph of paragraphs){
     const p=make('p');
     const from=at,to=at+paragraph.length;
-    const a=match?Math.max(match.start,from):to;
-    const b=match?Math.min(match.end,to):from;
-    if(b>a){
-      if(a>from)p.append(document.createTextNode(paragraph.slice(0,a-from)));
-      const mark=make('mark',paragraph.slice(a-from,b-from));
+    const ranges=matches.map(match=>({start:Math.max(match.start,from),end:Math.min(match.end,to)}))
+      .filter(range=>range.end>range.start)
+      .reduce((merged,range)=>{
+        const previous=merged.at(-1);
+        if(previous&&range.start<=previous.end)previous.end=Math.max(previous.end,range.end);
+        else merged.push({...range});
+        return merged;
+      },[]);
+    let cursor=from;
+    for(const range of ranges){
+      if(range.start>cursor)p.append(document.createTextNode(paragraph.slice(cursor-from,range.start-from)));
+      const mark=make('mark',paragraph.slice(range.start-from,range.end-from));
       mark.className='cited-highlight';
       p.append(mark);
       if(!firstMark)firstMark=mark;
-      if(b<to)p.append(document.createTextNode(paragraph.slice(b-from)));
-    }else{
-      p.textContent=paragraph;
+      cursor=range.end;
     }
+    if(cursor<to)p.append(document.createTextNode(paragraph.slice(cursor-from)));
     container.append(p);
     at+=paragraph.length+separator.length;
   }
-  return {matched:Boolean(match&&firstMark),mark:firstMark,partial:match?.partial===true};
+  return {matched:Boolean(matches.length&&firstMark),mark:firstMark,
+    partial:matches.some(match=>match.partial),matchCount:matches.length};
 }
 export function createSourceReader({getBook,getManifest,isAllowedBook}){
   const root=byId('companion-source-reader');
@@ -73,12 +82,14 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
     const {source,pages,idx,pdfId}=active;
     const page=pages[idx];
     const onCitedPage=page.page===source.page;
-    const quotation=onCitedPage && typeof source.excerpt==='string'?source.excerpt:'';
+    const quotations=onCitedPage?
+      (Array.isArray(source.excerpts)?source.excerpts:
+        (typeof source.excerpt==='string'?[source.excerpt]:[])).filter(value=>typeof value==='string'&&value.trim()):[];
     title.textContent=source.title||'Original source';
     const attribution=sourceAttributionLabel(source.provenance);
     meta.textContent='Physical PDF page '+page.page+(attribution?' · '+attribution:'');
-    const shown=renderHighlightedText(viewer,page.text,quotation,source.bookId);
-    if(quotation){
+    const shown=renderHighlightedText(viewer,page.text,quotations,source.bookId);
+    if(quotations.length){
       status.textContent=shown.matched?
         'The matching cited passage is highlighted in yellow.':
         'The excerpt could not be located confidently on this page; no text has been highlighted.';
