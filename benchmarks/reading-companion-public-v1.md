@@ -1,6 +1,6 @@
 # Reading Companion public-library evaluation
 
-The 30-case suite in `reading-companion-public-v1.json` tests global discovery across science, history, literature, philosophy, and politics/society. Each case contains a fixed two-facet search plan and expected source groups. It starts in **All books** scope and uses the deployed v47 corpus.
+The 31-case suite in `reading-companion-public-v1.json` tests global discovery across science, history, literature, philosophy, politics/society, and religion. Each case contains a fixed two-facet search plan and expected source groups. It starts in **All books** scope and uses the deployed v48 corpus.
 
 ## Fully automated run
 
@@ -15,9 +15,9 @@ GitHub Actions runs the suite for relevant pull requests, once each week, or on 
 ## What the report measures
 
 - Whether each expected book group appears in the merged candidate list.
-- Whether it appears in the two passages selected by default.
+- Whether it appears in the answer-source set of up to four verified passages selected by default.
 - Whether exact indexed page text matches its published SHA-256 fingerprint.
-- Whether each citation locator maps to the same book, title, and physical PDF page in the v47 manifest.
+- Whether each citation locator maps to the same book, title, and physical PDF page in the v48 manifest.
 - Corpus records, distinct catalog title count, fingerprint coverage, and elapsed search time.
 
 The remaining human step is judging whether an AI-generated interpretation is accurate and complete. The automated suite intentionally makes no answer-generation calls and does not treat a valid citation as proof that a claim is true.
