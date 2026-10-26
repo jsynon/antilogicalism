@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 20226)
+Total output lines: 850
+
 #!/usr/bin/env node
 /* Explicit, metered end-to-end evaluation against the public Reading Companion
  * Worker. This is never run by the PR or scheduled retrieval-only workflow.
@@ -27,6 +30,20 @@ export function validatePublishedCorpus(coverage,manifest){
   throw Error(`Published library version mismatch (expected v48; fingerprint coverage v${coverageVersion}, corpus v${corpusVersion}).`);
  }
  return new Set(Object.keys(coverage.books));
+}
+export function validateEvaluationBookScopes(cases,allowed,manifest){
+ for(const item of cases){
+  for(const bookId of Array.isArray(item.selected_book_ids)?item.selected_book_ids:[]){
+   const id=String(bookId);
+   if(!allowed.has(id)||!manifest?.books?.[id])
+    throw Error(`${item.id}: selected book ${id} is not present in the published corpus and fingerprint coverage.`);
+  }
+  for(const group of item.required_source_groups||[]){
+   if(!group.book_ids.some(id=>allowed.has(String(id))))
+    throw Error(item.id+': no expected source book is fingerprint-covered.');
+  }
+ }
+ return true;
 }
 
 /* Planner part facets are optional retrieval hints. A malformed hint should
@@ -106,11 +123,11 @@ const QUALITY_CASES=[
 // quality baseline. This case targets the live user's question and asks the
 // reviewer to judge source sufficiency and highlight relevance qualitatively.
 const FOCUSED_CASES=[
- {id:'focused-kant-transcendental-idealism',discipline:'philosophy',question:'What is transcendental idealism?',selected_book_ids:[],planner_queries:['Kant transcendental idealism definition appearances things in themselves space time','Kant Prolegomena transcendental idealism empirical reality appearances things in themselves','Kant Critique of Pure Reason transcendental idealism phenomena noumena space time'],required_source_groups:[{label:'Kant on transcendental idealism',book_ids:['40','44']}],review_focus:['Explain the core operation of transcendental idealism: space and time are forms of human sensibility that structure appearances, while things in themselves are not known through those forms. Avoid implying that Kant simply denies the empirical reality of external objects.','Assess whether the answer cites enough distinct, relevant passages to establish both the definition and the appearance/thing-in-itself distinction. Judge adequacy by coverage and support, not by an arbitrary citation count.','For every displayed highlight, compare the exact passage text with the claim or question part it is linked to. Exact quote location alone is not evidence of semantic support; flag irrelevant, overly broad, fragmentary, or weakly connected highlights.']},
- {id:'focused-kierkegaard-faith',discipline:'philosophy',question:'What did Kierkegaard have to say about faith?',selected_book_ids:[],planner_queries:['Kierkegaard faith Fear and Trembling Abraham paradox individual relation to God','Kierkegaard faith Philosophical Fragments leap historical knowledge contemporary follower','Kierkegaard faith Sickness Unto Death self before God'],required_source_groups:[],review_focus:['Explain Kierkegaard’s account of faith using passages from his works, while distinguishing the works’ speakers and argumentative contexts.','Avoid reducing faith to generic belief or treating one famous formulation as a complete summary of Kierkegaard’s authorship.','Check that citations and highlights support the specific account given and represent the relevant passage in context.']},
- {id:'focused-nietzsche-christianity',discipline:'philosophy',question:'What did Nietzsche think about Christianity?',selected_book_ids:[],planner_queries:['Nietzsche critique Christianity morality ressentiment life affirmation Genealogy of Morals','Nietzsche The Antichrist Christianity life denial priestly morality','Nietzsche Christianity historical psychological critique works'],required_source_groups:[],review_focus:['Present Nietzsche’s critique of Christianity in his own terms and support the main claims with relevant passages.','Do not flatten different works or arguments into one slogan; distinguish moral, psychological, and historical claims where the evidence allows.','Check that each cited passage and highlight supports the attached claim rather than merely mentioning Christianity.']},
- {id:'focused-sunyata',discipline:'philosophy',question:'What is sunyata?',selected_book_ids:[],planner_queries:['śūnyatā sunyata emptiness lack inherent existence Madhyamaka Buddhism','Nagarjuna emptiness dependent origination Mulamadhyamakakarika','Buddhist sunyata not nihilism conventional truth dependent arising'],required_source_groups:[],review_focus:['Explain śūnyatā in its Buddhist philosophical context, using the retrieved texts’ own distinctions and terminology.','Avoid equating emptiness with absolute nonexistence or nihilism; clarify dependence or lack of inherent existence only where the cited text supports it.','Check whether the passages establish a definition and its implications, and whether displayed highlights semantically support the linked claims.']},
- {id:'focused-nietzsche-kierkegaard',discipline:'philosophy',question:'What would Nietzsche think about the thought of Kierkegaard?',selected_book_ids:[],planner_queries:['Nietzsche Kierkegaard faith Christianity individual religious commitment','Nietzsche critique Christianity morality faith priestly psychology','Kierkegaard faith Christianity subjectivity individual God'],required_source_groups:[],review_focus:['Do not invent a direct exchange or claim Nietzsche wrote about Kierkegaard unless the sources establish that fact.','Separate textual evidence for Nietzsche’s views from any explicitly labeled, cautious inference about how he might respond to Kierkegaard.','Use evidence from both thinkers where available and make the inference traceable to the cited passages.']},
+ {id:'focused-kant-transcendental-idealism',discipline:'philosophy',question:'What is transcendental idealism?',selected_book_ids:['40','44'],planner_queries:['Kant transcendental idealism definition appearances things in themselves space time','Kant Prolegomena transcendental idealism empirical reality appearances things in themselves','Kant Critique of Pure Reason transcendental idealism phenomena noumena space time'],required_source_groups:[{label:'Kant on transcendental idealism',book_ids:['40','44']}],review_focus:['Explain the core operation of transcendental idealism: space and time are forms of human sensibility that structure appearances, while things in themselves are not known through those forms. Avoid implying that Kant simply denies the empirical reality of external objects.','Assess whether the answer cites enough distinct, relevant passages to establish both the definition and the appearance/thing-in-itself distinction. Judge adequacy by coverage and support, not by an arbitrary citation count.','For every displayed highlight, compare the exact passage text with the claim or question part it is linked to. Exact quote location alone is not evidence of semantic support; flag irrelevant, overly broad, fragmentary, or weakly connected highlights.']},
+ {id:'focused-kierkegaard-faith',discipline:'philosophy',question:'What did Kierkegaard have to say about faith?',selected_book_ids:['140','192','253'],planner_queries:['Kierkegaard faith Fear and Trembling Abraham paradox individual relation to God','Kierkegaard faith Philosophical Fragments leap historical knowledge contemporary follower','Kierkegaard faith Sickness Unto Death self before God'],required_source_groups:[],review_focus:['Explain Kierkegaard’s account of faith using passages from his works, while distinguishing the works’ speakers and argumentative contexts.','Avoid reducing faith to generic belief or treating one famous formulation as a complete summary of Kierkegaard’s authorship.','For selected-books scope, keep conclusions within Fear and Trembling, Philosophical Fragments, and The Sickness Unto Death.','Check that citations and highlights support the specific account given and represent the relevant passage in context.']},
+ {id:'focused-nietzsche-christianity',discipline:'philosophy',question:'What did Nietzsche think about Christianity?',selected_book_ids:['54','144','239'],planner_queries:['Nietzsche critique Christianity morality ressentiment life affirmation Genealogy of Morals','Nietzsche The Antichrist Christianity life denial priestly morality','Nietzsche Christianity historical psychological critique works'],required_source_groups:[],review_focus:['Present Nietzsche’s critique of Christianity in his own terms and support the main claims with relevant passages.','Do not flatten different works or arguments into one slogan; distinguish moral, psychological, and historical claims where the evidence allows.','For selected-books scope, keep conclusions within Thus Spake Zarathustra, On the Genealogy of Morals, and the primary Nietzsche texts in The Portable Nietzsche; identify Kaufmann commentary as commentary.','Check that each cited passage and highlight supports the attached claim rather than merely mentioning Christianity.']},
+ {id:'focused-sunyata',discipline:'philosophy',question:'What is sunyata?',selected_book_ids:['178','23','158'],planner_queries:['śūnyatā sunyata emptiness lack inherent existence Madhyamaka Buddhism','Nagarjuna emptiness dependent origination Mulamadhyamakakarika','Buddhist sunyata not nihilism conventional truth dependent arising'],required_source_groups:[],review_focus:['Explain śūnyatā in its Buddhist philosophical context, using the retrieved texts’ own distinctions and terminology.','Avoid equating emptiness with absolute nonexistence or nihilism; clarify dependence or lack of inherent existence only where the cited text supports it.','The selected scope is Nāgārjuna’s Mūlamadhyamakakārikā, the Diamond Sutra, and D. T. Suzuki’s introduction; distinguish primary text from commentary.','Check whether the passages establish a definition and its implications, and whether displayed highlights semantically support the linked claims.']},
+ {id:'focused-nietzsche-kierkegaard',discipline:'philosophy',question:'What would Nietzsche think about the thought of Kierkegaard?',selected_book_ids:['144','140','253'],planner_queries:['Nietzsche Kierkegaard faith Christianity individual religious commitment','Nietzsche critique Christianity morality faith priestly psychology','Kierkegaard faith Christianity subjectivity individual God'],required_source_groups:[],review_focus:['Do not invent a direct exchange or claim Nietzsche wrote about Kierkegaard unless the sources establish that fact.','Separate textual evidence for Nietzsche’s views from any explicitly labeled, cautious inference about how he might respond to Kierkegaard.','In selected-books scope, limit the inference to Nietzsche’s On the Genealogy of Morals and Kierkegaard’s Fear and Trembling and The Sickness Unto Death; do not generalize to Kierkegaard’s entire thought.','Use evidence from both thinkers where available and make the inference traceable to the cited passages.']},
 ];
 const HOLDOUT_CASES=[
  {id:'holdout-history-herodotus-helen',discipline:'history',question:'When Herodotus recounts the story of Helen’s journey to Troy, what do the Egyptian priests tell him, and how does he explain why he finds their account more credible?',selected_book_ids:['149'],planner_queries:['Herodotus Histories Helen Egypt priests account Troy credibility','Herodotus Helen Paris Egypt Egyptian priests story judgment'],required_source_groups:[{label:'Herodotus, Histories',book_ids:['149']}],review_focus:['Keep the Egyptian priests’ account distinct from Herodotus’s own reasoning and reported Greek traditions.','Explain the basis he gives for preferring one account without turning his inference into a directly witnessed fact.']},
@@ -182,6 +199,9 @@ export function applyQualityScope(cases,scope='selected-books'){
   throw Error('Evaluation scope must be selected-books or all-books.');
  if(scope==='selected-books')return cases;
  return cases.map(item=>({...item,selected_book_ids:[]}));
+}
+export function evaluationUsesLivePlanner(mode,scope){
+ return ['quality','focused','holdout','acceptance'].includes(mode)&&scope==='all-books';
 }
 function normalizeDiagnosticExcerpt(value){
  return String(value||'').normalize('NFKC')
@@ -320,17 +340,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const citationHighlightAudit={citedSourceCount:citedSourceIds.length,
   highlightedSourceCount:citedSourceIds.filter(id=>highlightedSourceIds.has(id)).length,
   citedSourcesWithoutLocatedHighlight:citedSourceIds.filter(id=>!highlightedSourceIds.has(id))};
- const coverage=String(data?.coverage||'');
- const partStatusesConsistent=questionParts.length===0?null:
-  (coverage==='full'?questionParts.every(part=>part?.status==='supported'):
-   coverage==='partial'?questionParts.some(part=>part?.status!=='supported'):false);
- const proseContradictions=questionParts.filter(part=>answerDeniesSupportedComparison(part,answer))
-  .map(part=>String(part?.part||''));
- const answerCoverageConsistent=questionParts.length===0?null:
-  partStatusesConsistent&&!proseContradictions.length;
- const partEvidenceComplete=questionParts.length===0?null:
-  partEvidenceAudit.every(part=>part.structurallyComplete!==false);
- const evidenceAuditScope='Evidence IDs are checked for consistent linkage across question parts, the reviewed evidence map, cited sources, and submitted pages. This is a structural check, not a semantic judge of whether a passage truly supports a claim; review the answer and source text.';
+ …226 tokens truncated…eview the answer and source text.';
  const outcome=String(data?.outcome||'');
  const reviewStatus=String(data?.reviewStatus||'');
  const failureCode=typeof data?.failureCode==='string'?data.failureCode:'';
@@ -724,12 +734,12 @@ async function main(){
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
  const selectedCases=selectLiveCases(suite,args.mode,args.caseId);
  const cases=usesEvaluationMode?applyQualityScope(selectedCases,args.scope):selectedCases;
- const evaluationUsesPlanner=usesEvaluationMode&&(args.scope==='all-books'||args.mode==='focused');
+ const evaluationUsesPlanner=evaluationUsesLivePlanner(args.mode,args.scope);
  const plannerCalls=usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
  const answerCallsPerCase=args.answerVariant==='paired-review-ablation'?3:
   args.answerVariant==='compose-only'?1:2;
  const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:plannerCalls+cases.length*answerCallsPerCase;
- const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?(args.mode==='focused'?'all-books':args.scope):null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
+ const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   answerVariant:args.answerVariant,caseCount:cases.length,estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
    (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; the simplified answer path has no automatic composer regeneration',
@@ -753,7 +763,7 @@ async function main(){
   clearInterval(startupHeartbeat);
   const coverage=results[0],manifest=results[1];
   const allowed=validatePublishedCorpus(coverage,manifest);
-  for(const item of cases)for(const group of item.required_source_groups)if(!group.book_ids.some(id=>allowed.has(String(id))))throw Error(item.id+': no expected source book is fingerprint-covered.');
+  validateEvaluationBookScopes(cases,allowed,manifest);
   const library=new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT));
   activeLibrary=library;
   report.reproducibility={clientSourceRevision:sourceRevision(),corpus:{libraryVersion:manifest.version,

@@ -39,7 +39,7 @@ on:
         default: all
         required: true
       answer_variant:
-        description: Paired mode runs both variants on the same plan and pages; it uses about 4 calls per all-books case, plus bounded recovery when needed
+        description: Paired mode runs both variants on the same pages; about 3 calls per selected-books case or 4 per all-books case, plus bounded recovery
         type: choice
         options:
           - with-review
@@ -48,7 +48,7 @@ on:
         default: with-review
         required: true
       scope:
-        description: Acceptance requires All Books; focused cases always use All Books and the live planner
+        description: Selected-books honors each case's configured books and queries; All Books removes restrictions and uses the live planner. Acceptance requires All Books
         type: choice
         options:
           - selected-books

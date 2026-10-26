@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluateLiveCase,evaluatePlannerCase,runLiveCases,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan,validatePublishedCorpus} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes} from './live-answer-evaluation.mjs';
 import {PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -14,6 +14,20 @@ test('live evaluation preflight accepts only matching v48 corpus and fingerprint
   /expected v48; fingerprint coverage v47, corpus v48/);
  assert.throws(()=>validatePublishedCorpus(coverage,{version:47}),
   /expected v48; fingerprint coverage v48, corpus v47/);
+});
+
+test('live evaluation preflight rejects selected or expected books missing from published coverage',()=>{
+ const allowed=new Set(['40','44']);
+ const manifest={books:{'40':{title:'Critique of Pure Reason'},'44':{title:'Prolegomena'}}};
+ assert.equal(validateEvaluationBookScopes([
+  {id:'focused-kant',selected_book_ids:['40','44'],required_source_groups:[{book_ids:['40','44']}]}
+ ],allowed,manifest),true);
+ assert.throws(()=>validateEvaluationBookScopes([
+  {id:'focused-sunyata',selected_book_ids:['178'],required_source_groups:[]}
+ ],allowed,manifest),/focused-sunyata: selected book 178 is not present/);
+ assert.throws(()=>validateEvaluationBookScopes([
+  {id:'cross-work',selected_book_ids:[],required_source_groups:[{book_ids:['35']}]}
+ ],allowed,manifest),/cross-work: no expected source book is fingerprint-covered/);
 });
 
 test('malformed optional planner facets are dropped or fall back without blocking base retrieval',()=>{
@@ -68,7 +82,7 @@ test('the focused Kant case is selectable without changing the seven-case qualit
  assert.ok(!baseline.some(item=>item.id==='focused-kant-transcendental-idealism'));
  const [focused]=selectLiveCases({cases:[]},'quality','focused-kant-transcendental-idealism');
  assert.equal(focused.question,'What is transcendental idealism?');
- assert.deepEqual(focused.selected_book_ids,[]);
+ assert.deepEqual(focused.selected_book_ids,['40','44']);
  assert.deepEqual(focused.required_source_groups[0].book_ids,['40','44']);
  assert.equal(focused.planner_queries.length,3);
  assert.ok(focused.review_focus.some(item=>/enough distinct, relevant passages/.test(item)));
@@ -76,7 +90,7 @@ test('the focused Kant case is selectable without changing the seven-case qualit
  assert.throws(()=>selectLiveCases({cases:[]},'holdout','focused-kant-transcendental-idealism'),/Unknown holdout case/);
 });
 
-test('focused live cases include the four requested user questions and keep the quality baseline unchanged',()=>{
+test('focused live cases retain curated scopes and keep the quality baseline unchanged',()=>{
  const baseline=selectLiveCases({cases:[]},'quality');
  const focused=selectLiveCases({cases:[]},'focused');
  assert.equal(baseline.length,7);
@@ -91,10 +105,24 @@ test('focused live cases include the four requested user questions and keep the 
   'What is sunyata?',
   'What would Nietzsche think about the thought of Kierkegaard?'
  ]);
- assert.ok(focused.every(item=>item.selected_book_ids.length===0),
-  'focused cases must use All Books retrieval');
+ assert.deepEqual(focused.map(item=>item.selected_book_ids),[
+  ['40','44'],['140','192','253'],['54','144','239'],['178','23','158'],['144','140','253']
+ ],'each focused question needs a stable curated book scope for selected-books evaluation');
  assert.ok(focused.slice(1).every(item=>item.required_source_groups.length===0),
   'exploratory focused cases must not claim unverified expected corpus IDs');
+ const selectedBooks=applyQualityScope(focused,'selected-books');
+ assert.deepEqual(selectedBooks.map(item=>item.selected_book_ids),focused.map(item=>item.selected_book_ids));
+ const allBooks=applyQualityScope(focused,'all-books');
+ assert.ok(allBooks.every(item=>item.selected_book_ids.length===0),
+  'All Books scope must remove each focused case’s selected-book restriction');
+ assert.ok(focused.every(item=>item.selected_book_ids.length>0),
+  'selected-books scope must never silently become an unscoped search');
+ assert.equal(evaluationUsesLivePlanner('focused','selected-books'),false,
+  'selected-books uses fixed case queries and skips the planner');
+ assert.equal(evaluationUsesLivePlanner('focused','all-books'),true,
+  'All Books uses the live planner');
+ assert.equal(evaluationUsesLivePlanner('acceptance','all-books'),true);
+ assert.equal(evaluationUsesLivePlanner('acceptance','selected-books'),false);
  assert.equal(selectLiveCases({cases:[]},'focused','focused-sunyata').length,1);
  assert.throws(()=>selectLiveCases({cases:[]},'focused','not-a-focused-case'),/Unknown focused case/);
  assert.throws(()=>selectLiveCases({cases:[]},'focused','quality-science-darwin-selection'),/Unknown focused case/);
