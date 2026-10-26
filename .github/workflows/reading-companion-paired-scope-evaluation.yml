@@ -1,0 +1,66 @@
+name: Reading Companion paired scope evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      case_id:
+        description: Run all five new questions or one question in both scopes
+        type: choice
+        options:
+          - all
+          - paired-hume-kant-causal-inference
+          - paired-wollstonecraft-education-reason
+          - paired-dubois-double-consciousness
+          - paired-boethius-fortune-wheel
+          - paired-hamlet-conscience
+        default: all
+        required: true
+      confirm_live_ai:
+        description: I understand this runs each question in All Books and Selected Books and uses Cloudflare AI
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reading-companion-paired-scope-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: ${{ inputs.confirm_live_ai }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      LIVE_EVAL_MODE: paired
+      LIVE_EVAL_SCOPE: paired
+      LIVE_EVAL_CASE_ID: ${{ inputs.case_id }}
+      CONFIRM_LIVE_AI: ${{ inputs.confirm_live_ai }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate explicit cost confirmation
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          test "$CONFIRM_LIVE_AI" = "true"
+          test -n "$PILOT_EVALUATION_TOKEN"
+      - name: Test paired evaluator and report checks
+        run: node --test reading-companion/live-answer-evaluation.test.mjs
+      - name: Run confirmed paired scope evaluation
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+          LIVE_EVAL_OUTPUT: ${{ github.workspace }}/reading-companion-paired-scope-evaluation.json
+        run: node reading-companion/live-answer-evaluation.mjs --mode paired --scope paired --answer-variant with-review --case "$LIVE_EVAL_CASE_ID" --confirm-live-ai true --output "$LIVE_EVAL_OUTPUT"
+      - name: Save paired scope report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-companion-paired-scope-evaluation-${{ inputs.case_id }}
+          path: ${{ github.workspace }}/reading-companion-paired-scope-evaluation.json
+          if-no-files-found: warn
+          retention-days: 14

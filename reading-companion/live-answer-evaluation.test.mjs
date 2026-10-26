@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes} from './live-answer-evaluation.mjs';
 import {PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -128,6 +128,61 @@ test('focused live cases retain curated scopes and keep the quality baseline unc
  assert.throws(()=>selectLiveCases({cases:[]},'focused','quality-science-darwin-selection'),/Unknown focused case/);
 });
 
+test('paired new-question suite keeps its own five cases and gives each a published selected scope',()=>{
+ const focused=selectLiveCases({cases:[]},'focused');
+ const paired=selectLiveCases({cases:[]},'paired');
+ assert.equal(focused.length,5,'the previous focused workflow remains unchanged');
+ assert.equal(paired.length,5);
+ assert.ok(paired.every(item=>item.id.startsWith('paired-')&&item.selected_book_ids.length>0));
+ assert.deepEqual(paired.map(item=>item.id),[
+  'paired-hume-kant-causal-inference','paired-wollstonecraft-education-reason',
+  'paired-dubois-double-consciousness','paired-boethius-fortune-wheel','paired-hamlet-conscience'
+ ]);
+ assert.ok(paired.every(item=>item.planner_queries.length>=2&&item.review_focus.length>=2));
+ assert.ok(evaluationUsesLivePlanner('paired','paired'));
+ assert.equal(selectLiveCases({cases:[]},'paired','paired-dubois-double-consciousness').length,1);
+ assert.throws(()=>selectLiveCases({cases:[]},'paired','focused-sunyata'),/Unknown paired case/);
+});
+
+test('paired selected-scope plan is limited to the exact curated books',()=>{
+ const plan={sources:[{label:'Hume',bookIds:['35','276']},{label:'Kant',bookIds:['40','44']}],
+  parts:[{id:'P1',question:'Hume position',sourceBookIds:['35','276']},
+   {id:'P2',question:'Kant position',sourceBookIds:['40','44']},
+   {id:'P3',question:'Compare',sourceBookIds:['35','276','40','44']}]};
+ const restricted=restrictPlanToSelectedBooks(plan,['35','40']);
+ assert.deepEqual(restricted.sources.map(source=>source.bookIds),[['35'],['40']]);
+ assert.deepEqual(restricted.parts.map(part=>part.sourceBookIds),[['35'],['40'],['35','40']]);
+ assert.deepEqual(plan.sources.map(source=>source.bookIds),[['35','276'],['40','44']],
+  'paired restriction must not mutate the reusable all-books plan');
+});
+
+test('paired runner calls the planner once and reuses the same query plan for selected-books',async()=>{
+ const item={id:'paired-test',question:'Compare Hume and Kant on causality.',selected_book_ids:['35','40'],
+  planner_queries:['Hume causal inference','Kant causal rule'],required_source_groups:[],review_focus:[]};
+ const originalPlan={sources:[{label:'David Hume',role:'primary',bookIds:['35','276']},
+  {label:'Immanuel Kant',role:'primary',bookIds:['40','44']}],parts:[
+   {id:'P1',question:'Hume',sourceBookIds:['35','276']},{id:'P2',question:'Kant',sourceBookIds:['40','44']},
+   {id:'P3',question:'Compare',sourceBookIds:['35','276','40','44']}]};
+ const calls=[];
+ const evaluateCase=async(scoped,options)=>{
+  calls.push({scope:scoped.selected_book_ids.length?'selected-books':'all-books',options});
+  if(!options.preparedPlan)return {id:scoped.id,passed:true,plannerPlan:originalPlan,
+   plannerQueries:['shared planner query about Hume and Kant','shared causal query'],plannerFallback:false,
+   plannerWorkerVersionId:'worker-1',plannerWorkerSourceBuild:'build',plannerWorkerSourceRevision:'a'.repeat(40)};
+  return {id:scoped.id,passed:true,plannerPlan:restrictPlanToSelectedBooks(options.preparedPlan.plan,scoped.selected_book_ids),
+   plannerQueries:options.preparedPlan.queries,plannerReused:true};
+ };
+ const run=await runPairedScopeCases([item],{evaluateCase,evaluateOptions:{},onResult:async()=>{}});
+ assert.equal(run.results.length,2);
+ assert.deepEqual(run.results.map(result=>result.scope),['all-books','selected-books']);
+ assert.equal(calls.length,2,'selected-books reuses rather than repeats the planner call');
+ assert.equal(calls[0].options.preparedPlan,undefined);
+ assert.deepEqual(calls[1].options.preparedPlan.queries,
+  ['shared planner query about Hume and Kant','shared causal query']);
+ assert.deepEqual(run.results[1].plannerPlan.sources.map(source=>source.bookIds),[['35'],['40']]);
+ assert.equal(run.results[1].plannerReused,true);
+});
+
 test('both manual answer workflows expose every registered focused case',async()=>{
  const {readFileSync}=await import('node:fs');
  const focusedIds=selectLiveCases({cases:[]},'focused').map(item=>item.id);
@@ -139,6 +194,17 @@ test('both manual answer workflows expose every registered focused case',async()
   assert.match(workflow,/^\s+- focused\s*$/m);
   for(const id of focusedIds)assert.ok(workflow.includes(id),`${id} must be selectable in ${path.pathname}`);
  }
+});
+
+test('the separate paired-scope workflow exposes every new case and explicit live-call confirmation',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const workflow=readFileSync(new URL('../.github/workflows/reading-companion-paired-scope-evaluation.yml',import.meta.url),'utf8');
+ const pairedIds=selectLiveCases({cases:[]},'paired').map(item=>item.id);
+ assert.match(workflow,/LIVE_EVAL_MODE: paired/);
+ assert.match(workflow,/LIVE_EVAL_SCOPE: paired/);
+ assert.match(workflow,/confirm_live_ai:/);
+ assert.match(workflow,/node reading-companion\/live-answer-evaluation\.mjs --mode paired --scope paired/);
+ for(const id of pairedIds)assert.ok(workflow.includes(id),`${id} must be selectable in paired workflow`);
 });
 
 test('holdout mode selects a separate seven-question set across disciplines',()=>{
@@ -171,7 +237,7 @@ test('holdout all-books scope and single-case selection behave independently of 
  assert.equal(selected.length,1);
  assert.deepEqual(selected[0].required_source_groups[0].book_ids,['335']);
  assert.throws(()=>selectLiveCases({cases:[]},'holdout','quality-history-thucydides-causes'),/Unknown holdout case/);
- assert.throws(()=>selectLiveCases({cases:[]},'smoke','holdout-religion-james-faith-works'),/only in quality, focused, holdout or acceptance mode/);
+ assert.throws(()=>selectLiveCases({cases:[]},'smoke','holdout-religion-james-faith-works'),/only in quality, focused, paired, holdout or acceptance mode/);
 });
 
 test('all-books quality scope runs every question without a selected-book restriction',()=>{
@@ -192,7 +258,7 @@ test('quality mode can select exactly one named case for a low-cost live check',
  assert.equal(cases[0].id,id);
  assert.deepEqual(cases[0].required_source_groups.map(group=>group.book_ids),[['529'],['102']]);
  assert.throws(()=>selectLiveCases({cases:[]},'quality','not-a-quality-case'),/Unknown quality case/);
- assert.throws(()=>selectLiveCases({cases:[]},'smoke',id),/only in quality, focused, holdout or acceptance mode/);
+ assert.throws(()=>selectLiveCases({cases:[]},'smoke',id),/only in quality, focused, paired, holdout or acceptance mode/);
 });
 
 test('planner mode selects one selected-book case and one All Books cross-work case',()=>{
@@ -377,6 +443,21 @@ test('offline report recheck keeps an actual partial answer as a miss',()=>{
  assert.equal(checked.offlineRecheck.passedCases,0);
  assert.equal(checked.cases[0].offlineRecheck.passed,false);
  assert.equal(checked.cases[0].offlineRecheck.questionPartCoverage.partial,1);
+});
+
+test('offline report recheck recognizes paired scope rows by their shared question ID',()=>{
+ const checked=recheckQualityReport({cases:[{
+  id:'paired-hume-kant-causal-inference::selected-books',pairedCaseId:'paired-hume-kant-causal-inference',
+  coverage:'full',answerText:'Hume argues from custom [S1]. Kant treats causality as a condition of experience [S2].',
+  citationSources:[{id:'S1',bookId:'35'},{id:'S2',bookId:'40'}],
+  submittedSources:[{bookId:'35',page:1},{bookId:'40',page:1}],
+  evidenceMap:[{id:'S1',partId:'P1',quote:'a sufficiently long reviewed source span'},
+   {id:'S2',partId:'P2',quote:'another sufficiently long reviewed source span'}],
+  questionParts:[{part:'Hume account',status:'supported',evidenceIds:['S1']},
+   {part:'Kant account',status:'supported',evidenceIds:['S2']}]
+ }]});
+ assert.equal(checked.cases[0].offlineRecheck.passed,true);
+ assert.equal(checked.offlineRecheck.checkedCases,1);
 });
 
 test('offline report recheck refreshes both paired variant audits and preserves manual scores',()=>{

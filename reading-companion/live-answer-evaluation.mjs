@@ -126,6 +126,18 @@ const FOCUSED_CASES=[
  {id:'focused-sunyata',discipline:'philosophy',question:'What is sunyata?',selected_book_ids:['178','23','158'],planner_queries:['śūnyatā sunyata emptiness lack inherent existence Madhyamaka Buddhism','Nagarjuna emptiness dependent origination Mulamadhyamakakarika','Buddhist sunyata not nihilism conventional truth dependent arising'],required_source_groups:[],review_focus:['Explain śūnyatā in its Buddhist philosophical context, using the retrieved texts’ own distinctions and terminology.','Avoid equating emptiness with absolute nonexistence or nihilism; clarify dependence or lack of inherent existence only where the cited text supports it.','The selected scope is Nāgārjuna’s Mūlamadhyamakakārikā, the Diamond Sutra, and D. T. Suzuki’s introduction; distinguish primary text from commentary.','Check whether the passages establish a definition and its implications, and whether displayed highlights semantically support the linked claims.']},
  {id:'focused-nietzsche-kierkegaard',discipline:'philosophy',question:'What would Nietzsche think about the thought of Kierkegaard?',selected_book_ids:['144','140','253'],planner_queries:['Nietzsche Kierkegaard faith Christianity individual religious commitment','Nietzsche critique Christianity morality faith priestly psychology','Kierkegaard faith Christianity subjectivity individual God'],required_source_groups:[],review_focus:['Do not invent a direct exchange or claim Nietzsche wrote about Kierkegaard unless the sources establish that fact.','Separate textual evidence for Nietzsche’s views from any explicitly labeled, cautious inference about how he might respond to Kierkegaard.','In selected-books scope, limit the inference to Nietzsche’s On the Genealogy of Morals and Kierkegaard’s Fear and Trembling and The Sickness Unto Death; do not generalize to Kierkegaard’s entire thought.','Use evidence from both thinkers where available and make the inference traceable to the cited passages.']},
 ];
+// A separate, paired-scope suite tests new material without replacing the
+// five-question focused baseline. Each case uses one all-books planner result
+// for both modes, then restricts selected-books retrieval and plan IDs to that
+// case's explicit books. This isolates the scope change while preserving the
+// real planner path and the same answer/review budget in both modes.
+const PAIRED_CASES=[
+ {id:'paired-hume-kant-causal-inference',discipline:'philosophy',question:'What does Hume say about our inference from cause to effect, and what does Kant say about causality’s role in experience? How do their accounts differ?',selected_book_ids:['35','40'],planner_queries:['Hume Enquiry cause effect custom constant conjunction inference experience','Kant Critique of Pure Reason causality objective succession rule condition experience'],required_source_groups:[{label:'Hume, Enquiry Concerning Human Understanding',book_ids:['35']},{label:'Kant, Critique of Pure Reason',book_ids:['40']}],required_part_source_groups:[{partIncludes:'Hume',book_ids:['35']},{partIncludes:'Kant',book_ids:['40']}],review_focus:['Explain Hume’s account of causal inference from experience and custom, then Kant’s claim about causality as a condition of objective experience.','Keep the authors’ positions distinct and label the comparison as a synthesis of their texts, not a direct exchange.']},
+ {id:'paired-wollstonecraft-education-reason',discipline:'society',question:'How does Wollstonecraft connect women’s education with their capacity to reason and their social position?',selected_book_ids:['87'],planner_queries:['Wollstonecraft Vindication education women reason cultivate understanding independence','Wollstonecraft women social position education reason virtue dependence'],required_source_groups:[{label:'Wollstonecraft, A Vindication of the Rights of Woman',book_ids:['87']}],review_focus:['Explain the connection she argues between education, reason, and women’s social position.','Keep Wollstonecraft’s claims and examples in their historical context; do not turn them into unsupported modern generalizations.']},
+ {id:'paired-dubois-double-consciousness',discipline:'society',question:'What does Du Bois mean by double consciousness, and how does he connect it to the color line?',selected_book_ids:['454'],planner_queries:['Du Bois double consciousness two souls veil seeing oneself through others','Du Bois color line double consciousness self understanding Souls of Black Folk'],required_source_groups:[{label:'Du Bois, The Souls of Black Folk',book_ids:['454']}],review_focus:['Explain the concept through Du Bois’s own description of the divided self and the veil.','Show how the passage connects the experience to the color line without reducing it to a generic identity conflict.']},
+ {id:'paired-boethius-fortune-wheel',discipline:'philosophy',question:'How does Lady Philosophy explain why Fortune cannot be stable, and what do her gifts reveal about happiness?',selected_book_ids:['21'],planner_queries:['Boethius Consolation of Philosophy Fortune wheel unstable gifts happiness Lady Philosophy','Boethius fortune gifts cannot secure happiness true good instability'],required_source_groups:[{label:'Boethius, Consolation of Philosophy',book_ids:['21']}],review_focus:['Attribute the argument to Lady Philosophy within the dialogue.','Explain why changing external gifts cannot provide stable happiness, using the text’s reasoning.']},
+ {id:'paired-hamlet-conscience',discipline:'literature',question:'In Hamlet’s “To be, or not to be” soliloquy, what does he mean when he says that conscience makes cowards of us all?',selected_book_ids:['212'],planner_queries:['Hamlet to be or not to be conscience makes cowards of us all native hue resolution','Hamlet soliloquy thought fear of death unknown country action resolution'],required_source_groups:[{label:'Shakespeare, Hamlet',book_ids:['212']}],review_focus:['Explain the line in the soliloquy’s reasoning about thought, fear, and action.','Keep the passage attributed to Hamlet and avoid treating the speech as the play’s settled doctrine. Check that the highlighted passage contains the line and supports the explanation.']},
+];
 const HOLDOUT_CASES=[
  {id:'holdout-history-herodotus-helen',discipline:'history',question:'When Herodotus recounts the story of Helen’s journey to Troy, what do the Egyptian priests tell him, and how does he explain why he finds their account more credible?',selected_book_ids:['149'],planner_queries:['Herodotus Histories Helen Egypt priests account Troy credibility','Herodotus Helen Paris Egypt Egyptian priests story judgment'],required_source_groups:[{label:'Herodotus, Histories',book_ids:['149']}],review_focus:['Keep the Egyptian priests’ account distinct from Herodotus’s own reasoning and reported Greek traditions.','Explain the basis he gives for preferring one account without turning his inference into a directly witnessed fact.']},
  {id:'holdout-literature-hamlet-soliloquy',discipline:'literature',question:'In Hamlet’s “To be, or not to be” soliloquy, what alternatives does he weigh, and how does uncertainty about what follows death affect his reasoning?',selected_book_ids:['212'],planner_queries:['Hamlet to be or not to be soliloquy sleep death fear unknown country','Hamlet soliloquy conscience makes cowards of us all after death'],required_source_groups:[{label:'Shakespeare, Hamlet',book_ids:['212','564']}],review_focus:['Describe Hamlet’s alternatives and reasoning in the soliloquy without treating them as the play’s settled doctrine.','Connect the fear of the unknown after death to his hesitation, citing the soliloquy.']},
@@ -167,15 +179,16 @@ function jsonDigest(value){return createHash('sha256').update(JSON.stringify(val
 export function selectLiveCases(suite,mode='smoke',caseId=''){
  const evaluationCases=mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
-  mode==='focused'?FOCUSED_CASES:QUALITY_CASES;
+  mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
  if(caseId&&caseId!=='all'){
-  if(!['quality','focused','holdout','acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, focused, holdout or acceptance mode.');
+  if(!['quality','focused','paired','holdout','acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
  }
  if(mode==='quality')return QUALITY_CASES.map(copyEvaluationCase);
  if(mode==='focused')return FOCUSED_CASES.map(copyEvaluationCase);
+ if(mode==='paired')return PAIRED_CASES.map(copyEvaluationCase);
  if(mode==='holdout')return HOLDOUT_CASES.map(copyEvaluationCase);
  if(mode==='acceptance')return ACCEPTANCE_CASES.map(copyEvaluationCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
@@ -189,7 +202,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, focused, holdout, acceptance, or full.');
+ throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(!['selected-books','all-books'].includes(scope))
@@ -198,7 +211,23 @@ export function applyQualityScope(cases,scope='selected-books'){
  return cases.map(item=>({...item,selected_book_ids:[]}));
 }
 export function evaluationUsesLivePlanner(mode,scope){
- return ['quality','focused','holdout','acceptance'].includes(mode)&&scope==='all-books';
+ return ['quality','focused','paired','holdout','acceptance'].includes(mode)&&
+  (mode==='paired'||scope==='all-books');
+}
+export function restrictPlanToSelectedBooks(plan,selectedBookIds){
+ if(!plan||typeof plan!=='object'||!Array.isArray(selectedBookIds)||!selectedBookIds.length)
+  return plan||null;
+ const allowed=new Set(selectedBookIds.map(String));
+ const sources=(Array.isArray(plan.sources)?plan.sources:[]).map(source=>({
+  ...source,bookIds:(Array.isArray(source.bookIds)?source.bookIds:[]).map(String)
+   .filter(id=>allowed.has(id))
+ })).filter(source=>source.bookIds.length);
+ const parts=(Array.isArray(plan.parts)?plan.parts:[]).map(part=>({
+  ...part,...(Array.isArray(part.sourceBookIds)?{sourceBookIds:part.sourceBookIds.map(String)
+   .filter(id=>allowed.has(id))}:{}),
+  ...(Array.isArray(part.candidateSourceIds)?{candidateSourceIds:[...part.candidateSourceIds]}:{})
+ }));
+ return {...plan,sources,parts};
 }
 function normalizeDiagnosticExcerpt(value){
  return String(value||'').normalize('NFKC')
@@ -400,9 +429,9 @@ export function summarizeAnswerVariants(cases){
 }
 export function recheckQualityReport(report){
  if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
- const definitions=new Map([...QUALITY_CASES,...HOLDOUT_CASES,...ACCEPTANCE_CASES].map(item=>[item.id,item]));
+ const definitions=new Map([...QUALITY_CASES,...FOCUSED_CASES,...PAIRED_CASES,...HOLDOUT_CASES,...ACCEPTANCE_CASES].map(item=>[item.id,item]));
  const cases=report.cases.map(item=>{
-  const definition=definitions.get(String(item?.id||''));
+  const definition=definitions.get(String(item?.pairedCaseId||item?.id||'').replace(/::(?:all-books|selected-books)$/,''));
   if(!definition)return {...item,offlineRecheck:null};
   const audit=auditLiveAnswer({
    answer:item.answerText,coverage:item.coverage,citations:item.citationSources,
@@ -528,7 +557,7 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   matchedFacets,candidatePartIds,excerpt:String(preview||text||'').slice(0,1200)}));
  return {selected,searches:retrieval.searches,retrievalCandidates};
 }
-export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,answerVariant='with-review',onProgress=async()=>{}}){
+export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,preparedPlan=null,answerVariant='with-review',onProgress=async()=>{}}){
  if(!['with-review','compose-only','paired-review-ablation'].includes(answerVariant))
   throw Error('Answer variant must be with-review, compose-only, or paired-review-ablation.');
  const startTime=Date.now();
@@ -537,9 +566,22 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  await progress('case','started',`Starting ${answerVariant} evaluation for this question.`);
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
- let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false,
+ let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false,plannerReused=false,
   plannerWorkerVersionId=null,plannerWorkerSourceBuild=null,plannerWorkerSourceRevision=null;
- if(useFixedQueries&&validSearchPlan(item.planner_queries)){
+ if(preparedPlan&&(validSearchPlan(preparedPlan.queries)||
+   (preparedPlan.plannerFallback===true&&Array.isArray(preparedPlan.queries)&&
+    preparedPlan.queries.length===1&&preparedPlan.queries[0]===item.question))){
+  const restricted=restrictPlanToSelectedBooks(preparedPlan.plan,selectedBookIds);
+  plan={...preparedPlan,plan:restricted};
+  queries=preparedPlan.queries;
+  plannerFallback=preparedPlan.plannerFallback===true;
+  plannerReused=true;
+  plannerWorkerVersionId=preparedPlan.workerVersionId||null;
+  plannerWorkerSourceBuild=preparedPlan.workerSourceBuild||null;
+  plannerWorkerSourceRevision=preparedPlan.workerSourceRevision||null;
+  await progress('planner','reused','Reusing the paired all-books plan and queries; only the selected-book scope changes.',
+   {queryCount:queries.length});
+ }else if(useFixedQueries&&validSearchPlan(item.planner_queries)){
   queries=item.planner_queries;
   plannerSkipped=true;
   await progress('planner','skipped','Using the fixed evaluation queries; no planner request is needed.',{queryCount:queries.length});
@@ -616,7 +658,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   variants:variantResults
  }:null;
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
-  reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerQueries:plannerFallback?[]:queries,plannerFallback,
+  reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerReused,
+  plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,plannerWorkerSourceRevision,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
   ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,searches,retrievalCandidates,
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
@@ -723,32 +766,77 @@ export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluate
  }
  return {results,stopReason};
 }
+export async function runPairedScopeCases(cases,{evaluateCase=evaluateLiveCase,evaluateOptions={},onResult=async()=>{},maxConsecutiveWorkerFailures=2}={}){
+ const results=[];let consecutiveWorkerFailures=0,stopReason='';
+ const record=async(result)=>{
+  results.push(result);await onResult(result,results);
+  if(result.requestFailure?.workerFailure){
+   if(TERMINAL_PROVIDER_FAILURES.has(result.requestFailure.failureCode))stopReason='provider-limit-or-capacity';
+   else if(++consecutiveWorkerFailures>=maxConsecutiveWorkerFailures)stopReason='consecutive-worker-failures';
+  }else consecutiveWorkerFailures=0;
+ };
+ for(const item of cases){
+  const allItem={...item,selected_book_ids:[]};
+  let all;
+  try{all=await evaluateCase(allItem,{...evaluateOptions,useFixedQueries:false,
+   onProgress:event=>evaluateOptions.onProgress?.({...event,pairedCaseId:item.id,scope:'all-books'})});}
+  catch(error){all=failedCaseResult(allItem,error);}
+  await record({...all,id:item.id+'::all-books',pairedCaseId:item.id,scope:'all-books',plannerReused:false});
+  if(stopReason)break;
+
+  let selected;
+  if(all.requestFailure){
+   selected={...failedCaseResult(item,new Error('Selected-books scope was not run because the shared all-books planner result is unavailable.')),
+    requestFailure:{stage:'paired-evaluation',httpStatus:null,failureCode:'shared-planner-unavailable',
+     message:'The all-books scope did not produce a reusable planner result; selected-books scope was not run.',workerFailure:false}};
+  }else{
+   const preparedPlan={plan:all.plannerPlan||null,
+    queries:all.plannerFallback?[item.question]:all.plannerQueries,
+    plannerFallback:all.plannerFallback===true,
+    workerVersionId:all.plannerWorkerVersionId||null,
+    workerSourceBuild:all.plannerWorkerSourceBuild||null,
+    workerSourceRevision:all.plannerWorkerSourceRevision||null};
+   try{selected=await evaluateCase(item,{...evaluateOptions,useFixedQueries:false,preparedPlan,
+    onProgress:event=>evaluateOptions.onProgress?.({...event,pairedCaseId:item.id,scope:'selected-books'})});}
+   catch(error){selected=failedCaseResult(item,error);}
+  }
+  await record({...selected,id:item.id+'::selected-books',pairedCaseId:item.id,scope:'selected-books',
+   plannerReused:!all.requestFailure});
+  if(stopReason)break;
+ }
+ return {results,stopReason};
+}
 function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',scope:process.env.LIVE_EVAL_SCOPE||'selected-books',caseId:process.env.LIVE_EVAL_CASE_ID||'',answerVariant:process.env.LIVE_EVAL_ANSWER_VARIANT||'with-review',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
  for(let i=0;i<argv.length;i++){const [flag,inline]=argv[i].split('=',2),key=flag.replace(/^--/,'');if(flag==='--help'||flag==='-h'){out.help=true;continue;}
   if(!['mode','scope','case','answer-variant','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
   if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|holdout|acceptance|full] [--scope selected-books|all-books] [--answer-variant with-review|compose-only|paired-review-ablation] [--case case-id] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|full] [--scope selected-books|all-books|paired] [--answer-variant with-review|compose-only|paired-review-ablation] [--case case-id] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation'].includes(args.answerVariant))throw Error('Answer variant must be with-review, compose-only, or paired-review-ablation.');
- const usesEvaluationMode=['quality','focused','holdout','acceptance'].includes(args.mode);
- if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, holdout or acceptance mode.');
- if(usesEvaluationMode&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ const usesEvaluationMode=['quality','focused','paired','holdout','acceptance'].includes(args.mode);
+ if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
+ if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, paired, holdout or acceptance mode.');
+ if(usesEvaluationMode&&args.mode!=='paired'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The untouched acceptance suite must run in all-books mode.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
  const selectedCases=selectLiveCases(suite,args.mode,args.caseId);
- const cases=usesEvaluationMode?applyQualityScope(selectedCases,args.scope):selectedCases;
+ const cases=args.mode==='paired'?selectedCases:usesEvaluationMode?applyQualityScope(selectedCases,args.scope):selectedCases;
  const evaluationUsesPlanner=evaluationUsesLivePlanner(args.mode,args.scope);
- const plannerCalls=usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
+ const plannerCalls=args.mode==='paired'?cases.length:usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
  const answerCallsPerCase=args.answerVariant==='paired-review-ablation'?3:
   args.answerVariant==='compose-only'?1:2;
- const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:plannerCalls+cases.length*answerCallsPerCase;
+ const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:args.mode==='paired'?
+  plannerCalls+cases.length*2*answerCallsPerCase:plannerCalls+cases.length*answerCallsPerCase;
+ const reportCaseCount=args.mode==='paired'?cases.length*2:cases.length;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
-  answerVariant:args.answerVariant,caseCount:cases.length,estimatedWorkerAiCalls,
-  callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':
+  answerVariant:args.answerVariant,caseCount:reportCaseCount,pairedQuestionCount:args.mode==='paired'?cases.length:undefined,
+  estimatedWorkerAiCalls,
+  callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
+   '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; no automatic composer regeneration':
    (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; the simplified answer path has no automatic composer regeneration',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
    'Automated checks cover source identity, per-part citation linkage, named-work-to-question-part alignment, and coverage consistency. They do not judge factual truth or whether cited passages semantically support the prose. Each answer includes a blank human rubric: rate accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong).',
@@ -761,7 +849,7 @@ async function main(){
   if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');
  };
  await saveReport();
- console.log('Initializing '+args.mode+' evaluation for '+cases.length+' question'+(cases.length===1?'':'s')+
+ console.log('Initializing '+args.mode+' evaluation for '+(args.mode==='paired'?cases.length+' paired questions ('+reportCaseCount+' scope results)':cases.length+' question'+(cases.length===1?'':'s'))+
   '; loading the published fingerprint coverage and corpus manifest before retrieval.');
  const startupHeartbeat=setInterval(()=>console.log('['+new Date().toISOString()+
   '] SETUP WAIT: still loading the published fingerprint coverage and corpus manifest.'),15_000);
@@ -783,6 +871,7 @@ async function main(){
   const printProgress=event=>{
    const details=[];
    if(event.variant)details.push('variant='+event.variant);
+   if(event.scope)details.push('scope='+event.scope);
    if(Number.isFinite(event.queryCount))details.push('queries='+event.queryCount);
    if(Number.isFinite(event.searchCount))details.push('searches='+event.searchCount);
    if(Number.isFinite(event.retrievalFallbackCount)&&event.retrievalFallbackCount)
@@ -797,24 +886,36 @@ async function main(){
     String(event.stage||'progress').toUpperCase()+' '+String(event.status||'update').toUpperCase()+': '+
     String(event.message||'')+(details.length?' ('+details.join('; ')+')':''));
   };
-  const run=await runLiveCases(cases,{evaluateCase:args.mode==='planner'?evaluatePlannerCase:evaluateLiveCase,
-  evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:usesEvaluationMode&&!evaluationUsesPlanner,
-   answerVariant:args.answerVariant,onProgress:printProgress},onResult:async(result,results)=>{
+  const onResult=async(result,results)=>{
    report.cases=results;report.completedCases=results.length;
-   report.notRunCases=cases.length-results.length;
+   report.notRunCases=report.caseCount-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
    report.plannerFallbackCases=results.filter(item=>item.plannerFallback).length;
    report.plannerSkippedCases=results.filter(item=>item.plannerSkipped).length;
+   report.plannerReusedCases=results.filter(item=>item.plannerReused).length;
    report.humanReview=summarizeManualReviews(results);
    report.answerVariants=summarizeAnswerVariants(results);
    report.workerVersionIds=[...new Set(results.flatMap(item=>[item.plannerWorkerVersionId,item.answerWorkerVersionId]).filter(value=>typeof value==='string'&&value))];
    report.workerSourceRevisions=[...new Set(results.flatMap(item=>[item.plannerWorkerSourceRevision,item.answerWorkerSourceRevision]).filter(value=>typeof value==='string'&&/^[a-f0-9]{40}$/.test(value)))];
+   report.scopeSummary=Object.fromEntries(['all-books','selected-books'].map(scope=>{
+    const scoped=results.filter(item=>item.scope===scope);
+    return [scope,{cases:scoped.length,passed:scoped.filter(item=>item.passed===true).length,
+     failed:scoped.filter(item=>item.passed===false).length,requestFailures:scoped.filter(item=>item.requestFailure).length,
+     questionPartCoverage:scoped.reduce((totals,item)=>{const count=item.questionPartCoverage||{};
+      for(const key of ['supported','partial','unsupported','total'])totals[key]+=Number(count[key])||0;return totals;},
+      {total:0,supported:0,partial:0,unsupported:0})}];
+   }));
    await saveReport();
    const label=args.mode==='planner'?'PLANNER':'STRUCTURAL';
    console.log((result.passed===true?label+'-PASS':result.passed===null?'UNSCORED':result.requestFailure?'REQUEST-FAIL':label+'-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
-  }});
+  };
+  const run=await (args.mode==='paired'?runPairedScopeCases(cases,{evaluateCase:evaluateLiveCase,
+   evaluateOptions:{library,manifest,allowed,token,beforeCall,answerVariant:args.answerVariant,onProgress:printProgress},onResult}):
+   runLiveCases(cases,{evaluateCase:args.mode==='planner'?evaluatePlannerCase:evaluateLiveCase,
+  evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:usesEvaluationMode&&!evaluationUsesPlanner,
+   answerVariant:args.answerVariant,onProgress:printProgress},onResult}));
   report.cases=run.results;report.stopReason=run.stopReason;
-  report.notRunCases=cases.length-run.results.length;
+  report.completedCases=run.results.length;report.notRunCases=report.caseCount-run.results.length;
   report.requestFailureCases=run.results.filter(item=>item.requestFailure).length;
   report.plannerFallbackCases=run.results.filter(item=>item.plannerFallback).length;
   report.executionStatus=report.requestFailureCases?'completed-with-request-failures':'completed';
@@ -835,7 +936,7 @@ async function main(){
   await saveReport();
   console.log(args.mode==='planner'?
    'Done: '+report.summary.passedCases+'/'+report.caseCount+' planner plans retrieved at least one expected book; no answers were generated.':
-   'Done: '+report.summary.passedCases+'/'+report.caseCount+' reviewed answers met structural gates; '+report.summary.failedCases+' failed and '+report.summary.unscoredCases+' are unscored. Semantic answer quality requires the separate human rubric.');
+   (args.mode==='paired'?'Done: '+report.summary.passedCases+'/'+report.caseCount+' scope results met structural gates; paired scope totals are in scopeSummary. ':'Done: '+report.summary.passedCases+'/'+report.caseCount+' reviewed answers met structural gates; ')+report.summary.failedCases+' failed and '+report.summary.unscoredCases+' are unscored. Semantic answer quality requires the separate human rubric.');
   return report.requestFailureCases||(args.mode==='planner'&&report.summary.failedCases)||
    (usesEvaluationMode&&report.summary.failedCases>0)?1:0;
  }catch(error){

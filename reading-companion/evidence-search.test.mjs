@@ -295,8 +295,8 @@ test('an empty comparison-side facet retries with the other side’s topic insid
  const question='What would Nietzsche think about the thought of Kierkegaard?';
  const books=[{id:'239',title:'The Antichrist — Friedrich Nietzsche'},
   {id:'140',title:'Fear and Trembling — Søren Kierkegaard'}];
- const queries=['Friedrich Nietzsche critique of religious existentialism',
-  'Søren Kierkegaard religious existence faith propositions'];
+ const queries=['Friedrich Nietzsche critique of religious inwardness or existential leap',
+  'Søren Kierkegaard concept of the individual and faith'];
  const parts=[
   {partId:'P1',question:'What position does Friedrich Nietzsche take?',sourceBookIds:['239']},
   {partId:'P2',question:'What position does Søren Kierkegaard take?',sourceBookIds:['140']},
@@ -320,8 +320,10 @@ test('an empty comparison-side facet retries with the other side’s topic insid
   allowedBookIds:new Set(['239','140']),pageLoader:async source=>({text:
    source.bookId==='239'?nietzsche.preview:kierkegaard.preview})});
  const retry=calls.find(call=>call.query.includes('Friedrich Nietzsche')&&call.query.includes('faith'));
- assert.ok(retry,'the missing author should be retried using the counterpart query’s topic terms');
+ assert.ok(retry,'the missing author should be retried using topic terms from both source-side queries');
  assert.deepEqual(retry.allowed,['239']);
+ assert.match(retry.query,/religious/i,'the failed source query can contribute a concrete topic word');
+ assert.match(retry.query,/faith/i,'the successful counterpart query contributes a shared topic anchor');
  assert.doesNotMatch(retry.query,/Kierkegaard/i);
  assert.ok(result.searches.some(search=>search.fallbackReason==='empty-source-side-facet'&&
   search.fallbackFrom===queries[0]&&search.resultCount>0));
