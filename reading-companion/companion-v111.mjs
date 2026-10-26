@@ -440,14 +440,15 @@ function renderResponse(data,turnQuestion=''){
       if(excerpts.length){
         excerpts.forEach(excerpt=>{
           const quote=node('p',excerpt,'companion-key-quote');
-          const read=node('button','Read highlighted passage','companion-inline-read');
-          read.type='button';
-          read.addEventListener('click',async()=>{
-            try{await sourceReader.open({...source,excerpt},read);}
-            catch(error){setStatus('Source reader: '+error.message);}
-          });
-          card.append(quote,read);
+          card.append(quote);
         });
+        const read=node('button','Read highlighted passages','companion-inline-read');
+        read.type='button';
+        read.addEventListener('click',async()=>{
+          try{await sourceReader.open({...source,excerpts},read);}
+          catch(error){setStatus('Source reader: '+error.message);}
+        });
+        card.append(read);
       }else{
         card.append(node('p','No verified passage highlight is available for this citation.',
           'companion-key-quote'));
