@@ -363,6 +363,38 @@ test('audit rejects a comparison part that cites the other named work',()=>{
  assert.equal(result.passed,false);
 });
 
+test('all-books source alignment allows planner-eligible alternate works but reports them',()=>{
+ const plan={parts:[{id:'P1',question:'What is Hume’s account of causal inference?',sourceBookIds:['35','276']}]};
+ const data={coverage:'full',answer:'Hume explains inference through custom [S1] and resemblance [S2].',
+  citations:[{id:'S1',bookId:'35'},{id:'S2',bookId:'276'}],
+  questionParts:[{part:'What is Hume’s account of causal inference?',status:'supported',evidenceIds:['S1','S2']}],
+  evidenceMap:[{id:'S1',point:'Hume explains inference through custom.'},{id:'S2',point:'Hume explains inference through resemblance.'}]};
+ const result=auditLiveAnswer(data,[{bookId:'35',page:42},{bookId:'276',page:64}],[],
+  [{partIncludes:'Hume',book_ids:['35']}],{scope:'all-books',plannerPlan:plan});
+ assert.equal(result.sourcePartAlignment[0].aligned,true);
+ assert.deepEqual(result.sourcePartAlignment[0].eligibleBookIds,['35','276']);
+ assert.deepEqual(result.sourcePartAlignment[0].additionalEligibleBookIds,['276']);
+ assert.deepEqual(result.sourcePartAlignment[0].misalignedBookIds,[]);
+ assert.equal(result.passed,true);
+});
+
+test('all-books alignment still rejects books outside the planner part and selected scope stays strict',()=>{
+ const plan={parts:[{id:'P1',question:'What is Hume’s account of causal inference?',sourceBookIds:['35','276']}]};
+ const base={coverage:'full',answer:'Hume explains inference through custom [S1] and a different claim [S2].',
+  citations:[{id:'S1',bookId:'35'},{id:'S2',bookId:'41'}],
+  questionParts:[{part:'What is Hume’s account of causal inference?',status:'supported',evidenceIds:['S1','S2']}],
+  evidenceMap:[{id:'S1',point:'Hume explains inference through custom.'},{id:'S2',point:'A different claim.'}]};
+ const submitted=[{bookId:'35',page:42},{bookId:'41',page:39}],required=[{partIncludes:'Hume',book_ids:['35']}];
+ const allBooks=auditLiveAnswer(base,submitted,[],required,{scope:'all-books',plannerPlan:plan});
+ assert.equal(allBooks.sourcePartAlignment[0].aligned,false);
+ assert.deepEqual(allBooks.sourcePartAlignment[0].misalignedBookIds,['41']);
+ assert.equal(allBooks.passed,false);
+ const selectedBooks=auditLiveAnswer(base,submitted,[],required,{scope:'selected-books',plannerPlan:plan});
+ assert.equal(selectedBooks.sourcePartAlignment[0].aligned,false);
+ assert.deepEqual(selectedBooks.sourcePartAlignment[0].eligibleBookIds,['35']);
+ assert.deepEqual(selectedBooks.sourcePartAlignment[0].misalignedBookIds,['41']);
+});
+
 test('human rubric summary keeps semantic review separate from structural passes',()=>{
  const pending=summarizeManualReviews([{id:'a',manualReview:{status:'not-reviewed',scores:{}}}]);
  assert.equal(pending.reviewed,0);assert.equal(pending.pending,1);assert.equal(pending.qualityPass,null);
@@ -458,6 +490,27 @@ test('offline report recheck recognizes paired scope rows by their shared questi
  }]});
  assert.equal(checked.cases[0].offlineRecheck.passed,true);
  assert.equal(checked.offlineRecheck.checkedCases,1);
+});
+
+test('offline paired all-books recheck uses the saved plan and reports eligible alternate works',()=>{
+ const plan={parts:[{id:'P1',question:'What is Hume’s account of causal inference?',sourceBookIds:['35','276']},
+  {id:'P2',question:'How does Kant account for causal necessity?',sourceBookIds:['40']}]};
+ const checked=recheckQualityReport({searchScope:'all-books',cases:[{
+  id:'paired-hume-kant-causal-inference::all-books',pairedCaseId:'paired-hume-kant-causal-inference',
+  scope:'all-books',coverage:'full',answerText:'Hume argues from custom [S1] and resemblance [S2]. Kant treats causality as a condition of experience [S3].',
+  plannerPlan:plan,
+  citationSources:[{id:'S1',bookId:'35',page:42},{id:'S2',bookId:'276',page:64},{id:'S3',bookId:'40',page:1}],
+  submittedSources:[{bookId:'35',page:42},{bookId:'276',page:64},{bookId:'40',page:1}],
+  evidenceMap:[{id:'S1',partId:'P1',point:'Hume argues from custom.'},{id:'S2',partId:'P1',point:'Hume refers to resemblance.'},
+   {id:'S3',partId:'P2',point:'Kant treats causality as a condition of experience.'}],
+  questionParts:[{part:'What is Hume’s account of causal inference?',status:'supported',evidenceIds:['S1','S2']},
+   {part:'How does Kant account for causal necessity?',status:'supported',evidenceIds:['S3']}]
+ }]});
+ const result=checked.cases[0].offlineRecheck;
+ assert.equal(result.passed,true);
+ assert.equal(result.sourcePartAlignment[0].aligned,true);
+ assert.deepEqual(result.sourcePartAlignment[0].additionalEligibleBookIds,['276']);
+ assert.equal(result.sourcePartAlignment[1].aligned,true);
 });
 
 test('offline report recheck refreshes both paired variant audits and preserves manual scores',()=>{
