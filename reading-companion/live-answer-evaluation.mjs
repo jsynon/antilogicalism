@@ -295,11 +295,25 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
    allowedBookIds,linkedBookIds:linkedBooks,misalignedBookIds,aligned,
    reason:aligned?'':'evidence-does-not-match-expected-part-source'};
  });
- const evidenceHighlights=highlights.map(item=>({sourceId:String(item?.source_id||item?.sourceId||''),
-  title:String(item?.title||''),page:Number.isSafeInteger(item?.page)?item.page:null,
-  quote:typeof item?.quote==='string'?item.quote:'',
-  quoteLocated:typeof item?.quoteLocated==='boolean'?item.quoteLocated:
-   locateHighlightInSubmittedPage(item,citations,submitted)}));
+ const evidenceHighlights=highlights.map(item=>{
+  const quotes=(Array.isArray(item?.quotes)?item.quotes:[]).slice(0,3).map(quote=>({
+   claimId:String(quote?.claim_id||''),partId:String(quote?.part_id||''),
+   point:typeof quote?.point==='string'?quote.point:'',
+   quote:typeof quote?.quote==='string'?quote.quote:'',
+   quoteLocated:typeof quote?.quoteLocated==='boolean'?quote.quoteLocated:
+    locateHighlightInSubmittedPage({...item,quote:quote?.quote},citations,submitted),
+   partialMatch:quote?.partialMatch===true
+  }));
+  const nestedLocated=quotes.some(quote=>quote.quoteLocated===true)?true:
+   quotes.some(quote=>typeof quote.quoteLocated==='boolean')?false:null;
+  const quoteLocated=typeof item?.quoteLocated==='boolean'?item.quoteLocated:
+   (quotes.length?nestedLocated:locateHighlightInSubmittedPage(item,citations,submitted));
+  return {sourceId:String(item?.source_id||item?.sourceId||''),
+   title:String(item?.title||''),page:Number.isSafeInteger(item?.page)?item.page:null,
+   quote:typeof item?.quote==='string'?item.quote:'',
+   claimId:String(item?.claim_id||''),point:typeof item?.point==='string'?item.point:'',
+   quoteLocated,quotes};
+ });
  const highlightedSourceIds=new Set(evidenceHighlights.filter(item=>item.quoteLocated===true)
   .map(item=>item.sourceId));
  const citedSourceIds=[...new Set(inline)].filter(id=>citationIds.has(id));
