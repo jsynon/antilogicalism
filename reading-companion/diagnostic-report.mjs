@@ -203,8 +203,15 @@ export function createDiagnosticReport(input={}){
         sourceId:string(item?.source_id,24),
         page:Number.isSafeInteger(item?.page)?item.page:null,
         quote:string(item?.quote,320),
+        claimId:string(item?.claim_id,48),
+        point:string(item?.point,320),
         quoteLocated:item?.quoteLocated===true,
-        partialMatch:item?.partialMatch===true
+        partialMatch:item?.partialMatch===true,
+        quotes:(Array.isArray(item?.quotes)?item.quotes:[]).slice(0,3).map(quote=>({
+          claimId:string(quote?.claim_id,48),partId:string(quote?.part_id,24),
+          point:string(quote?.point,320),quote:string(quote?.quote,320),
+          quoteLocated:quote?.quoteLocated===true,partialMatch:quote?.partialMatch===true
+        }))
       })):[]
   };
 }
