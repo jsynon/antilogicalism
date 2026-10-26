@@ -169,8 +169,11 @@ test('answer citations open in the local page reader while Sources keeps the PDF
  assert.ok(clientV48.includes('function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map())'));
  assert.ok(clientV48.includes('claimQuotesForCitation(answer,citationGroup.start,evidence)'));
  assert.ok(clientV48.includes('sourceReader.open({...source,excerpts},a)'));
- assert.match(clientV48,/excerpts\.forEach\(excerpt=>\{\s*const quote=node\('p',excerpt,'companion-key-quote'\);\s*card\.append\(quote\);\s*\}\);\s*const read=node\('button','Read highlighted passages'/,
-  'each citation card renders every excerpt but creates one source-level reader button');
+ assert.match(clientV48,/excerpts\.forEach\(excerpt=>\{\s*const quote=node\('p',excerpt,'companion-key-quote'\);\s*card\.append\(quote\);\s*\}\);\s*const read=node\('button','Read passages'/,
+  'each citation card renders its excerpts behind one source-level reader button');
+ assert.match(clientV48,/node\('button','Read passages','companion-inline-read'\)/);
+ assert.doesNotMatch(clientV48,/Read highlighted passages|node\('button','Read passage'/);
+ assert.match(html,/“Read passages” opens the cited excerpts here/);
  assert.ok(clientV48.includes('sourceReader.open({...source,excerpts},read)'));
  assert.ok(clientV48.includes('link.href=source.url'));
  assert.ok(clientV48.includes("panel.append(node('h3','Key passages from the source books'))"));

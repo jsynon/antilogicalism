@@ -442,7 +442,7 @@ function renderResponse(data,turnQuestion=''){
           const quote=node('p',excerpt,'companion-key-quote');
           card.append(quote);
         });
-        const read=node('button','Read highlighted passages','companion-inline-read');
+        const read=node('button','Read passages','companion-inline-read');
         read.type='button';
         read.addEventListener('click',async()=>{
           try{await sourceReader.open({...source,excerpts},read);}
@@ -452,7 +452,7 @@ function renderResponse(data,turnQuestion=''){
       }else{
         card.append(node('p','No verified passage highlight is available for this citation.',
           'companion-key-quote'));
-        const read=node('button','Read passage','companion-inline-read');
+        const read=node('button','Read passages','companion-inline-read');
         read.type='button';
         read.addEventListener('click',async()=>{
           try{await sourceReader.open({...source,excerpts:[]},read);}
