@@ -1595,3 +1595,206 @@ html[data-theme="dark"] ::selection {
 	background: #315a73;
 	color: #fff;
 }
+
+
+/*
+ * Dark-mode refinements for the three feature pages whose controls use
+ * page-specific inline colors. Keep these scoped so the light design and
+ * unrelated pages retain their existing styles.
+ */
+
+/* Bookshelf */
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf {
+	background-color: transparent;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf h2,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf h3,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result h3,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-resource h3 {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .bookshelf-intro,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-category-intro,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-descriptions p,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-loading,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-empty {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-controls label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-search-row label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-count,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-page-label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-series,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-period-label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-category-label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-extras p {
+	color: var(--site-muted) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result {
+	border-bottom-color: var(--site-border) !important;
+	background-color: transparent !important;
+	box-shadow: none !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-book-links a {
+	color: var(--site-link) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf select,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf input {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-search-button,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-pagination button {
+	background-color: #343b43 !important;
+	border-color: #6c7884 !important;
+	color: #f3f5f7 !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-search-button:hover,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-pagination button:hover:not(:disabled) {
+	background-color: #46515c !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-empty,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-loading {
+	border-bottom-color: var(--site-border) !important;
+}
+
+/* Library Search */
+html[data-theme="dark"] body #primary .entry-content #digital-library {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #digital-library h2,
+html[data-theme="dark"] body #primary .entry-content #digital-library h3,
+html[data-theme="dark"] body #primary .entry-content #digital-library p,
+html[data-theme="dark"] body #primary .entry-content #digital-library label,
+html[data-theme="dark"] body #primary .entry-content #digital-library summary {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #digital-library #library-search-note,
+html[data-theme="dark"] body #primary .entry-content #digital-library .library-search-help,
+html[data-theme="dark"] body #primary .entry-content #digital-library .library-page-kind,
+html[data-theme="dark"] body #primary .entry-content #digital-library .library-pdf-unavailable {
+	color: var(--site-muted) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #digital-library input,
+html[data-theme="dark"] body #primary .entry-content #digital-library select,
+html[data-theme="dark"] body #primary .entry-content #digital-library textarea {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #digital-library .library-result {
+	border-bottom-color: var(--site-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #digital-library .library-result a {
+	color: var(--site-link) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #digital-library .library-original {
+	border-color: var(--site-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #digital-library mark {
+	background-color: #765f23 !important;
+	color: #fff5d7 !important;
+}
+
+/* Reading Companion */
+html[data-theme="dark"] body #primary .entry-content #companion-pilot {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot h2,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot h3,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot p,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot label,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-turn-question {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-hint,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-reader-meta,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-book-search-status,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-key-passage>a,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-source-entry p>a {
+	color: var(--site-muted) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot textarea,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-book-search,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-book-filter,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot select {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-actions button,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot button.companion-inline-read {
+	background-color: #343b43 !important;
+	border-color: #6c7884 !important;
+	color: #f3f5f7 !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-actions button:hover:not(:disabled),
+html[data-theme="dark"] body #primary .entry-content #companion-pilot button.companion-inline-read:hover {
+	background-color: #46515c !important;
+	border-color: #82909d !important;
+	color: #fff !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-status:not(:empty) {
+	background: linear-gradient(135deg, #242b31 0%, #202328 100%) !important;
+	border-color: #46515b !important;
+	border-left-color: #78a8c3 !important;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, .2) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-status:not(:empty)::before {
+	color: #a8c9db !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-status.is-busy::after {
+	border-color: #46515b !important;
+	border-top-color: #a8c9db !important;
+	border-right-color: #78a8c3 !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-actions,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-key-passage,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-answer,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-highlights,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-citations,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-source-text {
+	border-color: var(--site-border) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-source-reader {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-source-text mark.cited-highlight {
+	background-color: #765f23 !important;
+	color: #fff5d7 !important;
+}
