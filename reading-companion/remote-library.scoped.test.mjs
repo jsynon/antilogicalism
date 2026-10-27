@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {gzipSync} from 'node:zlib';
-import {RemoteLibrary,queryTerms,substantivePageEvidence,isNavigationPage} from './remote-library.mjs';
+import {RemoteLibrary,filterEvidenceExcerptArtifacts,filterPageDisplayArtifacts,queryTerms,substantivePageEvidence,isNavigationPage} from './remote-library.mjs';
 import {retrieveEvidence,selectAnswerSources} from './evidence-search.mjs';
 
 const driveId='ABCDEFGHIJKLMNOPQRSTUVWXY123456';
@@ -579,3 +579,74 @@ test('an ellipsis-truncated final connector retains the relevant next page',asyn
  assert(result.sources[1].preview.includes('Dreams after death'));
 });
 
+
+
+test('v49 display filters suppress only the four scan-backed page-scoped artifacts',async()=>{
+ const archive='Digitized by the Internet Archive with funding from Microsoft.\nhttp://www.archive.org/details/freethoughtofficOOrussiala';
+ const courtesy='The essay ends here.\n\nelectronic reproduction courtesy of http://www.reasoned.org/dir/';
+ const reasoned='The argument concludes.\n\nEND\n\nwww.reasoned.org/dir/';
+ const blackmask='Mysticism and Logic.\n  This page formatted 2007 Blackmask Online.\n  http://www.blackmask.com\n\nOnline Distributed Proofreading Team at http://www.pgdp.net';
+ assert.doesNotMatch(filterPageDisplayArtifacts('142',4,archive),/freethoughtofficOOrussiala/i);
+ assert.match(filterPageDisplayArtifacts('142',4,archive),/Digitized by the Internet Archive/);
+ assert.equal(filterPageDisplayArtifacts('157',21,courtesy).includes('reasoned.org'),false);
+ assert.match(filterPageDisplayArtifacts('157',21,courtesy),/electronic reproduction courtesy of/);
+ assert.equal(filterPageDisplayArtifacts('174',101,reasoned).includes('reasoned.org'),false);
+ const filteredBlackmask=filterPageDisplayArtifacts('180',4,blackmask);
+ assert.equal(/blackmask/i.test(filteredBlackmask),false);
+ assert.match(filteredBlackmask,/Online Distributed Proofreading Team/);
+ assert(filteredBlackmask.includes('pgdp.net'));
+ assert.equal(filterPageDisplayArtifacts('142',5,archive),archive);
+ assert.equal(filterPageDisplayArtifacts('153',1,'https://www.gutenberg.org/license'),'https://www.gutenberg.org/license');
+
+ const corpus={
+  'manifest.json':{version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:4,
+   page_books:[142,157,174,180],partitions:['fr','re','bl'],books:{
+    '142':{title:'Freethought on Official Matters',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+    '157':{title:'An Introduction to Metaphysics — Henri Bergson',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+    '174':{title:'Matter and Memory — Henri Bergson',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+    '180':{title:'Mysticism and Logic — Bertrand Russell',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
+   }},
+  'terms-fr.json':{freethoughtofficoorussiala:[0]},
+  'terms-re.json':{reasoned:[1,1]},
+  'terms-bl.json':{blackmask:[3]},
+  'book-142.json':{pages:[{id:0,page:4,text:archive}]},
+  'book-157.json':{pages:[{id:1,page:21,text:courtesy}]},
+  'book-174.json':{pages:[{id:2,page:101,text:reasoned}]},
+  'book-180.json':{pages:[{id:3,page:4,text:blackmask}]}
+ };
+ const fetcher=url=>{
+  const file=String(url).split('/').pop().replace(/\.gz$/,'');
+  return Promise.resolve(file in corpus
+   ? new Response(gzipSync(JSON.stringify(corpus[file])),{status:200})
+   : new Response('Not found',{status:404}));
+ };
+ const library=new RemoteLibrary('https://example.test/v48/',fetcher);
+ for(const term of ['freethoughtofficoorussiala','reasoned','blackmask']){
+  const result=await library.search(term,{maxBooks:3,pagesPerBook:2});
+  assert.equal(result.sources.length,0,'display artifact must not create a search result: '+term);
+ }
+});
+
+test('Reading Companion filters only matching page excerpts and leaves citations and other pages intact',()=>{
+ const input=[
+  {source_id:'c1',page:4,quote:'Opening text http://www.archive.org/details/freethoughtofficOOrussiala',
+   quotes:[{quote:'Digitized by the Internet Archive. http://www.archive.org/details/freethoughtofficOOrussiala',claim_id:'claim-1'}]},
+  {source_id:'c2',page:4,quote:'This page formatted 2007 Blackmask Online. http://www.blackmask.com; see http://www.pgdp.net.',
+   quotes:[{quote:'Online Distributed Proofreading Team at http://www.pgdp.net',claim_id:'claim-2'}]}
+ ];
+ const citations=[
+  {id:'c1',bookId:'142',page:4},
+  {id:'c2',bookId:'180',page:4}
+ ];
+ const output=filterEvidenceExcerptArtifacts(input,citations);
+ assert.equal(output[0].quote.includes('freethoughtofficOOrussiala'),false);
+ assert.match(output[0].quotes[0].quote,/Digitized by the Internet Archive/);
+ assert.equal(output[1].quote.includes('Blackmask'),false);
+ assert.equal(output[1].quote.includes('blackmask.com'),false);
+ assert(output[1].quote.includes('pgdp.net'));
+ assert.deepEqual(output[1].quotes,input[1].quotes);
+ assert.equal(input[0].quote.includes('freethoughtofficOOrussiala'),true,'response evidence remains untouched');
+ const unrelated=filterEvidenceExcerptArtifacts([{source_id:'c3',page:4,quote:input[0].quote}],
+  [{id:'c3',bookId:'142',page:5}]);
+ assert.equal(unrelated[0].quote,input[0].quote);
+});
