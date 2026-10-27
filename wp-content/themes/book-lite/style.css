@@ -1989,17 +1989,38 @@ html[data-theme="dark"] body #primary .entry-content #surprise-me-home-button:ho
 }
 
 /* Match the Library Search action to the shared outlined button style. */
-html[data-theme="dark"] body #primary .entry-content #digital-library #digital-library-search #library-search-button {
+html[data-theme="dark"] body #primary #digital-library .entry-content #digital-library-search #library-search-button {
 	background: var(--site-button-bg) !important;
 	border: 1px solid var(--site-button-border) !important;
 	border-radius: 4px !important;
 	color: var(--site-text) !important;
 }
 
-html[data-theme="dark"] body #primary .entry-content #digital-library #digital-library-search #library-search-button:hover:not(:disabled) {
+html[data-theme="dark"] body #primary #digital-library .entry-content #digital-library-search #library-search-button:hover:not(:disabled) {
 	background: var(--site-button-hover) !important;
 }
 
 html[data-theme="dark"] body #primary .entry-content p::first-letter {
+	color: var(--site-text) !important;
+}
+
+/* Apply the same outlined button treatment to controls outside page-specific wrappers too. */
+html[data-theme="dark"] button:not(.site-theme-toggle) {
+	background-color: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] button:not(.site-theme-toggle):hover:not(:disabled) {
+	background-color: var(--site-button-hover) !important;
+	border-color: var(--site-button-border) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content span,
+html[data-theme="dark"] body #primary .entry-content strong,
+html[data-theme="dark"] body #primary .entry-content em,
+html[data-theme="dark"] body #primary .entry-content b,
+html[data-theme="dark"] body #primary .entry-content i {
 	color: var(--site-text) !important;
 }
