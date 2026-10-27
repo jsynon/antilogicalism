@@ -24,11 +24,43 @@ function surname(name){
   return particles.has((words.at(-2)||'').toLocaleLowerCase('en'))?
     words.at(-2)+' '+last:last;
 }
+function volumeNumber(token){
+  if(/^\d+$/.test(token))return Number(token);
+  const letters=token.toUpperCase();
+  if(!/^(?=[IVXLCDM]+$)M{0,3}(CM|CD|D?C{0,3})(XC|XL|L?X{0,3})(IX|IV|V?I{0,3})$/.test(letters))return null;
+  const values={I:1,V:5,X:10,L:50,C:100,D:500,M:1000};
+  let value=0;
+  for(let i=0;i<letters.length;i++){
+    const current=values[letters[i]],next=values[letters[i+1]]||0;
+    value+=current<next?-current:current;
+  }
+  return value;
+}
 function collectionVolume(title){
-  const match=String(title||'').match(/^(.*?)\s*,?\s+(?:volume|vol\.?)\s*(\d+)\b/i);
+  // Strip the author suffix before reading series labels, since some volumes
+  // credit different translators or contributors in the selector.
+  const work=splitTitle(title).work;
+  const known=[
+    {name:'Harvard Classics',pattern:/\bHarvard Classics\b/i},
+    {name:'Sacred Books of the East',pattern:/\bSacred Books of the East\b/i}
+  ];
+  for(const series of known){
+    const label=series.pattern.exec(work);
+    if(!label)continue;
+    const volume=work.slice(label.index+label[0].length)
+      .match(/\b(?:volume|vol\.?)\s*(\d+|[ivxlcdm]+)\b/i);
+    if(volume){
+      const number=volumeNumber(volume[1]);
+      if(number!==null)return {name:series.name,volume:number};
+    }
+  }
+  // Also group ordinary multi-volume and multi-book titles such as
+  // "Collected Works of X, Volume II" or "Against Heresies, Book III".
+  const match=work.match(/^(.*?)\s*,?\s+(?:volume|vol\.?|book|part)\s*(\d+|[ivxlcdm]+)\b/i);
   if(!match)return null;
   const name=match[1].replace(/[,:;–—-]+$/,'').trim();
-  return name?{name,volume:Number(match[2])}:null;
+  const volume=volumeNumber(match[2]);
+  return name&&volume!==null?{name,volume}:null;
 }
 function compareBookTitle(a,b){
   return collator.compare(a.title,b.title)||collator.compare(a.id,b.id);
