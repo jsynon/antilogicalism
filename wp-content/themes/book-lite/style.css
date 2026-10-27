@@ -1999,3 +1999,7 @@ html[data-theme="dark"] body #primary .entry-content #digital-library #digital-l
 html[data-theme="dark"] body #primary .entry-content #digital-library #digital-library-search #library-search-button:hover:not(:disabled) {
 	background: var(--site-button-hover) !important;
 }
+
+html[data-theme="dark"] body #primary .entry-content p::first-letter {
+	color: var(--site-text) !important;
+}
