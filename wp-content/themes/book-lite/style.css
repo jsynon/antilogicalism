@@ -881,7 +881,8 @@ object {
 }
 #main .site-navigation {
 	margin: 0 0 1.8em;
-	overflow: hidden;
+	overflow: visible;
+	display: flow-root;
 }
 #nav-below {
 	overflow: hidden;
@@ -1436,7 +1437,7 @@ body {
 	justify-content: center;
 	padding: 10px;
 	position: absolute;
-	right: max(1rem, calc((100vw - 750px) / 2));
+	right: -3.5rem;
 	top: 50%;
 	transform: translateY(-50%);
 	width: 44px;
@@ -1465,11 +1466,25 @@ body {
 	outline-offset: 3px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 818.375px) {
 	.site-theme-toggle {
 		right: .5rem;
 		top: 0;
 		transform: none;
+	}
+
+	#masthead nav h1.menu-toggle {
+		box-sizing: border-box;
+		display: block;
+		text-align: center;
+		width: 100%;
+	}
+
+	#masthead .main-small-navigation ul.menu {
+		list-style: none;
+		margin: 0;
+		padding: .9em 0 1.8em;
+		text-align: center;
 	}
 }
 
@@ -1688,6 +1703,16 @@ html[data-theme="dark"] body #primary .entry-content #digital-library .library-s
 html[data-theme="dark"] body #primary .entry-content #digital-library .library-page-kind,
 html[data-theme="dark"] body #primary .entry-content #digital-library .library-pdf-unavailable {
 	color: var(--site-muted) !important;
+}
+
+/* Keep the search form controls legible even when page-specific rules target individual fields. */
+html[data-theme="dark"] body #primary .entry-content #digital-library-search input,
+html[data-theme="dark"] body #primary .entry-content #digital-library-search select,
+html[data-theme="dark"] body #primary .entry-content #digital-library-search textarea,
+html[data-theme="dark"] body #primary .entry-content #digital-library-search select option {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
 }
 
 html[data-theme="dark"] body #primary .entry-content #digital-library input,
