@@ -1436,7 +1436,7 @@ body {
 	justify-content: center;
 	padding: 10px;
 	position: absolute;
-	right: max(1rem, calc((100vw - 750px) / 2 - 6rem));
+	right: max(1rem, calc((100vw - 750px) / 2 - 7rem));
 	top: 50%;
 	transform: translateY(-50%);
 	width: 44px;
