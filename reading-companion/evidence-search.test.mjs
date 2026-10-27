@@ -993,53 +993,70 @@ test('a contextual query carries a quoted parent passage into a pronoun-based pa
   'a root-question quote in the contextual part query should connect the source to that part');
 });
 
-test('exact part wording is searched inside works resolved by a sibling source facet',async()=>{
- const question='What is the meaning of “conscience makes cowards of us all” in Hamlet’s “To be, or not to be” soliloquy?';
+test('rephrased part wording is searched only inside works resolved by a sibling source facet',async()=>{
+ const question='How does Hamlet weigh thought against action in the soliloquy?';
+ const partQuestion='What is the meaning of “conscience makes cowards of us all” in Hamlet’s “To be, or not to be” soliloquy?';
  const namedSourceQuery='Shakespeare Hamlet conscience meaning cowardice hesitation soliloquy';
+ const combinedPartQuery=`${question} ${partQuestion}`;
  const books=[
   {id:'212',title:'The Complete Works of William Shakespeare — William Shakespeare'},
   {id:'564',title:'Elizabethan Drama, Vol. I: Marlowe and Shakespeare — Christopher Marlowe and William Shakespeare'},
   {id:'230',title:'The Courage to Be — Paul Tillich'}
  ];
- const partQuestions=[{partId:'P1',question}];
+ const partQuestions=[{partId:'P1',question:partQuestion}];
+ const calls=[];
  const library={search:async(query,{bookId}={})=>{
+  calls.push({query,bookId:String(bookId||'')});
   if(query===namedSourceQuery&&bookId==='212')return {sources:[{
    bookId:'212',title:books[0].title,page:471,globalPageId:100471,score:40
   }]};
   if(query===namedSourceQuery&&bookId==='564')return {sources:[{
    bookId:'564',title:books[1].title,page:215,globalPageId:100215,score:38
   }]};
-  if(query===question&&bookId==='212')return {sources:[{
+  if(query===partQuestion&&bookId==='212')return {sources:[{
    bookId:'212',title:books[0].title,page:454,globalPageId:100454,score:80
   }]};
-  if(query===question&&bookId==='564')return {sources:[{
+  if(query===partQuestion&&bookId==='564')return {sources:[{
    bookId:'564',title:books[1].title,page:152,globalPageId:100152,score:72
   }]};
   if(!bookId)return {sources:[{bookId:'230',title:books[2].title,page:43,
    globalPageId:100043,score:99}]};
   return {sources:[]};
  }};
- const result=await retrieveEvidence({question,queries:[
+ const retrievalInput={question,queries:[
   "Hamlet 'To be, or not to be' conscience makes cowards meaning",
   namedSourceQuery
- ],partQueries:[{partId:'P1',query:question}],partQuestions,library,books,
+ ],partQueries:[{partId:'P1',query:combinedPartQuery}],partQuestions,library,books,
   allowedBookIds:new Set(books.map(book=>book.id)),
   pageLoader:async source=>({text:source.page===454?
    'Thus conscience does make cowards of us all; and thus the native hue of resolution is sicklied over with the pale cast of thought.':
    source.page===152?'The undiscovered country puzzles the will and makes us rather bear those ills we have.':
-   'Commentary on Hamlet explains that thought and fear may restrain a person from action in a difficult choice.'})});
+   'Commentary on Hamlet explains that thought and fear may restrain a person from action in a difficult choice.'})};
+ const result=await retrieveEvidence(retrievalInput);
  const directPage=result.candidates.find(source=>source.bookId==='212'&&source.page===454);
- assert.ok(directPage,'the exact part query should be retried inside the already-resolved Shakespeare volume');
+ assert.ok(directPage,'the exact part question should be added as a scoped facet when planner wording differs');
  assert.ok(directPage.candidatePartIds.includes('P1'));
+ assert.ok(result.candidates.some(source=>source.bookId==='564'&&source.page===152),
+  'the same part wording should reach the second already-resolved Hamlet work');
  assert.ok(result.searches.some(search=>search.partScopeInherited==='P1'&&
   search.targetBookIds.includes('212')&&search.targetBookIds.includes('564')),
-  'the artifact trace should identify the inherited, catalog-resolved work scope');
+  'the artifact trace should identify the added query and its catalog-resolved work scope');
+ assert.ok(calls.some(call=>call.query===partQuestion&&call.bookId==='212'));
+ assert.ok(calls.some(call=>call.query===partQuestion&&call.bookId==='564'));
+ assert.ok(!calls.some(call=>call.query===partQuestion&&!call.bookId),
+  'the fallback part wording must never be searched across all books');
  const selected=selectAnswerSources(result.candidates,question,'token',{maxSources:3,
   maxBytes:12000,maxSourceBytes:12000,partQuestions});
  assert.ok(selected.some(source=>source.bookId==='212'&&source.page===454),
   'the direct passage should reach the bounded answer packet');
+ assert.ok(selected.some(source=>source.bookId==='564'&&source.page===152),
+  'the bounded packet should retain the direct passage from the second resolved work');
  assert.ok(!selected.some(source=>source.bookId==='230'),
   'an unscoped commentary hit must not stand in for the requested primary passage');
+ calls.length=0;
+ await retrieveEvidence({...retrievalInput,selectedBookIds:['212']});
+ assert.ok(!calls.some(call=>call.query===partQuestion),
+  'a selected one-work scope should keep its established searches without adding a redundant facet');
 });
 
 test('quoted part phrase links an otherwise unassigned page through OCR spacing and reserves it',async()=>{
