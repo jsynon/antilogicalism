@@ -2080,3 +2080,22 @@ html[data-theme="dark"] .sd-sharing .share-twitter iframe {
 html[data-theme="dark"] #secondary .rss-widget-icon {
 	filter: drop-shadow(0 0 1px rgba(230, 237, 243, .3));
 }
+
+/* Recolor the small ornamental break used after each article. */
+html[data-theme="dark"] article {
+	background-image: none !important;
+	position: relative;
+}
+html[data-theme="dark"] article::after {
+	background-color: var(--site-border);
+	bottom: 0;
+	content: "";
+	height: 10px;
+	left: 50%;
+	mask: url("/antilogicalism/wp-content/themes/book-lite/images/break-2x.png") center / 125px 10px no-repeat;
+	-webkit-mask: url("/antilogicalism/wp-content/themes/book-lite/images/break-2x.png") center / 125px 10px no-repeat;
+	pointer-events: none;
+	position: absolute;
+	transform: translateX(-50%);
+	width: 125px;
+}
