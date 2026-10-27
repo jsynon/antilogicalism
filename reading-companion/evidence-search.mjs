@@ -403,10 +403,27 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  for(const part of scopedPartQuestions){
   if(!primaryPartIds.has(part?.partId)||typeof part?.question!=='string')continue;
   const query=part.question.trim();
-  const facet=searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===query.toLocaleLowerCase());
   const sourceIds=partSourceBookIds.get(part.partId)||[];
-  if(facet<0||!sourceIds.length)continue;
-  const searchSet=searchSets[facet];
+  if(!sourceIds.length)continue;
+  let facet=searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===query.toLocaleLowerCase());
+  let searchSet;
+  if(facet<0){
+   // Planner part queries may combine the reader's question with a rewritten
+   // sub-question, so exact wording is not guaranteed to exist as a facet.
+   // Add a separate local facet only when the linked planner facet resolved
+   // multiple works. A one-work scope has already been searched by its linked
+   // facet; preserving that path avoids changing established single-work
+   // packets. Never issue this fallback as an unrestricted library query.
+   const scopedIds=sourceIds.filter(id=>retrievalAllowed.has(String(id)));
+   if(scopedIds.length<2)continue;
+   facet=searchQueries.length;
+   searchQueries.push(query);
+   searchSet={sources:[],executedQuery:query,targetBookIds:[],inheritedPartScope:part.partId};
+   searchSets.push(searchSet);
+   partFacetIndices.push({partId:part.partId,facet});
+  }else{
+   searchSet=searchSets[facet];
+  }
   const alreadySearched=new Set((searchSet?.targetBookIds||[]).map(String));
   const missingIds=sourceIds.filter(id=>retrievalAllowed.has(String(id))&&!alreadySearched.has(String(id)));
   if(!missingIds.length)continue;
