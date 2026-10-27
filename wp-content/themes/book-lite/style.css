@@ -2067,6 +2067,40 @@ html[data-theme="dark"] body #primary .entry-content #companion-pilot button.com
 	outline-offset: 2px;
 }
 
+/* Related article and book panels ship inline light-theme colors in each
+   post's markup. Override their surfaces, text, and separators together. */
+html[data-theme="dark"] .antilogicalism-related,
+html[data-theme="dark"] .antilogicalism-related-books {
+	background-color: var(--site-page-bg) !important;
+	border-top-color: var(--site-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] .antilogicalism-related h2,
+html[data-theme="dark"] .antilogicalism-related-books h2 {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] .antilogicalism-related .related-item,
+html[data-theme="dark"] .antilogicalism-related-books li {
+	border-bottom-color: var(--site-border) !important;
+}
+
+html[data-theme="dark"] .antilogicalism-related .related-title,
+html[data-theme="dark"] .antilogicalism-related-books .book-title,
+html[data-theme="dark"] .antilogicalism-related-books .book-link {
+	color: var(--site-link) !important;
+}
+
+html[data-theme="dark"] .antilogicalism-related .related-date,
+html[data-theme="dark"] .antilogicalism-related-books .book-author {
+	color: var(--site-muted) !important;
+}
+
+html[data-theme="dark"] .antilogicalism-related .related-excerpt {
+	color: var(--site-text) !important;
+}
+
 html[data-theme="dark"] body #primary .entry-content span,
 html[data-theme="dark"] body #primary .entry-content strong,
 html[data-theme="dark"] body #primary .entry-content em,
