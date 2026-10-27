@@ -98,7 +98,7 @@ function refreshDiagnostic(){
 }
 function beginDiagnostic(questionText){
   diagnosticState={question:questionText,selectedBookId:bookFilter.value||'all',
-    libraryVersion:48,fallbackMode:oldPilotFallback,stage:'planning',
+    libraryVersion:49,fallbackMode:oldPilotFallback,stage:'planning',
     plannerQueries:[],searches:[],candidates:[],submittedSources:[],
     evidenceHighlights:[],failureHttpStatus:null,failureCode:'',
     failureStage:null,failureProviderClass:null,failureProviderCode:null,
@@ -145,11 +145,11 @@ function populateBooks(){
 }
 async function loadCoverage(){
   try{
-    const response=await fetch(ROOT+'reader-fingerprints-v2/coverage-v2.json',{cache:'no-store'});
-    if(!response.ok)throw Error('The v48 fingerprint collection is not available yet.');
+    const response=await fetch(ROOT+'reader-fingerprints-v3/coverage-v3.json',{cache:'no-store'});
+    if(!response.ok)throw Error('The v49 fingerprint collection is not available yet.');
     const index=await response.json();
-    if(index.schema!=='antilogicalism-reader-coverage-v2'||
-       index.libraryVersion!==48||!index.books||typeof index.books!=='object')
+    if(index.schema!=='antilogicalism-reader-coverage-v3'||
+       index.libraryVersion!==49||!index.books||typeof index.books!=='object')
       throw Error('Unexpected fingerprint coverage index');
     const list=sortBooksForSelector(Object.entries(index.books)
       .filter(([id,book])=>/^[1-9]\d{0,3}$/.test(id)&&book&&
@@ -233,7 +233,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
   try{
     let populated=[];
     if(oldPilotFallback){
-      // If the v48 fingerprint collection cannot be loaded, search the
+      // If the v49 fingerprint collection cannot be loaded, search the
       // previously proven 32-page Thucydides selection directly. Do not
       // search the entire shard and accidentally offer unverified pages.
       const book=await bookShard('152');
@@ -603,7 +603,7 @@ async function askQuestion(questionText){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
         history,bookId:bookFilter.value||'',plan:diagnosticState?.plannerPlan||undefined,
-        sources:chosen.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds}))})
+        sources:chosen.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds,libraryVersion:49}))})
     });
     let data;
     try{data=await response.json();}catch{

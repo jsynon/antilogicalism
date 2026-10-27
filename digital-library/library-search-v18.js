@@ -106,6 +106,7 @@
       titleCollator.compare(titleSortKey(a), titleSortKey(b));
   }
   let manifestPromise;
+  let suppressionPromise;
   const partitions = new Map();
   const chunks = new Map();
   let generation = 0;
@@ -132,6 +133,18 @@
   function manifest() {
     if (!manifestPromise) manifestPromise = loadJson(root + 'manifest.json').catch(e => { manifestPromise = null; throw e; });
     return manifestPromise;
+  }
+  function urlSuppressions() {
+    if (!suppressionPromise) suppressionPromise = loadJson(root + 'url-suppressions.json').catch(e => { suppressionPromise = null; throw e; });
+    return suppressionPromise;
+  }
+  function searchVisibleText(raw, bookId, pdfPage, policy) {
+    let text = String(raw || '');
+    for (const scope of policy?.scopes || []) {
+      if (String(scope.book_id) !== String(bookId) || !scope.pages?.some(p => pdfPage >= p.start && pdfPage <= p.end)) continue;
+      for (const source of scope.patterns || []) text = text.replace(new RegExp(source, 'giu'), ' ');
+    }
+    return text;
   }
   function partition(prefix) {
     if (!partitions.has(prefix)) partitions.set(prefix, loadJson(root + 'terms-' + prefix + '.json').catch(e => { partitions.delete(prefix); throw e; }));
@@ -231,9 +244,10 @@
     return 'passage';
   }
   // Score passage usefulness, not just its position in the PDF.
-  function rankText(page, rawText, term, mode) {
-    const kind = pageKind(rawText);
-    const text = displayText(rawText);
+  function rankText(page, rawText, term, mode, bookId, policy) {
+    const visibleText = searchVisibleText(rawText, bookId, page.page, policy);
+    const kind = pageKind(visibleText);
+    const text = displayText(visibleText);
     const ranges = matchRanges(text, term, mode);
     const positions = ranges.map(range => range.start);
     if (!positions.length) return null;
@@ -264,17 +278,18 @@
     }
     return { page, text, pos: bestPos, score, rawText, kind };
   }
-  function rankPage(page, term, mode) {
+  function rankPage(page, term, mode, bookId, policy) {
     if (!Array.isArray(page.regions) || !page.regions.length) {
-      return rankText(page, page.text || '', term, mode);
+      return rankText(page, page.text || '', term, mode, bookId, policy);
     }
-    let matches = page.regions.map(region => rankText(page, region.text || '', term, mode)).filter(Boolean);
+    let matches = page.regions.map(region => rankText(page, region.text || '', term, mode, bookId, policy)).filter(Boolean);
     // Word searches can match across PDF text regions; keep each excerpt inside one region.
-    if (!matches.length && (mode === 'words' || mode === 'any') && matchRanges(displayText(page.text || ''), term, mode).length) {
+    const visiblePageText = searchVisibleText(page.text || '', bookId, page.page, policy);
+    if (!matches.length && (mode === 'words' || mode === 'any') && matchRanges(displayText(visiblePageText), term, mode).length) {
       const needles = [...new Set(term.match(/[a-z0-9]+/g) || [])];
       matches = page.regions.map(region => {
-        const found = needles.filter(needle => matchRanges(displayText(region.text || ''), needle, 'phrase').length);
-        const match = found.length ? rankText(page, region.text || '', found.join(' '), mode) : null;
+        const found = needles.filter(needle => matchRanges(displayText(searchVisibleText(region.text || '', bookId, page.page, policy)), needle, 'phrase').length);
+        const match = found.length ? rankText(page, region.text || '', found.join(' '), mode, bookId, policy) : null;
         if (match) match.score += found.length;
         return match;
       }).filter(Boolean);
@@ -436,7 +451,7 @@
           catch (error) { state.queue.unshift(bookId); throw error; }
           if (myGeneration !== generation || active !== state) return;
           const matches = chunk.pages.filter(page => wanted.has(page.id))
-            .map(page => rankPage(page, state.term, state.mode)).filter(Boolean)
+            .map(page => rankPage(page, state.term, state.mode, bookId, state.suppressionPolicy)).filter(Boolean)
             .sort((a, b) => b.score - a.score || a.page.page - b.page.page);
           record = {pages: matches.filter(match => match.kind === 'passage'), cursor: 0,
                     references: matches.filter(match => match.kind !== 'passage'), referenceCursor: 0};
@@ -484,6 +499,7 @@
     showMessage('Searching indexed pages…');
     try {
       const index = await manifest();
+      const suppressionPolicy = await urlSuppressions();
       if (myGeneration !== generation) return;
       const available = new Set(index.partitions);
       const searchableWords = [...new Set(words)].filter(word => available.has(wordPrefix(word)));
@@ -546,7 +562,7 @@
       const state = {
         generation: myGeneration, index, term, mode, idsByBook,
         queue: rankedBooks, referenceQueue: [], bookProgress: new Map(), displayed: 0,
-        loading: false, status, list, more
+        loading: false, status, list, more, suppressionPolicy
       };
       active = state;
       more.addEventListener('click', () => loadMore(state));

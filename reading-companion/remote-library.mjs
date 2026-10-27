@@ -1,8 +1,8 @@
-/* v1.8.1: Read-only browser proof of concept for the published v48 corpus.
+/* v1.8.1: Read-only browser proof of concept for the published v49 corpus.
  * This does not call an LLM or replace Python's evidence pipeline.
  * Original shard IDs, physical PDF pages and manifest PDF URLs are preserved.
  */
-export const DEFAULT_INDEX_ROOT = 'https://jsynon.github.io/antilogicalism-library-data/data-v48/';
+export const DEFAULT_INDEX_ROOT = 'https://jsynon.github.io/antilogicalism-library-data/data-v49/';
 export const PRODUCTION_PAGES_PER_BOOK = 4;
 const SCRIPTURE_BOOK_NAMES = [
   'genesis','exodus','leviticus','numbers','deuteronomy','joshua','judges','ruth',
@@ -400,11 +400,12 @@ export class RemoteLibrary {
     this.root = String(root).replace(/\/?$/, '/');
     this.fetcher = fetcher;
     this.manifestPromise = null;
+    this.suppressionPromise = null;
     this.partitions = new Map();
     this.contentDigests = new Map();
   }
   async jsonGzip(filename) {
-    if (!/^(?:manifest|terms-[a-z0-9]{2}|book-[0-9]+)\.json$/.test(filename)) {
+    if (!/^(?:manifest|url-suppressions|terms-[a-z0-9]{2}|book-[0-9]+)\.json$/.test(filename)) {
       throw new Error('Unexpected corpus filename.');
     }
     const response = await this.fetcher(this.root + filename + '.gz', {cache:'no-store'});
@@ -422,14 +423,28 @@ export class RemoteLibrary {
     }
     return JSON.parse(raw);
   }
+  async urlSuppressions() {
+    if (!this.suppressionPromise) {
+      this.suppressionPromise = this.jsonGzip('url-suppressions.json').catch(error => { this.suppressionPromise = null; throw error; });
+    }
+    return this.suppressionPromise;
+  }
+  searchVisibleText(raw, bookId, pdfPage, policy) {
+    let text = String(raw || '');
+    for (const scope of policy?.scopes || []) {
+      if (String(scope.book_id) !== String(bookId) || !scope.pages?.some(p => pdfPage >= p.start && pdfPage <= p.end)) continue;
+      for (const source of scope.patterns || []) text = text.replace(new RegExp(source, 'giu'), ' ');
+    }
+    return text;
+  }
   async manifest() {
     if (!this.manifestPromise) {
       this.manifestPromise = this.jsonGzip('manifest.json').then(value => {
-        if (value.version !== 48 || value.postings_encoding !== 'delta-json-v1' ||
+        if (value.version !== 49 || value.postings_encoding !== 'delta-json-v1' ||
             value.prefix_length !== 2 || !Array.isArray(value.page_books) ||
             value.page_books.length !== value.pages ||
             !Array.isArray(value.partitions) || typeof value.books !== 'object') {
-          throw new Error('Incompatible v48 manifest.');
+          throw new Error('Incompatible v49 manifest.');
         }
         return value;
       }).catch(error => { this.manifestPromise = null; throw error; });
@@ -450,6 +465,7 @@ export class RemoteLibrary {
   async search(question, {bookId = '', allowedBookIds = null, maxBooks = 3, pagesPerBook = PRODUCTION_PAGES_PER_BOOK} = {}) {
     const started = performance.now();
     const manifest = await this.manifest();
+    const suppressionPolicy = await this.urlSuppressions();
     const selectedTitle = bookId ? String(manifest.books[String(bookId)]?.title || '') : '';
     // The catalog title puts the author's name after a dash. In a selected
     // work, author names are scope metadata, not evidence for a page-level
@@ -629,12 +645,14 @@ export class RemoteLibrary {
         if (!Number.isSafeInteger(item.id) || String(manifest.page_books[item.id]) !== book.id ||
             !Number.isSafeInteger(item.page) || item.page <= 0 ||
             typeof item.text !== 'string' || !item.text.trim()) continue;
-        if (isNavigationPage(item.text) || isPublicationPage(item.text)) {
+        const visibleText = this.searchVisibleText(item.text, book.id, item.page, suppressionPolicy);
+        if (!visibleText.trim()) continue;
+        if (isNavigationPage(visibleText) || isPublicationPage(visibleText)) {
           discardedNavigation++; continue;
         }
-        if ((item.text.match(/[a-z]+/gi) || []).length >= 10 &&
-            !proseByPage.has(item.page)) proseByPage.set(item.page, item);
-        const evidence = substantivePageEvidence(item.text, bookEvidenceGroups, bookTitleTerms,phrase);
+        if ((visibleText.match(/[a-z]+/gi) || []).length >= 10 &&
+            !proseByPage.has(item.page)) proseByPage.set(item.page, {item, text:visibleText});
+        const evidence = substantivePageEvidence(visibleText, bookEvidenceGroups, bookTitleTerms,phrase);
         if (!evidence || (evidence.localUnique < minimumEvidenceTerms&&!evidence.phraseMatches)) continue;
         const hit = relevant.get(item.id);
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
@@ -650,14 +668,16 @@ export class RemoteLibrary {
         const anchor=selected[0];
         const neighborPage=beginsMidSentence(anchor.item.text)?anchor.item.page-1:
           endsMidSentence(anchor.item.text)?anchor.item.page+1:0;
-        const item=neighborPage?proseByPage.get(neighborPage):null;
-        const neighborEvidence=item&&substantivePageEvidence(item.text,
+        const neighborRecord=neighborPage?proseByPage.get(neighborPage):null;
+        const item=neighborRecord?.item||null;
+        const neighborText=neighborRecord?.text||'';
+        const neighborEvidence=neighborRecord&&substantivePageEvidence(neighborText,
           bookEvidenceGroups,bookTitleTerms,phrase);
         const relevantNeighbor=neighborEvidence&&
           (neighborEvidence.localUnique>=1||neighborEvidence.phraseMatches>0);
         const phraseContinuesAcrossBoundary=phrase&&exactPhraseMatchCount(
-          neighborPage<anchor.item.page?item?.text+' '+anchor.item.text:
-            anchor.item.text+' '+item?.text,phrase)>0;
+          neighborPage<anchor.item.page?neighborText+' '+this.searchVisibleText(anchor.item.text,book.id,anchor.item.page,suppressionPolicy):
+            this.searchVisibleText(anchor.item.text,book.id,anchor.item.page,suppressionPolicy)+' '+neighborText,phrase)>0;
         const selectedNeighborIndex=selected.findIndex(entry=>entry.item.page===neighborPage);
         if(item&&relevantNeighbor&&selectedNeighborIndex>=0){
           if(phraseContinuesAcrossBoundary){
@@ -682,7 +702,7 @@ export class RemoteLibrary {
         const {item}=entry;
         const url = 'https://drive.google.com/file/d/' + pdfId + '/view?usp=sharing#page=' + item.page;
         sources.push({bookId:book.id, title:meta.title, page:item.page, globalPageId:item.id,
-          url, preview:excerptAroundEvidence(item.text,bookEvidenceTerms), textLength:item.text.length,
+          url, preview:excerptAroundEvidence(this.searchVisibleText(item.text,book.id,item.page,suppressionPolicy),bookEvidenceTerms), textLength:item.text.length,
           score:entry.rank});
       }
     }
