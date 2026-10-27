@@ -813,6 +813,21 @@ test('answer packet selection prefers a page that addresses the part over a high
  assert.deepEqual(selected.map(source=>source.page),[98]);
 });
 
+test('an explicitly named Hume work sends the part-relevant Enquiry page ahead of a stronger off-topic hit',()=>{
+ const title='An Enquiry Concerning Human Understanding — David Hume';
+ const question='In Hume’s An Enquiry Concerning Human Understanding, what does he say about our inference from cause to effect?';
+ const candidates=[
+  {bookId:'35',title,page:69,score:96,candidatePartIds:['P1'],
+   text:'Hume considers the origin of ideas and distinguishes impressions from ideas in memory and imagination.'},
+  {bookId:'35',title,page:30,score:34,candidatePartIds:['P1'],
+   text:'When we infer from cause to effect, custom leads the mind from repeated experience of constant conjunction to expect the usual consequence.'}
+ ];
+ const selected=selectAnswerSources(candidates,question,'token',{maxSources:1,maxBytes:5000,
+  maxSourceBytes:5000,partQuestions:[{partId:'P1',question:
+   'What does Hume say about our inference from cause to effect?'}]});
+ assert.deepEqual(selected.map(source=>source.page),[30]);
+});
+
 test('reused comparison queries may link to more than six parts while unique searches stay bounded',async()=>{
  const books=[{id:'35',title:'An Enquiry Concerning Human Understanding — David Hume'},
   {id:'40',title:'Critique of Pure Reason — Immanuel Kant'}];
