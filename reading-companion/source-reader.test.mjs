@@ -149,8 +149,13 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(client,/link\.href=source\.url/);
  assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
  assert.match(client,/sourceReader\.open\(\{\.\.\.source,excerpt\},read\)/);
- assert.match(clientV48,/claimQuotesForCitation\(answer,citationGroup\.start,evidence\)/,
-  'the active v48 client must choose excerpts linked to the cited answer claim');
+ assert.match(clientV48,/import \{claimQuotesForCitation\} from '\.\/citation-evidence\.mjs'/,
+  'the active client must use the exact claim-link helper');
+ assert.match(clientV48,/const evidenceMap=Array\.isArray\(data\.evidenceMap\)/);
+ assert.match(clientV48,/claimQuotesForCitation\(answer,citationGroup\.start,source\.id,evidenceMap\)/,
+  'inline citations must resolve against reviewer-approved evidence for their source');
+ assert.doesNotMatch(clientV48,/claimQuotesForCitation\(answer,citationGroup\.start,evidence\)/,
+  'the compact page summary must not be an inline-citation fallback');
  assert.match(clientV48,/sourceReader\.open\(\{\.\.\.source,excerpts\},a\)/);
  assert.match(source,/isAllowedBook\(bookId\)/);
  assert.match(source,/getBook\(bookId\)/);
