@@ -748,6 +748,57 @@ test('part queries keep matching page IDs linked to each question part through s
  assert.deepEqual(new Set(selected.flatMap(source=>source.candidatePartIds)),new Set(['P1','P2']));
 });
 
+test('candidate merging gives every requested part evidence before broad multi-work facets',async()=>{
+ const humeBooks=[
+  {id:'34',title:'Essays Moral Political and Literary — David Hume'},
+  {id:'35',title:'An Enquiry Concerning Human Understanding — David Hume'},
+  {id:'268',title:'The Philosophical Works of David Hume, Vol. 1 — David Hume'},
+  {id:'276',title:'A History of Philosophy, Volume VI — Frederick Copleston'},
+  {id:'555',title:'The Harvard Classics: English Philosophers — David Hume'}
+ ];
+ const kantBooks=['40','41','42','43','44','45','326'].map(id=>({id,
+  title:id==='40'?'Critique of Pure Reason — Immanuel Kant':`Kant Work ${id} — Immanuel Kant`}));
+ const books=[...humeBooks,...kantBooks],allowedBookIds=new Set(books.map(book=>book.id));
+ const queries=[
+  'David Hume cause and effect custom habit inference',
+  'David Hume experience cause effect philosophical account',
+  'Immanuel Kant causality category experience understanding',
+  'Immanuel Kant causal rules objective experience'
+ ];
+ const question='What does Hume say about inference from cause to effect, and what does Kant say about causality in experience?';
+ const partQuestions=[
+  {partId:'P1',question:'What is Hume’s account of the inference from cause to effect?',sourceBookIds:humeBooks.map(book=>book.id)},
+  {partId:'P2',question:'What is Kant’s account of causality in experience?',sourceBookIds:kantBooks.map(book=>book.id)},
+  {partId:'P3',question:'How do their accounts differ?',sourceBookIds:books.map(book=>book.id)}
+ ];
+ const sourceFor=(book,queryIndex)=>({bookId:book.id,title:book.title,page:10+queryIndex,
+  globalPageId:1000+Number(book.id)*4+queryIndex,score:100-queryIndex});
+ const queryBookLists=[humeBooks,humeBooks,kantBooks,kantBooks];
+ const library={search:async(query,{bookId}={})=>{
+  const queryIndex=queries.indexOf(query);
+  if(queryIndex<0)return {sources:[]};
+  const list=queryBookLists[queryIndex];
+  return {sources:bookId?list.filter(book=>book.id===String(bookId))
+   .map(book=>sourceFor(book,queryIndex)):list.map(book=>sourceFor(book,queryIndex))};
+ }};
+ const partQueries=[
+  {partId:'P1',query:queries[0]},{partId:'P1',query:queries[1]},
+  {partId:'P1',query:'What is Hume’s account of the inference from cause to effect?'},
+  {partId:'P2',query:queries[2]},{partId:'P2',query:queries[3]},
+  {partId:'P2',query:'What is Kant’s account of causality in experience?'},
+  {partId:'P3',query:queries[0]},{partId:'P3',query:queries[2]}
+ ];
+ const result=await retrieveEvidence({question,queries,partQueries,partQuestions,library,books,
+  allowedBookIds,maxCandidates:8,pageLoader:async source=>({text:
+   `A verified passage from ${source.title} describes causality, experience, and the inference from cause to effect with enough context.`})});
+ assert.ok(result.candidates.some(source=>source.bookId==='40'&&source.candidatePartIds.includes('P2')),
+  'a strong Kant result must survive candidate assembly even when Hume has more linked facets');
+ const selected=selectAnswerSources(result.candidates,question,'token',{maxSources:6,
+  maxBytes:30000,maxSourceBytes:25000,partQuestions});
+ assert.ok(selected.some(source=>source.bookId==='40'&&source.candidatePartIds.includes('P2')),
+  'the Kant part must reach the final bounded packet');
+});
+
 test('answer packet selection prefers a page that addresses the part over a higher-ranked topical page',()=>{
  const title='Critique of Pure Reason — Immanuel Kant';
  const candidates=[
@@ -940,6 +991,55 @@ test('a contextual query carries a quoted parent passage into a pronoun-based pa
  const page=result.candidates.find(source=>source.page===453);
  assert.ok(page?.candidatePartIds.includes('P2'),
   'a root-question quote in the contextual part query should connect the source to that part');
+});
+
+test('exact part wording is searched inside works resolved by a sibling source facet',async()=>{
+ const question='What is the meaning of “conscience makes cowards of us all” in Hamlet’s “To be, or not to be” soliloquy?';
+ const namedSourceQuery='Shakespeare Hamlet conscience meaning cowardice hesitation soliloquy';
+ const books=[
+  {id:'212',title:'The Complete Works of William Shakespeare — William Shakespeare'},
+  {id:'564',title:'Elizabethan Drama, Vol. I: Marlowe and Shakespeare — Christopher Marlowe and William Shakespeare'},
+  {id:'230',title:'The Courage to Be — Paul Tillich'}
+ ];
+ const partQuestions=[{partId:'P1',question}];
+ const library={search:async(query,{bookId}={})=>{
+  if(query===namedSourceQuery&&bookId==='212')return {sources:[{
+   bookId:'212',title:books[0].title,page:471,globalPageId:100471,score:40
+  }]};
+  if(query===namedSourceQuery&&bookId==='564')return {sources:[{
+   bookId:'564',title:books[1].title,page:215,globalPageId:100215,score:38
+  }]};
+  if(query===question&&bookId==='212')return {sources:[{
+   bookId:'212',title:books[0].title,page:454,globalPageId:100454,score:80
+  }]};
+  if(query===question&&bookId==='564')return {sources:[{
+   bookId:'564',title:books[1].title,page:152,globalPageId:100152,score:72
+  }]};
+  if(!bookId)return {sources:[{bookId:'230',title:books[2].title,page:43,
+   globalPageId:100043,score:99}]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question,queries:[
+  "Hamlet 'To be, or not to be' conscience makes cowards meaning",
+  namedSourceQuery
+ ],partQueries:[{partId:'P1',query:question}],partQuestions,library,books,
+  allowedBookIds:new Set(books.map(book=>book.id)),
+  pageLoader:async source=>({text:source.page===454?
+   'Thus conscience does make cowards of us all; and thus the native hue of resolution is sicklied over with the pale cast of thought.':
+   source.page===152?'The undiscovered country puzzles the will and makes us rather bear those ills we have.':
+   'Commentary on Hamlet explains that thought and fear may restrain a person from action in a difficult choice.'})});
+ const directPage=result.candidates.find(source=>source.bookId==='212'&&source.page===454);
+ assert.ok(directPage,'the exact part query should be retried inside the already-resolved Shakespeare volume');
+ assert.ok(directPage.candidatePartIds.includes('P1'));
+ assert.ok(result.searches.some(search=>search.partScopeInherited==='P1'&&
+  search.targetBookIds.includes('212')&&search.targetBookIds.includes('564')),
+  'the artifact trace should identify the inherited, catalog-resolved work scope');
+ const selected=selectAnswerSources(result.candidates,question,'token',{maxSources:3,
+  maxBytes:12000,maxSourceBytes:12000,partQuestions});
+ assert.ok(selected.some(source=>source.bookId==='212'&&source.page===454),
+  'the direct passage should reach the bounded answer packet');
+ assert.ok(!selected.some(source=>source.bookId==='230'),
+  'an unscoped commentary hit must not stand in for the requested primary passage');
 });
 
 test('quoted part phrase links an otherwise unassigned page through OCR spacing and reserves it',async()=>{

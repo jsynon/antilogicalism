@@ -55,32 +55,67 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  };
  const partFacetReservations=()=>{
    if(!Array.isArray(partFacetScopes))return [];
-   const reservations=[],reserved=new Set();
-   const eligibleScopes=[];
+   const reservations=[],reserved=new Set(),scopesByPart=new Map();
    for(const item of partFacetScopes){
      const facet=item?.facet;
      if(!Number.isInteger(facet)||facet<0||facet>=groups.length)continue;
      const sourceIds=Array.isArray(item.sourceBookIds)?[...new Set(item.sourceBookIds.map(String))]:[];
      if(!sourceIds.length)continue;
-     eligibleScopes.push({facet,sourceIds});
+    const partId=typeof item.partId==='string'?item.partId:'';
+    if(!partId)continue;
+    const scopes=scopesByPart.get(partId)||[];
+    scopes.push({facet,sourceIds});
+    scopesByPart.set(partId,scopes);
    }
-   // Reserve one best page per distinct work before spending a second slot
-   // within any work. Broad author facets can resolve to many books; reserving
-   // two pages from each of the first few books used to crowd out the best
-   // evidence from later works before page hydration.
-   const reservePass=(pageOffset)=>{
-     for(const {facet,sourceIds} of eligibleScopes)for(const sourceId of sourceIds){
-       const matches=groups[facet].filter(entry=>valid(entry)&&String(entry.bookId)===sourceId);
-       const entry=matches[pageOffset];
-       if(!entry)continue;
-       const key=sourceId+':'+entry.page;
-       if(reserved.has(key))continue;
-       reservations.push({entry,facet});
-       reserved.add(key);
+   const parts=[...scopesByPart.keys()];
+   const candidatesByPart=new Map(parts.map(partId=>{
+     const bestByPage=new Map();
+     for(const {facet,sourceIds} of scopesByPart.get(partId)){
+       groups[facet].forEach((entry,rank)=>{
+         if(!valid(entry)||!sourceIds.includes(String(entry.bookId)))return;
+         const key=String(entry.bookId)+':'+entry.page;
+         const previous=bestByPage.get(key);
+         if(!previous||rank<previous.rank||
+            (rank===previous.rank&&(Number(entry.score)||0)>(Number(previous.entry.score)||0)))
+           bestByPage.set(key,{entry,facet,rank});
+       });
      }
-   };
-   reservePass(0);
-   reservePass(1);
+     return [partId,[...bestByPage.values()].sort((a,b)=>
+       a.rank-b.rank||(Number(b.entry.score)||0)-(Number(a.entry.score)||0))];
+   }));
+   // First reserve one eligible result for each question part when one exists. A broad
+   // part may resolve to many books and facets; reserving all of those pages
+   // in facet order can exhaust the candidate cap before another part gets a
+   // chance, even when that part's own searches returned strong evidence.
+   for(const partId of parts){
+     const candidate=candidatesByPart.get(partId)?.find(item=>
+       !reserved.has(String(item.entry.bookId)+':'+item.entry.page));
+     if(!candidate)continue;
+     const key=String(candidate.entry.bookId)+':'+candidate.entry.page;
+     reservations.push(candidate);
+     reserved.add(key);
+   }
+   // Preserve work diversity after part coverage, distributing additional
+   // pages across parts instead of letting one broad part monopolize slots.
+   for(let round=0;round<limit&&reservations.length<limit;round++){
+     let added=false;
+     for(const partId of parts){
+       if(reservations.length>=limit)break;
+       const partScopes=scopesByPart.get(partId);
+       const representedBooks=new Set(reservations.filter(item=>partScopes.some(scope=>
+         scope.facet===item.facet&&scope.sourceIds.includes(String(item.entry.bookId))))
+         .map(item=>String(item.entry.bookId)));
+       const candidate=(candidatesByPart.get(partId)||[]).find(item=>
+         !reserved.has(String(item.entry.bookId)+':'+item.entry.page)&&
+         !representedBooks.has(String(item.entry.bookId)));
+       if(!candidate)continue;
+       const key=String(candidate.entry.bookId)+':'+candidate.entry.page;
+       reservations.push(candidate);
+       reserved.add(key);
+       added=true;
+     }
+     if(!added)break;
+   }
    return reservations;
  };
  const hasScores=groups.some(group=>group.some(entry=>Number.isFinite(entry?.score)));
@@ -356,6 +391,41 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  const scopedPartQuestions=partQuestions.map(part=>({
   ...part,...(partSourceBookIds.has(part?.partId)?{sourceBookIds:partSourceBookIds.get(part.partId)}:{})
  }));
+ // A part's natural-language query may omit an author name that a sibling
+ // planner facet used to resolve its catalog works. Search that exact part
+ // wording inside the already-resolved works so an unscoped global hit
+ // cannot crowd out work-linked evidence. This adds local index searches only;
+ // it does not widen scope, add a Worker call, or change the answer-page cap.
+ const comparisonSides=crossSourceSides(scopedPartQuestions);
+ const primaryPartIds=comparisonSides.length===2
+  ?new Set(comparisonSides.map(side=>side.part.partId))
+  :new Set(scopedPartQuestions.map(part=>part?.partId).filter(Boolean));
+ for(const part of scopedPartQuestions){
+  if(!primaryPartIds.has(part?.partId)||typeof part?.question!=='string')continue;
+  const query=part.question.trim();
+  const facet=searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===query.toLocaleLowerCase());
+  const sourceIds=partSourceBookIds.get(part.partId)||[];
+  if(facet<0||!sourceIds.length)continue;
+  const searchSet=searchSets[facet];
+  const alreadySearched=new Set((searchSet?.targetBookIds||[]).map(String));
+  const missingIds=sourceIds.filter(id=>retrievalAllowed.has(String(id))&&!alreadySearched.has(String(id)));
+  if(!missingIds.length)continue;
+  const scopedResults=await Promise.all(missingIds.map(async bookId=>{
+   try{return await library.search(query,{bookId:String(bookId),allowedBookIds:retrievalAllowed,
+    maxBooks,pagesPerBook});}catch{return {sources:[]};}
+  }));
+  const retained=(searchSet?.sources||[]).filter(source=>sourceIds.includes(String(source.bookId)));
+  const seen=new Set(retained.map(source=>String(source.bookId)+':'+source.page));
+  for(const result of scopedResults)for(const source of Array.isArray(result?.sources)?result.sources:[]){
+   const key=String(source.bookId)+':'+source.page;
+   if(!missingIds.includes(String(source.bookId))||seen.has(key))continue;
+   seen.add(key);
+   retained.push(source);
+  }
+  searchSet.sources=retained.sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+  searchSet.targetBookIds=[...new Set([...alreadySearched,...missingIds])];
+  searchSet.inheritedPartScope=part.partId;
+ }
  const partFacetScopes=partQuestions.length?partFacetIndices.map(item=>({partId:item.partId,facet:item.facet,
   sourceBookIds:partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[]})):[];
  const directQuestionFacetIndex=searchQueries.findIndex(value=>
@@ -416,6 +486,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  return {candidates:populated,partFacetIndices,searches:searchSets.map((set,index)=>({
   query:searchSets[index].executedQuery+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
   ...(searchSets[index].scopeReference?{originalQuery:searchQueries[index],scopeInherited:true}:{}),
+  ...(searchSets[index].inheritedPartScope?{partScopeInherited:searchSets[index].inheritedPartScope}:{}),
   ...(searchSets[index].fallbackFrom?{fallbackFrom:searchSets[index].fallbackFrom,
    fallbackReason:'empty-source-side-facet'}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
