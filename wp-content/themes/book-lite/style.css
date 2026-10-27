@@ -2131,3 +2131,8 @@ html[data-theme="dark"] .sd-sharing .share-twitter iframe {
 html[data-theme="dark"] body #primary #companion-pilot .companion-question-form p:first-of-type::first-letter {
 	color: inherit !important;
 }
+
+
+html[data-theme="dark"] body #primary #companion-pilot #companion-book-search-status::first-letter {
+	color: inherit !important;
+}
