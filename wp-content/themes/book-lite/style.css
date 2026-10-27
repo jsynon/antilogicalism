@@ -2243,3 +2243,10 @@ html[data-theme="dark"] article::after {
 html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result::after {
 	display: none !important;
 }
+
+
+/* Match the separator between an author's book groups to the author divider
+   in dark mode; the bookshelf script gives these groups a light inline border. */
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-work-group {
+	border-color: var(--site-border) !important;
+}
