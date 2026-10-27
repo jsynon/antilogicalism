@@ -46,6 +46,35 @@ const STOP = new Set(`
   discussing explain explains explained explaining novel novels relationship
   relationships show shows showed showing work works
 `.trim().split(/\s+/));
+// Keep the four scan-confirmed display artifacts out of candidate matching and previews.
+// Full-page reading and source verification still use the original shard text.
+export function filterPageDisplayArtifacts(bookId,pageNumber,rawText) {
+  const id=String(bookId),page=Number(pageNumber);
+  let text=String(rawText==null?'':rawText);
+  if(id==='142'&&page===4)return text.replace('http://www.archive.org/details/freethoughtofficOOrussiala','');
+  if(id==='157'&&page===21)return text.replace('http://www.reasoned.org/dir/','');
+  if(id==='174'&&page===101)return text.replace('www.reasoned.org/dir/','');
+  if(id==='180'&&page===4){
+    text=text.replace('This page formatted 2007 Blackmask Online.','');
+    return text.replace('http://www.blackmask.com','');
+  }
+  return text;
+}
+export function filterEvidenceExcerptArtifacts(highlights,citations) {
+  const sourcePages=new Map((Array.isArray(citations)?citations:[]).map(source=>[
+    `${String(source?.id??'')}|${Number(source?.page)}`,
+    {bookId:source?.bookId,page:source?.page}
+  ]));
+  return (Array.isArray(highlights)?highlights:[]).map(highlight=>{
+    const source=sourcePages.get(`${String(highlight?.source_id??'')}|${Number(highlight?.page)}`);
+    if(!source)return highlight;
+    const filtered={...highlight};
+    if(typeof filtered.quote==='string')filtered.quote=filterPageDisplayArtifacts(source.bookId,source.page,filtered.quote);
+    if(Array.isArray(filtered.quotes))filtered.quotes=filtered.quotes.map(item=>
+      typeof item?.quote==='string'?{...item,quote:filterPageDisplayArtifacts(source.bookId,source.page,item.quote)}:item);
+    return filtered;
+  });
+}
 const PDF = /^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:view|preview)/;
 export function hasExplicitScriptureReference(text) {
   return explicitScriptureReferences(text).length > 0;
@@ -629,12 +658,13 @@ export class RemoteLibrary {
         if (!Number.isSafeInteger(item.id) || String(manifest.page_books[item.id]) !== book.id ||
             !Number.isSafeInteger(item.page) || item.page <= 0 ||
             typeof item.text !== 'string' || !item.text.trim()) continue;
-        if (isNavigationPage(item.text) || isPublicationPage(item.text)) {
+        const searchableText = filterPageDisplayArtifacts(book.id, item.page, item.text);
+        if (isNavigationPage(searchableText) || isPublicationPage(searchableText)) {
           discardedNavigation++; continue;
         }
-        if ((item.text.match(/[a-z]+/gi) || []).length >= 10 &&
+        if ((searchableText.match(/[a-z]+/gi) || []).length >= 10 &&
             !proseByPage.has(item.page)) proseByPage.set(item.page, item);
-        const evidence = substantivePageEvidence(item.text, bookEvidenceGroups, bookTitleTerms,phrase);
+        const evidence = substantivePageEvidence(searchableText, bookEvidenceGroups, bookTitleTerms,phrase);
         if (!evidence || (evidence.localUnique < minimumEvidenceTerms&&!evidence.phraseMatches)) continue;
         const hit = relevant.get(item.id);
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
@@ -648,16 +678,18 @@ export class RemoteLibrary {
       const selected = candidates.slice(0, pageLimit);
       if (pageLimit >= 2 && selected.length) {
         const anchor=selected[0];
-        const neighborPage=beginsMidSentence(anchor.item.text)?anchor.item.page-1:
-          endsMidSentence(anchor.item.text)?anchor.item.page+1:0;
+        const anchorText=filterPageDisplayArtifacts(book.id,anchor.item.page,anchor.item.text);
+        const neighborPage=beginsMidSentence(anchorText)?anchor.item.page-1:
+          endsMidSentence(anchorText)?anchor.item.page+1:0;
         const item=neighborPage?proseByPage.get(neighborPage):null;
-        const neighborEvidence=item&&substantivePageEvidence(item.text,
+        const neighborText=item&&filterPageDisplayArtifacts(book.id,item.page,item.text);
+        const neighborEvidence=item&&substantivePageEvidence(neighborText,
           bookEvidenceGroups,bookTitleTerms,phrase);
         const relevantNeighbor=neighborEvidence&&
           (neighborEvidence.localUnique>=1||neighborEvidence.phraseMatches>0);
-        const phraseContinuesAcrossBoundary=phrase&&exactPhraseMatchCount(
-          neighborPage<anchor.item.page?item?.text+' '+anchor.item.text:
-            anchor.item.text+' '+item?.text,phrase)>0;
+        const phraseContinuesAcrossBoundary=phrase&&item&&exactPhraseMatchCount(
+          neighborPage<anchor.item.page?neighborText+' '+anchorText:
+            anchorText+' '+neighborText,phrase)>0;
         const selectedNeighborIndex=selected.findIndex(entry=>entry.item.page===neighborPage);
         if(item&&relevantNeighbor&&selectedNeighborIndex>=0){
           if(phraseContinuesAcrossBoundary){
@@ -682,7 +714,7 @@ export class RemoteLibrary {
         const {item}=entry;
         const url = 'https://drive.google.com/file/d/' + pdfId + '/view?usp=sharing#page=' + item.page;
         sources.push({bookId:book.id, title:meta.title, page:item.page, globalPageId:item.id,
-          url, preview:excerptAroundEvidence(item.text,bookEvidenceTerms), textLength:item.text.length,
+          url, preview:excerptAroundEvidence(filterPageDisplayArtifacts(book.id,item.page,item.text),bookEvidenceTerms), textLength:item.text.length,
           score:entry.rank});
       }
     }
