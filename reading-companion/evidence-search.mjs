@@ -1,4 +1,4 @@
-import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms} from './remote-library.mjs';
+import {explicitScriptureReferences,filterPageDisplayArtifacts,hasExplicitScriptureReference,queryTerms} from './remote-library.mjs';
 import {catalogIdentity} from './reader-contract.mjs';
 
 /* Merge two independently retrieved question facets, retaining alternatives
@@ -473,6 +473,9 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   if(!page||typeof page.text!=='string')continue;
   const byteLength=new TextEncoder().encode(page.text).byteLength;
   if(byteLength<25||byteLength>pageLimit)continue;
+  // Exclude scan-backed display artifacts from lexical checks, but keep raw text
+  // in the returned candidate so the Worker can verify its exact v48 fingerprint.
+  const searchableText=filterPageDisplayArtifacts(source.bookId,source.page,page.text);
   const matchedFacets=new Set((source.facetRanks||[]).map(item=>item.facet));
   const candidatePartIds=new Set(partFacetIndices.filter(item=>matchedFacets.has(item.facet)&&
    partAllowsBook(item.partId,source.bookId))
@@ -492,8 +495,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
    if(candidatePartIds.has(partId)||!partAllowsBook(partId,source.bookId))continue;
    const partQuestion=(Array.isArray(partQuestions)?partQuestions:[])
     .find(item=>item?.partId===partId)?.question||'';
-   if(queries.some(query=>directFacetTextMatch(query,page.text)>=2||
-      hasQuotedPhraseMatch(query,page.text))||hasQuotedPhraseMatch(partQuestion,page.text))
+   if(queries.some(query=>directFacetTextMatch(query,searchableText)>=2||
+      hasQuotedPhraseMatch(query,searchableText))||hasQuotedPhraseMatch(partQuestion,searchableText))
       candidatePartIds.add(partId);
   }
   populated.push({...source,text:page.text,byteLength,
