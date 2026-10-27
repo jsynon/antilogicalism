@@ -1425,38 +1425,38 @@ body {
 
 .site-theme-toggle {
 	align-items: center;
-	background: rgba(0, 0, 0, .35);
-	border: 1px solid rgba(255, 255, 255, .55);
-	border-radius: 50%;
+	background: rgba(0, 0, 0, .2);
+	border: 1px solid rgba(255, 255, 255, .38);
+	border-radius: 6px;
 	box-sizing: border-box;
 	color: #fff;
 	cursor: pointer;
 	display: inline-flex;
-	height: 44px;
+	height: 34px;
 	justify-content: center;
-	padding: 10px;
+	padding: 7px;
 	position: absolute;
-	right: max(1rem, calc((100vw - 750px) / 2 - 7rem));
+	right: max(1.5rem, calc((100vw - 750px) / 2 - 8.5rem));
 	top: 50%;
 	transform: translateY(-50%);
-	width: 44px;
+	width: 34px;
 	z-index: 100000;
 }
 
 .site-theme-toggle svg {
 	fill: none;
-	height: 20px;
+	height: 18px;
 	stroke: currentColor;
 	stroke-linecap: round;
 	stroke-linejoin: round;
 	stroke-width: 1.8;
-	width: 20px;
+	width: 18px;
 }
 
 .site-theme-toggle:hover,
 .site-theme-toggle:focus-visible {
-	background: rgba(255, 255, 255, .18);
-	border-color: #fff;
+	background: rgba(255, 255, 255, .12);
+	border-color: rgba(255, 255, 255, .72);
 	color: #fff;
 }
 
@@ -1467,7 +1467,7 @@ body {
 
 @media (max-width: 818.375px) {
 	.site-theme-toggle {
-		right: .5rem;
+		right: 1rem;
 		top: 0;
 		transform: none;
 	}
