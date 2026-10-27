@@ -143,6 +143,19 @@
     return chunks.get(id);
   }
   function normalized(s) { return s.replace(/\s+/g, ' ').trim(); }
+  // These exact page-scoped exclusions affect search matching only; full page text stays intact.
+  function filterPageDisplayArtifacts(bookId,pageNumber,rawText) {
+    const id=String(bookId),page=Number(pageNumber);
+    let text=String(rawText==null?'':rawText);
+    if(id==='142'&&page===4)return text.replace('http://www.archive.org/details/freethoughtofficOOrussiala','');
+    if(id==='157'&&page===21)return text.replace('http://www.reasoned.org/dir/','');
+    if(id==='174'&&page===101)return text.replace('www.reasoned.org/dir/','');
+    if(id==='180'&&page===4){
+      text=text.replace('This page formatted 2007 Blackmask Online.','');
+      return text.replace('http://www.blackmask.com','');
+    }
+    return text;
+  }
   function displayText(raw) {
     // Soft hyphens are discretionary layout marks. Visible hyphens may be
     // meaningful compounds, so leave them intact without dictionary evidence.
@@ -223,9 +236,9 @@
     return 'passage';
   }
   // Score passage usefulness, not just its position in the PDF.
-  function rankText(page, rawText, term, mode) {
-    const kind = pageKind(rawText);
-    const text = displayText(rawText);
+  function rankText(page, rawText, term, mode, searchableRawText = rawText) {
+    const kind = pageKind(searchableRawText);
+    const text = displayText(searchableRawText);
     const ranges = matchRanges(text, term, mode);
     const positions = ranges.map(range => range.start);
     if (!positions.length) return null;
@@ -256,17 +269,20 @@
     }
     return { page, text, pos: bestPos, score, rawText, kind };
   }
-  function rankPage(page, term, mode) {
+  function rankPage(page, term, mode, bookId) {
+    const searchablePageText = filterPageDisplayArtifacts(bookId, page.page, page.text || '');
     if (!Array.isArray(page.regions) || !page.regions.length) {
-      return rankText(page, page.text || '', term, mode);
+      return rankText(page, page.text || '', term, mode, searchablePageText);
     }
-    let matches = page.regions.map(region => rankText(page, region.text || '', term, mode)).filter(Boolean);
+    let matches = page.regions.map(region => rankText(page, region.text || '', term, mode,
+      filterPageDisplayArtifacts(bookId, page.page, region.text || ''))).filter(Boolean);
     // Word searches can match across PDF text regions; keep each excerpt inside one region.
-    if (!matches.length && (mode === 'words' || mode === 'any') && matchRanges(displayText(page.text || ''), term, mode).length) {
+    if (!matches.length && (mode === 'words' || mode === 'any') && matchRanges(displayText(searchablePageText), term, mode).length) {
       const needles = [...new Set(term.match(/[a-z0-9]+/g) || [])];
       matches = page.regions.map(region => {
-        const found = needles.filter(needle => matchRanges(displayText(region.text || ''), needle, 'phrase').length);
-        const match = found.length ? rankText(page, region.text || '', found.join(' '), mode) : null;
+        const searchableRegion = filterPageDisplayArtifacts(bookId, page.page, region.text || '');
+        const found = needles.filter(needle => matchRanges(displayText(searchableRegion), needle, 'phrase').length);
+        const match = found.length ? rankText(page, region.text || '', found.join(' '), mode, searchableRegion) : null;
         if (match) match.score += found.length;
         return match;
       }).filter(Boolean);
@@ -428,7 +444,7 @@
           catch (error) { state.queue.unshift(bookId); throw error; }
           if (myGeneration !== generation || active !== state) return;
           const matches = chunk.pages.filter(page => wanted.has(page.id))
-            .map(page => rankPage(page, state.term, state.mode)).filter(Boolean)
+            .map(page => rankPage(page, state.term, state.mode, bookId)).filter(Boolean)
             .sort((a, b) => b.score - a.score || a.page.page - b.page.page);
           record = {pages: matches.filter(match => match.kind === 'passage'), cursor: 0,
                     references: matches.filter(match => match.kind !== 'passage'), referenceCursor: 0};
