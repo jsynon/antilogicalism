@@ -881,8 +881,7 @@ object {
 }
 #main .site-navigation {
 	margin: 0 0 1.8em;
-	overflow: visible;
-	display: flow-root;
+	overflow: hidden;
 }
 #nav-below {
 	overflow: hidden;
@@ -1437,7 +1436,7 @@ body {
 	justify-content: center;
 	padding: 10px;
 	position: absolute;
-	right: -3.5rem;
+	right: max(1rem, calc((100vw - 750px) / 2 - 3.5rem));
 	top: 50%;
 	transform: translateY(-50%);
 	width: 44px;
@@ -1743,6 +1742,11 @@ html[data-theme="dark"] body #primary .entry-content #digital-library mark {
 }
 
 /* Reading Companion */
+html[data-theme="dark"] body #primary .entry-content #digital-library p:first-of-type:first-letter,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot p:first-of-type:first-letter {
+	color: var(--site-text) !important;
+}
+
 html[data-theme="dark"] body #primary .entry-content #companion-pilot {
 	color: var(--site-text) !important;
 }
