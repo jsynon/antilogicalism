@@ -17,8 +17,22 @@ function authorName(title){
   return author.replace(/\s+(?:and others|et al\.?)$/i,'').trim();
 }
 function surname(name){
-  const words=String(name||'').replace(/^(?:the|saint|st\.)\s+/i,'').split(/\s+/).filter(Boolean);
+  // Sort compound bylines under their first contributor, as the Library Search
+  // does, rather than under whichever name happens to appear last.
+  const first=String(name||'').split(/\s+(?:and|&)\s+/i)[0]
+    .split(/\s*;\s*/)[0].trim();
+  if(!first)return 'zzzzzz';
+  const commaParts=first.split(',').map(part=>part.trim()).filter(Boolean);
+  if(commaParts.length>1)return commaParts[0].split(/\s+/).at(-1);
+  const words=first.replace(/^(?:the|saint|st\.?)\s+/i,'')
+    .split(/\s+/).filter(Boolean);
   if(!words.length)return 'zzzzzz';
+  // Ancient and medieval authors are commonly cataloged as "Name of Place"
+  // or "Name the Epithet"; file these under the author's name.
+  const ofIndex=words.findIndex(word=>word.toLocaleLowerCase('en')==='of');
+  if(ofIndex===1)return words[0].replace(/[^\p{L}\p{N}'’-]/gu,'');
+  if(words.length>2&&words.at(-2).toLocaleLowerCase('en')==='the')
+    return words.at(-3).replace(/[^\p{L}\p{N}'’-]/gu,'');
   const last=words.at(-1).replace(/[^\p{L}\p{N}'’-]/gu,'');
   const particles=new Set(['da','de','del','della','di','du','la','le','van','von','bin','al']);
   return particles.has((words.at(-2)||'').toLocaleLowerCase('en'))?
