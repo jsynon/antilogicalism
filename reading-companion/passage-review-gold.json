@@ -2,9 +2,9 @@
   "schema": "antilogicalism-reading-companion-passage-gold-v1",
   "sourceRun": {
     "repository": "jsynon/antilogicalism",
-    "runId": 40580563553,
-    "clientRevision": "579cf50594c5770d38e9fe0968d780809e7679b1",
-    "workerRevision": "8e04d7a2f49ff2338bacf2e8905268977d5165a8",
+    "runId": 40589127363,
+    "clientRevision": "9dd40ca5f496f8cfc135c37e37ee0e985e827efe",
+    "workerRevision": "339504ccb57bd9f209d912b047866b5c65bf3326",
     "libraryVersion": 48,
     "scope": "best means best among the candidates captured in this run, not across the full library"
   },
@@ -18,11 +18,18 @@
           "requestedClaim": "Interpret conscience in Hamlet's To be or not to be soliloquy.",
           "passages": [
             {
-              "bookId": "564",
-              "page": 152,
-              "globalPageId": 241919,
+              "bookId": "212",
+              "page": 454,
+              "globalPageId": 52375,
               "label": "best",
-              "reason": "Primary Shakespeare text gives the soliloquy's death, deliberation, and resolution context. The printed page is 454 in the source PDF."
+              "reason": "The Shakespeare primary text contains the exact line named by the question and its surrounding reasoning about thought, resolution, and action."
+            },
+            {
+              "bookId": "212",
+              "page": 453,
+              "globalPageId": 52374,
+              "label": "reject",
+              "reason": "This adjacent page contains an unrelated use of conscience by the King and only begins the soliloquy; the named line continues on p. 454."
             },
             {
               "bookId": "212",
