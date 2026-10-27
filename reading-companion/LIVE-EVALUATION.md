@@ -228,7 +228,7 @@ The previous Hamlet All Books failure did not recur: both scopes passed with a S
 
 ## October 27, 2026: run #24 passage-gold replay
 
-Run #24's three manually inspected traces now have a compact gold annotation in `passage-review-gold.json`. The no-AI audit compares the candidate pool with the submitted packet, then checks claim-linked highlights and whether the review-stage status matches the final returned part status. It labels alternatives as best/tied, acceptable, context-only, or reject. “Best” is bounded to this run's captured candidates, not the entire library.
+Run #24's three manually inspected questions now have a compact gold annotation covering four case/scope rows in `passage-review-gold.json`. The no-AI audit compares the candidate pool with the submitted packet, then checks claim-linked highlights and whether the review-stage status matches the final returned part status. It labels alternatives as best/tied, acceptable, context-only, or reject. “Best” is bounded to this run's captured candidates, not the entire library.
 
 Run the existing offline recheck on the extracted report JSON:
 
@@ -236,4 +236,12 @@ Run the existing offline recheck on the extracted report JSON:
 node reading-companion/recheck-live-answer-evaluation.mjs --input path/to/report.json
 ```
 
-The output JSON includes `offlinePassageReview`. Its counts are diagnostics, not a semantic score or a live workflow gate. No model or network call is made.
+The output JSON includes `offlinePassageReview`, with separate counts for best passages absent from retrieval and best passages retrieved but omitted from the packet. Its counts are diagnostics, not a semantic score or a live workflow gate. No model or network call is made.
+
+## October 27, 2026: post-merge run #25 offline passage replay
+
+Paired-scope run [#40589127363](https://github.com/jsynon/antilogicalism/actions/runs/40589127363) used library v48, site revision `9dd40ca5f496f8cfc135c37e37ee0e985e827efe`, and deployed Worker source revision `339504ccb57bd9f209d912b047866b5c65bf3326`. All ten cases completed, with no request failures or planner fallbacks. The live workflow passed 7/10 structural cases (All Books 3/5; Selected Books 4/5), for 16 supported, three partial, and one unsupported part. Ten human-review entries remain pending. The workflow used about 25 Worker AI calls.
+
+Replaying the saved artifact through the expanded passage audit took zero AI or network calls and checked four case/scope rows across Hamlet, Boethius, and Hume/Kant. It reports one best passage absent from retrieval (Hamlet All Books p. 454), zero retrieved best passages dropped from the packet, one context-only highlight (Kant p. 213 in Hume/Kant All Books), and zero review-to-output status mismatches. Boethius p. 14 reached the submitted packet in both scopes. The separate counters clarify that Hamlet failed before packet construction; the previous combined count could show zero packet drops without exposing the retrieval miss.
+
+This is a diagnostic replay of the same artifact, not another live evaluation. The structural result remains 7/10. The changed counts do not establish corpus-wide passage optimality or semantic answer quality.

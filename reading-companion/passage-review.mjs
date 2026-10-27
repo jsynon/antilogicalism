@@ -53,8 +53,8 @@ export function auditPassageGoldReview(report,gold){
   const claimChecks=(spec.claims||[]).map(claim=>{
    const passages=Array.isArray(claim.passages)?claim.passages:[];
    const best=passages.filter(value=>value.label==='best'||value.label==='tied');
-   const bestKeys=new Set(best.map(pageKey).filter(Boolean));
-   const claimHighlights=highlights.filter(value=>String(value?.claimId||value?.claim_id||'')===claim.claimId)
+   const claimIds=new Set([claim.claimId,...(claim.claimIdAliases||[])].map(String));
+   const claimHighlights=highlights.filter(value=>claimIds.has(String(value?.claimId||value?.claim_id||'')))
     .map(value=>{
      const source=sources.get(String(value?.sourceId||value?.source_id||''));
      const key=pageKey(source);
@@ -87,7 +87,10 @@ export function auditPassageGoldReview(report,gold){
   sourceRunId:gold.sourceRun?.runId??null,
   scope:gold.sourceRun?.scope||'',networkCalls:0,aiCalls:0,
   checkedCases:checked.length,missingCases:cases.length-checked.length,
-  bestCandidateMisses:claimChecks.filter(item=>item.bestCandidateInPool&&!item.bestCandidateSubmitted).length,
+  // Separate retrieval misses from packet loss so a zero packet-loss count
+  // cannot hide a passage that never reached the candidate pool.
+  bestCandidateRetrievalMisses:claimChecks.filter(item=>item.bestCandidates.length>0&&!item.bestCandidateInPool).length,
+  bestCandidatePacketMisses:claimChecks.filter(item=>item.bestCandidateInPool&&!item.bestCandidateSubmitted).length,
   nonBestHighlights:claimChecks.reduce((sum,item)=>sum+item.nonBestHighlights.length,0),
   statusMismatches:statusChecks.filter(item=>!item.consistent).length,cases};
 }
