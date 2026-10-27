@@ -1493,15 +1493,18 @@ body {
  */
 html[data-theme="dark"] {
 	color-scheme: dark;
-	--site-page-bg: #17191d;
-	--site-surface: #202328;
-	--site-surface-raised: #292e34;
-	--site-text: #e5e4e0;
-	--site-muted: #b7bdc4;
-	--site-link: #8fc7ee;
-	--site-link-hover: #c1e4fa;
-	--site-border: #454c54;
-	--site-control-border: #626b75;
+	--site-page-bg: #161b22;
+	--site-surface: #161b22;
+	--site-surface-raised: #0d1117;
+	--site-text: #e6edf3;
+	--site-muted: #8b949e;
+	--site-link: #58a6ff;
+	--site-link-hover: #79c0ff;
+	--site-border: #30363d;
+	--site-control-border: #484f58;
+	--site-button-bg: #21262d;
+	--site-button-hover: #30363d;
+	--site-button-border: #484f58;
 }
 
 html[data-theme="light"] {
@@ -1573,10 +1576,16 @@ html[data-theme="dark"] textarea::placeholder {
 	opacity: 1;
 }
 
-html[data-theme="dark"] button:not(.site-theme-toggle) {
-	background-color: var(--site-surface-raised);
-	border-color: var(--site-control-border);
-	color: var(--site-text);
+html[data-theme="dark"] body #primary .entry-content button:not(.site-theme-toggle) {
+	background-color: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content button:not(.site-theme-toggle):hover:not(:disabled) {
+	background-color: var(--site-button-hover) !important;
+	border-color: var(--site-button-border) !important;
 }
 
 html[data-theme="dark"] pre,
@@ -1668,14 +1677,15 @@ html[data-theme="dark"] body #primary .entry-content #master-bookshelf input {
 
 html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-search-button,
 html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-pagination button {
-	background-color: #343b43 !important;
-	border-color: #6c7884 !important;
-	color: #f3f5f7 !important;
+	background-color: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
 }
 
 html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-search-button:hover,
 html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-pagination button:hover:not(:disabled) {
-	background-color: #46515c !important;
+	background-color: var(--site-button-hover) !important;
 }
 
 html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result,
@@ -1786,8 +1796,8 @@ html[data-theme="dark"] body #primary .entry-content #companion-pilot button.com
 html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-actions button:hover:not(:disabled),
 html[data-theme="dark"] body #primary .entry-content #companion-pilot button.companion-inline-read:hover {
 	background-color: #46515c !important;
-	border-color: #82909d !important;
-	color: #fff !important;
+	border-color: var(--site-button-border) !important;
+	color: var(--site-text) !important;
 }
 
 html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-status:not(:empty) {
@@ -1851,8 +1861,9 @@ html[data-theme="dark"] body.page-id-372 #primary .entry-content a:focus-visible
 
 html[data-theme="dark"] body.page-id-372 #primary .entry-content input,
 html[data-theme="dark"] body.page-id-372 #primary .entry-content select {
-	background-color: var(--site-surface-raised) !important;
-	border-color: var(--site-control-border) !important;
+	background-color: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
 	color: var(--site-text) !important;
 }
 
@@ -1879,4 +1890,112 @@ html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-pagina
 	background-color: var(--site-surface-raised) !important;
 	border-color: var(--site-control-border) !important;
 	color: var(--site-text) !important;
+}
+
+/*
+ * Keep custom page styles readable in dark mode. Several static pages set
+ * light-theme text and control colors inline, so these scoped overrides win
+ * without changing the default light presentation.
+ */
+html[data-theme="dark"] body #primary .entry-content,
+html[data-theme="dark"] body #primary .entry-content h1,
+html[data-theme="dark"] body #primary .entry-content h2,
+html[data-theme="dark"] body #primary .entry-content h3,
+html[data-theme="dark"] body #primary .entry-content h4,
+html[data-theme="dark"] body #primary .entry-content h5,
+html[data-theme="dark"] body #primary .entry-content h6,
+html[data-theme="dark"] body #primary .entry-content p,
+html[data-theme="dark"] body #primary .entry-content li,
+html[data-theme="dark"] body #primary .entry-content dt,
+html[data-theme="dark"] body #primary .entry-content dd,
+html[data-theme="dark"] body #primary .entry-content label,
+html[data-theme="dark"] body #primary .entry-content legend,
+html[data-theme="dark"] body #primary .entry-content summary,
+html[data-theme="dark"] body #primary .entry-content small,
+html[data-theme="dark"] body #primary .entry-content figcaption {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content a,
+html[data-theme="dark"] body #primary .entry-content a:visited,
+html[data-theme="dark"] body #primary .entry-content a:not([aria-current="page"]) {
+	color: var(--site-link) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content a:hover,
+html[data-theme="dark"] body #primary .entry-content a:focus-visible {
+	color: var(--site-link-hover) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content input,
+html[data-theme="dark"] body #primary .entry-content select,
+html[data-theme="dark"] body #primary .entry-content textarea {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content input::placeholder,
+html[data-theme="dark"] body #primary .entry-content textarea::placeholder {
+	color: var(--site-muted) !important;
+	opacity: 1;
+}
+
+html[data-theme="dark"] body #primary .entry-content input[type="checkbox"],
+html[data-theme="dark"] body #primary .entry-content input[type="radio"] {
+	accent-color: var(--site-link);
+}
+
+html[data-theme="dark"] body #primary .entry-content hr,
+html[data-theme="dark"] body #primary .entry-content table,
+html[data-theme="dark"] body #primary .entry-content th,
+html[data-theme="dark"] body #primary .entry-content td,
+html[data-theme="dark"] body #primary .entry-content fieldset {
+	border-color: var(--site-border) !important;
+}
+
+/* Make embedded share controls and their text fit the same dark palette. */
+html[data-theme="dark"] .sd-sharing,
+html[data-theme="dark"] .sd-sharing .sd-title,
+html[data-theme="dark"] .sd-sharing .sd-content li,
+html[data-theme="dark"] .sd-sharing .sd-content li a:not(.twitter-share-button) {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] .sd-sharing .sd-content ul {
+	list-style: none;
+	padding-left: 0;
+}
+
+html[data-theme="dark"] .sd-sharing .sd-content li {
+	background: transparent !important;
+}
+
+html[data-theme="dark"] .sd-sharing .sd-content li a:not(.twitter-share-button) {
+	background-color: transparent !important;
+	border-color: var(--site-border) !important;
+}
+
+/* Match the homepage random-post button to the shared dark button style. */
+html[data-theme="dark"] body #primary .entry-content #surprise-me-home-button {
+	background: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #surprise-me-home-button:hover:not(:disabled) {
+	background: var(--site-button-hover) !important;
+}
+
+/* Match the Library Search action to the shared outlined button style. */
+html[data-theme="dark"] body #primary .entry-content #digital-library #digital-library-search #library-search-button {
+	background: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #digital-library #digital-library-search #library-search-button:hover:not(:disabled) {
+	background: var(--site-button-hover) !important;
 }
