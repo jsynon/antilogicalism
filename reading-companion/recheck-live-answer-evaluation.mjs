@@ -5,6 +5,7 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
 import {recheckQualityReport} from './live-answer-evaluation.mjs';
+import {auditPassageGoldReview} from './passage-review.mjs';
 
 function parseArgs(argv){
  const result={input:'',output:''};
@@ -30,6 +31,8 @@ async function main(){
  const input=resolve(args.input);
  const report=JSON.parse(await readFile(input,'utf8'));
  const result=recheckQualityReport(report);
+ const passageGold=JSON.parse(await readFile(new URL('./passage-review-gold.json',import.meta.url),'utf8'));
+ result.offlinePassageReview=auditPassageGoldReview(report,passageGold);
  const output=args.output?resolve(args.output):input.replace(/\.json$/i,'')+'.offline-rechecked.json';
  await writeFile(output,JSON.stringify(result,null,2)+'\n');
  const summary=result.offlineRecheck;
@@ -37,6 +40,10 @@ async function main(){
  console.log('Question parts: '+summary.questionPartStatusCounts.supported+' supported, '+
   summary.questionPartStatusCounts.partial+' partial, '+summary.questionPartStatusCounts.unsupported+' unsupported.');
  console.log('AI calls: 0. Network calls: 0.');
+ console.log('Passage gold review: '+result.offlinePassageReview.checkedCases+' cases; '+
+  result.offlinePassageReview.bestCandidateMisses+' best-passage packet misses, '+
+  result.offlinePassageReview.nonBestHighlights+' non-best highlights, '+
+  result.offlinePassageReview.statusMismatches+' review-to-answer status mismatches.');
  console.log('Report: '+output);
 }
 
