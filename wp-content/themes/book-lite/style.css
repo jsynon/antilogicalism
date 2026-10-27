@@ -2141,3 +2141,32 @@ html[data-theme="dark"] body #primary #companion-pilot #companion-book-search-st
 html[data-theme="dark"] body #primary #digital-library p.library-search-help::first-letter {
 	color: inherit !important;
 }
+
+
+/* Render the first-party X share link in dark mode instead of the provider's
+   iframe, whose rounded corners remain white inside its cross-origin frame. */
+html[data-theme="dark"] .sd-sharing .share-twitter iframe,
+html[data-theme="dark"] .sd-sharing .share-twitter > a.twitter-share-button {
+	display: none !important;
+}
+html[data-theme="dark"] .sd-sharing .share-twitter > a.site-dark-x-share {
+	align-items: center;
+	background: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	box-sizing: border-box;
+	color: var(--site-text) !important;
+	display: inline-flex !important;
+	font: 13px/18px Arial, sans-serif;
+	height: 22px;
+	padding: 1px 8px;
+	text-decoration: none !important;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+html[data-theme="dark"] .sd-sharing .share-twitter > a.site-dark-x-share:hover,
+html[data-theme="dark"] .sd-sharing .share-twitter > a.site-dark-x-share:focus-visible {
+	background: var(--site-button-hover) !important;
+	border-color: var(--site-button-border) !important;
+	color: var(--site-text) !important;
+}
