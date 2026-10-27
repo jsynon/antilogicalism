@@ -1436,7 +1436,7 @@ body {
 	justify-content: center;
 	padding: 10px;
 	position: absolute;
-	right: max(1rem, calc((100vw - 750px) / 2 - 3.5rem));
+	right: max(1rem, calc((100vw - 750px) / 2 - 6rem));
 	top: 50%;
 	transform: translateY(-50%);
 	width: 44px;
@@ -1685,64 +1685,64 @@ html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-l
 }
 
 /* Library Search */
-html[data-theme="dark"] body #primary .entry-content #digital-library {
+html[data-theme="dark"] body #primary #digital-library {
 	color: var(--site-text) !important;
 }
 
-html[data-theme="dark"] body #primary .entry-content #digital-library h2,
-html[data-theme="dark"] body #primary .entry-content #digital-library h3,
-html[data-theme="dark"] body #primary .entry-content #digital-library p,
-html[data-theme="dark"] body #primary .entry-content #digital-library label,
-html[data-theme="dark"] body #primary .entry-content #digital-library summary {
+html[data-theme="dark"] body #primary #digital-library h2,
+html[data-theme="dark"] body #primary #digital-library h3,
+html[data-theme="dark"] body #primary #digital-library p,
+html[data-theme="dark"] body #primary #digital-library label,
+html[data-theme="dark"] body #primary #digital-library summary {
 	color: var(--site-text) !important;
 }
 
-html[data-theme="dark"] body #primary .entry-content #digital-library #library-search-note,
-html[data-theme="dark"] body #primary .entry-content #digital-library .library-search-help,
-html[data-theme="dark"] body #primary .entry-content #digital-library .library-page-kind,
-html[data-theme="dark"] body #primary .entry-content #digital-library .library-pdf-unavailable {
+html[data-theme="dark"] body #primary #digital-library #library-search-note,
+html[data-theme="dark"] body #primary #digital-library .library-search-help,
+html[data-theme="dark"] body #primary #digital-library .library-page-kind,
+html[data-theme="dark"] body #primary #digital-library .library-pdf-unavailable {
 	color: var(--site-muted) !important;
 }
 
 /* Keep the search form controls legible even when page-specific rules target individual fields. */
-html[data-theme="dark"] body #primary .entry-content #digital-library-search input,
-html[data-theme="dark"] body #primary .entry-content #digital-library-search select,
-html[data-theme="dark"] body #primary .entry-content #digital-library-search textarea,
-html[data-theme="dark"] body #primary .entry-content #digital-library-search select option {
+html[data-theme="dark"] body #primary #digital-library-search input,
+html[data-theme="dark"] body #primary #digital-library-search select,
+html[data-theme="dark"] body #primary #digital-library-search textarea,
+html[data-theme="dark"] body #primary #digital-library-search select option {
 	background-color: var(--site-surface-raised) !important;
 	border-color: var(--site-control-border) !important;
 	color: var(--site-text) !important;
 }
 
-html[data-theme="dark"] body #primary .entry-content #digital-library input,
-html[data-theme="dark"] body #primary .entry-content #digital-library select,
-html[data-theme="dark"] body #primary .entry-content #digital-library textarea {
+html[data-theme="dark"] body #primary #digital-library input,
+html[data-theme="dark"] body #primary #digital-library select,
+html[data-theme="dark"] body #primary #digital-library textarea {
 	background-color: var(--site-surface-raised) !important;
 	border-color: var(--site-control-border) !important;
 	color: var(--site-text) !important;
 }
 
-html[data-theme="dark"] body #primary .entry-content #digital-library .library-result {
+html[data-theme="dark"] body #primary #digital-library .library-result {
 	border-bottom-color: var(--site-border) !important;
 	color: var(--site-text) !important;
 }
 
-html[data-theme="dark"] body #primary .entry-content #digital-library .library-result a {
+html[data-theme="dark"] body #primary #digital-library .library-result a {
 	color: var(--site-link) !important;
 }
 
-html[data-theme="dark"] body #primary .entry-content #digital-library .library-original {
+html[data-theme="dark"] body #primary #digital-library .library-original {
 	border-color: var(--site-border) !important;
 	color: var(--site-text) !important;
 }
 
-html[data-theme="dark"] body #primary .entry-content #digital-library mark {
+html[data-theme="dark"] body #primary #digital-library mark {
 	background-color: #765f23 !important;
 	color: #fff5d7 !important;
 }
 
 /* Reading Companion */
-html[data-theme="dark"] body #primary .entry-content #digital-library p:first-of-type:first-letter,
+html[data-theme="dark"] body #primary #digital-library p:first-of-type:first-letter,
 html[data-theme="dark"] body #primary .entry-content #companion-pilot p:first-of-type:first-letter {
 	color: var(--site-text) !important;
 }
