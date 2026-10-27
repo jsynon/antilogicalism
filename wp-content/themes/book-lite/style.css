@@ -2001,7 +2001,7 @@ html[data-theme="dark"] body #primary #digital-library .entry-content #digital-l
 }
 
 html[data-theme="dark"] body #primary .entry-content p::first-letter {
-	color: var(--site-text) !important;
+	color: inherit !important;
 }
 
 /* Apply the same outlined button treatment to controls outside page-specific wrappers too. */
@@ -2023,4 +2023,60 @@ html[data-theme="dark"] body #primary .entry-content em,
 html[data-theme="dark"] body #primary .entry-content b,
 html[data-theme="dark"] body #primary .entry-content i {
 	color: var(--site-text) !important;
+}
+
+
+/* Final dark-mode details from visual review */
+html[data-theme="dark"] #masthead .site-title a,
+html[data-theme="dark"] #masthead .site-title a:visited,
+html[data-theme="dark"] #masthead .site-title a:hover {
+	color: var(--site-text) !important;
+}
+
+/* The Book Lite divider is a dark raster image; use it as a mask so it can
+   take the theme border color without changing the light theme asset. */
+html[data-theme="dark"] #secondary {
+	background-image: none !important;
+	position: relative;
+}
+html[data-theme="dark"] #secondary::before {
+	background-color: var(--site-border);
+	content: "";
+	height: 10px;
+	left: 50%;
+	mask: url("/antilogicalism/wp-content/themes/book-lite/images/header-divider-2x.png") center / 50px 10px no-repeat;
+	-webkit-mask: url("/antilogicalism/wp-content/themes/book-lite/images/header-divider-2x.png") center / 50px 10px no-repeat;
+	pointer-events: none;
+	position: absolute;
+	top: 0;
+	transform: translateX(-50%);
+	width: 50px;
+}
+
+/* Preserve muted paragraphs such as Library Search notes and Reading
+   Companion status text while keeping real drop caps readable by inheritance. */
+html[data-theme="dark"] body #primary .entry-content p::first-letter {
+	color: inherit !important;
+}
+
+/* Keep the native social widgets clipped to the dark share row so their
+   transparent iframe corners do not reveal a white rectangle. */
+html[data-theme="dark"] .sd-sharing .share-facebook,
+html[data-theme="dark"] .sd-sharing .share-twitter {
+	background: var(--site-button-bg) !important;
+	border-radius: 4px;
+	overflow: hidden;
+}
+html[data-theme="dark"] .sd-sharing .share-facebook iframe,
+html[data-theme="dark"] .sd-sharing .share-twitter iframe {
+	background: transparent !important;
+	border: 0 !important;
+	border-radius: 4px;
+	vertical-align: top;
+}
+
+/* The RSS mark is intentionally kept in its familiar orange and white colors.
+   A subtle edge helps the small icon read against both dark footer columns. */
+html[data-theme="dark"] #secondary .rss-widget-icon {
+	filter: drop-shadow(0 0 1px rgba(230, 237, 243, .3));
 }
