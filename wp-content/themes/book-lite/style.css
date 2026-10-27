@@ -1473,14 +1473,19 @@ body {
 }
 
 @media (max-width: 1200px) {
+	.site-theme-toggle svg {
+		height: 20px;
+		width: 20px;
+	}
+
 	.site-theme-toggle {
 		background: rgba(0, 0, 0, .2);
-		height: 34px;
-		padding: 7px;
+		height: 38px;
+		padding: 8px;
 		right: 12px;
-		top: 8px;
+		top: 12px;
 		transform: none;
-		width: 34px;
+		width: 38px;
 		z-index: 100001;
 	}
 
