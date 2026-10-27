@@ -1469,7 +1469,7 @@ body {
 	outline-offset: 3px;
 }
 
-@media (max-width: 818.375px) {
+@media (max-width: 1050px) {
 	.site-theme-toggle {
 		align-items: center;
 		background: rgba(0, 0, 0, .38);
@@ -1477,8 +1477,8 @@ body {
 		height: 42px;
 		padding: 0 12px;
 		right: 12px;
-		top: 50%;
-		transform: translateY(-50%);
+		top: 8px;
+		transform: none;
 		width: auto;
 		z-index: 100001;
 	}
