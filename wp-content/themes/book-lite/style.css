@@ -2209,3 +2209,37 @@ html[data-theme="dark"] body #primary .entry-content .sd-sharing .share-twitter 
 	min-height: 26px;
 	overflow: visible !important;
 }
+
+
+/* Keep the Facebook and X controls the same visual height in dark mode.
+   The Facebook iframe renders at 20px; match the first-party X link to it. */
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-facebook,
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-twitter {
+	align-items: center;
+	height: auto !important;
+	min-height: 26px;
+}
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-facebook {
+	overflow: hidden !important;
+}
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-facebook .fb-share-button {
+	height: 20px !important;
+}
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-twitter > a.site-dark-x-share {
+	height: 20px !important;
+	line-height: 16px;
+	min-height: 20px !important;
+	padding-bottom: 0;
+	padding-top: 0;
+}
+
+/* Make the lower-page separator ornaments clearer against the dark surface. */
+html[data-theme="dark"] #secondary::before,
+html[data-theme="dark"] article::after {
+	background-color: #484f58;
+}
+
+/* Bookshelf author cards keep their thin rule, without the centered ornament. */
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result::after {
+	display: none !important;
+}
