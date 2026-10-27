@@ -250,6 +250,32 @@ function locateHighlightInSubmittedPage(item,citations,submitted){
  if(normalizedQuote.length<24)return null;
  return normalizeDiagnosticExcerpt(original.text).includes(normalizedQuote);
 }
+function highlightRelevanceAudit(answer,citations,evidenceHighlights){
+ // Keep this diagnostic inspection-only: shared source IDs connect a quote to
+ // candidate answer sentences, but neither that link nor quote location proves
+ // that the excerpt supports the sentence's meaning.
+ const answerSentences=String(answer||'')
+  .split(/(?<=[.!?])\s+(?=[\p{Lu}"“‘(])/u)
+  .map(text=>text.trim()).filter(Boolean)
+  .map((text,index)=>({index:index+1,text,
+   sourceIds:auditCitationIds(text,citations).inlineIds}));
+ const excerpts=(Array.isArray(evidenceHighlights)?evidenceHighlights:[]).flatMap(item=>{
+  const sourceId=String(item?.sourceId||'');
+  const quotes=Array.isArray(item?.quotes)&&item.quotes.length?item.quotes:[item];
+  return quotes.map(quote=>({sourceId,page:Number.isSafeInteger(item?.page)?item.page:null,
+   claimId:String(quote?.claimId||item?.claimId||''),
+   partId:String(quote?.partId||''),point:String(quote?.point||item?.point||''),
+   quote:String(quote?.quote||item?.quote||''),
+   quoteLocated:typeof quote?.quoteLocated==='boolean'?quote.quoteLocated:
+    typeof item?.quoteLocated==='boolean'?item.quoteLocated:null,
+   answerSentenceIndexes:answerSentences.filter(sentence=>sentence.sourceIds.includes(sourceId))
+    .map(sentence=>sentence.index)}));
+ }).filter(item=>item.sourceId&&item.quote);
+ return {method:'inspection-only',linkage:'shared-citation-source-id',
+  semanticRelevanceScored:false,
+  limitation:'A located quote and a shared citation identify a candidate link; inspect the answer sentence and passage to judge relevance.',
+  answerSentences,excerpts};
+}
 function answerDeniesSupportedComparison(part,answer){
  if(part?.status!=='supported'||!/\b(?:compare|comparison|contrast|differ|difference|different|distinguish)\b/i.test(String(part?.part||'')))return false;
  const text=String(answer||'');
@@ -379,6 +405,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const citationHighlightAudit={citedSourceCount:citedSourceIds.length,
   highlightedSourceCount:citedSourceIds.filter(id=>highlightedSourceIds.has(id)).length,
   citedSourcesWithoutLocatedHighlight:citedSourceIds.filter(id=>!highlightedSourceIds.has(id))};
+ const highlightRelevance=highlightRelevanceAudit(answer,citations,evidenceHighlights);
  const coverage=String(data?.coverage||'');
  const partStatusesConsistent=questionParts.length===0?null:
   (coverage==='full'?questionParts.every(part=>part?.status==='supported'):
@@ -408,6 +435,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   sourcePartAlignment,
   answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
   evidenceHighlightCount:highlights.length,evidenceHighlights,citationHighlightAudit,
+  highlightRelevance,
   manualReview,structuralPassed,
   passed:reviewStatus==='answer-draft-unverified'?null:structuralPassed};
 }
