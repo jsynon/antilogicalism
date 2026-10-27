@@ -12,6 +12,7 @@ import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
 import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
+import {claimQuotesForCitation} from './citation-evidence.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -298,25 +299,7 @@ function sourcePage(source){
   return candidates.find(page=>page.bookId===String(source.bookId) &&
     page.page===Number(source.page))||null;
 }
-function normalizeClaimAnchor(value){
-  return String(value||'').normalize('NFKC').toLocaleLowerCase()
-    .replace(/[^\p{L}\p{N}]+/gu,' ').trim();
-}
-function claimQuotesForCitation(answer,citationStart,highlight){
-  const quotes=Array.isArray(highlight?.quotes)?highlight.quotes:[];
-  if(!quotes.length)return typeof highlight?.quote==='string'&&highlight.quote.trim()?
-    [highlight.quote]:[];
-  const before=String(answer).slice(0,citationStart);
-  const sentence=before.split(/(?:[.!?]+\s+|\n+)/).at(-1)||before;
-  const anchor=normalizeClaimAnchor(sentence);
-  const linked=quotes.filter(item=>{
-    const point=normalizeClaimAnchor(item?.point);
-    return point&&anchor&&(point===anchor||point.includes(anchor)||anchor.includes(point));
-  });
-  const selected=linked.length?linked:quotes.filter(item=>item?.claim_id===highlight.claim_id);
-  return selected.map(item=>item?.quote).filter(value=>typeof value==='string'&&value.trim()).slice(0,3);
-}
-function appendCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
+function appendCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map()){
   const byId=new Map(citations.map(s=>[s.id,s]));
   const groups=inlineCitationGroups(answer);
   let at=0;
@@ -331,9 +314,11 @@ function appendCitationTokens(target,answer,citations,evidenceHighlights=[],numb
       a.title=source.title+' PDF page '+source.page+(attribution?' · '+attribution:'');
       a.setAttribute('aria-label','Open ['+label+'] in the page reader: '+
         source.title+', PDF page '+source.page+(attribution?'. '+attribution:''));
-      const evidence=evidenceHighlights.find(item=>item.source_id===source.id&&
-        Number(item.page)===Number(source.page));
-      const excerpts=claimQuotesForCitation(answer,citationGroup.start,evidence);
+      // Inline citations use the full reviewer-approved evidence map. The
+      // three-quote page summary is only for source cards and may omit a
+      // claim's quote; falling back to its primary quote could highlight a
+      // different claim on the same page.
+      const excerpts=claimQuotesForCitation(answer,citationGroup.start,source.id,evidenceMap);
       a.addEventListener('click',async()=>{
         try{
           await sourceReader.open({...source,excerpts},a);
@@ -357,30 +342,30 @@ function appendCitationTokens(target,answer,citations,evidenceHighlights=[],numb
   }
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
 }
-function putCitationTokens(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
+function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map()){
   const pattern=/\*\*([^*\n]+?)\*\*|__([^_\n]+?)__|\*([^*\n]+?)\*|_([^_\n]+?)_/g;
   let at=0;
   for(const match of answer.matchAll(pattern)){
     if(match.index>at)appendCitationTokens(target,answer.slice(at,match.index),
-      citations,evidenceHighlights,numbering);
+      citations,evidenceMap,numbering);
     const isBold=match[1]!==undefined||match[2]!==undefined;
     const formatted=document.createElement(isBold?'strong':'em');
     appendCitationTokens(formatted,match[1]??match[2]??match[3]??match[4],
-      citations,evidenceHighlights,numbering);
+      citations,evidenceMap,numbering);
     target.append(formatted);
     at=match.index+match[0].length;
   }
   if(at<answer.length)appendCitationTokens(target,answer.slice(at),
-    citations,evidenceHighlights,numbering);
+    citations,evidenceMap,numbering);
 }
-function putMarkdownBlocks(target,answer,citations,evidenceHighlights=[],numbering=new Map()){
+function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new Map()){
   let paragraph=[];
   let list=null;
   let listType='';
   const flushParagraph=()=>{
     if(!paragraph.length)return;
     const p=document.createElement('p');
-    putCitationTokens(p,paragraph.join(' ').trim(),citations,evidenceHighlights,numbering);
+    putCitationTokens(p,paragraph.join(' ').trim(),citations,evidenceMap,numbering);
     target.append(p);
     paragraph=[];
   };
@@ -395,7 +380,7 @@ function putMarkdownBlocks(target,answer,citations,evidenceHighlights=[],numberi
         listType=nextListType;
       }
       const item=document.createElement('li');
-      putCitationTokens(item,bullet[1],citations,evidenceHighlights,numbering);
+      putCitationTokens(item,bullet[1],citations,evidenceMap,numbering);
       list.append(item);
       continue;
     }
@@ -417,10 +402,11 @@ function renderResponse(data,turnQuestion=''){
   const numbering=buildCitationNumbering(answer,citations);
   const orderedCitations=sortCitationsByNumber(citations,numbering);
   const highlights=Array.isArray(data.evidenceHighlights)?data.evidenceHighlights:[];
+  const evidenceMap=Array.isArray(data.evidenceMap)?data.evidenceMap:[];
   turn.append(node('h2',data.outcome==='insufficient-evidence'?
     'Insufficient evidence':'Reading Companion answer'));
   const reply=node('div',undefined,'companion-answer-text');
-  putMarkdownBlocks(reply,answer,citations,highlights,numbering);
+  putMarkdownBlocks(reply,answer,citations,evidenceMap,numbering);
   turn.append(reply);
   if(orderedCitations.length){
     const panel=node('section',undefined,'companion-highlights');
