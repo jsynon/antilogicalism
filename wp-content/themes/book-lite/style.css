@@ -2125,3 +2125,9 @@ html[data-theme="dark"] .sd-sharing .share-twitter iframe {
 	clip-path: inset(0 round 5px);
 	-webkit-clip-path: inset(0 round 5px);
 }
+
+
+/* Loading/status labels inherit their intentionally muted parent color. */
+html[data-theme="dark"] body #primary #companion-pilot .companion-question-form p:first-of-type::first-letter {
+	color: inherit !important;
+}
