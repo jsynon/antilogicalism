@@ -2099,3 +2099,29 @@ html[data-theme="dark"] article::after {
 	transform: translateX(-50%);
 	width: 125px;
 }
+
+
+/* Keep every native dropdown, including its opened option list, readable. */
+html[data-theme="dark"] body select,
+html[data-theme="dark"] body select option,
+html[data-theme="dark"] body select optgroup,
+html[data-theme="dark"] body #primary #digital-library-search select option,
+html[data-theme="dark"] body #primary #digital-library select option,
+html[data-theme="dark"] body #primary #companion-pilot select option,
+html[data-theme="dark"] body #primary #master-bookshelf select option,
+html[data-theme="dark"] body.page-id-372 #primary select option {
+	background-color: var(--site-surface-raised) !important;
+	color: var(--site-text) !important;
+	color-scheme: dark;
+}
+
+/* The static title index uses <cite> elements with a light-theme black rule. */
+html[data-theme="dark"] body #primary #book-title-index cite {
+	color: var(--site-text) !important;
+}
+
+/* Clip the X widget's embedded white iframe corners against the dark share row. */
+html[data-theme="dark"] .sd-sharing .share-twitter iframe {
+	clip-path: inset(0 round 5px);
+	-webkit-clip-path: inset(0 round 5px);
+}
