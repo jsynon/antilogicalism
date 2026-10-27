@@ -1432,14 +1432,15 @@ body {
 	color: #fff;
 	cursor: pointer;
 	display: inline-flex;
-	height: 34px;
+	gap: 8px;
+	height: 42px;
 	justify-content: center;
-	padding: 7px;
+	padding: 0 12px;
 	position: absolute;
 	right: max(1.5rem, calc((100vw - 750px) / 2 - 11rem));
 	top: 50%;
 	transform: translateY(-50%);
-	width: 34px;
+	width: auto;
 	z-index: 100000;
 }
 
@@ -1454,7 +1455,9 @@ body {
 }
 
 .site-theme-toggle .site-theme-label {
-	display: none;
+	display: inline;
+	font: 600 13px/1 Arial, sans-serif;
+	white-space: nowrap;
 }
 
 .site-theme-toggle:hover,
@@ -1469,31 +1472,27 @@ body {
 	outline-offset: 3px;
 }
 
-@media (max-width: 1050px) {
+@media (max-width: 1200px) {
 	.site-theme-toggle {
-		align-items: center;
-		background: rgba(0, 0, 0, .38);
-		gap: 8px;
-		height: 42px;
-		padding: 0 12px;
+		background: rgba(0, 0, 0, .2);
+		height: 34px;
+		padding: 7px;
 		right: 12px;
 		top: 8px;
 		transform: none;
-		width: auto;
+		width: 34px;
 		z-index: 100001;
 	}
 
 	.site-theme-toggle .site-theme-label {
-		display: inline;
-		font: 600 13px/1 Arial, sans-serif;
-		white-space: nowrap;
+		display: none;
 	}
 
 	#masthead nav h1.menu-toggle {
 		box-sizing: border-box;
 		display: block;
-		padding-left: 0;
-		padding-right: 118px;
+		padding-left: 56px;
+		padding-right: 56px;
 		text-align: center;
 		width: 100%;
 	}
