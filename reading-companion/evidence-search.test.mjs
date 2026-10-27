@@ -464,6 +464,45 @@ test('linked planner facets reserve one strong page per work before a second pag
  assert.ok(selected.some(source=>source.bookId==='44'&&source.page===22),
   'the Prolegomena passage must reach the bounded packet after surviving candidate reservation');
 });
+test('an exact quoted passage on the next page survives a crowded all-books candidate cap',()=>{
+ const title='The Complete Works of William Shakespeare — William Shakespeare';
+ const question='In Hamlet’s “To be, or not to be” soliloquy, what does he mean when he says that conscience makes cowards of us all?';
+ const partQuestion="What is the meaning of Hamlet's statement that 'conscience makes cowards of us all' in his 'To be, or not to be' soliloquy?";
+ const p453={...page(453,'212'),title,score:36.791759,
+  preview:'King: How smart a lash that speech doth give my conscience. Enter Hamlet. To be, or not to be...'};
+ const p454={...page(454,'212'),title,score:36.781759,candidatePartIds:['P1'],
+  preview:'... Thus conscience does make cowards of us all, and thus the native hue of resolution is sicklied over with the pale cast of thought.'};
+ const broadSources=[
+  {...page(43,'230'),title:'The Courage to Be — Paul Tillich',score:83.386},
+  {...page(43,'300'),title:'The Courage to Be — Paul Tillich',score:83.386},
+  {...page(146,'321'),title:'Adventures of Huckleberry Finn — Mark Twain',score:99.197},
+  {...page(13,'395'),title:'The Meaning of It All — Richard Feynman',score:78.381},
+  {...page(41,'416'),title:'What Does It All Mean? — Thomas Nagel',score:70.897},
+  {...page(44,'518'),title:'The Harvard Classics: Fifteen Minutes a Day — Charles W. Eliot',score:61.079}
+ ];
+ const sameWorkFacet=[p453,p454,
+  {...page(493,'212'),title,score:35.79},
+  {...page(151,'564'),title:'Elizabethan Drama, Vol. I — William Shakespeare',score:35.61},
+  {...page(496,'212'),title,score:35.2},
+  {...page(215,'564'),title:'Elizabethan Drama, Vol. I — William Shakespeare',score:34.61}];
+ const candidates=mergeFacetSearches([
+  {sources:broadSources},
+  {sources:sameWorkFacet},
+  {sources:broadSources},
+  {sources:broadSources}
+ ],12,[0,1,2,3],{
+  partQuestions:[{partId:'P1',question:partQuestion,sourceBookIds:['212']}],
+  partFacetScopes:[{partId:'P1',facet:1,sourceBookIds:['212']}]
+ });
+ assert.ok(candidates.some(source=>source.bookId==='212'&&source.page===454),
+  'the exact quoted line must survive even when the adjacent page ranks first');
+ const selected=selectAnswerSources(candidates.map(source=>({...source,
+  ...(source.bookId==='212'?{candidatePartIds:['P1'],text:source.preview}:{})})),
+  question,'token',{maxSources:1,maxBytes:7000,maxSourceBytes:7000,
+   partQuestions:[{partId:'P1',question:partQuestion}]});
+ assert.equal(selected[0]?.bookId+':'+selected[0]?.page,'212:454',
+  'the direct line should reach the answer packet instead of the adjacent keyword hit');
+});
 test('a strong passage later in a facet reaches the bounded answer context',()=>{
  const out=mergeFacetSearches([
   {sources:[

@@ -80,8 +80,16 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
            bestByPage.set(key,{entry,facet,rank});
        });
      }
-     return [partId,[...bestByPage.values()].sort((a,b)=>
-       a.rank-b.rank||(Number(b.entry.score)||0)-(Number(a.entry.score)||0))];
+     const partQuestion=partQuestions.find(item=>item?.partId===partId)?.question||'';
+     return [partId,[...bestByPage.values()].sort((a,b)=>{
+       // A quoted phrase in the question may sit on the next page after a
+       // stronger adjacent-page keyword hit. Preserve that exact passage
+       // inside the same source scope before rank-one pages consume the cap.
+       const aQuoted=quotedPhraseMatchLength(partQuestion,a.entry?.preview||a.entry?.text||'');
+       const bQuoted=quotedPhraseMatchLength(partQuestion,b.entry?.preview||b.entry?.text||'');
+       if(aQuoted!==bQuoted)return bQuoted-aQuoted;
+       return a.rank-b.rank||(Number(b.entry.score)||0)-(Number(a.entry.score)||0);
+     })];
    }));
    // First reserve one eligible result for each question part when one exists. A broad
    // part may resolve to many books and facets; reserving all of those pages
@@ -757,8 +765,7 @@ function singlePartFacetTextMatch(facet,partQuestion){
  * This grants a source eligibility link; it does not certify semantic support.
  */
 function hasQuotedPhraseMatch(question,text){
- const value=String(question||'');
- const phrases=[];
+ const value=String(question||''),phrases=[];
  for(const match of value.matchAll(/[“"]([^”"]{8,120})[”"]|‘([^’]{8,120})’|'([^']{8,120})'/gu))
   phrases.push(match[1]||match[2]||match[3]||'');
  const sourceWords=String(text||'').toLocaleLowerCase().normalize('NFKD')
@@ -793,6 +800,32 @@ function hasQuotedPhraseMatch(question,text){
   }
  }
  return false;
+}
+
+function quotedPhraseMatchLength(question,text){
+ const value=String(question||''),phrases=[];
+ for(const match of value.matchAll(/[“"]([^”"]{8,120})[”"]|‘([^’]{8,120})’/gu))
+  phrases.push(match[1]||match[2]||'');
+ // Treat ASCII apostrophes as quotes only when they do not belong to a word.
+ for(const match of value.matchAll(/(?<![\p{L}\p{N}])'([^']{8,120})'(?![\p{L}\p{N}])/gu))
+  phrases.push(match[1]||'');
+ const normalize=word=>word==='makes'?'make':word;
+ const sourceWords=(String(text||'').toLocaleLowerCase().normalize('NFKD')
+  .replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]+/gu)||[])
+  .filter(word=>!['do','does','did'].includes(word)).map(normalize);
+ let longest=0;
+ for(const phrase of phrases){
+  const target=(phrase.toLocaleLowerCase().normalize('NFKD')
+   .replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]+/gu)||[]).map(normalize);
+  if(target.length<4||target.join('').length<12)continue;
+  for(let start=0;start+target.length<=sourceWords.length;start++){
+   if(target.every((word,index)=>sourceWords[start+index]===word)){
+    longest=Math.max(longest,phrase.trim().length);
+    break;
+   }
+  }
+ }
+ return longest;
 }
 
 function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
