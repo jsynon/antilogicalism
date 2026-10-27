@@ -1559,8 +1559,10 @@ html[data-theme="dark"] textarea::placeholder {
 	opacity: 1;
 }
 
-html[data-theme="dark"] button {
+html[data-theme="dark"] button:not(.site-theme-toggle) {
+	background-color: var(--site-surface-raised);
 	border-color: var(--site-control-border);
+	color: var(--site-text);
 }
 
 html[data-theme="dark"] pre,
