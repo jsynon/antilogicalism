@@ -1453,6 +1453,10 @@ body {
 	width: 18px;
 }
 
+.site-theme-toggle .site-theme-label {
+	display: none;
+}
+
 .site-theme-toggle:hover,
 .site-theme-toggle:focus-visible {
 	background: rgba(255, 255, 255, .12);
@@ -1467,14 +1471,29 @@ body {
 
 @media (max-width: 818.375px) {
 	.site-theme-toggle {
-		right: 1rem;
-		top: 0;
-		transform: none;
+		align-items: center;
+		background: rgba(0, 0, 0, .38);
+		gap: 8px;
+		height: 42px;
+		padding: 0 12px;
+		right: 12px;
+		top: 50%;
+		transform: translateY(-50%);
+		width: auto;
+		z-index: 100001;
+	}
+
+	.site-theme-toggle .site-theme-label {
+		display: inline;
+		font: 600 13px/1 Arial, sans-serif;
+		white-space: nowrap;
 	}
 
 	#masthead nav h1.menu-toggle {
 		box-sizing: border-box;
 		display: block;
+		padding-left: 0;
+		padding-right: 118px;
 		text-align: center;
 		width: 100%;
 	}
@@ -2020,6 +2039,32 @@ html[data-theme="dark"] button:not(.site-theme-toggle) {
 html[data-theme="dark"] button:not(.site-theme-toggle):hover:not(:disabled) {
 	background-color: var(--site-button-hover) !important;
 	border-color: var(--site-button-border) !important;
+}
+
+/* Inline Reading Companion citations are links into the source reader, not
+   action buttons. Keep them transparent and link-colored in dark mode. */
+html[data-theme="dark"] body #primary .entry-content #companion-pilot button.companion-inline-citation,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot button.companion-inline-citation:hover {
+	-webkit-appearance: none !important;
+	appearance: none !important;
+	background: transparent !important;
+	border: 0 !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+	color: var(--site-link) !important;
+	font: inherit !important;
+	line-height: inherit !important;
+	min-height: 0 !important;
+	padding: 0 !important;
+	text-decoration: underline;
+	text-underline-offset: .12em;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot button.companion-inline-citation:focus-visible {
+	background: transparent !important;
+	color: var(--site-link-hover) !important;
+	outline: 2px solid var(--site-link) !important;
+	outline-offset: 2px;
 }
 
 html[data-theme="dark"] body #primary .entry-content span,

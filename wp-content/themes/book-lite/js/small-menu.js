@@ -197,7 +197,7 @@ jQuery( document ).ready( function( $ ) {
 			var isDark = document.documentElement.getAttribute( 'data-theme' ) === 'dark';
 			$themeButton.attr( 'aria-pressed', isDark ? 'true' : 'false' );
 			$themeButton.attr( 'title', isDark ? 'Dark mode on' : 'Dark mode off' );
-			$themeButton.html( isDark ? sunIcon : moonIcon );
+			$themeButton.html( ( isDark ? sunIcon : moonIcon ) + '<span class="site-theme-label">' + ( isDark ? 'Light mode' : 'Dark mode' ) + '</span>' );
 		}
 
 		updateThemeButton();
