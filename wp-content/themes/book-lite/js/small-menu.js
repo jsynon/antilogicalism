@@ -222,7 +222,7 @@ jQuery( document ).ready( function( $ ) {
 	};
 
 	// Check viewport width on first load.
-	if ( $( window ).width() <= 818.375 )
+	if ( $( window ).width() <= 1050 )
 		$.fn.smallMenu();
 
 	// Check viewport width when user resizes the browser window.
@@ -233,7 +233,7 @@ jQuery( document ).ready( function( $ ) {
 			clearTimeout( timeout );
 
 		timeout = setTimeout( function() {
-			if ( browserWidth <= 818.375 ) {
+			if ( browserWidth <= 1050 ) {
 				$.fn.smallMenu();
 			} else {
 				$masthead.find( '.site-navigation' ).removeClass( 'main-small-navigation' ).addClass( 'main-navigation' );
