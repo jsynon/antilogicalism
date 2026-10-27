@@ -2172,15 +2172,15 @@ html[data-theme="dark"] .sd-sharing .share-twitter > a.site-dark-x-share:focus-v
 }
 
 
-/* Keep Bookshelf category labels visually even; the theme's small-caps
-   treatment made the initial look brighter than the remaining letters. */
+/* Preserve the Bookshelf's small-caps category style and keep the initial
+   explicitly matched to the rest of each label. */
 html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-category-label {
 	color: var(--site-muted) !important;
-	font-variant: normal !important;
+	font-variant: small-caps !important;
 }
 html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-category-label::first-letter {
 	color: var(--site-muted) !important;
-	font-variant: normal !important;
+	font-variant: small-caps !important;
 }
 
 /* Give the dark-mode X share control enough contrast to read as a button. */
@@ -2198,4 +2198,14 @@ html[data-theme="dark"] body #primary .entry-content .sd-sharing .share-twitter 
 	background-color: #3d444d !important;
 	border-color: #c9d1d9 !important;
 	color: #fff !important;
+}
+
+
+/* The X iframe is hidden in dark mode, so let its replacement link define
+   the share row height instead of clipping it to the old iframe's dimensions. */
+html[data-theme="dark"] body #primary .entry-content .sd-sharing .share-twitter {
+	align-items: center;
+	height: auto !important;
+	min-height: 26px;
+	overflow: visible !important;
 }
