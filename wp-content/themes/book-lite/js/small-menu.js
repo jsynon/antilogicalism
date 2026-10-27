@@ -67,6 +67,75 @@ jQuery( document ).ready( function( $ ) {
 	var $masthead = $( '#masthead' ),
 	    timeout = false;
 
+	// X's hosted share iframe draws white pixels in its rounded corners. In
+	// dark mode, replace its visible control with a matching first-party link;
+	// keep the original widget intact so light mode remains unchanged.
+	function syncDarkShareButtons() {
+		var isDark = document.documentElement.getAttribute( 'data-theme' ) === 'dark';
+
+		$( '.sd-sharing li.share-twitter' ).each( function() {
+			var $item = $( this ),
+			    $darkLink = $item.children( '.site-dark-x-share' ),
+			    $frame = $item.children( 'iframe' ),
+			    $originalLink = $item.children( 'a.twitter-share-button' );
+
+			if ( ! isDark ) {
+				$darkLink.remove();
+				$item.children( 'iframe, a.twitter-share-button' )
+					.removeAttr( 'aria-hidden tabindex' )
+					.show();
+				return;
+			}
+
+			var url = $frame.attr( 'data-url' ) || $originalLink.attr( 'data-url' ) || window.location.href,
+			    text = $originalLink.attr( 'data-text' ) || '',
+			    via = $originalLink.attr( 'data-via' ) || 'antilogicalism';
+
+			if ( ! text && $frame.attr( 'src' ) ) {
+				try {
+					var frameParams = new URLSearchParams( $frame.attr( 'src' ).split( '#' )[1] || '' );
+					text = frameParams.get( 'text' ) || '';
+					via = frameParams.get( 'via' ) || via;
+				} catch ( error ) {
+					// Sharing still works with the page URL if frame data is malformed.
+				}
+			}
+
+			var intent = 'https://twitter.com/intent/tweet?url=' + encodeURIComponent( url ) +
+				'&text=' + encodeURIComponent( text ) +
+				'&via=' + encodeURIComponent( via );
+
+			if ( ! $darkLink.length ) {
+				$darkLink = $( '<a>', {
+					'class': 'site-dark-x-share',
+					'href': intent,
+					'target': '_blank',
+					'rel': 'noopener noreferrer',
+					'aria-label': 'Share this page on X',
+					'text': '𝕏 Post'
+				} );
+				$item.append( $darkLink );
+			} else {
+				$darkLink.attr( 'href', intent );
+			}
+
+			$item.children( 'iframe, a.twitter-share-button' )
+				.attr( 'aria-hidden', 'true' )
+				.attr( 'tabindex', '-1' )
+				.hide();
+			$darkLink.show();
+		} );
+	}
+
+	syncDarkShareButtons();
+	if ( window.MutationObserver ) {
+		var shareObserver = new MutationObserver( syncDarkShareButtons );
+		$( '.sd-sharing' ).each( function() {
+			shareObserver.observe( this, { childList: true, subtree: true } );
+		} );
+	}
+
+
 	// Keep the theme control separate from the page links and visible beside
 	// the mobile menu heading, even while the collapsed menu is closed.
 	var $siteNavigation = $masthead.find( '.site-navigation' ).first();
@@ -94,6 +163,7 @@ jQuery( document ).ready( function( $ ) {
 			var isDark = document.documentElement.getAttribute( 'data-theme' ) === 'dark';
 			window.antilogicalismSetTheme( isDark ? 'light' : 'dark' );
 			updateThemeButton();
+			syncDarkShareButtons();
 		} );
 	}
 
