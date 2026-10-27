@@ -43,6 +43,40 @@
       ]
     },
     {
+      "id": "paired-hume-kant-causal-inference::all-books",
+      "claims": [
+        {
+          "claimId": "P2-C4",
+          "claimIdAliases": ["P2-C3"],
+          "partId": "P2",
+          "requestedClaim": "Kant's role for causality in possible experience.",
+          "passages": [
+            {
+              "bookId": "40",
+              "page": 103,
+              "globalPageId": 3191,
+              "label": "best",
+              "reason": "Directly calls causality the principle and ground of possible experience and objective cognition."
+            },
+            {
+              "bookId": "40",
+              "page": 104,
+              "globalPageId": 3192,
+              "label": "acceptable",
+              "reason": "Directly connects causal relations to objective validity and empirical truth of judgments."
+            },
+            {
+              "bookId": "40",
+              "page": 213,
+              "globalPageId": 3301,
+              "label": "context-only",
+              "reason": "States a universal causal law in a cosmological-freedom discussion, not the most direct passage for causality's role in experience."
+            }
+          ]
+        }
+      ]
+    },
+    {
       "id": "paired-boethius-fortune-wheel::all-books",
       "claims": [
         {

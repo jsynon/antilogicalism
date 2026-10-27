@@ -41,7 +41,8 @@ async function main(){
   summary.questionPartStatusCounts.partial+' partial, '+summary.questionPartStatusCounts.unsupported+' unsupported.');
  console.log('AI calls: 0. Network calls: 0.');
  console.log('Passage gold review: '+result.offlinePassageReview.checkedCases+' cases; '+
-  result.offlinePassageReview.bestCandidateMisses+' best-passage packet misses, '+
+  result.offlinePassageReview.bestCandidateRetrievalMisses+' best passages not retrieved, '+
+  result.offlinePassageReview.bestCandidatePacketMisses+' retrieved best passages omitted from the packet, '+
   result.offlinePassageReview.nonBestHighlights+' non-best highlights, '+
   result.offlinePassageReview.statusMismatches+' review-to-answer status mismatches.');
  console.log('Report: '+output);
