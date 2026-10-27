@@ -56,7 +56,12 @@
   ];
   function seriesName(title) {
     const series = groupedSeries.find(item => item.pattern.test(title));
-    return series ? series.name : '';
+    if (series) return series.name;
+    // Titles with a volume marker at the end of their work name form a series
+    // even when their records use different authors or translator metadata.
+    const workTitle = title.split(/\s+—\s+/)[0];
+    const match = workTitle.match(/^(.*?)\s*,?\s+(?:volume|vol\.?|book|part)\s*(?:\d+|[ivxlcdm]+)\b/i);
+    return match ? match[1].replace(/[,:;–—-]+$/, '').trim() : '';
   }
   function seriesVolume(title, series) {
     // Many Harvard Classics entries are cataloged under the title of the
@@ -64,7 +69,7 @@
     // Vol. 44)"). Use the collection's own volume number, not the work's.
     const match = series === 'Harvard Classics'
       ? title.match(/\bHarvard Classics\b[^)]*?\b(?:volume|vol\.?)\s*([0-9]+)\b/i)
-      : title.match(/\b(?:volume|vol\.?)\s*([0-9]+|[ivxlcdm]+)\b/i);
+      : title.split(/\s+—\s+/)[0].match(/\b(?:volume|vol\.?|book|part)\s*([0-9]+|[ivxlcdm]+)\b/i);
     if (!match) return null;
     const token = match[1];
     if (/^\d+$/.test(token)) return Number(token);
