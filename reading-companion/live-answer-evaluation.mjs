@@ -501,7 +501,8 @@ export function recheckQualityReport(report){
    answerCoverageConsistent:audit.answerCoverageConsistent,
    coverageContradictions:audit.coverageContradictions,
    inlineIdsWithoutSource:audit.inlineIdsWithoutSource,
-   citationHighlightAudit:audit.citationHighlightAudit}};
+   citationHighlightAudit:audit.citationHighlightAudit,
+   highlightRelevance:audit.highlightRelevance}};
  });
  const checked=cases.filter(item=>item.offlineRecheck);
  return {...report,cases,humanReview:summarizeManualReviews(cases),answerVariants:summarizeAnswerVariants(cases),offlineRecheck:{checkedAt:new Date().toISOString(),

@@ -517,10 +517,17 @@ test('offline report recheck recognizes paired scope rows by their shared questi
   submittedSources:[{bookId:'35',page:1},{bookId:'40',page:1}],
   evidenceMap:[{id:'S1',partId:'P1',quote:'a sufficiently long reviewed source span'},
    {id:'S2',partId:'P2',quote:'another sufficiently long reviewed source span'}],
+  evidenceHighlights:[{source_id:'S1',page:1,quote:'A verified Hume passage excerpt.',quoteLocated:true,
+   quotes:[{claim_id:'P1-C1',part_id:'P1',point:'Hume argues from custom.',
+    quote:'A verified Hume passage excerpt.',quoteLocated:true}]}],
   questionParts:[{part:'Hume account',status:'supported',evidenceIds:['S1']},
    {part:'Kant account',status:'supported',evidenceIds:['S2']}]
  }]});
  assert.equal(checked.cases[0].offlineRecheck.passed,true);
+ assert.deepEqual(checked.cases[0].offlineRecheck.highlightRelevance.excerpts.map(item=>[
+  item.sourceId,item.answerSentenceIndexes
+ ]),[['S1',[1]]],
+  'a saved report can get the inspection packet during offline recheck, without another Worker request');
  assert.equal(checked.offlineRecheck.checkedCases,1);
 });
 
