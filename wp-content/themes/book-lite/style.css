@@ -1416,3 +1416,837 @@ html,
 body {
     max-width: 100%;
 }
+
+
+/* Persistent theme control: independent of the page links and mobile menu state. */
+.site-navigation {
+	position: relative;
+}
+
+.site-theme-toggle {
+	align-items: center;
+	background: rgba(0, 0, 0, .2);
+	border: 1px solid rgba(255, 255, 255, .38);
+	border-radius: 6px;
+	box-sizing: border-box;
+	color: #fff;
+	cursor: pointer;
+	display: inline-flex;
+	height: 34px;
+	justify-content: center;
+	padding: 7px;
+	position: absolute;
+	right: max(1.5rem, calc((100vw - 750px) / 2 - 8.5rem));
+	top: 50%;
+	transform: translateY(-50%);
+	width: 34px;
+	z-index: 100000;
+}
+
+.site-theme-toggle svg {
+	fill: none;
+	height: 18px;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.8;
+	width: 18px;
+}
+
+.site-theme-toggle:hover,
+.site-theme-toggle:focus-visible {
+	background: rgba(255, 255, 255, .12);
+	border-color: rgba(255, 255, 255, .72);
+	color: #fff;
+}
+
+.site-theme-toggle:focus-visible {
+	outline: 3px solid #fff;
+	outline-offset: 3px;
+}
+
+@media (max-width: 818.375px) {
+	.site-theme-toggle {
+		right: 1rem;
+		top: 0;
+		transform: none;
+	}
+
+	#masthead nav h1.menu-toggle {
+		box-sizing: border-box;
+		display: block;
+		text-align: center;
+		width: 100%;
+	}
+
+	#masthead .main-small-navigation ul.menu {
+		list-style: none;
+		margin: 0;
+		padding: .9em 0 1.8em;
+		text-align: center;
+	}
+}
+
+/*
+ * Shared dark palette for the site-wide theme.
+ * Page-specific tools may refine these surface and control colors below.
+ */
+html[data-theme="dark"] {
+	color-scheme: dark;
+	--site-page-bg: #161b22;
+	--site-surface: #161b22;
+	--site-surface-raised: #0d1117;
+	--site-text: #e6edf3;
+	--site-muted: #8b949e;
+	--site-link: #58a6ff;
+	--site-link-hover: #79c0ff;
+	--site-border: #30363d;
+	--site-control-border: #484f58;
+	--site-button-bg: #21262d;
+	--site-button-hover: #30363d;
+	--site-button-border: #484f58;
+}
+
+html[data-theme="light"] {
+	color-scheme: light;
+}
+
+html[data-theme="dark"] body {
+	background-color: var(--site-page-bg);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] #main,
+html[data-theme="dark"] #colophon,
+html[data-theme="dark"] body.custom-background #main,
+html[data-theme="dark"] body.custom-background #colophon {
+	background-color: var(--site-surface);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] h5,
+html[data-theme="dark"] h6,
+html[data-theme="dark"] p,
+html[data-theme="dark"] li,
+html[data-theme="dark"] dt,
+html[data-theme="dark"] dd,
+html[data-theme="dark"] blockquote,
+html[data-theme="dark"] figcaption {
+	color: inherit;
+}
+
+html[data-theme="dark"] a,
+html[data-theme="dark"] a:visited {
+	color: var(--site-link);
+}
+
+html[data-theme="dark"] a:hover,
+html[data-theme="dark"] a:focus-visible,
+html[data-theme="dark"] a:active {
+	color: var(--site-link-hover);
+}
+
+html[data-theme="dark"] :focus-visible {
+	outline-color: #a9d8f5;
+}
+
+html[data-theme="dark"] hr,
+html[data-theme="dark"] table,
+html[data-theme="dark"] th,
+html[data-theme="dark"] td,
+html[data-theme="dark"] fieldset {
+	border-color: var(--site-border);
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+	background-color: var(--site-surface-raised);
+	border-color: var(--site-control-border);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+	color: var(--site-muted);
+	opacity: 1;
+}
+
+html[data-theme="dark"] body #primary .entry-content button:not(.site-theme-toggle) {
+	background-color: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content button:not(.site-theme-toggle):hover:not(:disabled) {
+	background-color: var(--site-button-hover) !important;
+	border-color: var(--site-button-border) !important;
+}
+
+html[data-theme="dark"] pre,
+html[data-theme="dark"] code,
+html[data-theme="dark"] blockquote {
+	background-color: var(--site-surface-raised);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] .entry-meta,
+html[data-theme="dark"] .entry-meta a,
+html[data-theme="dark"] .comment-meta,
+html[data-theme="dark"] .site-info {
+	color: var(--site-muted);
+}
+
+html[data-theme="dark"] .main-navigation ul ul,
+html[data-theme="dark"] .main-small-navigation .menu,
+html[data-theme="dark"] #main-menu {
+	background-color: var(--site-surface-raised);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] .main-navigation ul ul a,
+html[data-theme="dark"] .main-navigation ul ul a:hover {
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] ::selection {
+	background: #315a73;
+	color: #fff;
+}
+
+
+/*
+ * Dark-mode refinements for the three feature pages whose controls use
+ * page-specific inline colors. Keep these scoped so the light design and
+ * unrelated pages retain their existing styles.
+ */
+
+/* Bookshelf */
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf {
+	background-color: transparent;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf h2,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf h3,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result h3,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-resource h3 {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .bookshelf-intro,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-category-intro,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-descriptions p,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-loading,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-empty {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-controls label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-search-row label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-count,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-page-label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-series,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-period-label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-category-label,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-extras p {
+	color: var(--site-muted) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result {
+	border-bottom-color: var(--site-border) !important;
+	background-color: transparent !important;
+	box-shadow: none !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-book-links a {
+	color: var(--site-link) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf select,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf input {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-search-button,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-pagination button {
+	background-color: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-search-button:hover,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-pagination button:hover:not(:disabled) {
+	background-color: var(--site-button-hover) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-empty,
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-loading {
+	border-bottom-color: var(--site-border) !important;
+}
+
+/* Library Search */
+html[data-theme="dark"] body #primary #digital-library {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary #digital-library h2,
+html[data-theme="dark"] body #primary #digital-library h3,
+html[data-theme="dark"] body #primary #digital-library p,
+html[data-theme="dark"] body #primary #digital-library label,
+html[data-theme="dark"] body #primary #digital-library summary {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary #digital-library #library-search-note,
+html[data-theme="dark"] body #primary #digital-library .library-search-help,
+html[data-theme="dark"] body #primary #digital-library .library-page-kind,
+html[data-theme="dark"] body #primary #digital-library .library-pdf-unavailable {
+	color: var(--site-muted) !important;
+}
+
+/* Keep the search form controls legible even when page-specific rules target individual fields. */
+html[data-theme="dark"] body #primary #digital-library-search input,
+html[data-theme="dark"] body #primary #digital-library-search select,
+html[data-theme="dark"] body #primary #digital-library-search textarea,
+html[data-theme="dark"] body #primary #digital-library-search select option {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary #digital-library input,
+html[data-theme="dark"] body #primary #digital-library select,
+html[data-theme="dark"] body #primary #digital-library textarea {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary #digital-library .library-result {
+	border-bottom-color: var(--site-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary #digital-library .library-result a {
+	color: var(--site-link) !important;
+}
+
+html[data-theme="dark"] body #primary #digital-library .library-original {
+	border-color: var(--site-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary #digital-library mark {
+	background-color: #765f23 !important;
+	color: #fff5d7 !important;
+}
+
+/* Reading Companion */
+html[data-theme="dark"] body #primary #digital-library p:first-of-type:first-letter,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot p:first-of-type:first-letter {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot h2,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot h3,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot p,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot label,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-turn-question {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-hint,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-reader-meta,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-book-search-status,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-key-passage>a,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-source-entry p>a {
+	color: var(--site-muted) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot textarea,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-book-search,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-book-filter,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot select {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-actions button,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot button.companion-inline-read {
+	background-color: #343b43 !important;
+	border-color: #6c7884 !important;
+	color: #f3f5f7 !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-actions button:hover:not(:disabled),
+html[data-theme="dark"] body #primary .entry-content #companion-pilot button.companion-inline-read:hover {
+	background-color: #46515c !important;
+	border-color: var(--site-button-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-status:not(:empty) {
+	background: linear-gradient(135deg, #242b31 0%, #202328 100%) !important;
+	border-color: #46515b !important;
+	border-left-color: #78a8c3 !important;
+	box-shadow: 0 2px 8px rgba(0, 0, 0, .2) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-status:not(:empty)::before {
+	color: #a8c9db !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-status.is-busy::after {
+	border-color: #46515b !important;
+	border-top-color: #a8c9db !important;
+	border-right-color: #78a8c3 !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-actions,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-key-passage,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot #companion-answer,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-highlights,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-citations,
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-source-text {
+	border-color: var(--site-border) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-source-reader {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion-source-text mark.cited-highlight {
+	background-color: #765f23 !important;
+	color: #fff5d7 !important;
+}
+
+/* Blog archive */
+html[data-theme="dark"] body.page-id-372 #primary .entry-content,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content h2,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content h3,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content p,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content label,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-results-count,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-page-label {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content a,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content a:not([aria-current="page"]) {
+	color: var(--site-link) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content a:hover,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content a:focus-visible {
+	color: var(--site-link-hover) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content input,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content select {
+	background-color: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content input::placeholder {
+	color: var(--site-muted) !important;
+	opacity: 1;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-browse {
+	border-color: var(--site-border) !important;
+	background-color: transparent !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content #lcp_instance_0>li,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-pagination {
+	border-color: var(--site-border) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content #lcp_instance_0 .lcp_excerpt p {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-pagination button {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+/*
+ * Keep custom page styles readable in dark mode. Several static pages set
+ * light-theme text and control colors inline, so these scoped overrides win
+ * without changing the default light presentation.
+ */
+html[data-theme="dark"] body #primary .entry-content,
+html[data-theme="dark"] body #primary .entry-content h1,
+html[data-theme="dark"] body #primary .entry-content h2,
+html[data-theme="dark"] body #primary .entry-content h3,
+html[data-theme="dark"] body #primary .entry-content h4,
+html[data-theme="dark"] body #primary .entry-content h5,
+html[data-theme="dark"] body #primary .entry-content h6,
+html[data-theme="dark"] body #primary .entry-content p,
+html[data-theme="dark"] body #primary .entry-content li,
+html[data-theme="dark"] body #primary .entry-content dt,
+html[data-theme="dark"] body #primary .entry-content dd,
+html[data-theme="dark"] body #primary .entry-content label,
+html[data-theme="dark"] body #primary .entry-content legend,
+html[data-theme="dark"] body #primary .entry-content summary,
+html[data-theme="dark"] body #primary .entry-content small,
+html[data-theme="dark"] body #primary .entry-content figcaption {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content a,
+html[data-theme="dark"] body #primary .entry-content a:visited,
+html[data-theme="dark"] body #primary .entry-content a:not([aria-current="page"]) {
+	color: var(--site-link) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content a:hover,
+html[data-theme="dark"] body #primary .entry-content a:focus-visible {
+	color: var(--site-link-hover) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content input,
+html[data-theme="dark"] body #primary .entry-content select,
+html[data-theme="dark"] body #primary .entry-content textarea {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content input::placeholder,
+html[data-theme="dark"] body #primary .entry-content textarea::placeholder {
+	color: var(--site-muted) !important;
+	opacity: 1;
+}
+
+html[data-theme="dark"] body #primary .entry-content input[type="checkbox"],
+html[data-theme="dark"] body #primary .entry-content input[type="radio"] {
+	accent-color: var(--site-link);
+}
+
+html[data-theme="dark"] body #primary .entry-content hr,
+html[data-theme="dark"] body #primary .entry-content table,
+html[data-theme="dark"] body #primary .entry-content th,
+html[data-theme="dark"] body #primary .entry-content td,
+html[data-theme="dark"] body #primary .entry-content fieldset {
+	border-color: var(--site-border) !important;
+}
+
+/* Make embedded share controls and their text fit the same dark palette. */
+html[data-theme="dark"] .sd-sharing,
+html[data-theme="dark"] .sd-sharing .sd-title,
+html[data-theme="dark"] .sd-sharing .sd-content li,
+html[data-theme="dark"] .sd-sharing .sd-content li a:not(.twitter-share-button) {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] .sd-sharing .sd-content ul {
+	list-style: none;
+	padding-left: 0;
+}
+
+html[data-theme="dark"] .sd-sharing .sd-content li {
+	background: transparent !important;
+}
+
+html[data-theme="dark"] .sd-sharing .sd-content li a:not(.twitter-share-button) {
+	background-color: transparent !important;
+	border-color: var(--site-border) !important;
+}
+
+/* Match the homepage random-post button to the shared dark button style. */
+html[data-theme="dark"] body #primary .entry-content #surprise-me-home-button {
+	background: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content #surprise-me-home-button:hover:not(:disabled) {
+	background: var(--site-button-hover) !important;
+}
+
+/* Match the Library Search action to the shared outlined button style. */
+html[data-theme="dark"] body #primary #digital-library .entry-content #digital-library-search #library-search-button {
+	background: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body #primary #digital-library .entry-content #digital-library-search #library-search-button:hover:not(:disabled) {
+	background: var(--site-button-hover) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content p::first-letter {
+	color: inherit !important;
+}
+
+/* Apply the same outlined button treatment to controls outside page-specific wrappers too. */
+html[data-theme="dark"] button:not(.site-theme-toggle) {
+	background-color: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] button:not(.site-theme-toggle):hover:not(:disabled) {
+	background-color: var(--site-button-hover) !important;
+	border-color: var(--site-button-border) !important;
+}
+
+html[data-theme="dark"] body #primary .entry-content span,
+html[data-theme="dark"] body #primary .entry-content strong,
+html[data-theme="dark"] body #primary .entry-content em,
+html[data-theme="dark"] body #primary .entry-content b,
+html[data-theme="dark"] body #primary .entry-content i {
+	color: var(--site-text) !important;
+}
+
+
+/* Final dark-mode details from visual review */
+html[data-theme="dark"] #masthead .site-title a,
+html[data-theme="dark"] #masthead .site-title a:visited,
+html[data-theme="dark"] #masthead .site-title a:hover {
+	color: var(--site-text) !important;
+}
+
+/* The Book Lite divider is a dark raster image; use it as a mask so it can
+   take the theme border color without changing the light theme asset. */
+html[data-theme="dark"] #secondary {
+	background-image: none !important;
+	position: relative;
+}
+html[data-theme="dark"] #secondary::before {
+	background-color: var(--site-border);
+	content: "";
+	height: 10px;
+	left: 50%;
+	mask: url("/antilogicalism/wp-content/themes/book-lite/images/header-divider-2x.png") center / 50px 10px no-repeat;
+	-webkit-mask: url("/antilogicalism/wp-content/themes/book-lite/images/header-divider-2x.png") center / 50px 10px no-repeat;
+	pointer-events: none;
+	position: absolute;
+	top: 0;
+	transform: translateX(-50%);
+	width: 50px;
+}
+
+/* Preserve muted paragraphs such as Library Search notes and Reading
+   Companion status text while keeping real drop caps readable by inheritance. */
+html[data-theme="dark"] body #primary .entry-content p::first-letter {
+	color: inherit !important;
+}
+
+/* Keep the native social widgets clipped to the dark share row so their
+   transparent iframe corners do not reveal a white rectangle. */
+html[data-theme="dark"] .sd-sharing .share-facebook,
+html[data-theme="dark"] .sd-sharing .share-twitter {
+	background: var(--site-button-bg) !important;
+	border-radius: 4px;
+	overflow: hidden;
+}
+html[data-theme="dark"] .sd-sharing .share-facebook iframe,
+html[data-theme="dark"] .sd-sharing .share-twitter iframe {
+	background: transparent !important;
+	border: 0 !important;
+	border-radius: 4px;
+	vertical-align: top;
+}
+
+/* The RSS mark is intentionally kept in its familiar orange and white colors.
+   A subtle edge helps the small icon read against both dark footer columns. */
+html[data-theme="dark"] #secondary .rss-widget-icon {
+	filter: drop-shadow(0 0 1px rgba(230, 237, 243, .3));
+}
+
+/* Recolor the small ornamental break used after each article. */
+html[data-theme="dark"] article {
+	background-image: none !important;
+	position: relative;
+}
+html[data-theme="dark"] article::after {
+	background-color: var(--site-border);
+	bottom: 0;
+	content: "";
+	height: 10px;
+	left: 50%;
+	mask: url("/antilogicalism/wp-content/themes/book-lite/images/break-2x.png") center / 125px 10px no-repeat;
+	-webkit-mask: url("/antilogicalism/wp-content/themes/book-lite/images/break-2x.png") center / 125px 10px no-repeat;
+	pointer-events: none;
+	position: absolute;
+	transform: translateX(-50%);
+	width: 125px;
+}
+
+
+/* Keep every native dropdown, including its opened option list, readable. */
+html[data-theme="dark"] body select,
+html[data-theme="dark"] body select option,
+html[data-theme="dark"] body select optgroup,
+html[data-theme="dark"] body #primary #digital-library-search select option,
+html[data-theme="dark"] body #primary #digital-library select option,
+html[data-theme="dark"] body #primary #companion-pilot select option,
+html[data-theme="dark"] body #primary #master-bookshelf select option,
+html[data-theme="dark"] body.page-id-372 #primary select option {
+	background-color: var(--site-surface-raised) !important;
+	color: var(--site-text) !important;
+	color-scheme: dark;
+}
+
+/* The static title index uses <cite> elements with a light-theme black rule. */
+html[data-theme="dark"] body #primary #book-title-index cite {
+	color: var(--site-text) !important;
+}
+
+/* Clip the X widget's embedded white iframe corners against the dark share row. */
+html[data-theme="dark"] .sd-sharing .share-twitter iframe {
+	clip-path: inset(0 round 5px);
+	-webkit-clip-path: inset(0 round 5px);
+}
+
+
+/* Loading/status labels inherit their intentionally muted parent color. */
+html[data-theme="dark"] body #primary #companion-pilot .companion-question-form p:first-of-type::first-letter {
+	color: inherit !important;
+}
+
+
+html[data-theme="dark"] body #primary #companion-pilot #companion-book-search-status::first-letter {
+	color: inherit !important;
+}
+
+
+html[data-theme="dark"] body #primary #digital-library p.library-search-help::first-letter {
+	color: inherit !important;
+}
+
+
+/* Render the first-party X share link in dark mode instead of the provider's
+   iframe, whose rounded corners remain white inside its cross-origin frame. */
+html[data-theme="dark"] .sd-sharing .share-twitter iframe,
+html[data-theme="dark"] .sd-sharing .share-twitter > a.twitter-share-button {
+	display: none !important;
+}
+html[data-theme="dark"] .sd-sharing .share-twitter > a.site-dark-x-share {
+	align-items: center;
+	background: var(--site-button-bg) !important;
+	border: 1px solid var(--site-button-border) !important;
+	border-radius: 4px !important;
+	box-sizing: border-box;
+	color: var(--site-text) !important;
+	display: inline-flex !important;
+	font: 13px/18px Arial, sans-serif;
+	height: 22px;
+	padding: 1px 8px;
+	text-decoration: none !important;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+html[data-theme="dark"] .sd-sharing .share-twitter > a.site-dark-x-share:hover,
+html[data-theme="dark"] .sd-sharing .share-twitter > a.site-dark-x-share:focus-visible {
+	background: var(--site-button-hover) !important;
+	border-color: var(--site-button-border) !important;
+	color: var(--site-text) !important;
+}
+
+
+/* Preserve the Bookshelf's small-caps category style and keep the initial
+   explicitly matched to the rest of each label. */
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-category-label {
+	color: var(--site-muted) !important;
+	font-variant: small-caps !important;
+}
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-category-label::first-letter {
+	color: var(--site-muted) !important;
+	font-variant: small-caps !important;
+}
+
+/* Give the dark-mode X share control enough contrast to read as a button. */
+html[data-theme="dark"] body #primary .entry-content .sd-sharing .share-twitter > a.site-dark-x-share {
+	background-color: #30363d !important;
+	border: 1px solid #8b949e !important;
+	color: #f0f6fc !important;
+	font-weight: 600;
+	min-height: 24px;
+	padding-left: 10px;
+	padding-right: 10px;
+}
+html[data-theme="dark"] body #primary .entry-content .sd-sharing .share-twitter > a.site-dark-x-share:hover,
+html[data-theme="dark"] body #primary .entry-content .sd-sharing .share-twitter > a.site-dark-x-share:focus-visible {
+	background-color: #3d444d !important;
+	border-color: #c9d1d9 !important;
+	color: #fff !important;
+}
+
+
+/* The X iframe is hidden in dark mode, so let its replacement link define
+   the share row height instead of clipping it to the old iframe's dimensions. */
+html[data-theme="dark"] body #primary .entry-content .sd-sharing .share-twitter {
+	align-items: center;
+	height: auto !important;
+	min-height: 26px;
+	overflow: visible !important;
+}
+
+
+/* Keep the Facebook and X controls the same visual height in dark mode.
+   The Facebook iframe renders at 20px; match the first-party X link to it. */
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-facebook,
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-twitter {
+	align-items: center;
+	height: auto !important;
+	min-height: 26px;
+}
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-facebook {
+	overflow: hidden !important;
+}
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-facebook .fb-share-button {
+	height: 20px !important;
+}
+html[data-theme="dark"] body #primary .entry-content .sd-sharing li.share-twitter > a.site-dark-x-share {
+	height: 20px !important;
+	line-height: 16px;
+	min-height: 20px !important;
+	padding-bottom: 0;
+	padding-top: 0;
+}
+
+/* Make the lower-page separator ornaments clearer against the dark surface. */
+html[data-theme="dark"] #secondary::before,
+html[data-theme="dark"] article::after {
+	background-color: #484f58;
+}
+
+/* Bookshelf author cards keep their thin rule, without the centered ornament. */
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-result::after {
+	display: none !important;
+}
+
+
+/* Match the separator between an author's book groups to the author divider
+   in dark mode; the bookshelf script gives these groups a light inline border. */
+html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-work-group {
+	border-color: var(--site-border) !important;
+}
