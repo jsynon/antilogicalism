@@ -2136,3 +2136,8 @@ html[data-theme="dark"] body #primary #companion-pilot .companion-question-form 
 html[data-theme="dark"] body #primary #companion-pilot #companion-book-search-status::first-letter {
 	color: inherit !important;
 }
+
+
+html[data-theme="dark"] body #primary #digital-library p.library-search-help::first-letter {
+	color: inherit !important;
+}
