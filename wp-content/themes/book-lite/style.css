@@ -1827,3 +1827,56 @@ html[data-theme="dark"] body #primary .entry-content #companion-pilot .companion
 	background-color: #765f23 !important;
 	color: #fff5d7 !important;
 }
+
+/* Blog archive */
+html[data-theme="dark"] body.page-id-372 #primary .entry-content,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content h2,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content h3,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content p,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content label,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-results-count,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-page-label {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content a,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content a:not([aria-current="page"]) {
+	color: var(--site-link) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content a:hover,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content a:focus-visible {
+	color: var(--site-link-hover) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content input,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content select {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content input::placeholder {
+	color: var(--site-muted) !important;
+	opacity: 1;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-browse {
+	border-color: var(--site-border) !important;
+	background-color: transparent !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content #lcp_instance_0>li,
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-pagination {
+	border-color: var(--site-border) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content #lcp_instance_0 .lcp_excerpt p {
+	color: var(--site-text) !important;
+}
+
+html[data-theme="dark"] body.page-id-372 #primary .entry-content .archive-pagination button {
+	background-color: var(--site-surface-raised) !important;
+	border-color: var(--site-control-border) !important;
+	color: var(--site-text) !important;
+}
