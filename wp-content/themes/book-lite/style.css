@@ -1416,3 +1416,59 @@ html,
 body {
     max-width: 100%;
 }
+
+
+/* Persistent theme control: independent of the page links and mobile menu state. */
+.site-navigation {
+	position: relative;
+}
+
+.site-theme-toggle {
+	align-items: center;
+	background: rgba(0, 0, 0, .35);
+	border: 1px solid rgba(255, 255, 255, .55);
+	border-radius: 50%;
+	box-sizing: border-box;
+	color: #fff;
+	cursor: pointer;
+	display: inline-flex;
+	height: 44px;
+	justify-content: center;
+	padding: 10px;
+	position: absolute;
+	right: max(1rem, calc((100vw - 750px) / 2));
+	top: 50%;
+	transform: translateY(-50%);
+	width: 44px;
+	z-index: 100000;
+}
+
+.site-theme-toggle svg {
+	fill: none;
+	height: 20px;
+	stroke: currentColor;
+	stroke-linecap: round;
+	stroke-linejoin: round;
+	stroke-width: 1.8;
+	width: 20px;
+}
+
+.site-theme-toggle:hover,
+.site-theme-toggle:focus-visible {
+	background: rgba(255, 255, 255, .18);
+	border-color: #fff;
+	color: #fff;
+}
+
+.site-theme-toggle:focus-visible {
+	outline: 3px solid #fff;
+	outline-offset: 3px;
+}
+
+@media (max-width: 600px) {
+	.site-theme-toggle {
+		right: .5rem;
+		top: 0;
+		transform: none;
+	}
+}
