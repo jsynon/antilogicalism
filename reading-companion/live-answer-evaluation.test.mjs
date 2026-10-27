@@ -323,6 +323,33 @@ test('citation highlight coverage is reported separately from structural answer 
  assert.equal(withHighlight.structuralPassed,true);
 });
 
+test('highlight relevance audit pairs each exact excerpt with answer sentences by citation without scoring support',()=>{
+ const citations=[
+  {id:'S1',bookId:'140',title:'Fear and Trembling',page:40},
+  {id:'S2',bookId:'192',title:'Philosophical Fragments',page:51}
+ ];
+ const result=auditLiveAnswer({coverage:'full',answer:
+  'Johannes de Silentio presents faith as a paradox [S1]. Kierkegaard describes the relation to God as inwardness [S2].',
+  citations,questionParts:[],evidenceHighlights:[
+   {source_id:'S1',page:40,quote:'A verified excerpt about Abraham and the paradox of faith.',
+    quoteLocated:true,quotes:[{claim_id:'P1-C1',part_id:'P1',point:'Faith is presented as a paradox.',
+     quote:'A verified excerpt about Abraham and the paradox of faith.',quoteLocated:true}]},
+   {source_id:'S2',page:51,quote:'A second verified excerpt.',quoteLocated:true,
+    quotes:[{claim_id:'P1-C2',part_id:'P1',point:'The individual relates inwardly to God.',
+     quote:'A second verified excerpt.',quoteLocated:true}]}
+  ]},[{bookId:'140',page:40},{bookId:'192',page:51}],[]);
+ const audit=result.highlightRelevance;
+ assert.equal(audit.method,'inspection-only');
+ assert.equal(audit.linkage,'shared-citation-source-id');
+ assert.equal(audit.semanticRelevanceScored,false);
+ assert.deepEqual(audit.answerSentences.map(item=>[item.index,item.sourceIds]),[[1,['S1']],[2,['S2']]]);
+ assert.deepEqual(audit.excerpts.map(item=>[
+  item.sourceId,item.claimId,item.partId,item.answerSentenceIndexes,item.quoteLocated
+ ]),[['S1','P1-C1','P1',[1],true],['S2','P1-C2','P1',[2],true]]);
+ assert.equal(result.structuralPassed,true,
+  'the inspection packet is diagnostic and cannot change the structural verdict');
+});
+
 test('review truncation reason remains visible in the saved answer audit',()=>{
  const result=auditLiveAnswer({outcome:'unverified-source-draft',coverage:'partial',
   reviewStatus:'review-format-failed',failureCode:'review-output-truncated',failureStage:'review',
@@ -490,10 +517,17 @@ test('offline report recheck recognizes paired scope rows by their shared questi
   submittedSources:[{bookId:'35',page:1},{bookId:'40',page:1}],
   evidenceMap:[{id:'S1',partId:'P1',quote:'a sufficiently long reviewed source span'},
    {id:'S2',partId:'P2',quote:'another sufficiently long reviewed source span'}],
+  evidenceHighlights:[{source_id:'S1',page:1,quote:'A verified Hume passage excerpt.',quoteLocated:true,
+   quotes:[{claim_id:'P1-C1',part_id:'P1',point:'Hume argues from custom.',
+    quote:'A verified Hume passage excerpt.',quoteLocated:true}]}],
   questionParts:[{part:'Hume account',status:'supported',evidenceIds:['S1']},
    {part:'Kant account',status:'supported',evidenceIds:['S2']}]
  }]});
  assert.equal(checked.cases[0].offlineRecheck.passed,true);
+ assert.deepEqual(checked.cases[0].offlineRecheck.highlightRelevance.excerpts.map(item=>[
+  item.sourceId,item.answerSentenceIndexes
+ ]),[['S1',[1]]],
+  'a saved report can get the inspection packet during offline recheck, without another Worker request');
  assert.equal(checked.offlineRecheck.checkedCases,1);
 });
 
