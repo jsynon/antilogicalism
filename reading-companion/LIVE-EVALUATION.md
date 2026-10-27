@@ -225,3 +225,15 @@ Run [#40446494819](https://github.com/jsynon/antilogicalism/actions/runs/4044649
 The new trace separates the reviewer’s original part status from the final Worker status. In four incomplete parts the reviewer said `answered`, but the Worker correctly kept the part partial after one or more nominated direct claims failed exact source review: Hume/Kant All Books P3, Wollstonecraft Selected Books P1, and both Boethius All Books parts. Wollstonecraft All Books had a separate malformed-JSON reviewer response and correctly remained unverified with no highlights.
 
 The previous Hamlet All Books failure did not recur: both scopes passed with a Shakespeare p. 454 citation and a located highlight. The planner now split the question into two parts, unlike the one-part run #8 plan, so this is promising but not a like-for-like reproduction. The overall score remained 6/10, with the All/Selected split reversing from 4/5–2/5 in run #8 to 2/5–4/5 in run #9. The changing planner decomposition and pending human scores mean this does not establish a general quality improvement. Keep the acceptance set frozen.
+
+## October 27, 2026: run #24 passage-gold replay
+
+Run #24's three manually inspected traces now have a compact gold annotation in `passage-review-gold.json`. The no-AI audit compares the candidate pool with the submitted packet, then checks claim-linked highlights and whether the review-stage status matches the final returned part status. It labels alternatives as best/tied, acceptable, context-only, or reject. “Best” is bounded to this run's captured candidates, not the entire library.
+
+Run the existing offline recheck on the extracted report JSON:
+
+```sh
+node reading-companion/recheck-live-answer-evaluation.mjs --input path/to/report.json
+```
+
+The output JSON includes `offlinePassageReview`. Its counts are diagnostics, not a semantic score or a live workflow gate. No model or network call is made.

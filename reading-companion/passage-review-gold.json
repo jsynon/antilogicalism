@@ -1,0 +1,213 @@
+{
+  "schema": "antilogicalism-reading-companion-passage-gold-v1",
+  "sourceRun": {
+    "repository": "jsynon/antilogicalism",
+    "runId": 40580563553,
+    "clientRevision": "579cf50594c5770d38e9fe0968d780809e7679b1",
+    "workerRevision": "8e04d7a2f49ff2338bacf2e8905268977d5165a8",
+    "libraryVersion": 48,
+    "scope": "best means best among the candidates captured in this run, not across the full library"
+  },
+  "cases": [
+    {
+      "id": "paired-hamlet-conscience::all-books",
+      "claims": [
+        {
+          "claimId": "P1-C1",
+          "partId": "P1",
+          "requestedClaim": "Interpret conscience in Hamlet's To be or not to be soliloquy.",
+          "passages": [
+            {
+              "bookId": "564",
+              "page": 152,
+              "globalPageId": 241919,
+              "label": "best",
+              "reason": "Primary Shakespeare text gives the soliloquy's death, deliberation, and resolution context. The printed page is 454 in the source PDF."
+            },
+            {
+              "bookId": "212",
+              "page": 1625,
+              "globalPageId": 53546,
+              "label": "reject",
+              "reason": "A different scene; keyword overlap does not make it evidence for the soliloquy."
+            },
+            {
+              "bookId": "230",
+              "page": 43,
+              "globalPageId": 68563,
+              "label": "context-only",
+              "reason": "Tillich's commentary discusses the soliloquy but is not Shakespeare's primary text."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "paired-boethius-fortune-wheel::all-books",
+      "claims": [
+        {
+          "claimId": "P1-C2",
+          "partId": "P1",
+          "requestedClaim": "Explain Fortune's characteristic instability.",
+          "passages": [
+            {
+              "bookId": "21",
+              "page": 11,
+              "globalPageId": 1912,
+              "label": "best",
+              "reason": "Fortune directly describes her changing wheel and unchanging sport."
+            },
+            {
+              "bookId": "21",
+              "page": 12,
+              "globalPageId": 1913,
+              "label": "acceptable",
+              "reason": "Supports the law of change and the natural-world analogy."
+            }
+          ]
+        },
+        {
+          "claimId": "P2-C2",
+          "partId": "P2",
+          "requestedClaim": "Explain what Fortune's gifts reveal about happiness.",
+          "passages": [
+            {
+              "bookId": "21",
+              "page": 14,
+              "globalPageId": 1915,
+              "label": "best",
+              "reason": "Directly connects chance, loss, the highest good, happiness, and the limits of riches."
+            },
+            {
+              "bookId": "21",
+              "page": 11,
+              "globalPageId": 1912,
+              "label": "acceptable",
+              "reason": "Directly establishes that wealth and honors are Fortune's handmaids that come and go, but does not establish the full happiness inference alone."
+            },
+            {
+              "bookId": "21",
+              "page": 38,
+              "globalPageId": 1939,
+              "label": "context-only",
+              "reason": "Discusses divine goodness and happiness, but is less direct for the question about Fortune's gifts."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "paired-hume-kant-causal-inference::selected-books",
+      "claims": [
+        {
+          "claimId": "P1-C1",
+          "partId": "P1",
+          "requestedClaim": "Hume's custom-based inference from cause to effect.",
+          "passages": [
+            {
+              "bookId": "35",
+              "page": 24,
+              "globalPageId": 2719,
+              "label": "best",
+              "reason": "Directly states that inferences from experience arise from custom rather than reasoning."
+            },
+            {
+              "bookId": "35",
+              "page": 39,
+              "globalPageId": 2734,
+              "label": "acceptable",
+              "reason": "Adds the customary transition from cause to effect after repeated conjunction."
+            }
+          ]
+        },
+        {
+          "claimId": "P2-C2",
+          "partId": "P2",
+          "requestedClaim": "Kant's role for causality in objective experience.",
+          "passages": [
+            {
+              "bookId": "40",
+              "page": 103,
+              "globalPageId": 3191,
+              "label": "best",
+              "reason": "Directly calls causality the principle and ground of possible experience and objective cognition."
+            },
+            {
+              "bookId": "40",
+              "page": 104,
+              "globalPageId": 3192,
+              "label": "acceptable",
+              "reason": "Directly connects causal relations to objective validity and empirical truth of judgments."
+            },
+            {
+              "bookId": "40",
+              "page": 213,
+              "globalPageId": 3301,
+              "label": "context-only",
+              "reason": "States the universal causal law in a discussion of cosmological freedom; it is not the most direct passage for causality's role in experience."
+            }
+          ]
+        },
+        {
+          "claimId": "P3-C2",
+          "partId": "P3",
+          "requestedClaim": "Compare Kant's account of causality with Hume's account.",
+          "passages": [
+            {
+              "bookId": "35",
+              "page": 24,
+              "globalPageId": 2719,
+              "label": "best",
+              "reason": "Directly grounds Hume's account in custom rather than reasoning."
+            },
+            {
+              "bookId": "35",
+              "page": 39,
+              "globalPageId": 2734,
+              "label": "acceptable",
+              "reason": "Adds Hume's account of repeated conjunction and customary transition."
+            },
+            {
+              "bookId": "40",
+              "page": 103,
+              "globalPageId": 3191,
+              "label": "best",
+              "reason": "Directly establishes Kant's account of causality as a condition of possible experience."
+            },
+            {
+              "bookId": "40",
+              "page": 104,
+              "globalPageId": 3192,
+              "label": "acceptable",
+              "reason": "Supports the objective-validity side of the comparison."
+            },
+            {
+              "bookId": "40",
+              "page": 213,
+              "globalPageId": 3301,
+              "label": "context-only",
+              "reason": "The causal law is embedded in the cosmological-freedom discussion, so pages 103–104 are more direct for this comparison."
+            }
+          ]
+        }
+      ],
+      "partStatusChecks": [
+        {
+          "partId": "P1",
+          "reviewFinalStatus": "partial",
+          "returnedStatus": "partial"
+        },
+        {
+          "partId": "P2",
+          "reviewFinalStatus": "answered",
+          "returnedStatus": "supported"
+        },
+        {
+          "partId": "P3",
+          "reviewFinalStatus": "answered",
+          "returnedStatus": "partial"
+        }
+      ]
+    }
+  ]
+}
