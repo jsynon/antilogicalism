@@ -1436,7 +1436,7 @@ body {
 	justify-content: center;
 	padding: 7px;
 	position: absolute;
-	right: max(1.5rem, calc((100vw - 750px) / 2 - 8.5rem));
+	right: max(1.5rem, calc((100vw - 750px) / 2 - 11rem));
 	top: 50%;
 	transform: translateY(-50%);
 	width: 34px;
@@ -1589,9 +1589,14 @@ html[data-theme="dark"] body #primary .entry-content button:not(.site-theme-togg
 }
 
 html[data-theme="dark"] pre,
-html[data-theme="dark"] code,
-html[data-theme="dark"] blockquote {
+html[data-theme="dark"] code {
 	background-color: var(--site-surface-raised);
+	color: var(--site-text);
+}
+
+/* Article quotations sit on the same page surface as the surrounding text. */
+html[data-theme="dark"] blockquote {
+	background-color: var(--site-page-bg) !important;
 	color: var(--site-text);
 }
 
@@ -2249,4 +2254,51 @@ html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-r
    in dark mode; the bookshelf script gives these groups a light inline border. */
 html[data-theme="dark"] body #primary .entry-content #master-bookshelf .master-work-group {
 	border-color: var(--site-border) !important;
+}
+
+
+/* Keep share controls clear of missing external icon fonts. */
+.sd-sharing .share-email > a::before,
+.sd-sharing .share-print > a::before {
+	content: none !important;
+	display: none !important;
+}
+.sd-sharing .site-share-icon {
+	flex: 0 0 14px;
+	height: 14px;
+	margin-right: 5px;
+	width: 14px;
+}
+
+/* First-party Facebook sharing avoids the white edge in its cross-origin iframe. */
+html[data-theme="dark"] .sd-sharing .share-facebook iframe,
+html[data-theme="dark"] .sd-sharing .share-facebook .fb-share-button {
+	display: none !important;
+}
+html[data-theme="dark"] .sd-sharing .share-facebook > a.site-dark-facebook-share {
+	align-items: center;
+	background: #1877f2 !important;
+	border: 1px solid #1877f2 !important;
+	border-radius: 4px !important;
+	box-sizing: border-box;
+	color: #fff !important;
+	display: inline-flex !important;
+	font: 600 12px/18px Arial, sans-serif;
+	height: 20px;
+	padding: 0 7px;
+	text-decoration: none !important;
+	vertical-align: middle;
+	white-space: nowrap;
+}
+html[data-theme="dark"] .sd-sharing .share-facebook > a.site-dark-facebook-share:hover,
+html[data-theme="dark"] .sd-sharing .share-facebook > a.site-dark-facebook-share:focus-visible {
+	background: #0f65d5 !important;
+	border-color: #0f65d5 !important;
+	color: #fff !important;
+}
+html[data-theme="dark"] .sd-sharing .share-facebook > a.site-dark-facebook-share .site-share-icon {
+	fill: currentColor;
+	height: 14px;
+	margin-right: 4px;
+	width: 14px;
 }

@@ -67,11 +67,54 @@ jQuery( document ).ready( function( $ ) {
 	var $masthead = $( '#masthead' ),
 	    timeout = false;
 
-	// X's hosted share iframe draws white pixels in its rounded corners. In
-	// dark mode, replace its visible control with a matching first-party link;
-	// keep the original widget intact so light mode remains unchanged.
+	// Provider share iframes can retain light pixels at their edges in dark
+	// mode. Use first-party links there, while restoring the original widgets
+	// in light mode. Add utility icons as inline SVGs so no remote icon font is
+	// needed for Email or Print.
 	function syncDarkShareButtons() {
 		var isDark = document.documentElement.getAttribute( 'data-theme' ) === 'dark';
+
+		$( '.sd-sharing li.share-facebook' ).each( function() {
+			var $item = $( this ),
+			    $darkLink = $item.children( '.site-dark-facebook-share' ),
+			    $widget = $item.children( '.fb-share-button' );
+
+			if ( ! isDark ) {
+				$darkLink.remove();
+				$widget.removeAttr( 'aria-hidden tabindex' ).show();
+				return;
+			}
+
+			var url = $widget.attr( 'data-href' ) || window.location.href,
+			    intent = 'https://www.facebook.com/sharer/sharer.php?u=' + encodeURIComponent( url );
+
+			if ( ! $darkLink.length ) {
+				$darkLink = $( '<a>', {
+					'class': 'site-dark-facebook-share',
+					'href': intent,
+					'target': '_blank',
+					'rel': 'noopener noreferrer',
+					'aria-label': 'Share this page on Facebook'
+				} ).html( '<svg class="site-share-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M13.2 21v-8h2.7l.4-3.1h-3.1v-2c0-.9.3-1.5 1.6-1.5h1.7V3.6c-.3 0-1.4-.1-2.6-.1-2.6 0-4.4 1.6-4.4 4.5v1.9h-3V13h3v8z"></path></svg><span>Share</span>' );
+				$item.append( $darkLink );
+			} else {
+				$darkLink.attr( 'href', intent );
+			}
+
+			$widget.attr( 'aria-hidden', 'true' ).attr( 'tabindex', '-1' ).hide();
+			$darkLink.show();
+		} );
+
+		$( '.sd-sharing li.share-email > a, .sd-sharing li.share-print > a' ).each( function() {
+			var $link = $( this );
+			if ( $link.children( '.site-share-icon' ).length )
+				return;
+
+			var icon = $link.closest( 'li' ).hasClass( 'share-email' )
+				? '<svg class="site-share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><rect x="3" y="5" width="18" height="14" rx="2"></rect><path d="m4 7 8 6 8-6"></path></svg>'
+				: '<svg class="site-share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false"><path d="M6 9V3h12v6"></path><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="7"></rect><path d="M18 12h.01"></path></svg>';
+			$link.prepend( icon );
+		} );
 
 		$( '.sd-sharing li.share-twitter' ).each( function() {
 			var $item = $( this ),
