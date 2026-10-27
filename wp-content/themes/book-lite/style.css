@@ -1472,3 +1472,124 @@ body {
 		transform: none;
 	}
 }
+
+/*
+ * Shared dark palette for the site-wide theme.
+ * Page-specific tools may refine these surface and control colors below.
+ */
+html[data-theme="dark"] {
+	color-scheme: dark;
+	--site-page-bg: #17191d;
+	--site-surface: #202328;
+	--site-surface-raised: #292e34;
+	--site-text: #e5e4e0;
+	--site-muted: #b7bdc4;
+	--site-link: #8fc7ee;
+	--site-link-hover: #c1e4fa;
+	--site-border: #454c54;
+	--site-control-border: #626b75;
+}
+
+html[data-theme="light"] {
+	color-scheme: light;
+}
+
+html[data-theme="dark"] body {
+	background-color: var(--site-page-bg);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] #main,
+html[data-theme="dark"] #colophon,
+html[data-theme="dark"] body.custom-background #main,
+html[data-theme="dark"] body.custom-background #colophon {
+	background-color: var(--site-surface);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] h1,
+html[data-theme="dark"] h2,
+html[data-theme="dark"] h3,
+html[data-theme="dark"] h4,
+html[data-theme="dark"] h5,
+html[data-theme="dark"] h6,
+html[data-theme="dark"] p,
+html[data-theme="dark"] li,
+html[data-theme="dark"] dt,
+html[data-theme="dark"] dd,
+html[data-theme="dark"] blockquote,
+html[data-theme="dark"] figcaption {
+	color: inherit;
+}
+
+html[data-theme="dark"] a,
+html[data-theme="dark"] a:visited {
+	color: var(--site-link);
+}
+
+html[data-theme="dark"] a:hover,
+html[data-theme="dark"] a:focus-visible,
+html[data-theme="dark"] a:active {
+	color: var(--site-link-hover);
+}
+
+html[data-theme="dark"] :focus-visible {
+	outline-color: #a9d8f5;
+}
+
+html[data-theme="dark"] hr,
+html[data-theme="dark"] table,
+html[data-theme="dark"] th,
+html[data-theme="dark"] td,
+html[data-theme="dark"] fieldset {
+	border-color: var(--site-border);
+}
+
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+	background-color: var(--site-surface-raised);
+	border-color: var(--site-control-border);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+	color: var(--site-muted);
+	opacity: 1;
+}
+
+html[data-theme="dark"] button {
+	border-color: var(--site-control-border);
+}
+
+html[data-theme="dark"] pre,
+html[data-theme="dark"] code,
+html[data-theme="dark"] blockquote {
+	background-color: var(--site-surface-raised);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] .entry-meta,
+html[data-theme="dark"] .entry-meta a,
+html[data-theme="dark"] .comment-meta,
+html[data-theme="dark"] .site-info {
+	color: var(--site-muted);
+}
+
+html[data-theme="dark"] .main-navigation ul ul,
+html[data-theme="dark"] .main-small-navigation .menu,
+html[data-theme="dark"] #main-menu {
+	background-color: var(--site-surface-raised);
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] .main-navigation ul ul a,
+html[data-theme="dark"] .main-navigation ul ul a:hover {
+	color: var(--site-text);
+}
+
+html[data-theme="dark"] ::selection {
+	background: #315a73;
+	color: #fff;
+}
