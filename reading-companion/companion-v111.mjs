@@ -4,7 +4,7 @@
  * fingerprints before any inference. The verified scope comes from the
  * owner-published cohort manifest; expanding it does not change v48 OCR.
  */
-import {RemoteLibrary} from './remote-library.mjs';
+import {filterEvidenceExcerptArtifacts,RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
 import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence} from './evidence-search.mjs';
@@ -416,7 +416,7 @@ function renderResponse(data,turnQuestion=''){
   const answer=String(data.answer||'');
   const numbering=buildCitationNumbering(answer,citations);
   const orderedCitations=sortCitationsByNumber(citations,numbering);
-  const highlights=Array.isArray(data.evidenceHighlights)?data.evidenceHighlights:[];
+  const highlights=filterEvidenceExcerptArtifacts(data.evidenceHighlights,citations);
   turn.append(node('h2',data.outcome==='insufficient-evidence'?
     'Insufficient evidence':'Reading Companion answer'));
   const reply=node('div',undefined,'companion-answer-text');
