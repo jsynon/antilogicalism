@@ -139,6 +139,11 @@ test('paired new-question suite keeps its own five cases and gives each a publis
   'paired-dubois-double-consciousness','paired-boethius-fortune-wheel','paired-hamlet-conscience'
  ]);
  assert.ok(paired.every(item=>item.planner_queries.length>=2&&item.review_focus.length>=2));
+ const humeKant=paired.find(item=>item.id==='paired-hume-kant-causal-inference');
+ assert.match(humeKant.question,/An Enquiry Concerning Human Understanding/);
+ assert.match(humeKant.question,/Critique of Pure Reason/);
+ assert.deepEqual(humeKant.selected_book_ids,['35','40'],
+  'both scope modes should be evaluated against the same explicitly named source works');
  assert.ok(evaluationUsesLivePlanner('paired','paired'));
  assert.equal(selectLiveCases({cases:[]},'paired','paired-dubois-double-consciousness').length,1);
  assert.throws(()=>selectLiveCases({cases:[]},'paired','focused-sunyata'),/Unknown paired case/);
