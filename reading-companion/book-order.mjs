@@ -51,7 +51,7 @@ function collectionVolume(title){
       .match(/\b(?:volume|vol\.?)\s*(\d+|[ivxlcdm]+)\b/i);
     if(volume){
       const number=volumeNumber(volume[1]);
-      if(number!==null)return {name:series.name,volume:number};
+      if(number!==null)return {name:series.name,volume:number,collection:true};
     }
   }
   // Also group ordinary multi-volume and multi-book titles such as
@@ -72,13 +72,13 @@ export function sortBooksForSelector(books){
     const series=collectionVolume(book.title);
     if(!series){entries.push({kind:'book',book,author:authorName(book.title)});continue;}
     const key=normalized(series.name);
-    if(!groups.has(key))groups.set(key,{kind:'collection',name:series.name,books:[]});
+    if(!groups.has(key))groups.set(key,{kind:'collection',name:series.name,books:[],collection:series.collection===true});
     groups.get(key).books.push({...book,collectionVolume:series.volume});
   }
   for(const group of groups.values()){
     group.books.sort((a,b)=>a.collectionVolume-b.collectionVolume||compareBookTitle(a,b));
     const first=group.books[0];
-    group.author=authorName(first.title)||group.name;
+    group.author=group.collection?group.name:(authorName(first.title)||group.name);
     entries.push(group);
   }
   entries.sort((a,b)=>{
