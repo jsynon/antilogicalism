@@ -408,7 +408,7 @@ test('author-only mentions search across the named author’s catalog works',()=
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,directFallbackQueries,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence} from './evidence-search.mjs';
 import {catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
 import {sourceAttributionLabel} from './citation-numbering.mjs';
 
@@ -635,6 +635,68 @@ test('scripture references retain the exact question under the same general rule
  const question='According to 1 John 4:7–12, what does “God is love” say about loving one another?';
  assert.deepEqual(buildSearchFacets(question,plan),[...plan,question]);
  assert.deepEqual(buildSearchFacets(question,plan,'638'),[...plan,question]);
+});
+
+test('planner fallback adds a bounded Bible facet for God is love only in All Books scope',()=>{
+ const question='What does “God is love” mean?';
+ assert.deepEqual(directFallbackQueries(question),[
+  '1 John 4:7-12 God is love and love one another',question]);
+ assert.deepEqual(directFallbackQueries(question,{selectedBookIds:['427']}),[question],
+  'Selected Books fallback must stay within the reader’s exact book scope');
+ assert.deepEqual(directFallbackQueries(
+  'According to 1 John 4:7–12, what does “God is love” mean?'),
+  ['According to 1 John 4:7–12, what does “God is love” mean?'],
+  'an explicit scripture reference already supplies the focused facet');
+ assert.deepEqual(directFallbackQueries('What does “conscience makes cowards” mean?'),
+  ['What does “conscience makes cowards” mean?']);
+});
+
+test('God is love planner fallback keeps a Bible page in the six-page answer packet',async()=>{
+ const question='What does “God is love” mean?';
+ const bibleQuery='1 John 4:7-12 God is love and love one another';
+ const books=[
+  {id:'638',title:'The New Oxford Annotated Bible, Fully Revised Fifth Edition'},
+  {id:'646',title:'The New Oxford Annotated Bible, Fourth Edition'},
+  {id:'427',title:'Waiting for God — Simone Weil'},
+  {id:'16',title:'The City of God — Augustine of Hippo'},
+ ];
+ const searches=[];
+ const result=await retrieveEvidence({question,queries:[question],directFallback:true,
+  library:{search:async query=>{
+   searches.push(query);
+   if(query===bibleQuery)return {sources:[{id:'B1',bookId:'638',title:books[0].title,
+    page:1821,globalPageId:1821,preview:'God is love; let us love one another.',score:42}]};
+   return {sources:[
+    {id:'W1',bookId:'427',title:books[2].title,page:140,globalPageId:140,
+     preview:'Before all things, God is love; love is both union and infinite distance.',score:99},
+    ...Array.from({length:8},(_,index)=>({id:'A'+index,bookId:'16',title:books[3].title,
+     page:200+index,globalPageId:200+index,preview:'Augustine discusses divine love and creation.',score:90-index}))
+   ]};
+  }},books,allowedBookIds:new Set(books.map(book=>book.id)),
+  pageLoader:async source=>({text:`Verified page ${source.page} says that God is love and connects this with loving one another.`})});
+ assert.deepEqual(result.searchQueries,[bibleQuery,question],
+  'the exact question remains the final direct facet for packet balancing');
+ assert.deepEqual(searches,[bibleQuery,question]);
+ const packet=selectAnswerSources(result.candidates,question,'token',{
+  maxSources:6,plannedFacetCount:result.searchQueries.length-1});
+ assert(packet.length<=6);
+ assert(packet.some(source=>source.bookId==='638'&&source.page===1821),
+  'the relevant Bible page must survive both candidate merging and the six-page budget');
+});
+
+test('God is love fallback does not add a Bible search inside Selected Books',async()=>{
+ const question='What does “God is love” mean?';
+ const searches=[];
+ const result=await retrieveEvidence({question,queries:[question],directFallback:true,
+  selectedBookIds:['427'],books:[{id:'427',title:'Waiting for God — Simone Weil'}],
+  allowedBookIds:new Set(['427']),library:{search:async query=>{
+   searches.push(query);
+   return {sources:[{bookId:'427',title:'Waiting for God — Simone Weil',page:140,
+    globalPageId:140,preview:'Before all things, God is love; divine love joins nearness and distance.',score:80}]};
+  }},pageLoader:async()=>({text:'Before all things, God is love; divine love joins nearness and distance.'})});
+ assert.deepEqual(searches,[question]);
+ assert.deepEqual(result.searchQueries,[question]);
+ assert(result.candidates.every(source=>source.bookId==='427'));
 });
 
 test('three targeted searches survive facet merge and answer-source selection',()=>{
@@ -1357,7 +1419,7 @@ test('planner-facet part links preserve named-source scope and the decisive Kant
 
 test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
  const {readFileSync}=await import('node:fs');
- const js=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
+ const js=readFileSync(new URL('./companion-v112.mjs',import.meta.url),'utf8');
  assert.match(js,/API\+'\/api\/pilot-plan'/);
  assert.match(js,/data\.searchPlanning===true/);
  assert.match(js,/validSearchPlan\(data\.queries\)/);
@@ -1366,10 +1428,10 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions\}/);
  assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
  assert.match(js,/diagnosticState\.fallbackMode=true/);
- assert.match(js,/Search planning is temporarily unavailable; searching directly with your question/);
+ assert.match(js,/Search planning is temporarily unavailable; searching with your question/);
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
- assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text,candidatePartIds\}\)=>\(\{bookId,page,text,candidatePartIds\}\)\)/);
+ assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text,candidatePartIds\}\)=>\(\{bookId,page,text,candidatePartIds,libraryVersion:49\}\)\)/);
  assert.match(js,/selectAnswerSources\(candidates,q,token,\{history,\s*maxSources:MAX_ANSWER_SOURCES,\s*plannedFacetCount:/);
  assert.doesNotMatch(js,/searchPages\(|lastSearch|checked passages will guide/i);
  assert.match(js,/data\.outcome==='insufficient-evidence'/);
