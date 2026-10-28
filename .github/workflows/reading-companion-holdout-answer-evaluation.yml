@@ -37,6 +37,7 @@ on:
           - acceptance-boethius-fortune
           - acceptance-locke-political-authority
           - acceptance-god-is-love
+          - acceptance-simulation-hypothesis
         default: all
         required: true
       answer_variant:
