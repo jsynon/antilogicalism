@@ -55,11 +55,18 @@
     {name: 'Sacred Books of the East', pattern: /^Sacred Books of the East\b/i}
   ];
   function seriesName(title) {
-    const series = groupedSeries.find(item => item.pattern.test(title));
-    if (series) return series.name;
+    const workTitle = title.split(/\s+—\s+/)[0];
+    const series = groupedSeries.find(item => item.pattern.test(workTitle));
+    if (series) {
+      // Keep only numbered collection volumes in the grouped collection block;
+      // companion guides and other unnumbered titles sort under their authors.
+      const marker = series.name === 'Harvard Classics'
+        ? /\b(?:volume|vol\.?)\s*\d+\b/i
+        : /\b(?:volume|vol\.?|book|part)\s*(?:\d+|[ivxlcdm]+)\b/i;
+      return marker.test(workTitle) ? series.name : '';
+    }
     // Titles with a volume marker at the end of their work name form a series
     // even when their records use different authors or translator metadata.
-    const workTitle = title.split(/\s+—\s+/)[0];
     const match = workTitle.match(/^(.*?)\s*,?\s+(?:volume|vol\.?|book|part)\s*(?:\d+|[ivxlcdm]+)\b/i);
     return match ? match[1].replace(/[,:;–—-]+$/, '').trim() : '';
   }
