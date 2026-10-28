@@ -27,6 +27,10 @@ function surname(name){
   const words=first.replace(/[.]/g,'').split(/\s+/).filter(Boolean);
   while(words.length>1&&/^(jr|sr|ii|iii|iv|v)$/i.test(words.at(-1)))words.pop();
   if(!words.length)return 'zzzzzz';
+  // Historical names such as "Philo of Alexandria" and "John of Damascus"
+  // are filed under the person's given name, not the place in the epithet.
+  const ofIndex=words.findIndex(word=>word.toLocaleLowerCase('en')==='of');
+  if(ofIndex===1)return words[0].replace(/[^\p{L}\p{N}'’-]/gu,'');
   // Use the same conventions as Library Search for compound surnames,
   // epithets, and place names.
   const yIndex=words.findIndex(word=>word.toLocaleLowerCase('en')==='y');

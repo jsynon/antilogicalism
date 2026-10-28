@@ -37,15 +37,19 @@
   }
   function surnameKey(name) {
     if (!name) return '\uffff';
-    const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0].trim();
+    const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0]
+      .replace(/^(?:saint|st\.?)\s+/i, '').trim();
     if (/^various\s+(?:authors?|poets?|contributors?)$/i.test(firstContributor)) return 'Various';
     const commaParts = firstContributor.split(',').map(part => part.trim()).filter(Boolean);
     if (commaParts.length > 1) return commaParts[0].split(/\s+/).pop();
     const tokens = firstContributor.replace(/[.]/g, '').split(/\s+/).filter(Boolean);
     while (tokens.length > 1 && /^(jr|sr|ii|iii|iv|v)$/i.test(tokens[tokens.length - 1])) tokens.pop();
     if (!tokens.length) return '\uffff';
-    // Keep Spanish compound surnames together, but file epithets and place
-    // names by their final meaningful word (Hippo, Elder, Areopagite).
+    // File historical "Name of Place" authors under their own name, as with
+    // Philo of Alexandria, John of Damascus, and Augustine of Hippo.
+    const ofIndex = tokens.findIndex(token => token.toLocaleLowerCase() === 'of');
+    if (ofIndex === 1) return tokens[0];
+    // Keep Spanish compound surnames together while handling other epithets.
     const yIndex = tokens.findIndex(token => token.toLocaleLowerCase() === 'y');
     if (yIndex > 0 && yIndex < tokens.length - 1) return tokens.slice(yIndex - 1).join(' ');
     // Preserve conventional compound surnames while ignoring particles such
