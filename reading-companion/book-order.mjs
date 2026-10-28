@@ -30,7 +30,7 @@ function surname(name){
   // Historical names such as "Philo of Alexandria" and "John of Damascus"
   // are filed under the person's given name, not the place in the epithet.
   const ofIndex=words.findIndex(word=>word.toLocaleLowerCase('en')==='of');
-  if(ofIndex===1)return words[0].replace(/[^\\p{L}\\p{N}'’-]/gu,'');
+  if(ofIndex===1)return words[0].replace(/[^\p{L}\p{N}'’-]/gu,'');
   // Use the same conventions as Library Search for compound surnames,
   // epithets, and place names.
   const yIndex=words.findIndex(word=>word.toLocaleLowerCase('en')==='y');
