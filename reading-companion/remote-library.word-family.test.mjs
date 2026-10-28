@@ -21,6 +21,7 @@ const fixture={
 };
 function fakeFetch(url){
  const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (key === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
  return Promise.resolve(key in fixture?
   new Response(gzipSync(JSON.stringify(fixture[key])),{status:200}):
   new Response('Not found',{status:404}));
@@ -60,6 +61,7 @@ test('passage evidence ranks Nicomachean Ethics ahead of Politics without a titl
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
@@ -93,6 +95,7 @@ test('all-books search recovers a uniquely misspelled author surname',async()=>{
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
@@ -124,6 +127,7 @@ test('fuzzy author scoping requires a distinct indexed topic term',async()=>{
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
