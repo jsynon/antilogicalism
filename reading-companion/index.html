@@ -342,9 +342,9 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 @media(prefers-reduced-motion:reduce){#companion-pilot #companion-status.is-busy::after{animation:companion-status-spin 2s linear infinite}}
 #companion-pilot #companion-turnstile{margin:.8rem 0}
 #companion-pilot .companion-source-entry,#companion-pilot .companion-key-passage{padding:.9rem 0;border-bottom:1px solid #dfe2e3}
-/* Keep the source-entry rules while removing Book Lite's centered break ornament. */
-#companion-pilot .companion-source-entry{background-image:none!important}
-#companion-pilot .companion-source-entry::after{content:none!important;display:none!important}
+/* Suppress Book Lite's article ornament throughout the companion; keep entry borders. */
+#companion-pilot article{background-image:none!important}
+#companion-pilot article::after{content:none!important;display:none!important}
 #companion-pilot .companion-key-passage{background:none}
 #companion-pilot .companion-key-passage:last-child{border-bottom:0}
 #companion-pilot .companion-source-entry p{margin:.3rem 0 .65rem}
