@@ -38,7 +38,7 @@ test('Kant causal-necessity search adds the Critique’s indexed Second Analogy 
  const prefixes=[...new Set(terms.map(term=>term.slice(0,2)))];
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
    page_books:[40,40],partitions:prefixes,
    books:{'40':{title:'Critique of Pure Reason — Immanuel Kant',
     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
@@ -95,7 +95,7 @@ test('run 62 Buddhist phrase variant retrieves the linked page without counting 
  };
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:5,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:5,
    page_books:[183,185,178,400,400],
    partitions:['ar','bu','de','em','es','na','op','or','su','te'],
    books:Object.fromEntries(books.map(book=>[book.id,{
@@ -230,7 +230,7 @@ test('an explicitly requested phrase boosts pages containing it in the source te
 
 const fixture={
  'manifest.json':{
-  version:48,postings_encoding:'delta-json-v1',prefix_length:2,
+  version:49,postings_encoding:'delta-json-v1',prefix_length:2,
   pages:7,page_books:[7,7,89,89,114,114,529],
   partitions:['mo','vi','pr','wi','ph','ha','eu','fi','ar','ni','et','ra','ex','ma','th','na','mu','da','ch','hu','li','po'],
   books:{
@@ -385,7 +385,7 @@ test('all-books search honors an explicitly named author when limiting candidate
 test('a named scene routed through its canonical author prefers the primary collected work',async()=>{
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
    page_books:[212,552],partitions:['ha','sh'],
    books:{
     '212':{title:'The Complete Works of William Shakespeare — William Shakespeare',
@@ -422,7 +422,7 @@ test('an OCR-joined page ending can retrieve the relevant adjacent continuation'
  const first='Hamlet. To be, or not to be: that is the question. To die, to sleepNo';
  const second='more; and by a sleep to say we end the heartache. To sleep, perchance to dream; for in that sleep of death what dreams may come must give us pause.';
  const corpus={
-  'manifest.json':{version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+  'manifest.json':{version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
    page_books:[212,212,212],partitions:['ha','wi','sh','de'],books:{
     '212':{title:'The Complete Works of William Shakespeare — William Shakespeare',
      drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}},
@@ -452,7 +452,7 @@ test('an OCR-joined page ending can retrieve the relevant adjacent continuation'
 test('a thinker named as the subject of another author’s view is not searched as its source',async()=>{
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
    page_books:[54,74],partitions:['ni','th','pl'],
    books:{
     '54':{title:'Thus Spake Zarathustra — Friedrich Nietzsche',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
@@ -487,7 +487,7 @@ test('a thinker named as the subject of another author’s view is not searched 
 test('a relevant previous page is retained when the strongest passage starts mid-sentence',async()=>{
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
    page_books:[149,149,149],partitions:['eg','pr','he','tr'],
    books:{'149':{title:'The Histories — Herodotus',
     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
@@ -519,7 +519,7 @@ test('a relevant previous page is retained when the strongest passage starts mid
 test('uppercase proper-name fragments also retain a relevant previous page',async()=>{
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
    page_books:[149,149,149],partitions:['eg','pr','he','tr'],
    books:{'149':{title:'The Histories — Herodotus',
     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
@@ -551,7 +551,7 @@ test('uppercase proper-name fragments also retain a relevant previous page',asyn
 test('an ellipsis-truncated final connector retains the relevant next page',async()=>{
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:3,
    page_books:[212,212,212],partitions:['ha','so','dr'],
    books:{'212':{title:'The Complete Works of William Shakespeare — William Shakespeare',
     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
