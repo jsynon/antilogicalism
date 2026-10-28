@@ -59,6 +59,7 @@ test('Kant causal-necessity search adds the Critique’s indexed Second Analogy 
  }
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
@@ -113,6 +114,7 @@ test('run 62 Buddhist phrase variant retrieves the linked page without counting 
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
@@ -281,6 +283,7 @@ const fixture={
 };
 function fakeFetch(url) {
  const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (key === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
  return Promise.resolve(key in fixture?
    new Response(gzipSync(JSON.stringify(fixture[key])),{status:200}):
    new Response('Not found',{status:404}));
@@ -362,6 +365,7 @@ test('a neighboring page cannot displace a stronger direct evidence page',async(
  ]};
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
@@ -405,6 +409,7 @@ test('a named scene routed through its canonical author prefers the primary coll
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
@@ -438,6 +443,7 @@ test('an OCR-joined page ending can retrieve the relevant adjacent continuation'
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
@@ -471,6 +477,7 @@ test('a thinker named as the subject of another author’s view is not searched 
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
@@ -504,6 +511,7 @@ test('a relevant previous page is retained when the strongest passage starts mid
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
@@ -536,6 +544,7 @@ test('uppercase proper-name fragments also retain a relevant previous page',asyn
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
@@ -567,6 +576,7 @@ test('an ellipsis-truncated final connector retains the relevant next page',asyn
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
