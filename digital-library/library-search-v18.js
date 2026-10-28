@@ -37,7 +37,8 @@
   }
   function surnameKey(name) {
     if (!name) return '\uffff';
-    const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0].trim();
+    const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0]
+      .replace(/^(?:saint|st\.?)\s+/i, '').trim();
     if (/^various\s+(?:authors?|poets?|contributors?)$/i.test(firstContributor)) return 'Various';
     const commaParts = firstContributor.split(',').map(part => part.trim()).filter(Boolean);
     if (commaParts.length > 1) return commaParts[0].split(/\s+/).pop();
