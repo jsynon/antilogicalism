@@ -634,6 +634,8 @@ test('all-books evaluation sends the same six-page evidence budget as the public
    citations:[],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(answerBody.sources.length,6);
  assert.deepEqual(new Set(answerBody.sources.map(source=>source.bookId)),new Set(['529','102']));
+ assert.ok(answerBody.sources.every(source=>source.libraryVersion===49),
+  'each page must be checked against the fingerprint collection for the v49 index');
  assert.equal(result.submittedSources.length,6);
 });
 
