@@ -37,21 +37,18 @@
   }
   function surnameKey(name) {
     if (!name) return '\uffff';
-    const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0]
-      .replace(/^(?:saint|st\.?)\s+/i, '').trim();
+    const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0].trim();
     const commaParts = firstContributor.split(',').map(part => part.trim()).filter(Boolean);
     if (commaParts.length > 1) return commaParts[0].split(/\s+/).pop();
     const tokens = firstContributor.replace(/[.]/g, '').split(/\s+/).filter(Boolean);
     while (tokens.length > 1 && /^(jr|sr|ii|iii|iv|v)$/i.test(tokens[tokens.length - 1])) tokens.pop();
-    if (tokens.length < 2) return tokens[0] || '';
-    // Treat "Name of Place" and "Name the Epithet" like single-name authors,
-    // matching the Reading Companion selector's author ordering.
-    const ofIndex = tokens.findIndex(token => token.toLocaleLowerCase() === 'of');
-    if (ofIndex === 1) return tokens[0];
-    if (tokens.length > 2 && tokens[tokens.length - 2].toLocaleLowerCase() === 'the') return tokens[tokens.length - 3];
-    const yIndex = tokens.findIndex(token => token.toLocaleLowerCase() === 'y');
-    if (yIndex > 0 && yIndex < tokens.length - 1) return tokens.slice(yIndex - 1).join(' ');
-    return tokens[tokens.length - 1];
+    if (!tokens.length) return '\uffff';
+    // Ignore name particles so "Augustine of Hippo", "Pliny the Elder", and
+    // "Benedict de Spinoza" file under Hippo, Elder, and Spinoza.
+    const particles = new Set(['al','bin','da','de','del','della','der','di','du','el','ibn','la','le','of','the','ten','ter','van','von','zu','zum','zur']);
+    const meaningful = tokens.filter(token => !particles.has(token.toLocaleLowerCase()));
+    const key = (meaningful.length ? meaningful : tokens).at(-1);
+    return key.replace(/^(?:al|el)-/i, '') || key;
   }
   const groupedSeries = [
     {name: 'Harvard Classics', pattern: /\bHarvard Classics\b/i},
@@ -98,12 +95,25 @@
   function compareAuthors(a, b) {
     const seriesA = seriesName(a), seriesB = seriesName(b);
     const authorA = authorName(a), authorB = authorName(b);
-    const keyA = seriesA || surnameKey(authorA);
-    const keyB = seriesB || surnameKey(authorB);
+    const collectionA = groupedSeries.some(item => item.name === seriesA);
+    const collectionB = groupedSeries.some(item => item.name === seriesB);
+    // Named collections sort under their collection name; other series sort
+    // under the author's surname, with series volumes kept together below.
+    const keyA = collectionA ? seriesA : surnameKey(authorA);
+    const keyB = collectionB ? seriesB : surnameKey(authorB);
+    const keyOrder = authorCollator.compare(keyA, keyB);
+    if (keyOrder) return keyOrder;
     if (seriesA && seriesA === seriesB) return compareSeriesTitles(a, b, seriesA);
-    return authorCollator.compare(keyA, keyB) ||
-      authorCollator.compare(authorA, authorB) ||
-      titleCollator.compare(titleSortKey(a), titleSortKey(b));
+
+    const authorOrder = authorCollator.compare(authorA, authorB);
+    if (authorOrder) return authorOrder;
+    if (seriesA && !seriesB) return -1;
+    if (!seriesA && seriesB) return 1;
+    if (seriesA && seriesB) {
+      const seriesOrder = authorCollator.compare(seriesA, seriesB);
+      if (seriesOrder) return seriesOrder;
+    }
+    return titleCollator.compare(titleSortKey(a), titleSortKey(b));
   }
   let manifestPromise;
   let suppressionPromise;
