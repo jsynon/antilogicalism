@@ -1781,7 +1781,7 @@ html[data-theme="dark"] body #primary #digital-library mark {
 
 /* Reading Companion */
 html[data-theme="dark"] body #primary #digital-library p:first-of-type:first-letter,
-html[data-theme="dark"] body #primary .entry-content #companion-pilot p:first-of-type:first-letter {
+html[data-theme="dark"] body #primary .entry-content #companion-pilot > p:first-child:first-letter {
 	color: var(--site-text) !important;
 }
 
