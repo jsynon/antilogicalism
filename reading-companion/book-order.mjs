@@ -12,31 +12,32 @@ function normalized(value){
 }
 function authorName(title){
   let author=splitTitle(title).author;
-  author=author.replace(/^(?:(?:edited|compiled|translated|selected|introduced)\s+by|by)\s+/i,'');
+  author=author.replace(/^(?:(?:edited|compiled|translated|selected|annotated|introduced|prepared|arranged|revised|adapted)\s+by|by)\s+/i,'');
+  author=author.replace(/\s*\((?:(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\b[^)]*|[^)]*,\s*(?:editors?|translators?|compilers?|annotators?|contributors?)|editors?|translators?|compilers?|annotators?|contributors?)\)\s*$/i,'');
   author=author.split(/[,;]\s*(?:(?:translated|edited|compiled|introduced)\s+by|trans\.?|ed\.?)\b/i)[0];
   return author.replace(/\s+(?:and others|et al\.?)$/i,'').trim();
 }
 function surname(name){
-  // Sort compound bylines under their first contributor, as the Library Search
-  // does, rather than under whichever name happens to appear last.
   const first=String(name||'').split(/\s+(?:and|&)\s+/i)[0]
     .split(/\s*;\s*/)[0].trim();
   if(!first)return 'zzzzzz';
+  if(/^various\s+(?:authors?|poets?|contributors?)$/i.test(first))return 'Various';
   const commaParts=first.split(',').map(part=>part.trim()).filter(Boolean);
   if(commaParts.length>1)return commaParts[0].split(/\s+/).at(-1);
-  const words=first.replace(/^(?:the|saint|st\.?)\s+/i,'')
-    .split(/\s+/).filter(Boolean);
+  const words=first.replace(/[.]/g,'').split(/\s+/).filter(Boolean);
+  while(words.length>1&&/^(jr|sr|ii|iii|iv|v)$/i.test(words.at(-1)))words.pop();
   if(!words.length)return 'zzzzzz';
-  // Ancient and medieval authors are commonly cataloged as "Name of Place"
-  // or "Name the Epithet"; file these under the author's name.
-  const ofIndex=words.findIndex(word=>word.toLocaleLowerCase('en')==='of');
-  if(ofIndex===1)return words[0].replace(/[^\p{L}\p{N}'’-]/gu,'');
-  if(words.length>2&&words.at(-2).toLocaleLowerCase('en')==='the')
-    return words.at(-3).replace(/[^\p{L}\p{N}'’-]/gu,'');
-  const last=words.at(-1).replace(/[^\p{L}\p{N}'’-]/gu,'');
-  const particles=new Set(['da','de','del','della','di','du','la','le','van','von','bin','al']);
-  return particles.has((words.at(-2)||'').toLocaleLowerCase('en'))?
-    words.at(-2)+' '+last:last;
+  // Use the same conventions as Library Search for compound surnames,
+  // epithets, and place names.
+  const yIndex=words.findIndex(word=>word.toLocaleLowerCase('en')==='y');
+  if(yIndex>0&&yIndex<words.length-1)return words.slice(yIndex-1).join(' ');
+  const includedParticles=new Set(['da','del','della','di','du','la','le','van','von']);
+  if(words.length>1&&includedParticles.has(words.at(-2).toLocaleLowerCase('en')))
+    return words.slice(-2).join(' ');
+  const particles=new Set(['al','bin','de','el','ibn','of','the']);
+  const meaningful=words.filter(word=>!particles.has(word.toLocaleLowerCase('en')));
+  const key=(meaningful.length?meaningful:words).at(-1);
+  return key.replace(/^(?:al|el)-/i,'')||key;
 }
 function volumeNumber(token){
   if(/^\d+$/.test(token))return Number(token);
@@ -96,8 +97,12 @@ export function sortBooksForSelector(books){
     entries.push(group);
   }
   entries.sort((a,b)=>{
-    const surnameOrder=collator.compare(surname(a.author),surname(b.author));
-    if(surnameOrder)return surnameOrder;
+    // Keep named collections under their collection name; ordinary books and
+    // author-specific series use the author's final meaningful surname.
+    const keyA=a.collection?a.name:surname(a.author);
+    const keyB=b.collection?b.name:surname(b.author);
+    const keyOrder=collator.compare(keyA,keyB);
+    if(keyOrder)return keyOrder;
     const authorOrder=collator.compare(a.author,b.author);
     if(authorOrder)return authorOrder;
     if(a.kind==='collection'&&b.kind==='collection')

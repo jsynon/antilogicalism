@@ -32,37 +32,50 @@
     if (parts.length < 2) return '';
     return parts.slice(1).join(' — ')
       .replace(/^\s*(?:\((?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\s+by\s+\)|(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\s+by\s+)/i, '')
-      .replace(/\s*\((?:(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\b[^)]*|editors?|translators?|compilers?|annotators?|contributors?)\)\s*$/i, '')
+      .replace(/\s*\((?:(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\b[^)]*|[^)]*,\s*(?:editors?|translators?|compilers?|annotators?|contributors?)|editors?|translators?|compilers?|annotators?|contributors?)\)\s*$/i, '')
       .trim();
   }
   function surnameKey(name) {
     if (!name) return '\uffff';
-    const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0]
-      .replace(/^(?:saint|st\.?)\s+/i, '').trim();
+    const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0].trim();
+    if (/^various\s+(?:authors?|poets?|contributors?)$/i.test(firstContributor)) return 'Various';
     const commaParts = firstContributor.split(',').map(part => part.trim()).filter(Boolean);
     if (commaParts.length > 1) return commaParts[0].split(/\s+/).pop();
     const tokens = firstContributor.replace(/[.]/g, '').split(/\s+/).filter(Boolean);
     while (tokens.length > 1 && /^(jr|sr|ii|iii|iv|v)$/i.test(tokens[tokens.length - 1])) tokens.pop();
-    if (tokens.length < 2) return tokens[0] || '';
-    // Treat "Name of Place" and "Name the Epithet" like single-name authors,
-    // matching the Reading Companion selector's author ordering.
-    const ofIndex = tokens.findIndex(token => token.toLocaleLowerCase() === 'of');
-    if (ofIndex === 1) return tokens[0];
-    if (tokens.length > 2 && tokens[tokens.length - 2].toLocaleLowerCase() === 'the') return tokens[tokens.length - 3];
+    if (!tokens.length) return '\uffff';
+    // Keep Spanish compound surnames together, but file epithets and place
+    // names by their final meaningful word (Hippo, Elder, Areopagite).
     const yIndex = tokens.findIndex(token => token.toLocaleLowerCase() === 'y');
     if (yIndex > 0 && yIndex < tokens.length - 1) return tokens.slice(yIndex - 1).join(' ');
-    return tokens[tokens.length - 1];
+    // Preserve conventional compound surnames while ignoring particles such
+    // as "of", "the", and "de" for Augustine, Pliny, and Spinoza.
+    const includedParticles = new Set(['da','del','della','di','du','la','le','van','von']);
+    if (tokens.length > 1 && includedParticles.has(tokens.at(-2).toLocaleLowerCase())) {
+      return tokens.slice(-2).join(' ');
+    }
+    const particles = new Set(['al','bin','de','el','ibn','of','the']);
+    const meaningful = tokens.filter(token => !particles.has(token.toLocaleLowerCase()));
+    const key = (meaningful.length ? meaningful : tokens).at(-1);
+    return key.replace(/^(?:al|el)-/i, '') || key;
   }
   const groupedSeries = [
     {name: 'Harvard Classics', pattern: /\bHarvard Classics\b/i},
     {name: 'Sacred Books of the East', pattern: /^Sacred Books of the East\b/i}
   ];
   function seriesName(title) {
-    const series = groupedSeries.find(item => item.pattern.test(title));
-    if (series) return series.name;
+    const workTitle = title.split(/\s+—\s+/)[0];
+    const series = groupedSeries.find(item => item.pattern.test(workTitle));
+    if (series) {
+      // Keep only numbered collection volumes in the grouped collection block;
+      // companion guides and other unnumbered titles sort under their authors.
+      const marker = series.name === 'Harvard Classics'
+        ? /\b(?:volume|vol\.?)\s*\d+\b/i
+        : /\b(?:volume|vol\.?|book|part)\s*(?:\d+|[ivxlcdm]+)\b/i;
+      return marker.test(workTitle) ? series.name : '';
+    }
     // Titles with a volume marker at the end of their work name form a series
     // even when their records use different authors or translator metadata.
-    const workTitle = title.split(/\s+—\s+/)[0];
     const match = workTitle.match(/^(.*?)\s*,?\s+(?:volume|vol\.?|book|part)\s*(?:\d+|[ivxlcdm]+)\b/i);
     return match ? match[1].replace(/[,:;–—-]+$/, '').trim() : '';
   }
@@ -98,12 +111,25 @@
   function compareAuthors(a, b) {
     const seriesA = seriesName(a), seriesB = seriesName(b);
     const authorA = authorName(a), authorB = authorName(b);
-    const keyA = seriesA || surnameKey(authorA);
-    const keyB = seriesB || surnameKey(authorB);
+    const collectionA = groupedSeries.some(item => item.name === seriesA);
+    const collectionB = groupedSeries.some(item => item.name === seriesB);
+    // Named collections sort under their collection name; other series sort
+    // under the author's surname, with series volumes kept together below.
+    const keyA = collectionA ? seriesA : surnameKey(authorA);
+    const keyB = collectionB ? seriesB : surnameKey(authorB);
+    const keyOrder = authorCollator.compare(keyA, keyB);
+    if (keyOrder) return keyOrder;
     if (seriesA && seriesA === seriesB) return compareSeriesTitles(a, b, seriesA);
-    return authorCollator.compare(keyA, keyB) ||
-      authorCollator.compare(authorA, authorB) ||
-      titleCollator.compare(titleSortKey(a), titleSortKey(b));
+
+    const authorOrder = authorCollator.compare(authorA, authorB);
+    if (authorOrder) return authorOrder;
+    if (seriesA && !seriesB) return -1;
+    if (!seriesA && seriesB) return 1;
+    if (seriesA && seriesB) {
+      const seriesOrder = authorCollator.compare(seriesA, seriesB);
+      if (seriesOrder) return seriesOrder;
+    }
+    return titleCollator.compare(titleSortKey(a), titleSortKey(b));
   }
   let manifestPromise;
   let suppressionPromise;

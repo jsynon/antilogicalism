@@ -7,7 +7,7 @@ const driveId='ABCDEFGHIJKLMNOPQRSTUVWXY123456';
 const biblePassage='1 John 4 7 12 Beloved let us love one another because love is from God and God sent his Son.';
 const fixture={
  'manifest.json':{
-  version:48,postings_encoding:'delta-json-v1',prefix_length:2,
+  version:49,postings_encoding:'delta-json-v1',prefix_length:2,
   pages:5,page_books:[16,427,638,639,335],
   partitions:['jo','go','lo','an'],
   books:{
@@ -31,6 +31,7 @@ const fixture={
 
 function fakeFetch(url){
  const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (key === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
  return Promise.resolve(key in fixture?
   new Response(gzipSync(JSON.stringify(fixture[key])),{status:200}):
   new Response('Not found',{status:404}));
@@ -54,7 +55,7 @@ test('a cited Bible passage prefers unannotated verse text over topical and anno
 test('a James chapter-and-verse question cannot be narrowed to William James works',async()=>{
  const jamesFixture={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,
    pages:2,page_books:[39,335],partitions:['fa'],
    books:{
     '39':{title:'The Will to Believe — William James',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
@@ -67,6 +68,7 @@ test('a James chapter-and-verse question cannot be narrowed to William James wor
  };
  const library=new RemoteLibrary('https://example.test/v48/',url=>{
   const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (key === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return Promise.resolve(key in jamesFixture?
    new Response(gzipSync(JSON.stringify(jamesFixture[key])),{status:200}):
    new Response('Not found',{status:404}));

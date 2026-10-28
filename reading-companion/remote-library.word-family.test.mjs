@@ -8,7 +8,7 @@ const driveId='ABCDEFGHIJKLMNOPQRSTUVWXY123456';
 const passage='Moral virtue comes about as a result of habit, and we are made perfect by habit. The virtues we get by first exercising them: we learn by doing them, so too we become just by doing just acts, temperate by doing temperate acts, brave by doing brave acts.';
 const fixture={
  'manifest.json':{
-  version:48,postings_encoding:'delta-json-v1',prefix_length:2,
+  version:49,postings_encoding:'delta-json-v1',prefix_length:2,
   pages:1,page_books:[7],partitions:['ar','ha','pr','th','re','vi','ac','ch'],
   books:{'7':{title:'Nicomachean Ethics — Aristotle',
     drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
@@ -21,6 +21,7 @@ const fixture={
 };
 function fakeFetch(url){
  const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (key === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
  return Promise.resolve(key in fixture?
   new Response(gzipSync(JSON.stringify(fixture[key])),{status:200}):
   new Response('Not found',{status:404}));
@@ -39,7 +40,7 @@ test('all-books retrieval bridges planner wording to indexed source word familie
 test('passage evidence ranks Nicomachean Ethics ahead of Politics without a title hint',async()=>{
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,
    pages:2,page_books:[12,7],
    partitions:['ar','ha','pr','re','ac','fo','vi','ch'],
    books:{
@@ -60,6 +61,7 @@ test('passage evidence ranks Nicomachean Ethics ahead of Politics without a titl
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
@@ -78,7 +80,7 @@ test('passage evidence ranks Nicomachean Ethics ahead of Politics without a titl
 test('all-books search recovers a uniquely misspelled author surname',async()=>{
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,
    pages:2,page_books:[140,223],partitions:['fa'],
    books:{
     '140':{title:'Fear and Trembling — Søren Kierkegaard',
@@ -93,6 +95,7 @@ test('all-books search recovers a uniquely misspelled author surname',async()=>{
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
@@ -109,7 +112,7 @@ test('all-books search recovers a uniquely misspelled author surname',async()=>{
 test('fuzzy author scoping requires a distinct indexed topic term',async()=>{
  const corpus={
   'manifest.json':{
-   version:48,postings_encoding:'delta-json-v1',prefix_length:2,
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,
    pages:2,page_books:[140,223],partitions:['fa'],
    books:{
     '140':{title:'Fear and Trembling — Søren Kierkegaard',
@@ -124,6 +127,7 @@ test('fuzzy author scoping requires a distinct indexed topic term',async()=>{
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?
    new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});

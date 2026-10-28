@@ -5,7 +5,7 @@ import {RemoteLibrary} from './remote-library.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
-const clientV48=readFileSync(new URL('./companion-v111.mjs',import.meta.url),'utf8');
+const clientV49=readFileSync(new URL('./companion-v111.mjs',import.meta.url),'utf8');
 const bookOrder=await import('./book-order.mjs');
 
 test('response citation labels are plain ordered numbers while IDs stay internal',()=>{
@@ -100,6 +100,19 @@ test('book selector sorts by author surname and keeps numbered collections in na
  const sorted=bookOrder.sortBooksForSelector(books);
  assert.deepEqual(sorted.map(book=>book.id),['3','1','2','10','4']);
 });
+test('Copleston volumes sort together under C and de Spinoza sorts under S',()=>{
+ const books=[
+  {id:'copleston-2',title:'A History of Philosophy, Volume II: Medieval Philosophy — Frederick Copleston'},
+  {id:'spinoza',title:'A Theologico-Political Treatise — Benedict de Spinoza'},
+  {id:'copleston-1',title:'A History of Philosophy, Volume I: Greece and Rome — Frederick Copleston'},
+  {id:'smith',title:'A Book — John Smith'},
+  {id:'zebra',title:'A Book — Zoe Zebra'},
+  {id:'aardvark',title:'A Book — Aaron Aardvark'}
+ ];
+ const sorted=bookOrder.sortBooksForSelector(books);
+ assert.deepEqual(sorted.map(book=>book.id),
+  ['aardvark','copleston-1','copleston-2','smith','spinoza','zebra']);
+});
 test('book selector search matches title or author without changing source entries',()=>{
  const books=[
   {id:'1',title:'Nicomachean Ethics — Aristotle'},
@@ -111,11 +124,11 @@ test('book selector search matches title or author without changing source entri
  assert.deepEqual(bookOrder.filterBooksByText(books,''),books);
 });
 
-test('v48 browser client validates the v2 fingerprint coverage manifest',()=>{
- assert(clientV48.includes("reader-fingerprints-v2/coverage-v2.json"));
- assert.match(clientV48,/antilogicalism-reader-coverage-v2/);
- assert.match(clientV48,/libraryVersion!==48/);
- assert.doesNotMatch(clientV48,/coverage-v1|libraryVersion:47/);
+test('current browser client validates the v3 fingerprint coverage manifest',()=>{
+ assert(clientV49.includes("reader-fingerprints-v3/coverage-v3.json"));
+ assert.match(clientV49,/antilogicalism-reader-coverage-v3/);
+ assert.match(clientV49,/libraryVersion!==49/);
+ assert.doesNotMatch(clientV49,/coverage-v1|coverage-v2|libraryVersion:47/);
 });
 
 test('v1.10 uses original v47 retrieval, verified pilot endpoint and safe Markdown rendering',()=>{
@@ -166,18 +179,18 @@ test('public companion copy explains cited sources and keeps source reading cont
 
 
 test('answer citations open in the local page reader while Sources keeps the PDF link',()=>{
- assert.ok(clientV48.includes('function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map())'));
- assert.ok(clientV48.includes('claimQuotesForCitation(answer,citationGroup.start,source.id,evidenceMap)'));
- assert.ok(clientV48.includes('const evidenceMap=Array.isArray(data.evidenceMap)?data.evidenceMap:[];'));
- assert.ok(clientV48.includes('sourceReader.open({...source,excerpts},a)'));
- assert.match(clientV48,/excerpts\.forEach\(excerpt=>\{\s*const quote=node\('p',excerpt,'companion-key-quote'\);\s*card\.append\(quote\);\s*\}\);\s*const read=node\('button','Read passages'/,
+ assert.ok(clientV49.includes('function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map())'));
+ assert.ok(clientV49.includes('claimQuotesForCitation(answer,citationGroup.start,source.id,evidenceMap)'));
+ assert.ok(clientV49.includes('const evidenceMap=Array.isArray(data.evidenceMap)?data.evidenceMap:[];'));
+ assert.ok(clientV49.includes('sourceReader.open({...source,excerpts},a)'));
+ assert.match(clientV49,/excerpts\.forEach\(excerpt=>\{\s*const quote=node\('p',excerpt,'companion-key-quote'\);\s*card\.append\(quote\);\s*\}\);\s*const read=node\('button','Read passages'/,
   'each citation card renders its excerpts behind one source-level reader button');
- assert.match(clientV48,/node\('button','Read passages','companion-inline-read'\)/);
- assert.doesNotMatch(clientV48,/Read highlighted passages|node\('button','Read passage'/);
+ assert.match(clientV49,/node\('button','Read passages','companion-inline-read'\)/);
+ assert.doesNotMatch(clientV49,/Read highlighted passages|node\('button','Read passage'/);
  assert.match(html,/“Read passages” opens the cited excerpts here/);
- assert.ok(clientV48.includes('sourceReader.open({...source,excerpts},read)'));
- assert.ok(clientV48.includes('link.href=source.url'));
- assert.ok(clientV48.includes("panel.append(node('h3','Key passages from the source books'))"));
+ assert.ok(clientV49.includes('sourceReader.open({...source,excerpts},read)'));
+ assert.ok(clientV49.includes('link.href=source.url'));
+ assert.ok(clientV49.includes("panel.append(node('h3','Key passages from the source books'))"));
  assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
 });
 
