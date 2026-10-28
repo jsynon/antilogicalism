@@ -1,5 +1,5 @@
 /* v1.10.2 in-page source reader, adapted from the local Reading Companion.
- * It reads canonical v47 shards already hosted on GitHub Pages and only
+ * It reads canonical v49 shards already hosted on GitHub Pages and only
  * displays excerpts. No AI calls, no secrets, no mutation of cited book text.
  */
 import {normalizeKnownOcrArtifacts,stripWebCaptureFooters,readableParagraphs,locateCitedExcerpt} from './source-text-format.mjs';
@@ -109,7 +109,7 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
   }
   async function open(source,trigger=null){
     // Only expose books in the owner-published verified collection. The text is
-    // published v47 data, not a generated model quote or a fabricated page.
+    // published v49 data, not a generated model quote or a fabricated page.
     const bookId=String(source?.bookId??'');
     if(!/^[1-9]\d{0,3}$/.test(bookId)||!isAllowedBook(bookId)||
        !Number.isSafeInteger(source?.page)||source.page<1||source.page>10000){
@@ -130,7 +130,7 @@ export function createSourceReader({getBook,getManifest,isAllowedBook}){
       if(!pdfMatch)throw Error('The canonical PDF link is missing.');
       const pages=eligiblePages(shard);
       const idx=pages.findIndex(p=>p.page===source.page);
-      if(idx<0)throw Error('The cited physical PDF page is absent from the v47 book shard.');
+      if(idx<0)throw Error('The cited physical PDF page is absent from the v49 book shard.');
       active={source,pages,idx,pdfId:pdfMatch[1]};
       present();
       close.focus({preventScroll:true});

@@ -1,5 +1,5 @@
 /* Reader-only display cleanup and exact quoted-passage location.
- * The trusted v47 corpus remains unchanged. Recognized Acrobat footer lines
+ * The trusted v49 corpus remains unchanged. Recognized Acrobat footer lines
  * are hidden, and known NKJV OCR substitutions apply only to the readable view.
  */
 // Remove only standalone Acrobat Web Capture footer lines. Requiring the

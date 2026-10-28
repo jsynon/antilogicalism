@@ -1,8 +1,8 @@
 /* Antilogicalism Reading Companion v1.12.0 — staged verified-library alpha.
- * Real indexed v48 passages; no secrets, model keys or paid APIs in this file.
- * The Worker independently validates every submitted source page against v48
+ * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
+ * The Worker independently validates every submitted source page against v49
  * fingerprints before any inference. The verified scope comes from the
- * owner-published cohort manifest; expanding it does not change v48 OCR.
+ * owner-published cohort manifest; expanding it does not change v49 OCR.
  */
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';

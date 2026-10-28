@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       case_id:
-        description: Run all five new questions or one question in both scopes
+        description: Run all seven questions or one question in both scopes
         type: choice
         options:
           - all
@@ -13,6 +13,8 @@ on:
           - paired-dubois-double-consciousness
           - paired-boethius-fortune-wheel
           - paired-hamlet-conscience
+          - paired-nietzsche-good-evil
+          - paired-diamond-sutra-giving
         default: all
         required: true
       confirm_live_ai:

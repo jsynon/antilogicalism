@@ -2,7 +2,7 @@
   "schema_version": 1,
   "suite_id": "antilogicalism-reading-companion-selected-book-v1",
   "purpose": "A read-only, no-AI evaluation of selected-book retrieval. Each case constrains passage search to one named work and verifies the selected work's indexed pages against published fingerprints.",
-  "corpus_version": 48,
+  "corpus_version": 49,
   "cases": [
     {
       "id": "selected-philosophy-aristotle-habituation",

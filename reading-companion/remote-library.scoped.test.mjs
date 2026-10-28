@@ -118,7 +118,7 @@ test('run 62 Buddhist phrase variant retrieves the linked page without counting 
   return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
- const library=new RemoteLibrary('https://example.test/data-v48/',localFetch);
+ const library=new RemoteLibrary('https://example.test/data-v49/',localFetch);
  const allowedBookIds=new Set(books.map(book=>book.id));
  const partQuestions=[{partId:'P1',question}];
  const retrieveWithFacet=query=>retrieveEvidence({question,queries:[firstQuery,query],
@@ -168,7 +168,7 @@ test('run 62 Buddhist phrase variant retrieves the linked page without counting 
   'generic planner wording without the part’s subject term must not gain a single-part eligibility link');
  const retrieved=await retrieveWithFacet(sourceNativeQuery);
  const nagaPage=retrieved.candidates.find(source=>source.bookId==='178'&&source.page===88);
- assert.ok(nagaPage,'the source-native query matches Nagarjuna, dependent arising, and emptiness on the v48 page');
+ assert.ok(nagaPage,'the source-native query matches Nagarjuna, dependent arising, and emptiness on the v49 page');
  assert.ok(nagaPage.candidatePartIds.includes('P1'),
   'the page found by the dependent-origination planner facet must remain linked to the Sunyata part');
  const answerPacket=selectAnswerSources(retrieved.candidates,question,'token',{
@@ -179,7 +179,7 @@ test('run 62 Buddhist phrase variant retrieves the linked page without counting 
   'the passage must survive the existing bounded source-packet selector');
  assert.match(nagaPage.text,/reconciling it with his cooception of emptiness/u);
  assert.match(nagaPage.text,/Whoever perceives dependent arising/u,
-  'the retrieved page retains the actual v48 OCR passage for downstream source-voice review');
+  'the retrieved page retains the actual v49 OCR passage for downstream source-voice review');
  assert.equal(substantivePageEvidence(
   'dependent '+Array(140).fill('ordinary').join(' ')+' emptiness',
   ['sunyata','operates','dependent','origination','emptiness']).localUnique,1,
@@ -194,7 +194,7 @@ test('run 62 Buddhist phrase variant retrieves the linked page without counting 
 
 test('remote library records the exact bytes of each corpus file used',async()=>{
  const bytes=new TextEncoder().encode('{"version":47,"postings_encoding":"delta-json-v1","prefix_length":2,"page_books":[],"pages":0,"partitions":[],"books":{}}');
- const library=new RemoteLibrary('https://example.test/data-v48/',async()=>new Response(bytes));
+ const library=new RemoteLibrary('https://example.test/data-v49/',async()=>new Response(bytes));
  await library.jsonGzip('manifest.json');
  const expected=[...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes))]
   .map(value=>value.toString(16).padStart(2,'0')).join('');

@@ -5,15 +5,15 @@ import {PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
 
-test('live evaluation preflight accepts only matching v48 corpus and fingerprint coverage',()=>{
- const coverage={schema:'antilogicalism-reader-coverage-v2',libraryVersion:48,
+test('live evaluation preflight accepts only matching v49 corpus and fingerprint coverage',()=>{
+ const coverage={schema:'antilogicalism-reader-coverage-v3',libraryVersion:49,
   books:{'7':{title:'Nicomachean Ethics — Aristotle'}}};
- const allowed=validatePublishedCorpus(coverage,{version:48});
+ const allowed=validatePublishedCorpus(coverage,{version:49});
  assert.deepEqual([...allowed],['7']);
- assert.throws(()=>validatePublishedCorpus({...coverage,libraryVersion:47},{version:48}),
-  /expected v48; fingerprint coverage v47, corpus v48/);
- assert.throws(()=>validatePublishedCorpus(coverage,{version:47}),
-  /expected v48; fingerprint coverage v48, corpus v47/);
+ assert.throws(()=>validatePublishedCorpus({...coverage,libraryVersion:48},{version:49}),
+  /expected v49; fingerprint coverage v48, corpus v49/);
+ assert.throws(()=>validatePublishedCorpus(coverage,{version:48}),
+  /expected v49; fingerprint coverage v49, corpus v48/);
 });
 
 test('live evaluation preflight rejects selected or expected books missing from published coverage',()=>{
@@ -128,15 +128,16 @@ test('focused live cases retain curated scopes and keep the quality baseline unc
  assert.throws(()=>selectLiveCases({cases:[]},'focused','quality-science-darwin-selection'),/Unknown focused case/);
 });
 
-test('paired new-question suite keeps its own five cases and gives each a published selected scope',()=>{
+test('paired new-question suite keeps its own seven cases and gives each a published selected scope',()=>{
  const focused=selectLiveCases({cases:[]},'focused');
  const paired=selectLiveCases({cases:[]},'paired');
  assert.equal(focused.length,5,'the previous focused workflow remains unchanged');
- assert.equal(paired.length,5);
+ assert.equal(paired.length,7);
  assert.ok(paired.every(item=>item.id.startsWith('paired-')&&item.selected_book_ids.length>0));
  assert.deepEqual(paired.map(item=>item.id),[
   'paired-hume-kant-causal-inference','paired-wollstonecraft-education-reason',
-  'paired-dubois-double-consciousness','paired-boethius-fortune-wheel','paired-hamlet-conscience'
+  'paired-dubois-double-consciousness','paired-boethius-fortune-wheel','paired-hamlet-conscience',
+  'paired-nietzsche-good-evil','paired-diamond-sutra-giving'
  ]);
  assert.ok(paired.every(item=>item.planner_queries.length>=2&&item.review_focus.length>=2));
  const humeKant=paired.find(item=>item.id==='paired-hume-kant-causal-inference');
@@ -144,6 +145,12 @@ test('paired new-question suite keeps its own five cases and gives each a publis
  assert.match(humeKant.question,/Critique of Pure Reason/);
  assert.deepEqual(humeKant.selected_book_ids,['35','40'],
   'both scope modes should be evaluated against the same explicitly named source works');
+ const nietzsche=paired.find(item=>item.id==='paired-nietzsche-good-evil');
+ assert.deepEqual(nietzsche.selected_book_ids,['144']);
+ assert.match(nietzsche.question,/origins of the contrast/);
+ const diamond=paired.find(item=>item.id==='paired-diamond-sutra-giving');
+ assert.deepEqual(diamond.selected_book_ids,['23']);
+ assert.match(diamond.question,/without abiding in forms/);
  assert.ok(evaluationUsesLivePlanner('paired','paired'));
  assert.equal(selectLiveCases({cases:[]},'paired','paired-dubois-double-consciousness').length,1);
  assert.throws(()=>selectLiveCases({cases:[]},'paired','focused-sunyata'),/Unknown paired case/);
