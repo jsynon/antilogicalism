@@ -43,9 +43,17 @@
     const tokens = firstContributor.replace(/[.]/g, '').split(/\s+/).filter(Boolean);
     while (tokens.length > 1 && /^(jr|sr|ii|iii|iv|v)$/i.test(tokens[tokens.length - 1])) tokens.pop();
     if (!tokens.length) return '\uffff';
-    // Ignore name particles so "Augustine of Hippo", "Pliny the Elder", and
-    // "Benedict de Spinoza" file under Hippo, Elder, and Spinoza.
-    const particles = new Set(['al','bin','da','de','del','della','der','di','du','el','ibn','la','le','of','the','ten','ter','van','von','zu','zum','zur']);
+    // Keep Spanish compound surnames together, but file epithets and place
+    // names by their final meaningful word (Hippo, Elder, Areopagite).
+    const yIndex = tokens.findIndex(token => token.toLocaleLowerCase() === 'y');
+    if (yIndex > 0 && yIndex < tokens.length - 1) return tokens.slice(yIndex - 1).join(' ');
+    // Preserve conventional compound surnames while ignoring particles such
+    // as "of", "the", and "de" for Augustine, Pliny, and Spinoza.
+    const includedParticles = new Set(['da','del','della','di','du','la','le','van','von']);
+    if (tokens.length > 1 && includedParticles.has(tokens.at(-2).toLocaleLowerCase())) {
+      return tokens.slice(-2).join(' ');
+    }
+    const particles = new Set(['al','bin','de','el','ibn','of','the']);
     const meaningful = tokens.filter(token => !particles.has(token.toLocaleLowerCase()));
     const key = (meaningful.length ? meaningful : tokens).at(-1);
     return key.replace(/^(?:al|el)-/i, '') || key;
