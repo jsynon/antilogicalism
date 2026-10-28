@@ -12,6 +12,14 @@ The `quality` mode defaults to the cases’ selected-book scope and uses two fix
 
 Quality reports separate expected-book retrieval from source use: for each requested part, `partEvidenceAudit` shows whether its evidence IDs resolve to the review map, cited source, and submitted page. `sourceGroups` then shows whether each required work is linked to a supported part. `answerCoverageConsistent` checks that reported coverage matches the part statuses and flags explicit prose that denies a comparison marked supported. These are structural checks only. They cannot determine whether the cited passage semantically supports the claim or whether the interpretation is correct; inspect `answerText`, `evidenceMap`, highlights, and cited page text manually. The automated `passed` count is a review signal, not an AI truth grade.
 
+## Acceptance calibration and repeatability
+
+The All Books **acceptance** suite preserves its original seven questions and adds one approved cross-source case: `acceptance-god-is-love`, “What does ‘God is love’ mean?” That case expects relevant citations from both a Bible text and a Simone Weil work. It is intended to check meaningful synthesis and citation support, not citation count by itself.
+
+To measure run-to-run variation, dispatch **suite `acceptance`**, **case ID `acceptance-god-is-love`**, **scope `all-books`**, and **answer variant `with-review`** three times as separate workflow runs. Each run is one answer attempt (about 3 baseline Worker inference calls, plus conditional repairs). Compare the answers, cited works, claim-level support, and the recorded Worker source revision and v49 corpus fingerprints across runs. The standard seven-case acceptance run remains available with case ID `all`.
+
+For each answer, score these dimensions independently from 0 (fail) to 2 (strong): accuracy, question coverage, explanation quality, citation support, and citation completeness. Record a short note for any score below 2 that names the claim or passage driving it. Keep those human scores separate from the automated supported/partial/unsupported labels; compare the two signals across cases to spot where the partial labels miss an incomplete answer or flag an answer that a reviewer considers complete.
+
 ## Focused source-selection checks
 
 The `focused` mode is separate from the stable seven-question `quality` baseline and is available in both manually dispatched live-answer workflows. To run the whole five-question set in one job and one artifact, choose **mode `focused`** and **case ID `all`**. Choose one focused `case_id` only when diagnosing a single question. The cases are Kant on transcendental idealism, Kierkegaard on faith, Nietzsche on Christianity, sunyata, and the question about Nietzsche's possible response to Kierkegaard.
