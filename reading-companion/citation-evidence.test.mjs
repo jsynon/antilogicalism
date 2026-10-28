@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {claimQuotesForCitation} from './citation-evidence.mjs';
 
-const client=readFileSync(new URL('./companion-v111.mjs',import.meta.url),'utf8');
+const client=readFileSync(new URL('./companion-v112.mjs',import.meta.url),'utf8');
 const answer='The gifts of Fortune reveal that true happiness cannot be found in external, changeable matters, as these goods lose their value when examined or are subject to being lost. [S1] Lady Philosophy observes that wealth is not inherently valuable for its own nature but depends on human use, and it becomes less of a possession when it is scattered to others. [S1]';
 const citationStart=answer.lastIndexOf('[S1]');
 const approved=[

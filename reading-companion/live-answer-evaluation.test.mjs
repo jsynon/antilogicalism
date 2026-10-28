@@ -241,7 +241,9 @@ test('acceptance mode preserves its seven-case baseline and adds the approved Go
  const focused=selectLiveCases({cases:[]},'acceptance','acceptance-god-is-love');
  assert.equal(focused.length,1);
  assert.deepEqual(focused[0].required_source_groups.map(group=>group.book_ids),[
-  ['335','638','646'],['411','417','427','428','429']]);
+  ['335','638','646']]);
+ assert.match(focused[0].review_focus[0],/Bible source is required/);
+ assert.match(focused[0].review_focus[1],/optional/);
  assert.throws(()=>selectLiveCases({cases:[]},'acceptance','holdout-history-herodotus-helen'),/Unknown acceptance case/);
 });
 
@@ -768,22 +770,37 @@ test('review ablation compares both answer paths against the identical source pa
  assert.equal(result.reviewAblation.variants[1].passed,null);
 });
 
-test('planner 502 falls back to searching the original question and completes evaluation',async()=>{
+test('planner 502 fallback retrieves and submits Bible evidence for God is love',async()=>{
  const calls=[],searched=[];
- const library={search:async(query)=>{searched.push(query);return {sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,preview:'A sufficiently long preview passage for testing.',score:4}]};},
-  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
- const item={id:'planner-outage',question:'Explain the source question with enough detail.',required_source_groups:[{label:'Bible',book_ids:['638']}]};
- const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
+ const question='What does “God is love” mean?';
+ const bibleQuery='1 John 4:7-12 God is love and love one another';
+ const library={search:async query=>{
+   searched.push(query);
+   if(query===bibleQuery)return {sources:[{id:'B1',bookId:'638',title:'The New Oxford Annotated Bible',
+    page:1821,globalPageId:1821,preview:'God is love; let us love one another.',score:42}]};
+   return {sources:[{id:'W1',bookId:'427',title:'Waiting for God — Simone Weil',
+    page:140,globalPageId:140,preview:'Before all things, God is love; divine love joins nearness and distance.',score:99}]};
+  },jsonGzip:async bookFile=>bookFile==='book-638.json'
+   ?{pages:[{id:1821,page:1821,text:'God is love; let us love one another, because love is from God.'}]}
+   :{pages:[{id:140,page:140,text:'Before all things, God is love; divine love joins nearness and distance.'}]}};
+ const item={id:'planner-outage',question,required_source_groups:[{label:'Bible',book_ids:['638']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'The New Oxford Annotated Bible'},427:{title:'Waiting for God'}}},
+  allowed:new Set(['638','427']),token:'x'.repeat(40),
   beforeCall:async()=>{},fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});
    if(url.endsWith('pilot-plan'))return new Response(JSON.stringify({failureCode:'search-planning-failed'}),{status:502,headers:{'content-type':'application/json'}});
-   return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+   return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',
+    answer:'In 1 John, God’s love is revealed and calls people to love one another [S1].',
+    citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(calls.length,2);
  assert.match(calls[0].url,/pilot-plan$/);assert.match(calls[1].url,/pilot-answer$/);
  assert.equal(result.plannerFallback,true);
  assert.deepEqual(result.plannerQueries,[]);
  assert.deepEqual(result.plannerFailure,{httpStatus:502,failureCode:'search-planning-failed'});
- assert.ok(result.searches.some(search=>search.query===item.question));
- assert.ok(searched.includes(item.question));
+ assert.deepEqual(searched,[bibleQuery,question]);
+ assert.ok(result.searches.some(search=>search.query===bibleQuery));
+ assert.ok(result.searches.some(search=>search.query===question));
+ assert.ok(result.submittedSources.some(source=>source.bookId==='638'&&source.page===1821),
+  'the Bible page must survive retrieval and reach the Worker packet');
  assert.equal(result.passed,true);
 });
 

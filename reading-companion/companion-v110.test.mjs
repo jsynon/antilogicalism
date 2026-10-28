@@ -5,7 +5,7 @@ import {RemoteLibrary} from './remote-library.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
-const clientV49=readFileSync(new URL('./companion-v111.mjs',import.meta.url),'utf8');
+const clientV49=readFileSync(new URL('./companion-v112.mjs',import.meta.url),'utf8');
 const bookOrder=await import('./book-order.mjs');
 
 test('response citation labels are plain ordered numbers while IDs stay internal',()=>{
@@ -28,7 +28,7 @@ test('v49 Reading Companion page retains Book Lite and loads the v49 client',()=
  assert.match(html,/wp-content\/themes\/book-lite/);
  assert.match(html,/id="masthead"/);
  assert.match(html,/id="secondary"/);
- assert.match(html,/companion-v111\.mjs/);
+ assert.match(html,/companion-v112\.mjs/);
  assert.doesNotMatch(html,/companion-v110\.mjs/);
 });
 test('companion introduction explains how to use it and links to Library Search',()=>{
@@ -125,6 +125,8 @@ test('book selector search matches title or author without changing source entri
 });
 
 test('current browser client validates the v3 fingerprint coverage manifest',()=>{
+ assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.13\.0'/,
+  'the active client cache-busts the changed shared retriever');
  assert(clientV49.includes("reader-fingerprints-v3/coverage-v3.json"));
  assert.match(clientV49,/antilogicalism-reader-coverage-v3/);
  assert.match(clientV49,/libraryVersion!==49/);

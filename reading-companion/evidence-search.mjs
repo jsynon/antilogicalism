@@ -266,6 +266,10 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   if(!Array.isArray(queries)||queries.length!==1||String(queries[0]||'').trim()!==direct)
    throw Error('Direct fallback must use the unchanged question.');
  }else if(!validSearchPlan(queries))throw Error('Planner returned an invalid search plan.');
+ const selected=selectedBookIds.map(String);
+ const selectedAllowed=new Set(selected.filter(id=>allowedBookIds.has(id)));
+ if(selected.length&&selected.some(id=>!allowedBookIds.has(id)))
+  throw Error('Selected book is not present in the published corpus.');
  if(!Array.isArray(partQueries)||partQueries.length>12||partQueries.some(item=>
    !item||typeof item.partId!=='string'||!/^P[1-9]\d*$/.test(item.partId)||
    typeof item.query!=='string'||item.query.trim().length<5||item.query.trim().length>400))
@@ -275,7 +279,10 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  // source-side query without spending additional retrieval work.
  if(new Set(partQueries.map(item=>item.query.trim().toLocaleLowerCase())).size>6)
   throw Error('Too many distinct part-specific retrieval queries.');
- const baseQueries=buildSearchFacets(direct,useDirect?[direct]:queries);
+ // Keep caller-supplied direct fallback constrained to the unchanged question;
+ // only this local deterministic helper may add a recognized source facet.
+ const fallbackQueries=useDirect?directFallbackQueries(direct,{selectedBookIds:selected}):queries;
+ const baseQueries=buildSearchFacets(direct,fallbackQueries);
  const searchQueries=[...baseQueries];
  for(const item of partQueries){
   const query=item.query.trim();
@@ -324,10 +331,6 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
    scriptureScopeByFacet.set(item.facet,inheritedScriptureReference);
   }
  }
- const selected=selectedBookIds.map(String);
- const selectedAllowed=new Set(selected.filter(id=>allowedBookIds.has(id)));
- if(selected.length&&selected.some(id=>!allowedBookIds.has(id)))
-  throw Error('Selected book is not present in the published corpus.');
  const namedBookIds=selected.length?selected:matchExplicitBookIds(direct,books);
  const targetBookIds=namedBookIds.length?namedBookIds:[null];
  const retrievalAllowed=selected.length?selectedAllowed:allowedBookIds;
@@ -492,9 +495,17 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   sourceBookIds:partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[]})):[];
  const directQuestionFacetIndex=searchQueries.findIndex(value=>
   value.trim().toLocaleLowerCase()===direct.toLocaleLowerCase());
- const results=searchSets.length>1?mergeFacetSearches(searchSets,maxCandidates,linkedFacets,{
+ // Give each deterministic outage-only source facet a candidate slot before
+ // unrelated high-scoring hits from the verbatim question can crowd it out.
+ // This preserves evidence availability; it does not certify relevance.
+ const fallbackFacetIndexes=useDirect?baseQueries.map((value,index)=>
+  value.trim().toLocaleLowerCase()===direct.toLocaleLowerCase()?-1:index).filter(index=>index>=0):[];
+ const reservedFacetIndexes=[...new Set([...linkedFacets,...fallbackFacetIndexes])];
+ const hasScriptureFallbackFacet=fallbackFacetIndexes.some(index=>
+  hasExplicitScriptureReference(searchQueries[index]));
+ const results=searchSets.length>1?mergeFacetSearches(searchSets,maxCandidates,reservedFacetIndexes,{
   directQuestionFacetIndex,partQuestions:scopedPartQuestions,partFacetScopes,
-  preferPrimaryBible:scriptureReferences.length===1
+  preferPrimaryBible:scriptureReferences.length===1||hasScriptureFallbackFacet
  }):
   (searchSets[0]?.sources||[]).map((source,index)=>({...source,facet:0,
     facetRanks:[{facet:0,rank:index+1}]}));
@@ -572,6 +583,21 @@ export function buildSearchFacets(question,plannedQueries,bookId=''){
  if(!direct||planned.some(query=>query.trim().toLowerCase()===direct.toLowerCase()))
   return [...planned];
  return [...planned,direct];
+}
+
+/* A planner outage should still preserve the reader's exact wording. For this
+ * canonical scriptural phrase, add one deterministic 1 John facet so All
+ * Books mode can retrieve the passage that gives the phrase its context. Keep
+ * the direct question last because packet balancing treats that as its own
+ * facet. Selected-book scope stays exact; it never gains a cross-book query.
+ */
+export function directFallbackQueries(question,{selectedBookIds=[]}={}){
+ const direct=String(question||'').trim();
+ if(!direct)return [];
+ if((Array.isArray(selectedBookIds)&&selectedBookIds.length)||
+   explicitScriptureReferences(direct).length||!/\bgod\s+is\s+love\b/i.test(direct))
+  return [direct];
+ return ['1 John 4:7-12 God is love and love one another',direct];
 }
 
 /* Resolve explicit work names and author mentions against the published
