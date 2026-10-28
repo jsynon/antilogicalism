@@ -13,7 +13,7 @@ function normalized(value){
 function authorName(title){
   let author=splitTitle(title).author;
   author=author.replace(/^(?:(?:edited|compiled|translated|selected|annotated|introduced|prepared|arranged|revised|adapted)\s+by|by)\s+/i,'');
-  author=author.replace(/\s*\((?:(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\b[^)]*|editors?|translators?|compilers?|annotators?|contributors?)\)\s*$/i,'');
+  author=author.replace(/\s*\((?:(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\b[^)]*|[^)]*,\s*(?:editors?|translators?|compilers?|annotators?|contributors?)|editors?|translators?|compilers?|annotators?|contributors?)\)\s*$/i,'');
   author=author.split(/[,;]\s*(?:(?:translated|edited|compiled|introduced)\s+by|trans\.?|ed\.?)\b/i)[0];
   return author.replace(/\s+(?:and others|et al\.?)$/i,'').trim();
 }
@@ -21,6 +21,7 @@ function surname(name){
   const first=String(name||'').split(/\s+(?:and|&)\s+/i)[0]
     .split(/\s*;\s*/)[0].trim();
   if(!first)return 'zzzzzz';
+  if(/^various\s+(?:authors?|poets?|contributors?)$/i.test(first))return 'Various';
   const commaParts=first.split(',').map(part=>part.trim()).filter(Boolean);
   if(commaParts.length>1)return commaParts[0].split(/\s+/).at(-1);
   const words=first.replace(/[.]/g,'').split(/\s+/).filter(Boolean);
