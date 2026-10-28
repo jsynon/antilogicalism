@@ -24,7 +24,7 @@ test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);
  assert.match(client,/maxSources:MAX_ANSWER_SOURCES/);
 });
-test('v48 Reading Companion page retains Book Lite and loads the v48 client',()=>{
+test('v49 Reading Companion page retains Book Lite and loads the v49 client',()=>{
  assert.match(html,/wp-content\/themes\/book-lite/);
  assert.match(html,/id="masthead"/);
  assert.match(html,/id="secondary"/);

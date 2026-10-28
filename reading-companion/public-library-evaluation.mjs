@@ -14,13 +14,13 @@ import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
 const CATALOG_URL='https://raw.githubusercontent.com/jsynon/antilogicalism/main/digital-library/library-catalog.json';
-const FINGERPRINT_ROOT='https://jsynon.github.io/antilogicalism-library-data/reader-fingerprints-v2/';
+const FINGERPRINT_ROOT='https://jsynon.github.io/antilogicalism-library-data/reader-fingerprints-v3/';
 const DEFAULT_OUTPUT='';
 const PDF_ID=/^https:\/\/drive\.google\.com\/file\/d\/([A-Za-z0-9_-]{10,})\/(?:view|preview)/;
 const MAX_PAGE_BYTES=14000;
 
 function parseArgs(argv){
- const out={suitePath:SUITE_PATH,corpusRoot:DEFAULT_INDEX_ROOT,catalogUrl:CATALOG_URL,coverageUrl:FINGERPRINT_ROOT+'coverage-v2.json',
+ const out={suitePath:SUITE_PATH,corpusRoot:DEFAULT_INDEX_ROOT,catalogUrl:CATALOG_URL,coverageUrl:FINGERPRINT_ROOT+'coverage-v3.json',
    output:DEFAULT_OUTPUT,limit:0,caseIds:[]};
  for(let i=0;i<argv.length;i++){
   const raw=argv[i];if(raw==='--help'||raw==='-h'){out.help=true;continue;}
@@ -41,8 +41,8 @@ function parseArgs(argv){
 export function validateSuite(suite){
  if(suite?.schema_version!==1||!['antilogicalism-reading-companion-public-v1',
     'antilogicalism-reading-companion-selected-book-v1'].includes(suite?.suite_id)||
-    suite?.corpus_version!==48||!Array.isArray(suite.cases)||!suite.cases.length)
-  throw Error('Expected a non-empty public-library v48 evaluation suite.');
+    suite?.corpus_version!==49||!Array.isArray(suite.cases)||!suite.cases.length)
+  throw Error('Expected a non-empty public-library v49 evaluation suite.');
  const seen=new Set();
  for(const item of suite.cases){
   if(!item||!/^[a-z][a-z0-9-]{2,79}$/.test(item.id||'')||seen.has(item.id))throw Error('Duplicate or invalid case ID: '+String(item?.id));
@@ -110,7 +110,7 @@ export async function verifyFingerprint(source,library,coverageBooks,fetcher=fet
    library.jsonGzip('book-'+bookId+'.json'),fetchJson(FINGERPRINT_ROOT+'books/'+bookId+'/'+chunk+'.json',fetcher)
   ]);
  }catch(error){return {ok:false,status:'fingerprint-fetch-failed',error:String(error?.message||error)};}
- if(packet?.schema!=='antilogicalism-reader-fingerprints-v2'||packet?.hashAlgorithm!=='SHA-256-utf8-exact'||packet?.libraryVersion!==48||packet?.bookId!==bookId||packet?.chunk!==chunk||!Array.isArray(packet.pages))
+ if(packet?.schema!=='antilogicalism-reader-fingerprints-v3'||packet?.hashAlgorithm!=='SHA-256-utf8-exact'||packet?.libraryVersion!==49||packet?.bookId!==bookId||packet?.chunk!==chunk||!Array.isArray(packet.pages))
   return {ok:false,status:'invalid-fingerprint-packet'};
  const records=shard.pages?.filter(p=>p.id===source.globalPageId&&p.page===page)||[];
  if(records.length!==1||typeof records[0].text!=='string')return {ok:false,status:'source-page-missing-or-ambiguous'};
@@ -264,7 +264,7 @@ async function main(){
  const cases=args.caseIds.length?suite.cases.filter(item=>args.caseIds.includes(item.id)):
   args.limit?suite.cases.slice(0,args.limit):suite.cases;
  const [catalog,coverage]=await Promise.all([fetchJson(args.catalogUrl),fetchJson(args.coverageUrl)]);
- if(coverage?.schema!=='antilogicalism-reader-coverage-v2'||coverage?.libraryVersion!==48||!coverage.books)throw Error('Published v48 fingerprint coverage is incompatible.');
+ if(coverage?.schema!=='antilogicalism-reader-coverage-v3'||coverage?.libraryVersion!==49||!coverage.books)throw Error('Published v49 fingerprint coverage is incompatible.');
  const allowedBookIds=new Set(Object.keys(coverage.books));
  const cachedFetch=makeCachedFetch(args.corpusRoot),library=new RemoteLibrary(args.corpusRoot,cachedFetch),manifest=await library.manifest();
  if(manifest.version!==suite.corpus_version)throw Error('Published corpus and benchmark versions differ.');

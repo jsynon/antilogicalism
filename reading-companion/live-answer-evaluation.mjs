@@ -13,18 +13,18 @@ import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
-const FINGERPRINT_ROOT='https://jsynon.github.io/antilogicalism-library-data/reader-fingerprints-v2/';
+const FINGERPRINT_ROOT='https://jsynon.github.io/antilogicalism-library-data/reader-fingerprints-v3/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
 const PART_ID=/^P[1-9]\d*$/;
 const validPartText=value=>typeof value==='string'&&value.trim().length>=5&&value.trim().length<=400;
 
 export function validatePublishedCorpus(coverage,manifest){
- if(coverage?.schema!=='antilogicalism-reader-coverage-v2'||coverage?.libraryVersion!==48||
+ if(coverage?.schema!=='antilogicalism-reader-coverage-v3'||coverage?.libraryVersion!==49||
     !coverage.books||typeof coverage.books!=='object'||Array.isArray(coverage.books)||
-    manifest?.version!==48){
+    manifest?.version!==49){
   const coverageVersion=Number.isInteger(coverage?.libraryVersion)?coverage.libraryVersion:'unknown';
   const corpusVersion=Number.isInteger(manifest?.version)?manifest.version:'unknown';
-  throw Error(`Published library version mismatch (expected v48; fingerprint coverage v${coverageVersion}, corpus v${corpusVersion}).`);
+  throw Error(`Published library version mismatch (expected v49; fingerprint coverage v${coverageVersion}, corpus v${corpusVersion}).`);
  }
  return new Set(Object.keys(coverage.books));
 }
@@ -137,6 +137,8 @@ const PAIRED_CASES=[
  {id:'paired-dubois-double-consciousness',discipline:'society',question:'What does Du Bois mean by double consciousness, and how does he connect it to the color line?',selected_book_ids:['454'],planner_queries:['Du Bois double consciousness two souls veil seeing oneself through others','Du Bois color line double consciousness self understanding Souls of Black Folk'],required_source_groups:[{label:'Du Bois, The Souls of Black Folk',book_ids:['454']}],review_focus:['Explain the concept through Du Bois’s own description of the divided self and the veil.','Show how the passage connects the experience to the color line without reducing it to a generic identity conflict.']},
  {id:'paired-boethius-fortune-wheel',discipline:'philosophy',question:'How does Lady Philosophy explain why Fortune cannot be stable, and what do her gifts reveal about happiness?',selected_book_ids:['21'],planner_queries:['Boethius Consolation of Philosophy Fortune wheel unstable gifts happiness Lady Philosophy','Boethius fortune gifts cannot secure happiness true good instability'],required_source_groups:[{label:'Boethius, Consolation of Philosophy',book_ids:['21']}],review_focus:['Attribute the argument to Lady Philosophy within the dialogue.','Explain why changing external gifts cannot provide stable happiness, using the text’s reasoning.']},
  {id:'paired-hamlet-conscience',discipline:'literature',question:'In Hamlet’s “To be, or not to be” soliloquy, what does he mean when he says that conscience makes cowards of us all?',selected_book_ids:['212'],planner_queries:['Hamlet to be or not to be conscience makes cowards of us all native hue resolution','Hamlet soliloquy thought fear of death unknown country action resolution'],required_source_groups:[{label:'Shakespeare, Hamlet',book_ids:['212']}],review_focus:['Explain the line in the soliloquy’s reasoning about thought, fear, and action.','Keep the passage attributed to Hamlet and avoid treating the speech as the play’s settled doctrine. Check that the highlighted passage contains the line and supports the explanation.']},
+ {id:'paired-nietzsche-good-evil',discipline:'philosophy',question:'In On the Genealogy of Morals, how does Nietzsche explain the origins of the contrast between “good” and “evil”?',selected_book_ids:['144'],planner_queries:['Nietzsche Genealogy of Morals first essay noble morality good bad slave morality good evil origins','Nietzsche Genealogy of Morals noble valuation good bad ressentiment slave revolt morality'],required_source_groups:[{label:'Nietzsche, On the Genealogy of Morals',book_ids:['144']}],review_focus:['Explain the contrast Nietzsche draws between the noble valuation of “good/bad” and the later slave-moral valuation of “good/evil.”','Attribute the historical-psychological account to Nietzsche’s argument and avoid presenting the terms as timeless definitions.']},
+ {id:'paired-diamond-sutra-giving',discipline:'religion',question:'In the Diamond Sutra, what does it mean for a bodhisattva to give without abiding in forms, and how does that shape the practice of giving?',selected_book_ids:['23'],planner_queries:['Diamond Sutra bodhisattva give without abiding in forms no attachment signs','Diamond Sutra practice giving without dwelling in objects of mind bodhisattva'],required_source_groups:[{label:'Diamond Sutra',book_ids:['23']}],review_focus:['Explain “giving without abiding in forms” in the text’s context rather than as ordinary generosity alone.','Keep claims about nonattachment tied to the passage and do not turn the teaching into nihilism or a denial of conventional practice.']},
 ];
 const HOLDOUT_CASES=[
  {id:'holdout-history-herodotus-helen',discipline:'history',question:'When Herodotus recounts the story of Helen’s journey to Troy, what do the Egyptian priests tell him, and how does he explain why he finds their account more credible?',selected_book_ids:['149'],planner_queries:['Herodotus Histories Helen Egypt priests account Troy credibility','Herodotus Helen Paris Egypt Egyptian priests story judgment'],required_source_groups:[{label:'Herodotus, Histories',book_ids:['149']}],review_focus:['Keep the Egyptian priests’ account distinct from Herodotus’s own reasoning and reported Greek traditions.','Explain the basis he gives for preferring one account without turning his inference into a directly witnessed fact.']},
@@ -902,7 +904,7 @@ async function main(){
  const startupHeartbeat=setInterval(()=>console.log('['+new Date().toISOString()+
   '] SETUP WAIT: still loading the published fingerprint coverage and corpus manifest.'),15_000);
  try{
-  const results=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v2.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
+  const results=await Promise.all([fetchJson(FINGERPRINT_ROOT+'coverage-v3.json'),new RemoteLibrary(DEFAULT_INDEX_ROOT,makeCachedFetch(DEFAULT_INDEX_ROOT)).manifest()]);
   clearInterval(startupHeartbeat);
   const coverage=results[0],manifest=results[1];
   const allowed=validatePublishedCorpus(coverage,manifest);
