@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Development regression cases, focused user questions, or the untouched acceptance set
+        description: Development regression cases, focused user questions, or the frozen acceptance set
         type: choice
         options:
           - holdout
@@ -36,6 +36,7 @@ on:
           - acceptance-aristotle-tragedy-plot
           - acceptance-boethius-fortune
           - acceptance-locke-political-authority
+          - acceptance-god-is-love
         default: all
         required: true
       answer_variant:
