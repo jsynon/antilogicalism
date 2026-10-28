@@ -872,7 +872,7 @@ async function main(){
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, paired, holdout or acceptance mode.');
  if(usesEvaluationMode&&args.mode!=='paired'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
- if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The untouched acceptance suite must run in all-books mode.');
+ if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
