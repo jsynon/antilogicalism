@@ -251,7 +251,7 @@ test('acceptance mode preserves its baseline and adds God is love followed by th
  assert.deepEqual(simulation[0].required_source_groups.map(group=>group.book_ids),[
   ['25'],['19','20','35']]);
  assert.match(simulation[0].review_focus[0],/do not establish whether we live in a computer simulation/);
- assert.match(simulation[0].review_focus[2],/not evidence for a computational simulation/);
+ assert.match(simulation[0].review_focus[2],/as evidence for a computational simulation/);
  assert.throws(()=>selectLiveCases({cases:[]},'acceptance','holdout-history-herodotus-helen'),/Unknown acceptance case/);
 });
 
