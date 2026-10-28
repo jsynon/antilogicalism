@@ -753,7 +753,7 @@ test('review ablation compares both answer paths against the identical source pa
  assert.equal(calls.length,2);
  assert.deepEqual(calls.map(call=>call.body.answerVariant),['with-review','compose-only']);
  assert.deepEqual(calls[0].body.sources,calls[1].body.sources);
- assert.deepEqual(calls[0].body.sources,[{bookId:'638',page:10,text:'A sufficiently long source passage for the fake test page.'}]);
+ assert.deepEqual(calls[0].body.sources,[{bookId:'638',page:10,text:'A sufficiently long source passage for the fake test page.',libraryVersion:49}]);
  assert.equal(result.answerVariant,'paired-review-ablation');
  assert.equal(result.passed,true);
  assert.deepEqual(result.reviewAblation.variants.map(variant=>variant.answerVariant),['with-review','compose-only']);

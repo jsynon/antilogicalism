@@ -686,7 +686,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    const data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
     bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
     answerVariant:variant==='compose-only'?'compose-only':'with-review',
-    sources:selected.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds}))},beforeCall,'answer',progressEvent);
+    // The evaluator loads v49 text; the Worker defaults omitted versions to v48.
+    sources:selected.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds,libraryVersion:49}))},beforeCall,'answer',progressEvent);
    const audit=auditLiveAnswer(data,selected,item.required_source_groups,
     item.required_part_source_groups||[],{scope:item.selected_book_ids?.length?'selected-books':'all-books',
      plannerPlan:plan?.plan||null});
