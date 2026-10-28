@@ -31,6 +31,7 @@ const fixture={
 
 function fakeFetch(url){
  const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (key === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
  return Promise.resolve(key in fixture?
   new Response(gzipSync(JSON.stringify(fixture[key])),{status:200}):
   new Response('Not found',{status:404}));
@@ -67,6 +68,7 @@ test('a James chapter-and-verse question cannot be narrowed to William James wor
  };
  const library=new RemoteLibrary('https://example.test/v48/',url=>{
   const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (key === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return Promise.resolve(key in jamesFixture?
    new Response(gzipSync(JSON.stringify(jamesFixture[key])),{status:200}):
    new Response('Not found',{status:404}));
