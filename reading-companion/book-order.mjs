@@ -12,7 +12,8 @@ function normalized(value){
 }
 function authorName(title){
   let author=splitTitle(title).author;
-  author=author.replace(/^(?:(?:edited|compiled|translated|selected|introduced)\s+by|by)\s+/i,'');
+  author=author.replace(/^(?:(?:edited|compiled|translated|selected|annotated|introduced|prepared|arranged|revised|adapted)\s+by|by)\s+/i,'');
+  author=author.replace(/\s*\((?:(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\b[^)]*|editors?|translators?|compilers?|annotators?|contributors?)\)\s*$/i,'');
   author=author.split(/[,;]\s*(?:(?:translated|edited|compiled|introduced)\s+by|trans\.?|ed\.?)\b/i)[0];
   return author.replace(/\s+(?:and others|et al\.?)$/i,'').trim();
 }
@@ -25,9 +26,14 @@ function surname(name){
   const words=first.replace(/[.]/g,'').split(/\s+/).filter(Boolean);
   while(words.length>1&&/^(jr|sr|ii|iii|iv|v)$/i.test(words.at(-1)))words.pop();
   if(!words.length)return 'zzzzzz';
-  // File by the final meaningful name: Hippo, Elder, and Spinoza, not
-  // the lead-in particles "of", "the", or "de".
-  const particles=new Set(['al','bin','da','de','del','della','der','di','du','el','ibn','la','le','of','the','ten','ter','van','von','zu','zum','zur']);
+  // Use the same conventions as Library Search for compound surnames,
+  // epithets, and place names.
+  const yIndex=words.findIndex(word=>word.toLocaleLowerCase('en')==='y');
+  if(yIndex>0&&yIndex<words.length-1)return words.slice(yIndex-1).join(' ');
+  const includedParticles=new Set(['da','del','della','di','du','la','le','van','von']);
+  if(words.length>1&&includedParticles.has(words.at(-2).toLocaleLowerCase('en')))
+    return words.slice(-2).join(' ');
+  const particles=new Set(['al','bin','de','el','ibn','of','the']);
   const meaningful=words.filter(word=>!particles.has(word.toLocaleLowerCase('en')));
   const key=(meaningful.length?meaningful:words).at(-1);
   return key.replace(/^(?:al|el)-/i,'')||key;
