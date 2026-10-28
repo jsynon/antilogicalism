@@ -408,6 +408,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  const primaryPartIds=comparisonSides.length===2
   ?new Set(comparisonSides.map(side=>side.part.partId))
   :new Set(scopedPartQuestions.map(part=>part?.partId).filter(Boolean));
+ let quotedPartFallbacks=0;
  for(const part of scopedPartQuestions){
   if(!primaryPartIds.has(part?.partId)||typeof part?.question!=='string')continue;
   const query=part.question.trim();
@@ -415,6 +416,42 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   if(!sourceIds.length)continue;
   let facet=searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===query.toLocaleLowerCase());
   let searchSet;
+  const scopedIds=sourceIds.filter(id=>retrievalAllowed.has(String(id)));
+  // In All Books mode, a planner can identify one trusted source work even
+  // though its rewritten searches remain global. If those results from that
+  // work do not contain the question's substantial quotation, run the full
+  // part wording once against that exact work. This recovers source-native
+  // wording such as Hamlet's quoted line without widening search or using AI.
+  // Selected Books already searches the chosen work directly, and comparison
+  // parts with several works use the established scoped-query path below.
+  if(!selected.length&&scopedIds.length===1&&quotedPartFallbacks<2&&
+     hasSubstantialQuotedPhrase(part.question)){
+   const bookId=String(scopedIds[0]);
+   const existingSources=searchSets.flatMap(set=>set.sources||[])
+    .filter(source=>String(source.bookId)===bookId);
+   const quoteAlreadyRetrieved=existingSources.some(source=>
+    quotedPhraseMatchLength(part.question,source.preview||source.text||'')>0);
+   const queryAlreadyScoped=facet>=0&&
+    (searchSets[facet]?.targetBookIds||[]).map(String).includes(bookId);
+   if(!quoteAlreadyRetrieved&&!queryAlreadyScoped){
+    quotedPartFallbacks++;
+    let scopedSources=[];
+    try{
+     const retry=await library.search(query,{bookId,allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook});
+     scopedSources=(Array.isArray(retry?.sources)?retry.sources:[])
+      .filter(source=>String(source.bookId)===bookId)
+      .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+    }catch{
+     // The optional exact-work recovery must not block the ordinary facets.
+    }
+    facet=searchQueries.length;
+    searchQueries.push(query);
+    searchSets.push({sources:scopedSources,executedQuery:query,targetBookIds:[bookId],
+     inheritedPartScope:part.partId,quoteFallback:true});
+    partFacetIndices.push({partId:part.partId,facet});
+    continue;
+   }
+  }
   if(facet<0){
    // Planner part queries may combine the reader's question with a rewritten
    // sub-question, so exact wording is not guaranteed to exist as a facet.
@@ -512,6 +549,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   query:searchSets[index].executedQuery+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
   ...(searchSets[index].scopeReference?{originalQuery:searchQueries[index],scopeInherited:true}:{}),
   ...(searchSets[index].inheritedPartScope?{partScopeInherited:searchSets[index].inheritedPartScope}:{}),
+  ...(searchSets[index].quoteFallback?{quoteFallback:true}:{}),
   ...(searchSets[index].fallbackFrom?{fallbackFrom:searchSets[index].fallbackFrom,
    fallbackReason:'empty-source-side-facet'}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
@@ -826,6 +864,19 @@ function quotedPhraseMatchLength(question,text){
   }
  }
  return longest;
+}
+
+function hasSubstantialQuotedPhrase(question){
+ const value=String(question||''),phrases=[];
+ for(const match of value.matchAll(/[“"]([^”"]{8,120})[”"]|‘([^’]{8,120})’/gu))
+  phrases.push(match[1]||match[2]||'');
+ for(const match of value.matchAll(/(?<![\p{L}\p{N}])'([^']{8,120})'(?![\p{L}\p{N}])/gu))
+  phrases.push(match[1]||'');
+ return phrases.some(phrase=>{
+  const words=phrase.toLocaleLowerCase().normalize('NFKD')
+   .replace(/[\u0300-\u036f]/g,'').match(/[\p{L}\p{N}]+/gu)||[];
+  return words.length>=4&&words.join('').length>=12;
+ });
 }
 
 function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
