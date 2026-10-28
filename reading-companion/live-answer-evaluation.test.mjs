@@ -230,11 +230,18 @@ test('holdout mode selects a separate seven-question set across disciplines',()=
  assert.equal(selectLiveCases({cases:[]},'quality').length,7,'the original quality baseline remains intact');
 });
 
-test('acceptance mode is a separate untouched all-books set',()=>{
+test('acceptance mode preserves its seven-case baseline and adds the approved God is love calibration case',()=>{
  const cases=selectLiveCases({cases:[]},'acceptance');
- assert.equal(cases.length,7);
+ assert.equal(cases.length,8);
  assert.ok(cases.every(item=>item.id.startsWith('acceptance-')&&item.selected_book_ids.length===0));
- assert.equal(new Set(cases.map(item=>item.id)).size,7);
+ assert.equal(new Set(cases.map(item=>item.id)).size,8);
+ for(const id of ['acceptance-descartes-cogito','acceptance-mill-harm-principle','acceptance-epictetus-freedom',
+  'acceptance-augustine-memory','acceptance-aristotle-tragedy-plot','acceptance-boethius-fortune',
+  'acceptance-locke-political-authority'])assert.ok(cases.some(item=>item.id===id),id+' remains in the baseline');
+ const focused=selectLiveCases({cases:[]},'acceptance','acceptance-god-is-love');
+ assert.equal(focused.length,1);
+ assert.deepEqual(focused[0].required_source_groups.map(group=>group.book_ids),[
+  ['335','638','646'],['411','417','427','428','429']]);
  assert.throws(()=>selectLiveCases({cases:[]},'acceptance','holdout-history-herodotus-helen'),/Unknown acceptance case/);
 });
 
