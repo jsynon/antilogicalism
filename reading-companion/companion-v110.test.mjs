@@ -100,6 +100,19 @@ test('book selector sorts by author surname and keeps numbered collections in na
  const sorted=bookOrder.sortBooksForSelector(books);
  assert.deepEqual(sorted.map(book=>book.id),['3','1','2','10','4']);
 });
+test('Copleston volumes sort together under C and de Spinoza sorts under S',()=>{
+ const books=[
+  {id:'copleston-2',title:'A History of Philosophy, Volume II: Medieval Philosophy — Frederick Copleston'},
+  {id:'spinoza',title:'A Theologico-Political Treatise — Benedict de Spinoza'},
+  {id:'copleston-1',title:'A History of Philosophy, Volume I: Greece and Rome — Frederick Copleston'},
+  {id:'smith',title:'A Book — John Smith'},
+  {id:'zebra',title:'A Book — Zoe Zebra'},
+  {id:'aardvark',title:'A Book — Aaron Aardvark'}
+ ];
+ const sorted=bookOrder.sortBooksForSelector(books);
+ assert.deepEqual(sorted.map(book=>book.id),
+  ['aardvark','copleston-1','copleston-2','smith','spinoza','zebra']);
+});
 test('book selector search matches title or author without changing source entries',()=>{
  const books=[
   {id:'1',title:'Nicomachean Ethics — Aristotle'},
