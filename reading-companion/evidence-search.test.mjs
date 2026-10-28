@@ -1113,6 +1113,89 @@ test('rephrased part wording is searched only inside works resolved by a sibling
   'a selected one-work scope should keep its established searches without adding a redundant facet');
 });
 
+test('All Books retries a missing quotation once inside its trusted single-work scope',async()=>{
+ const question='In Hamlet’s “To be, or not to be” soliloquy, what does Hamlet mean when he says that conscience makes cowards of us all?';
+ const partQuestion="What does Hamlet mean by the phrase 'conscience makes cowards of us all' in his 'To be, or not to be' soliloquy?";
+ const queries=["Hamlet 'To be, or not to be' conscience makes cowards of us all meaning",
+  "Shakespeare Hamlet 'conscience' meaning hesitation or thought in soliloquy"];
+ const plannerPartQuery=`${question} ${partQuestion}`;
+ const books=[{id:'212',title:'The Complete Works of William Shakespeare — William Shakespeare'},
+  {id:'564',title:'Elizabethan Drama, Vol. I: Marlowe and Shakespeare — Christopher Marlowe and William Shakespeare'},
+  {id:'230',title:'The Courage to Be — Paul Tillich'}];
+ const parts=[{partId:'P1',question:partQuestion,sourceBookIds:['212']}];
+ const calls=[];
+ const library={search:async(query,{bookId}={})=>{
+  calls.push({query,bookId:String(bookId||'')});
+  if(query===partQuestion&&bookId==='212')return {sources:[{
+   bookId:'212',title:books[0].title,page:454,globalPageId:100454,score:92,
+   preview:'Thus conscience does make cowards of us all.'
+  }]};
+  if(query===queries[1]&&bookId==='212')return {sources:[{
+   bookId:'212',title:books[0].title,page:434,globalPageId:100434,score:82,
+   preview:'His thought and hesitation interrupt his resolution.'
+  }]};
+  if(query===queries[1]&&bookId==='564')return {sources:[{
+   bookId:'564',title:books[1].title,page:121,globalPageId:100121,score:74,
+   preview:'A related Shakespeare discussion.'
+  }]};
+  if(!bookId)return {sources:[{bookId:'230',title:books[2].title,page:43,
+   globalPageId:100043,score:99,preview:'A commentary mentions courage and thought.'}]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question,queries,
+  partQueries:[{partId:'P1',query:queries[0]},{partId:'P1',query:queries[1]},
+   {partId:'P1',query:plannerPartQuery}],partQuestions:parts,
+  library,books,allowedBookIds:new Set(books.map(book=>book.id)),maxCandidates:12,
+  pageLoader:async source=>({text:source.page===454?
+   'Thus conscience does make cowards of us all; and thus the native hue of resolution is sicklied over with the pale cast of thought.':
+   source.page===434?'His thought and hesitation interrupt his resolution.':'A commentary mentions courage and thought.'})});
+ const directPage=result.candidates.find(source=>source.bookId==='212'&&source.page===454);
+ assert.ok(directPage,'the targeted quote page should join the ordinary candidate pool');
+ assert.ok(directPage.candidatePartIds.includes('P1'),
+  'the quote fallback is linked to the part whose trusted work scope triggered it');
+ assert.ok(calls.some(call=>call.query===partQuestion&&call.bookId==='212'),
+  'All Books adds one exact-work search using the full part wording');
+ assert.ok(!calls.some(call=>call.query===partQuestion&&!call.bookId),
+  'the recovery never repeats the part query globally');
+ assert.ok(result.searches.some(search=>search.quoteFallback&&
+  search.partScopeInherited==='P1'&&search.targetBookIds.includes('212')),
+  'the retrieval trace identifies why the scoped facet was added');
+ const packet=selectAnswerSources(result.candidates,question,'token',{maxSources:3,
+  maxBytes:12000,maxSourceBytes:12000,partQuestions:parts});
+ assert.ok(packet.some(source=>source.bookId==='212'&&source.page===454),
+  'the quoted Hamlet passage survives the existing source selector into the answer packet');
+
+ calls.length=0;
+ await retrieveEvidence({question,queries,
+  partQueries:[{partId:'P1',query:queries[0]},{partId:'P1',query:queries[1]},
+   {partId:'P1',query:plannerPartQuery}],partQuestions:parts,
+  library,books,allowedBookIds:new Set(books.map(book=>book.id)),selectedBookIds:['212'],
+  pageLoader:async()=>({text:'A selected-book page.'})});
+ assert.ok(!calls.some(call=>call.query===partQuestion),
+  'Selected Books already targets its chosen work and does not add this fallback');
+});
+
+test('All Books skips the quote retry when a scoped result already contains the phrase',async()=>{
+ const question='What does “conscience makes cowards of us all” mean?';
+ const partQuestion='What does Hamlet mean by “conscience makes cowards of us all” in the soliloquy?';
+ const plannerQuery='Shakespeare Hamlet conscience hesitation thought in soliloquy';
+ const calls=[];
+ const result=await retrieveEvidence({question,queries:[plannerQuery,'Hamlet Shakespeare conscience meaning'],
+  partQueries:[{partId:'P1',query:plannerQuery}],partQuestions:[{
+   partId:'P1',question:partQuestion,sourceBookIds:['212']}],
+  library:{search:async(query,{bookId}={})=>{
+   calls.push({query,bookId:String(bookId||'')});
+   return query===plannerQuery?{sources:[{bookId:'212',title:'The Complete Works of William Shakespeare',
+    page:454,globalPageId:100454,score:90,
+    preview:'Thus conscience does make cowards of us all.'}]}:{sources:[]};
+  }},books:[{id:'212',title:'The Complete Works of William Shakespeare'}],
+  allowedBookIds:new Set(['212']),pageLoader:async()=>({text:
+   'Thus conscience does make cowards of us all; thought makes resolution weak.'})});
+ assert.ok(result.candidates.some(source=>source.page===454));
+ assert.ok(!calls.some(call=>call.query===partQuestion),
+  'retrieved quoted evidence prevents a redundant exact-work search');
+});
+
 test('quoted part phrase links an otherwise unassigned page through OCR spacing and reserves it',async()=>{
  const question='What does Hamlet weigh in the famous soliloquy?';
  const books=[{id:'564',title:'Elizabethan Drama, Vol I'}],allowedBookIds=new Set(['564']);
