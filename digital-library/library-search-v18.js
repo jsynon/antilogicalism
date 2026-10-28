@@ -32,12 +32,13 @@
     if (parts.length < 2) return '';
     return parts.slice(1).join(' — ')
       .replace(/^\s*(?:\((?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\s+by\s+\)|(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\s+by\s+)/i, '')
-      .replace(/\s*\((?:(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\b[^)]*|editors?|translators?|compilers?|annotators?|contributors?)\)\s*$/i, '')
+      .replace(/\s*\((?:(?:edited|translated|compiled|selected|annotated|introduced|prepared|arranged|revised|adapted)\b[^)]*|[^)]*,\s*(?:editors?|translators?|compilers?|annotators?|contributors?)|editors?|translators?|compilers?|annotators?|contributors?)\)\s*$/i, '')
       .trim();
   }
   function surnameKey(name) {
     if (!name) return '\uffff';
     const firstContributor = name.split(/\s+(?:and|&)\s+/i)[0].split(/\s*;\s*/)[0].trim();
+    if (/^various\s+(?:authors?|poets?|contributors?)$/i.test(firstContributor)) return 'Various';
     const commaParts = firstContributor.split(',').map(part => part.trim()).filter(Boolean);
     if (commaParts.length > 1) return commaParts[0].split(/\s+/).pop();
     const tokens = firstContributor.replace(/[.]/g, '').split(/\s+/).filter(Boolean);
