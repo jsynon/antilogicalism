@@ -252,6 +252,11 @@ test('acceptance mode preserves its baseline and adds three calibration cases',(
   ['25'],['19','20','35']]);
  assert.match(simulation[0].review_focus[0],/do not establish whether we live in a computer simulation/);
  assert.match(simulation[0].review_focus[2],/as evidence for a computational simulation/);
+ const buddha=selectLiveCases({cases:[]},'acceptance','acceptance-buddha-on-death');
+ assert.equal(buddha.length,1);
+ assert.deepEqual(buddha[0].required_source_groups.map(group=>group.book_ids),[
+  ['22','23','104','225']]);
+ assert.match(buddha[0].review_focus[1],/more than one distinct work/);
  assert.throws(()=>selectLiveCases({cases:[]},'acceptance','holdout-history-herodotus-helen'),/Unknown acceptance case/);
 });
 
