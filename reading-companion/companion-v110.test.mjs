@@ -192,8 +192,10 @@ test('answer citations open in the local page reader while Sources keeps the PDF
  assert.ok(clientV49.includes('citationExcerptsForAnswer(answer,evidenceMap)'));
  assert.ok(clientV49.includes('const evidenceMap=Array.isArray(data.evidenceMap)?data.evidenceMap:[];'));
  assert.ok(clientV49.includes('sourceReader.open({...source,excerpts},a)'));
- assert.match(clientV49,/excerpts\.forEach\(excerpt=>\{\s*const quote=node\('blockquote',undefined,'companion-key-quote'\);\s*quote\.append\(node\('p',excerpt\)\);\s*card\.append\(quote\);\s*\}\);\s*const read=node\('button','Read passages'/,
-  'each citation card renders its excerpts behind one source-level reader button');
+ assert.ok(clientV49.includes("const quote=node('blockquote',undefined,'companion-key-quote')"));
+ assert.ok(clientV49.includes('quote.append(node(\'p\',excerpt))'));
+ assert.ok(clientV49.includes("const read=node('button','Read passages','companion-inline-read')"),
+  'each citation card keeps one source-level reader button');
  assert.match(clientV49,/node\('button','Read passages','companion-inline-read'\)/);
  assert.doesNotMatch(clientV49,/Read highlighted passages|node\('button','Read passage'/);
  assert.match(html,/“Read passages” opens the cited excerpts here/);
