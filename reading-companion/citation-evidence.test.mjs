@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {claimQuotesForCitation} from './citation-evidence.mjs';
+import {claimQuotesForCitation,citationExcerptsForAnswer} from './citation-evidence.mjs';
 
 const client=readFileSync(new URL('./companion-v112.mjs',import.meta.url),'utf8');
 const answer='The gifts of Fortune reveal that true happiness cannot be found in external, changeable matters, as these goods lose their value when examined or are subject to being lost. [S1] Lady Philosophy observes that wealth is not inherently valuable for its own nature but depends on human use, and it becomes less of a possession when it is scattered to others. [S1]';
@@ -47,10 +47,20 @@ test('only verified evidence for the cited source can be highlighted',()=>{
   ]),[]);
 });
 
+test('inline citations retain claim excerpts when Markdown splits the rendered text',()=>{
+  const answer='**The gifts of Fortune reveal that true happiness cannot be found in external, changeable matters, as these goods lose their value when examined or are subject to being lost.** [S1]\n\n- **Lady Philosophy observes that wealth is not inherently valuable for its own nature but depends on human use, and it becomes less of a possession when it is scattered to others.** [S1]';
+  const groups=citationExcerptsForAnswer(answer,approved);
+  assert.deepEqual(groups,[
+    {S1:[approved[1].quote]},
+    {S1:[approved[3].quote]},
+  ]);
+});
+
 test('the live response path uses reviewed evidence, not the capped page summary, for inline citations',()=>{
-  assert.match(client,/import \{claimQuotesForCitation\} from '\.\/citation-evidence\.mjs'/);
+  assert.match(client,/import \{citationExcerptsForAnswer\} from '\.\/citation-evidence\.mjs'/);
   assert.match(client,/const evidenceMap=Array\.isArray\(data\.evidenceMap\)/);
-  assert.match(client,/putMarkdownBlocks\(reply,answer,citations,evidenceMap,numbering\)/);
-  assert.match(client,/claimQuotesForCitation\(answer,citationGroup\.start,source\.id,evidenceMap\)/);
-  assert.doesNotMatch(client,/claimQuotesForCitation\(answer,citationGroup\.start,evidence\)/);
+  assert.match(client,/citationExcerptsForAnswer\(answer,evidenceMap\)/);
+  assert.match(client,/putMarkdownBlocks\(reply,answer,citations,evidenceMap,numbering,citationExcerpts\)/);
+  assert.match(client,/groupExcerpts\[source\.id\]/);
+  assert.doesNotMatch(client,/citationExcerptsForAnswer\(answer,evidenceHighlights\)/);
 });
