@@ -462,12 +462,29 @@ test('conditional coverage is a weak-overlap signal, not a source verdict',()=>{
   'How do we know that reality exists?');
  assert.equal(covered.shouldSearch,false);
 });
+test('index-style entries cannot combine unrelated terms into answer coverage',()=>{
+ const indexPage={bookId:'114',page:1264,globalPageId:'114:1264',
+  preview:'Asceticism, 461; Simulation, St. Peter, 461; Christian living, 512; Jerusalem, common life at, 512; Widows, 450.'};
+ const question='How does simulation relate to Christian living at Jerusalem?';
+ const coverage=assessEvidenceCoverage([indexPage],question);
+ assert.equal(coverage.shouldSearch,true);
+ assert.equal(coverage.weakParts[0].coverageReason,'index-like-candidates-not-counted');
+ assert.deepEqual(coverage.weakParts[0].coverageSource,
+  {bookId:'114',page:1264,globalPageId:'114:1264'});
+ const selected=selectAnswerSources([indexPage],question,'token',{maxSources:3});
+ assert.deepEqual(selected,[]);
+ const prose=assessEvidenceCoverage([{excerpt:'The simulation of Christian living at Jerusalem shapes the argument.'}],question);
+ assert.equal(prose.shouldSearch,false);
+});
 test('answer selection collapses near-identical edition copies but retains distinct passages',()=>{
  const excerpt=Array.from({length:45},(_,i)=>'the same verified source text word'+i).join(' ');
- const distinctExcerpt=excerpt+' '+Array.from({length:30},(_,i)=>'distinctive'+i).join(' ');
+ const longerExcerpt='An introduction with other contextual words. '+excerpt+
+  ' A concluding note with more surrounding source context.';
+ const distinctExcerpt=Array.from({length:45},(_,i)=>
+  (i<22?'a revised and materially different translation phrase':'the same verified source text word'+i)).join(' ');
  const selected=selectAnswerSources([
   {...page(12,'101'),title:'The Teaching of the Buddha, 1986 edition',score:2,text:excerpt},
-  {...page(18,'102'),title:'The Teaching of the Buddha, 2019 edition',score:5,text:excerpt},
+  {...page(18,'102'),title:'The Teaching of the Buddha, 2019 edition',score:5,text:longerExcerpt},
   {...page(22,'103'),title:'The Teaching of the Buddha, 2019 edition',score:4,text:distinctExcerpt}
  ],'What does this passage teach?','token',{maxSources:3});
  assert.deepEqual(selected.map(source=>source.bookId),['102','103']);

@@ -696,7 +696,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    const gap=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,
     bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token',retrievalGap:{
      weakParts:retrievalCoverage.weakParts.slice(0,6).map(part=>({part:part.question,
-      overlap:part.overlap,matchedTerms:part.matchedTerms})),
+      overlap:part.overlap,matchedTerms:part.matchedTerms,
+      coverageReason:part.coverageReason,coverageSource:part.coverageSource})),
      originalQueries:[...queries,...partQueries.map(value=>value.query)].slice(0,7),
      candidates:loaded.retrievalCandidates.slice(0,6).map(source=>({title:source.title,excerpt:source.excerpt.slice(0,420)}))
     }},beforeCall,'gap-planner',progressEvent);

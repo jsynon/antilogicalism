@@ -539,7 +539,8 @@ async function requestSourcePlan(q,verificationToken,history){
 async function requestRetrievalGap(q,verificationToken,history,originalQueries,partQuestions,coverage,candidates){
   if(diagnosticState){diagnosticState.stage='gap-planning';diagnosticState.gapPlannerAttempted=true;}
   const weakParts=coverage.weakParts.slice(0,6).map(item=>({part:item.question,
-    overlap:item.overlap,matchedTerms:item.matchedTerms}));
+    overlap:item.overlap,matchedTerms:item.matchedTerms,
+    coverageReason:item.coverageReason,coverageSource:item.coverageSource}));
   const evidence=candidates.slice(0,6).map(source=>({title:source.title,
     excerpt:String(source.preview||source.text||'').slice(0,420)}));
   const res=await fetch(API+'/api/pilot-plan',{method:'POST',headers:{'Content-Type':'application/json'},
