@@ -19,6 +19,8 @@ const API='https://antilogicalism-companion-public.jsynon.workers.dev';
 const FALLBACK_BOOK={id:'152',title:'History of the Peloponnesian War — Thucydides'};
 const PDF_PAGE_LIMIT=14000;
 const MAX_ANSWER_SOURCES=6;
+// Keep a workbench-sized recall pool; the verified answer packet stays capped at six pages.
+const MAX_RETRIEVAL_CANDIDATES=24;
 const el=id=>document.getElementById(id);
 const question=el('companion-question');
 const form=el('companion-question-form');
