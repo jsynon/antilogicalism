@@ -256,7 +256,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  * difference (the browser has a shard cache; the evaluator reads the shard
  * through RemoteLibrary directly).
  */
-export async function retrieveEvidence({question,queries,partQueries=[],library,books,allowedBookIds,
+export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
  maxCandidates=LIVE_RETRIEVAL_CONFIG.maxCandidates,maxBooks=LIVE_RETRIEVAL_CONFIG.maxBooks,
  pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000}={}){
@@ -283,11 +283,22 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  // source-side query without spending additional retrieval work.
  if(new Set(partQueries.map(item=>item.query.trim().toLocaleLowerCase())).size>6)
   throw Error('Too many distinct part-specific retrieval queries.');
+ if(!Array.isArray(gapQueries)||gapQueries.length>3||gapQueries.some(query=>
+   typeof query!=='string'||query.trim().length<8||query.trim().length>160))
+  throw Error('Conditional retrieval queries are invalid.');
  // Direct fallback uses only the unchanged question. Topic or source-language
  // expansions belong in the planner output, where they remain visible in traces.
  const fallbackQueries=useDirect?[direct]:queries;
  const baseQueries=buildSearchFacets(direct,fallbackQueries);
  const searchQueries=[...baseQueries];
+ // Conditional gap searches add bounded lexical facets without replacing the
+ // reader's question or original planner facets. Evidence checks still decide
+ // what may support the answer.
+ for(const query of gapQueries){
+  const value=query.trim();
+  if(!searchQueries.some(existing=>existing.trim().toLocaleLowerCase()===value.toLocaleLowerCase()))
+   searchQueries.push(value);
+ }
  for(const item of partQueries){
   const query=item.query.trim();
   if(!searchQueries.some(value=>value.trim().toLocaleLowerCase()===query.toLocaleLowerCase()))
@@ -570,6 +581,28 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
   ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),sources:set.sources.slice(0,8)
  })),searchQueries,namedBookIds};
+}
+
+/* Text overlap is a retrieval diagnostic, never a relevance verdict. It
+ * triggers a librarian retry when every page misses the distinctive language
+ * of any requested part, while exact support remains the answer reviewer's job.
+ */
+export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
+ const parts=Array.isArray(partQuestions)&&partQuestions.length
+  ?partQuestions.filter(item=>typeof item?.question==='string').map(item=>({
+    partId:item.partId||'',question:item.question}))
+  :[{partId:'P1',question:String(question||'')}];
+ const weakParts=parts.map(part=>{
+  let overlap=0;
+  // Strip generic prompt scaffolding so evaluation templates such as
+  // "Explain the source question" do not create artificial search calls.
+  const coverageQuestion=part.question.replace(/\b(?:explain|source|question|detail|specific|named|book|passage|answer|enough|sufficiently|testing|fake)\b/giu,' ');
+  for(const source of Array.isArray(candidates)?candidates:[])
+   overlap=Math.max(overlap,directFacetTextMatch(coverageQuestion,source?.preview||source?.text||source?.excerpt||''));
+  if(directFacetTextMatch(coverageQuestion,coverageQuestion)===0)overlap=2;
+  return {...part,overlap};
+ }).filter(part=>part.overlap<2);
+ return {weakParts,shouldSearch:weakParts.length>0};
 }
 export function validSearchPlan(value){
  return Array.isArray(value)&&value.length>=2&&value.length<=4&&
@@ -963,6 +996,7 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    partQuestions=[]}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||
     typeof turnstileToken!=='string')return [];
+ candidates=dedupeEditionCopies(candidates);
  const chosen=[],firstPerBook=[],seenBooks=new Set();
  for(const candidate of candidates){
    const key=String(candidate?.bookId||'');
@@ -1123,5 +1157,30 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    if(bytes<=maxBytes){chosen.push(candidate);selectedSourceBytes+=candidateBytes;}
  }
  return chosen;
+}
+
+/* Some catalogs publish the same source text in several edition records.
+ * Collapse only exact normalized page copies under the same normalized work
+ * title; translated or otherwise textually different editions remain eligible. */
+function dedupeEditionCopies(candidates){
+ const seen=new Map(),out=[];
+ for(const candidate of candidates){
+  const title=String(candidate?.title||'').toLocaleLowerCase().normalize('NFKD')
+   .replace(/[\u0300-\u036f]/g,'').replace(/\b(?:19|20)\d{2}\b/g,' ')
+   .replace(/\b(?:edition|editions|printing|reprint|revised|updated)\b/g,' ')
+   .replace(/[^a-z0-9]+/g,' ').trim();
+  const text=typeof candidate?.text==='string'?candidate.text.toLocaleLowerCase().normalize('NFKC')
+   .replace(/[^\p{L}\p{N}]+/gu,' ').trim():'';
+  // A tiny heading or OCR fragment is not enough to establish a duplicate.
+  if(title.length<6||text.split(/\s+/).length<40){out.push(candidate);continue;}
+  const key=title+'\u0000'+text;
+  const previous=seen.get(key);
+  if(!previous){seen.set(key,candidate);out.push(candidate);continue;}
+  if(Number(candidate?.score)>Number(previous?.score)){
+   const index=out.indexOf(previous);if(index>=0)out[index]=candidate;
+   seen.set(key,candidate);
+  }
+ }
+ return out;
 }
 

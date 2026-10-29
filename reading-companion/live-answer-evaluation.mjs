@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
+import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -591,10 +591,10 @@ function makeCachedFetch(root){
 }
 async function fetchJson(url){const response=await fetch(url,{headers:{accept:'application/json'},cache:'no-store'});if(!response.ok)throw Error(url+' returned HTTP '+response.status);return response.json();}
 async function loadSources(item,queries,{library,manifest,allowed,directFallback=false,
- partQueries=[],partQuestions=[]}){
+ partQueries=[],partQuestions=[],gapQueries=[]}){
  const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
- const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,partQuestions,directFallback,
+ const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,partQuestions,gapQueries,directFallback,
   library,books:bookCatalog,allowedBookIds:allowed,selectedBookIds,
   ...LIVE_RETRIEVAL_CONFIG,
   pageLoader:async source=>{
@@ -603,7 +603,6 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
    return pages.length===1&&typeof pages[0].text==='string'?{text:pages[0].text}:null;
   }});
  const populated=retrieval.candidates;
- if(!populated.length)throw Error('Retrieval returned no fingerprint-eligible source pages.');
  // Match the public companion's answer packet limits. A four-page / 30 KB
  // evaluation can omit a strong passage that the website itself would send,
  // especially when an all-books question needs evidence from several facets.
@@ -611,7 +610,6 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   maxSources:6,maxBytes:39_000,maxSourceBytes:35_000,history:[],
   plannedFacetCount:Math.max(0,retrieval.searchQueries.length-1),
   partQuestions});
- if(!selected.length)throw Error('No source pages fit the Worker request limit.');
  for(const source of selected){
   const book=manifest.books[String(source.bookId)];
   if(!book)throw Error('A selected source is absent from the published manifest.');
@@ -686,6 +684,51 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
+ let gapQueries=[],gapPlannerFailure=null;
+ const initialRetrievalCoverage=assessEvidenceCoverage(loaded.retrievalCandidates,item.question,partQuestions);
+ let retrievalCoverage=initialRetrievalCoverage;
+ const gapSearchTriggered=initialRetrievalCoverage.shouldSearch;
+ let gapRetrievalRerun=false;
+ if(retrievalCoverage.shouldSearch){
+  await progress('gap-planner','started','Retrieved passages leave at least one question part weakly covered; asking the librarian for optional alternate search terms.',
+   {weakPartCount:retrievalCoverage.weakParts.length});
+  try{
+   const gap=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,
+    bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token',retrievalGap:{
+     weakParts:retrievalCoverage.weakParts.slice(0,6).map(part=>({part:part.question,overlap:part.overlap})),
+     originalQueries:[...queries,...partQueries.map(value=>value.query)].slice(0,7),
+     candidates:loaded.retrievalCandidates.slice(0,6).map(source=>({title:source.title,excerpt:source.excerpt.slice(0,420)}))
+    }},beforeCall,'gap-planner',progressEvent);
+   if(!Array.isArray(gap?.queries)||gap.queries.length>3||gap.queries.some(value=>
+     typeof value!=='string'||value.trim().length<8||value.trim().length>160))
+    throw attachRequestFailure(new Error('Conditional retrieval planner returned invalid queries.'),
+     'gap-planner',{httpStatus:200,failureCode:'invalid-response',workerFailure:false});
+   gapQueries=[...new Set(gap.queries.map(value=>value.trim()))];
+   await progress('gap-planner','completed',`Conditional retrieval returned ${gapQueries.length} optional search terms.`,
+    {queryCount:gapQueries.length,usage:gap.usage||null});
+   if(gapQueries.length){
+    loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,
+     partQueries,partQuestions,gapQueries});
+    gapRetrievalRerun=true;
+    retrievalCoverage=assessEvidenceCoverage(loaded.retrievalCandidates,item.question,partQuestions);
+   }
+  }catch(error){
+   const failure=error.requestFailure||{};
+   if(!canFallbackToDirectSearch(failure.httpStatus,failure.failureCode)){
+    failure.gapPlannerAttempted=true;error.requestFailure=failure;throw error;
+   }
+   gapPlannerFailure=failure.failureCode||'gap-planning-failed';
+   await progress('gap-planner','recovered','Conditional search planning failed; continuing with the original verified retrieval packet.',
+    {failureCode:gapPlannerFailure});
+  }
+ }
+ if(!loaded.selected.length){
+  const error=attachRequestFailure(new Error('Retrieval produced no fingerprint-eligible pages that fit the answer packet.'),
+   'retrieval',{failureCode:'no-eligible-sources',workerFailure:false});
+  error.requestFailure.gapPlannerAttempted=gapSearchTriggered;
+  if(gapPlannerFailure)error.requestFailure.gapPlannerFailure=gapPlannerFailure;
+  throw error;
+ }
  const {selected,searches,retrievalCandidates}=loaded;
  const retrievalFallbackCount=searches.filter(value=>value.fallbackFrom).length;
  await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; selected ${selected.length} verified pages.`+
@@ -728,6 +771,10 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,plannerWorkerSourceRevision,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
   ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,searches,retrievalCandidates,
+  retrievalCoverage:{triggered:gapSearchTriggered,
+   weakParts:initialRetrievalCoverage.weakParts},
+  ...(gapRetrievalRerun?{retrievalCoverageAfterGap:{weakParts:retrievalCoverage.weakParts}}:{}),
+  gapPlannerAttempted:gapSearchTriggered,gapQueries,...(gapPlannerFailure?{gapPlannerFailure}:{}),
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
   ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
@@ -802,7 +849,9 @@ function failedCaseResult(item,error){
   answerWorkerVersionId:failure.stage==='answer'?failure.workerVersionId:null,
   answerWorkerSourceBuild:failure.stage==='answer'?failure.workerSourceBuild:null,
   answerWorkerSourceRevision:failure.stage==='answer'?failure.workerSourceRevision:null,
-  plannerFallback:failure.plannerFallback===true,...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),searches:[],
+  plannerFallback:failure.plannerFallback===true,gapPlannerAttempted:failure.gapPlannerAttempted===true,
+  ...(failure.gapPlannerFailure?{gapPlannerFailure:failure.gapPlannerFailure}:{}),
+  ...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),searches:[],
   submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',
   answerText:'',citationCount:0,citationBookIds:[],citationSources:[],inlineCitationCount:0,
   inlineIdsWithoutSource:[],submittedSourceCount:0,
@@ -906,14 +955,15 @@ async function main(){
  const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:args.mode==='paired'?
   plannerCalls+cases.length*2*answerCallsPerCase:plannerCalls+cases.length*answerCallsPerCase;
  const reportCaseCount=args.mode==='paired'?cases.length*2:cases.length;
+ const conditionalGapPlannerCallAllowance=args.mode==='planner'?0:reportCaseCount;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   answerVariant:args.answerVariant,retrievalConfig:{...LIVE_RETRIEVAL_CONFIG},caseCount:reportCaseCount,pairedQuestionCount:args.mode==='paired'?cases.length:undefined,
   repeatCount:args.repeatCount>1?args.repeatCount:undefined,
   repeatedCaseIds:args.repeatCount>1?baseCases.map(item=>item.id):undefined,
-  estimatedWorkerAiCalls,
+  estimatedWorkerAiCalls,conditionalGapPlannerCallAllowance,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
-   '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; no automatic composer regeneration':
-   (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case; the simplified answer path has no automatic composer regeneration',
+   '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope; no automatic composer regeneration':
+   (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case, plus up to one conditional gap-planner call when page text weakly covers a requested part; no automatic composer regeneration',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
    'Automated checks cover source identity, per-part citation linkage, named-work-to-question-part alignment, and coverage consistency. They do not judge factual truth or whether cited passages semantically support the prose. Each answer includes a blank human rubric: rate accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong).',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],workerSourceRevisions:[],stopReason:'',cases:[]};

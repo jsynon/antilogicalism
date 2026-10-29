@@ -7,7 +7,7 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.15.0';
+import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.16.0';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -222,7 +222,7 @@ async function bookShard(id){
   }
   return sourceShards.get(id);
 }
-async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=null,partQuestions=[]}={}){
+async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=null,partQuestions=[],gapQueries=[],allowEmpty=false}={}){
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   candidates=[];
@@ -260,6 +260,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
     }else{
       const retrieval=await retrieveEvidence({question:q,
         queries:plannerFallback||!plannedQueries?[q]:plannedQueries,
+        gapQueries,
         partQuestions,
         partQueries:!plannerFallback&&Array.isArray(plan?.parts)?plan.parts.flatMap(part=>
           (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
@@ -276,6 +277,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
       populated=retrieval.candidates;
       if(diagnosticState){
         diagnosticState.searches=retrieval.searches;
+        diagnosticState.gapQueries=gapQueries;
       }
       if(diagnosticState&&plan)diagnosticState.plannerPlan=plan;
     }
@@ -288,7 +290,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
     }
     if(!candidates.length){
       setStatus('No matching passages found. Try different wording or choose another book.');
-      return false;
+      return allowEmpty;
     }
     setStatus('Checking the source passages…');
     return true;
@@ -374,7 +376,12 @@ function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new 
     target.append(p);
     paragraph=[];
   };
-  for(const line of String(answer).replace(/\r\n?/g,'\n').split('\n')){
+  // The model occasionally emits a list item after a sentence on the same
+  // line. Split only clear Markdown list markers so they render as semantic
+  // lists instead of exposing the marker in the answer text.
+  const markdown=String(answer).replace(/\r\n?/g,'\n')
+    .replace(/([.!?])\s+(?=(?:[*+-]|\d+[.)])\s{1,})/g,'$1\n');
+  for(const line of markdown.split('\n')){
     const bullet=line.match(/^\s*(?:[*+-]|\d+[.)])\s+(.+?)\s*$/);
     if(bullet){
       flushParagraph();
@@ -529,6 +536,29 @@ async function requestSourcePlan(q,verificationToken,history){
     diagnosticState.plannerPlan=plan;refreshDiagnostic();}
   return {queries:data.queries,plan};
 }
+async function requestRetrievalGap(q,verificationToken,history,originalQueries,partQuestions,coverage,candidates){
+  if(diagnosticState){diagnosticState.stage='gap-planning';diagnosticState.gapPlannerAttempted=true;}
+  const weakParts=coverage.weakParts.slice(0,6).map(item=>({part:item.question,overlap:item.overlap}));
+  const evidence=candidates.slice(0,6).map(source=>({title:source.title,
+    excerpt:String(source.preview||source.text||'').slice(0,420)}));
+  const res=await fetch(API+'/api/pilot-plan',{method:'POST',headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({question:q,bookId:bookFilter.value,history,
+      turnstileToken:verificationToken,retrievalGap:{weakParts,originalQueries:[...originalQueries,
+        ...partQuestions.map(item=>item.question)].slice(0,7),candidates:evidence}})});
+  let data;try{data=await res.json();}catch{throw Error('The evidence search service returned an invalid response.');}
+  if(!res.ok){
+    if(diagnosticState){diagnosticState.gapFailureHttpStatus=res.status;
+      diagnosticState.gapFailureCode=diagnosticFailureCode(res.status,'planner',data.failureCode);}
+    throw Error(data.error||'Conditional evidence search is unavailable');
+  }
+  if(!Array.isArray(data.queries)||data.queries.length>3||data.queries.some(value=>
+    typeof value!=='string'||value.trim().length<8||value.trim().length>160))
+    throw Error('The conditional evidence search plan was incomplete.');
+  const queries=[...new Set(data.queries.map(value=>value.trim()))];
+  if(diagnosticState){diagnosticState.gapQueries=queries;
+    diagnosticState.gapUsage=data.usage||null;refreshDiagnostic();}
+  return queries;
+}
 async function nextTurnstileToken(){
   if(!window.turnstile||turnstileId===null)
     throw Error('The quick check needs to be reloaded.');
@@ -590,8 +620,34 @@ async function askQuestion(questionText){
         ({partId:part.id,question:part.question,sourceBookIds:part.sourceBookIds})):[];
       if(planned)setStatus('Gathering passages from across the collection…');
       const found=await retrieveSources(planned?.queries||null,{plannerFallback,
-        plan:planned?.plan||null,partQuestions});
+        plan:planned?.plan||null,partQuestions,allowEmpty:true});
       if(!found)return;
+      const coverage=assessEvidenceCoverage(candidates,q,partQuestions);
+      if(diagnosticState){diagnosticState.retrievalCoverage={weakParts:coverage.weakParts,
+        triggered:coverage.shouldSearch};refreshDiagnostic();}
+      if(coverage.shouldSearch){
+        turnstileToken='';
+        let gapQueries=[];
+        try{
+          const gapToken=await nextTurnstileToken();turnstileToken='';
+          gapQueries=await requestRetrievalGap(q,gapToken,history,planned?.queries||[q],
+            partQuestions,coverage,candidates);
+        }catch(error){
+          if(!canFallbackToDirectSearch(diagnosticState?.gapFailureHttpStatus,
+            diagnosticState?.gapFailureCode))throw error;
+          if(diagnosticState){diagnosticState.gapPlannerFailure=diagnosticState.gapFailureCode||'gap-planning-failed';
+            diagnosticState.gapFailureHttpStatus=null;diagnosticState.gapFailureCode='';}
+        }
+        if(gapQueries.length){
+          const expanded=await retrieveSources(planned?.queries||null,{plannerFallback,
+            plan:planned?.plan||null,partQuestions,gapQueries});
+          if(!expanded)return;
+          const secondCoverage=assessEvidenceCoverage(candidates,q,partQuestions);
+          if(diagnosticState)diagnosticState.retrievalCoverageAfterGap={
+            weakParts:secondCoverage.weakParts,triggered:true};
+        }
+      }
+      if(!candidates.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
       token=await nextTurnstileToken();
     }else{
       const found=await retrieveSources();

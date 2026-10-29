@@ -447,12 +447,30 @@ test('author-only mentions search across the named author’s catalog works',()=
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage} from './evidence-search.mjs';
 import {catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
 import {sourceAttributionLabel} from './citation-numbering.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
  preview:'Authentic indexed excerpt',url:'https://drive.google.com/file/d/X/view#page='+page});
+test('conditional coverage is a weak-overlap signal, not a source verdict',()=>{
+ const weak=assessEvidenceCoverage([{excerpt:'A long page about bodies and perception.'}],
+  'How do we know that reality exists?',[{partId:'P1',question:'How do we know that reality exists?'}]);
+ assert.equal(weak.shouldSearch,true);
+ assert.equal(weak.weakParts[0].partId,'P1');
+ const covered=assessEvidenceCoverage([{excerpt:'We know reality through experience and perception.'}],
+  'How do we know that reality exists?');
+ assert.equal(covered.shouldSearch,false);
+});
+test('answer selection collapses exact edition copies but retains distinct passages',()=>{
+ const excerpt=Array.from({length:45},(_,i)=>'the same verified source text word'+i).join(' ');
+ const selected=selectAnswerSources([
+  {...page(12,'101'),title:'The Teaching of the Buddha, 1986 edition',score:2,text:excerpt},
+  {...page(18,'102'),title:'The Teaching of the Buddha, 2019 edition',score:5,text:excerpt},
+  {...page(22,'103'),title:'The Teaching of the Buddha, 2019 edition',score:4,text:excerpt+' changed translation'}
+ ],'What does this passage teach?','token',{maxSources:3});
+ assert.deepEqual(selected.map(source=>source.bookId),['102','103']);
+});
 test('first two selections cover different semantic question facets',()=>{
  const out=mergeFacetSearches([
   {sources:[page(475),page(465),page(476)]},
@@ -1417,7 +1435,13 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/validSearchPlan\(data\.queries\)/);
  assert.match(js,/retrieveEvidence\(\{question:q/);
  assert.match(js,/const found=await retrieveSources\(planned\?\.queries\|\|null,\{plannerFallback,/);
- assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions\}/);
+ assert.match(js,/assessEvidenceCoverage\(candidates,q,partQuestions\)/);
+ assert.match(js,/requestRetrievalGap\(q,gapToken,history/);
+ assert.ok(js.includes('partQuestions,gapQueries}'));
+ assert.doesNotMatch(js,/retrievalGap:[^}]*reviewFocus/s);
+ assert.match(js,/const queries=\[\.\.\.new Set\(data\.queries\.map/);
+ assert.match(js,/const markdown=String\(answer\)\.replace/);
+ assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions,allowEmpty:true\}/);
  assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
  assert.match(js,/diagnosticState\.fallbackMode=true/);
  assert.match(js,/Search planning is temporarily unavailable; searching with your question/);

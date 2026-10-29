@@ -128,7 +128,7 @@ export function createDiagnosticReport(input={}){
     [...new Set(value.filter(id=>typeof id==='string'&&/^P[1-9]\d*$/.test(id)))].slice(0,6):[];
   return {
     schema:'antilogicalism-reading-companion-diagnostic-v1',
-    clientBuild:'v1.17-part-evidence-diagnostics',
+    clientBuild:'v1.18-conditional-gap-search',
     libraryVersion:Number.isSafeInteger(input.libraryVersion)?input.libraryVersion:null,
     plannerWorkerVersionId:optionalString(input.plannerWorkerVersionId),
     plannerWorkerVersionTag:optionalString(input.plannerWorkerVersionTag),
@@ -159,6 +159,18 @@ export function createDiagnosticReport(input={}){
     failureDetail:input.stage==='complete'?null:safeDiagnosticToken(input.failureDetail),
     plannerQueries:Array.isArray(input.plannerQueries)?
       input.plannerQueries.filter(x=>typeof x==='string').slice(0,4).map(x=>x.slice(0,240)):[],
+    gapSearch:input.retrievalCoverage&&typeof input.retrievalCoverage==='object'?{
+      triggered:input.retrievalCoverage.triggered===true,
+      plannerAttempted:input.gapPlannerAttempted===true,
+      weakParts:Array.isArray(input.retrievalCoverage.weakParts)?input.retrievalCoverage.weakParts.slice(0,6).map(part=>({
+        part:string(part?.question,240),overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0
+      })):[],
+      queries:Array.isArray(input.gapQueries)?input.gapQueries.slice(0,3).map(value=>string(value,160)):[],
+      failureCode:isSafeFailureCode(input.gapPlannerFailure)?input.gapPlannerFailure:null,
+      afterGap:Array.isArray(input.retrievalCoverageAfterGap?.weakParts)?input.retrievalCoverageAfterGap.weakParts.slice(0,6).map(part=>({
+        part:string(part?.question,240),overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0
+      })):[]
+    }:null,
     plannerPlan:input.plannerPlan&&typeof input.plannerPlan==='object'?{
       version:string(input.plannerPlan.version,40),
       resolvedQuestion:string(input.plannerPlan.resolvedQuestion,600),
