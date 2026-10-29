@@ -39,7 +39,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
      if(typeof part?.partId!=='string'||typeof part?.question!=='string')continue;
      const sourceIds=Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):[];
      const best=directCandidates.map((entry,rank)=>({entry,rank,
-       overlap:directFacetTextMatch(part.question,entry?.preview||entry?.text||''),
+       overlap:localFacetTextMatch(part.question,entry?.preview||entry?.text||'').overlap,
        primaryBible:/\bbible\b/i.test(String(entry?.title||''))&&
         !/\b(?:annotated|study|commentary|notes)\b/i.test(String(entry?.title||''))
      })).filter(item=>valid(item.entry)&&item.overlap>=2&&
@@ -563,7 +563,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    if(candidatePartIds.has(partId)||!partAllowsBook(partId,source.bookId))continue;
    const partQuestion=(Array.isArray(partQuestions)?partQuestions:[])
     .find(item=>item?.partId===partId)?.question||'';
-   if(queries.some(query=>directFacetTextMatch(query,page.text)>=2||
+   if(queries.some(query=>localFacetTextMatch(query,page.text).overlap>=2||
       hasQuotedPhraseMatch(query,page.text))||hasQuotedPhraseMatch(partQuestion,page.text))
       candidatePartIds.add(partId);
   }
@@ -583,9 +583,11 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  })),searchQueries,namedBookIds};
 }
 
-/* Text overlap is a retrieval diagnostic, never a relevance verdict. It
- * triggers a librarian retry when every page misses the distinctive language
- * of any requested part, while exact support remains the answer reviewer's job.
+/* Text overlap is a retrieval diagnostic, never a relevance verdict. Keep
+ * matched terms close together in the same excerpt window: a whole-page count
+ * can mistake two separate senses of an ambiguous word for coverage. A weak
+ * result triggers the existing librarian retry; only answer review can decide
+ * whether a passage actually supports a claim.
  */
 export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
  const parts=Array.isArray(partQuestions)&&partQuestions.length
@@ -593,15 +595,21 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
     partId:item.partId||'',question:item.question}))
   :[{partId:'P1',question:String(question||'')}];
  const weakParts=parts.map(part=>{
-  let overlap=0;
+  let best={overlap:0,matchedTerms:[],windowStart:-1};
   // Strip generic prompt scaffolding so evaluation templates such as
   // "Explain the source question" do not create artificial search calls.
   const coverageQuestion=part.question.replace(/\b(?:explain|source|question|detail|specific|named|book|passage|answer|enough|sufficiently|testing|fake)\b/giu,' ');
-  for(const source of Array.isArray(candidates)?candidates:[])
-   overlap=Math.max(overlap,directFacetTextMatch(coverageQuestion,source?.preview||source?.text||source?.excerpt||''));
-  if(directFacetTextMatch(coverageQuestion,coverageQuestion)===0)overlap=2;
-  return {...part,overlap};
- }).filter(part=>part.overlap<2);
+  for(const source of Array.isArray(candidates)?candidates:[]){
+   const match=localFacetTextMatch(coverageQuestion,source?.preview||source?.text||source?.excerpt||'');
+   if(match.overlap>best.overlap)best=match;
+  }
+  const terms=facetTerms(coverageQuestion);
+  const overlap=terms.length?best.overlap:2;
+  const required=Math.min(2,terms.length);
+  const weak=terms.length>0&&overlap<required;
+  return {...part,overlap,matchedTerms:terms.length?best.matchedTerms:[],
+   distinctiveTermCount:terms.length,coverageSignal:weak?'weak-text-cluster':'text-cluster-found'};
+ }).filter(part=>part.coverageSignal==='weak-text-cluster');
  return {weakParts,shouldSearch:weakParts.length>0};
 }
 export function validSearchPlan(value){
@@ -844,19 +852,37 @@ function directFacetTitleMatch(question,title){
  return score;
 }
 
-function directFacetTextMatch(question,text){
- const stop=new Set(['what','when','where','which','who','whom','whose','why','how','does','did','has','have','had','are','was','were','the','and','for','from','with','into','about','between','this','that','these','those','there','their','they','them','than','then','your','our','also','only','could','would','should',
+const FACET_MATCH_STOP_WORDS=new Set(['what','when','where','which','who','whom','whose','why','how','does','did','has','have','had','are','was','were','the','and','for','from','with','into','about','between','this','that','these','those','there','their','they','them','than','then','your','our','also','only','could','would','should',
   // Comparison framing does not describe passage content; source names and
   // titles remain ordinary query terms and are not listed here.
   'differ','differs','different','difference','differences','compare','comparison','contrast','versus']);
  const normalize=term=>/^(?:cause|causal|causality|causes|caused|causing)$/.test(term)?'caus':
   term.startsWith('necess')?'necess':term.startsWith('experienc')?'experienc':term;
+function facetTerms(question){
+ return [...new Set((String(question||'').toLowerCase().match(/[a-z0-9]+/g)||[])
+  .filter(term=>term.length>=4&&!FACET_MATCH_STOP_WORDS.has(term)).map(normalize))];
+}
+function directFacetTextMatch(question,text){
  const questionTerms=new Set((String(question||'').toLowerCase().match(/[a-z0-9]+/g)||[])
-  .filter(term=>term.length>=4&&!stop.has(term)).map(normalize));
+  .filter(term=>term.length>=4&&!FACET_MATCH_STOP_WORDS.has(term)).map(normalize));
  const textTerms=new Set((String(text||'').toLowerCase().match(/[a-z0-9]+/g)||[]).map(normalize));
  let score=0;
  for(const term of questionTerms)if(textTerms.has(term))score++;
  return score;
+}
+function localFacetTextMatch(question,text,windowSize=22){
+ const terms=facetTerms(question);
+ if(!terms.length)return {overlap:0,matchedTerms:[],windowStart:-1};
+ const words=(String(text||'').toLowerCase().match(/[a-z0-9]+/g)||[]).map(normalize);
+ let best={overlap:0,matchedTerms:[],windowStart:-1};
+ for(let start=0;start<words.length;start++){
+  const window=new Set(words.slice(start,start+windowSize));
+  const matchedTerms=terms.filter(term=>window.has(term));
+  if(matchedTerms.length>best.overlap)
+   best={overlap:matchedTerms.length,matchedTerms,windowStart:start};
+  if(best.overlap===terms.length)break;
+ }
+ return best;
 }
 function singlePartFacetTextMatch(facet,partQuestion){
  const searchFraming=/\b(?:definition|nature|concept|concepts|meaning|explain|explains|explained|explaining|philosophy|philosophical|texts|text|account|accounts|theory|theories|role|function)\b/giu;
@@ -972,8 +998,8 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
      const titleMatch=directFacetTitleMatch(question,value.title);
      const bestTitleMatch=directFacetTitleMatch(question,best.title);
      if(titleMatch!==bestTitleMatch)return titleMatch>bestTitleMatch?value:best;
-     return directFacetTextMatch(question,value.text??value.preview)>
-       directFacetTextMatch(question,best.text??best.preview)?value:best;
+     return localFacetTextMatch(question,value.text??value.preview).overlap>
+       localFacetTextMatch(question,best.text??best.preview).overlap?value:best;
     },facetCandidates[0])
    :facetCandidates[0];
   if(candidate){used.add(candidate);ordered.push(candidate);}
@@ -1105,8 +1131,8 @@ export function selectAnswerSources(candidates,question,turnstileToken,
     const valuePhrase=hasQuotedPhraseMatch(targetQuestion,value.text??value.preview);
     const bestPhrase=hasQuotedPhraseMatch(targetQuestion,best.text??best.preview);
     if(valuePhrase!==bestPhrase)return valuePhrase?value:best;
-    return directFacetTextMatch(targetQuestion,value.text??value.preview)>
-      directFacetTextMatch(targetQuestion,best.text??best.preview)?value:best;
+    return localFacetTextMatch(targetQuestion,value.text??value.preview).overlap>
+      localFacetTextMatch(targetQuestion,best.text??best.preview).overlap?value:best;
   },eligible[0]):null;
   if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
  }
@@ -1127,8 +1153,8 @@ export function selectAnswerSources(candidates,question,turnstileToken,
      value.candidatePartIds?.includes(partId)&&!representedBooks.has(String(value.bookId)));
     if(!eligible.length)break;
     const candidate=eligible.reduce((best,value)=>{
-     const overlap=directFacetTextMatch(targetQuestion,value.text??value.preview);
-     const bestOverlap=directFacetTextMatch(targetQuestion,best.text??best.preview);
+     const overlap=localFacetTextMatch(targetQuestion,value.text??value.preview).overlap;
+     const bestOverlap=localFacetTextMatch(targetQuestion,best.text??best.preview).overlap;
      return overlap>bestOverlap||overlap===bestOverlap&&(Number(value.score)||0)>(Number(best.score)||0)?value:best;
     },eligible[0]);
     diverseRepresentatives.push(candidate);
@@ -1160,27 +1186,53 @@ export function selectAnswerSources(candidates,question,turnstileToken,
 }
 
 /* Some catalogs publish the same source text in several edition records.
- * Collapse only exact normalized page copies under the same normalized work
- * title; translated or otherwise textually different editions remain eligible. */
+ * Collapse exact and near-identical pages only when their normalized work
+ * titles also match. A high three-word-shingle similarity catches OCR and
+ * punctuation differences while preserving materially different translations. */
 function dedupeEditionCopies(candidates){
- const seen=new Map(),out=[];
+ const seenByTitle=new Map(),out=[];
  for(const candidate of candidates){
   const title=String(candidate?.title||'').toLocaleLowerCase().normalize('NFKD')
    .replace(/[\u0300-\u036f]/g,'').replace(/\b(?:19|20)\d{2}\b/g,' ')
    .replace(/\b(?:edition|editions|printing|reprint|revised|updated)\b/g,' ')
    .replace(/[^a-z0-9]+/g,' ').trim();
-  const text=typeof candidate?.text==='string'?candidate.text.toLocaleLowerCase().normalize('NFKC')
-   .replace(/[^\p{L}\p{N}]+/gu,' ').trim():'';
-  // A tiny heading or OCR fragment is not enough to establish a duplicate.
-  if(title.length<6||text.split(/\s+/).length<40){out.push(candidate);continue;}
-  const key=title+'\u0000'+text;
-  const previous=seen.get(key);
-  if(!previous){seen.set(key,candidate);out.push(candidate);continue;}
-  if(Number(candidate?.score)>Number(previous?.score)){
-   const index=out.indexOf(previous);if(index>=0)out[index]=candidate;
-   seen.set(key,candidate);
+  const text=typeof candidate?.text==='string'?candidate.text:'';
+  const tokens=normalizedCopyTokens(text);
+  // Short fragments do not carry enough language to distinguish a repeated
+  // heading from a genuinely duplicated passage.
+  if(title.length<6||tokens.length<40){out.push(candidate);continue;}
+  const entries=seenByTitle.get(title)||[];
+  const shingles=copyShingles(tokens);
+  const duplicate=entries.find(entry=>nearDuplicateCopy(entry,tokens,shingles));
+  if(!duplicate){
+   const entry={candidate,index:out.length,tokens,shingles};
+   entries.push(entry);seenByTitle.set(title,entries);out.push(candidate);continue;
+  }
+  // Keep the stronger retrieved edition in the original packet position.
+  // This changes citation redundancy, not source scope or answer obligations.
+  if((Number(candidate?.score)||0)>(Number(duplicate.candidate?.score)||0)){
+   out[duplicate.index]=candidate;duplicate.candidate=candidate;
+   duplicate.tokens=tokens;duplicate.shingles=shingles;
   }
  }
  return out;
+}
+function normalizedCopyTokens(text){
+ return String(text||'').toLocaleLowerCase().normalize('NFKC')
+  .match(/[\p{L}\p{N}]+/gu)||[];
+}
+function copyShingles(tokens){
+ const shingles=new Set();
+ for(let index=0;index+2<tokens.length;index++)
+  shingles.add(tokens[index]+' '+tokens[index+1]+' '+tokens[index+2]);
+ return shingles;
+}
+function nearDuplicateCopy(previous,tokens,shingles){
+ const longest=Math.max(previous.tokens.length,tokens.length);
+ const shortest=Math.min(previous.tokens.length,tokens.length);
+ if(!longest||shortest/longest<0.86)return false;
+ const common=[...shingles].reduce((count,shingle)=>
+  count+(previous.shingles.has(shingle)?1:0),0);
+ return common/Math.max(1,Math.min(shingles.size,previous.shingles.size))>=0.94;
 }
 
