@@ -28,15 +28,16 @@ on:
         default: baseline
         required: true
       answer_experiment:
-        description: Optionally compare ordinary composition with a reviewed post-composition expansion
+        description: Choose the answer pipeline comparison; selection comparison is evaluation-only
         type: choice
         options:
           - standard
           - compare-expansion
+          - compare-selection
         default: standard
         required: true
       confirm_live_ai:
-        description: I understand this uses the live Worker and Cloudflare AI; expansion comparison adds three Worker calls per question
+        description: I understand this uses live Worker AI; selection comparison adds three Worker calls per question (one selector and two answer runs)
         type: boolean
         default: false
         required: true
@@ -87,6 +88,8 @@ jobs:
           fi
           if [ "$BENCHMARK_ANSWER_EXPERIMENT" = "compare-expansion" ]; then
             answer_variant=paired-expansion-ablation
+          elif [ "$BENCHMARK_ANSWER_EXPERIMENT" = "compare-selection" ]; then
+            answer_variant=paired-selection-ablation
           else
             answer_variant=with-review
           fi
