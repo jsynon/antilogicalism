@@ -1,6 +1,9 @@
 import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms} from './remote-library.mjs';
 import {catalogIdentity} from './reader-contract.mjs';
 
+// Keep live browser and workflow retrieval breadth on one shared contract.
+export const LIVE_RETRIEVAL_CONFIG=Object.freeze({maxCandidates:24,maxBooks:4,pagesPerBook:4});
+
 /* Merge two independently retrieved question facets, retaining alternatives
  * for source selection and manual inspection.
  * No generated claim or PDF locator is trusted by this component.
@@ -255,7 +258,8 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  */
 export async function retrieveEvidence({question,queries,partQueries=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
- maxCandidates=24,maxBooks=4,pagesPerBook=4,pageLimit=14000}={}){
+ maxCandidates=LIVE_RETRIEVAL_CONFIG.maxCandidates,maxBooks=LIVE_RETRIEVAL_CONFIG.maxBooks,
+ pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000}={}){
  const direct=String(question||'').trim();
  if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
  if(!library||typeof library.search!=='function'||!Array.isArray(books)||
