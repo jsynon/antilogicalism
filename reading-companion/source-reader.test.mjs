@@ -149,12 +149,12 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
  assert.match(client,/link\.href=source\.url/);
  assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
  assert.match(client,/sourceReader\.open\(\{\.\.\.source,excerpt\},read\)/);
- assert.match(clientV49,/import \{claimQuotesForCitation\} from '\.\/citation-evidence\.mjs'/,
-  'the active client must use the exact claim-link helper');
+ assert.match(clientV49,/import \{citationExcerptsForAnswer\} from '\.\/citation-evidence\.mjs'/,
+  'the active client must pre-resolve exact claim-linked excerpts');
  assert.match(clientV49,/const evidenceMap=Array\.isArray\(data\.evidenceMap\)/);
- assert.match(clientV49,/claimQuotesForCitation\(answer,citationGroup\.start,source\.id,evidenceMap\)/,
-  'inline citations must resolve against reviewer-approved evidence for their source');
- assert.doesNotMatch(clientV49,/claimQuotesForCitation\(answer,citationGroup\.start,evidence\)/,
+ assert.match(clientV49,/citationExcerptsForAnswer\(answer,evidenceMap\)/,
+  'inline citations must resolve against the full answer before Markdown parsing changes offsets');
+ assert.doesNotMatch(clientV49,/citationExcerptsForAnswer\(answer,evidenceHighlights\)/,
   'the compact page summary must not be an inline-citation fallback');
  assert.match(clientV49,/sourceReader\.open\(\{\.\.\.source,excerpts\},a\)/);
  assert.match(source,/isAllowedBook\(bookId\)/);

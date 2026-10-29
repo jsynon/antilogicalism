@@ -181,8 +181,8 @@ test('public companion copy explains cited sources and keeps source reading cont
 
 
 test('answer citations open in the local page reader while Sources keeps the PDF link',()=>{
- assert.ok(clientV49.includes('function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map())'));
- assert.ok(clientV49.includes('claimQuotesForCitation(answer,citationGroup.start,source.id,evidenceMap)'));
+ assert.ok(clientV49.includes('function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map(),'));
+ assert.ok(clientV49.includes('citationExcerptsForAnswer(answer,evidenceMap)'));
  assert.ok(clientV49.includes('const evidenceMap=Array.isArray(data.evidenceMap)?data.evidenceMap:[];'));
  assert.ok(clientV49.includes('sourceReader.open({...source,excerpts},a)'));
  assert.match(clientV49,/excerpts\.forEach\(excerpt=>\{\s*const quote=node\('p',excerpt,'companion-key-quote'\);\s*card\.append\(quote\);\s*\}\);\s*const read=node\('button','Read passages'/,
