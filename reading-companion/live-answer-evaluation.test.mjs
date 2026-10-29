@@ -260,7 +260,7 @@ test('acceptance mode preserves its baseline and adds three calibration cases',(
  assert.throws(()=>selectLiveCases({cases:[]},'acceptance','holdout-history-herodotus-helen'),/Unknown acceptance case/);
 });
 
-test('acceptance workflow lists the simulation case immediately after God is love',async()=>{
+test('acceptance workflow lists the three calibration cases in sequence',async()=>{
  const {readFileSync}=await import('node:fs');
  const workflow=readFileSync(new URL('../.github/workflows/reading-companion-holdout-answer-evaluation.yml',import.meta.url),'utf8');
  assert.match(workflow, /^\s+- acceptance-god-is-love\s*\n\s+- acceptance-simulation-hypothesis\s*$/m);
