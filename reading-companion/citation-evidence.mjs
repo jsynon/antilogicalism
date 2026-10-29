@@ -1,3 +1,5 @@
+import {inlineCitationGroups} from './diagnostic-report.mjs';
+
 /* Match an inline citation to the reviewed evidence for its own answer claim.
  * The compact page-summary highlights are for source cards; they are not a
  * safe fallback when a sentence's quote was left out of that summary.
@@ -35,4 +37,15 @@ export function claimQuotesForCitation(answer,citationStart,sourceId,evidenceMap
   // The source reader independently locates these exact excerpts on the page.
   return [...new Set(sourceQuotes.filter(item=>item.claimId===claimIds[0])
     .map(item=>item.quote.trim()))];
+}
+
+/* Resolve claim-specific excerpts against the complete answer before Markdown
+ * rendering splits it into paragraphs, list items, and emphasis spans. The
+ * renderer consumes these groups in order so citation offsets stay tied to
+ * the original answer and never fall back to another claim's page summary.
+ */
+export function citationExcerptsForAnswer(answer,evidenceMap=[]){
+  const text=String(answer||'');
+  return inlineCitationGroups(text).map(group=>Object.fromEntries(
+    group.ids.map(id=>[id,claimQuotesForCitation(text,group.start,id,evidenceMap)])));
 }
