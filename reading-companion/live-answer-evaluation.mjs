@@ -7,8 +7,8 @@ import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
-import {RemoteLibrary,DEFAULT_INDEX_ROOT,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
-import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence} from './evidence-search.mjs';
+import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
+import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -588,7 +588,7 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,partQuestions,directFallback,
   library,books:bookCatalog,allowedBookIds:allowed,selectedBookIds,
-  maxCandidates:12,maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK,
+  ...LIVE_RETRIEVAL_CONFIG,
   pageLoader:async source=>{
    const shard=await library.jsonGzip('book-'+String(source.bookId)+'.json');
    const pages=shard.pages?.filter(page=>page.id===source.globalPageId&&page.page===source.page)||[];
@@ -891,7 +891,7 @@ async function main(){
   plannerCalls+cases.length*2*answerCallsPerCase:plannerCalls+cases.length*answerCallsPerCase;
  const reportCaseCount=args.mode==='paired'?cases.length*2:cases.length;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
-  answerVariant:args.answerVariant,caseCount:reportCaseCount,pairedQuestionCount:args.mode==='paired'?cases.length:undefined,
+  answerVariant:args.answerVariant,retrievalConfig:{...LIVE_RETRIEVAL_CONFIG},caseCount:reportCaseCount,pairedQuestionCount:args.mode==='paired'?cases.length:undefined,
   estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
    '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; no automatic composer regeneration':

@@ -8,8 +8,8 @@ import {createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {RemoteLibrary,DEFAULT_INDEX_ROOT,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources} from './evidence-search.mjs';
+import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
+import {validSearchPlan,selectAnswerSources,retrieveEvidence,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
@@ -135,18 +135,32 @@ async function sourcePageIsUsable(source,library){
 }
 
 export function selectEvaluationAnswerSources(candidates,question){
- return selectAnswerSources(candidates,question,'evaluation-token',{maxSources:4,history:[]});
+ return selectAnswerSources(candidates,question,'evaluation-token',{maxSources:6,history:[]});
 }
 
 export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher}){
  const start=performance.now();
- const searchQueries=buildSearchFacets(item.question,item.planner_queries);
  const selectedBookId=item.selected_book_id===undefined?'':String(item.selected_book_id);
  const searchAllowedBookIds=selectedBookId?new Set([selectedBookId]):allowedBookIds;
- const foundSets=await Promise.all(searchQueries.map(query=>library.search(query,{
-  allowedBookIds:searchAllowedBookIds,maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK
- })));
- const merged=mergeFacetSearches(foundSets,8);
+ const selectedBookIds=selectedBookId?[selectedBookId]:[];
+ // Exercise the same facet expansion, ranking, page hydration, and candidate
+ // cap as the browser; only the query plan and remote page loader are fixed here.
+ let booksScanned=0;
+ const trackedLibrary={search:async(...args)=>{
+  const result=await library.search(...args);
+  booksScanned+=Number(result?.booksScanned)||0;
+  return result;
+ }};
+ const retrieval=await retrieveEvidence({question:item.question,queries:item.planner_queries,
+  library:trackedLibrary,books:Object.entries(manifest.books).map(([id,book])=>({id,title:book.title})),
+  allowedBookIds:searchAllowedBookIds,selectedBookIds,...LIVE_RETRIEVAL_CONFIG,
+  pageLoader:async source=>{
+   const shard=await library.jsonGzip('book-'+String(source.bookId)+'.json');
+   const pages=shard.pages?.filter(page=>page.id===source.globalPageId&&page.page===source.page)||[];
+   return pages.length===1&&typeof pages[0].text==='string'?{text:pages[0].text}:null;
+  }});
+ const searchQueries=retrieval.searches.map(search=>search.query.replace(/ \[named books: .*$/,''));
+ const merged=retrieval.candidates;
  const issues=merged.flatMap((source,index)=>sourceIdentityIssues(source,manifest).map(code=>({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code})));
  if(selectedBookId)for(const [index,source] of merged.entries())if(String(source.bookId)!==selectedBookId)
   issues.push({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code:'selected_book_scope_leak'});
@@ -161,7 +175,7 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
  }
  const fingerprintChecks=await Promise.all(candidates.map(async source=>({bookId:String(source.bookId),page:source.page,
   globalPageId:source.globalPageId,...await verifyFingerprint(source,library,allowedBookIds,fetcher)})));
- // Mirror the production answer request: up to four full pages, with one
+ // Mirror the production answer request: up to six full pages, with one
  // passage per work preferred before alternate pages from the same work.
  // The benchmark has no prior-turn context, so use empty history and a fixed
  // placeholder token solely for request byte-budget accounting.
@@ -197,7 +211,7 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
   selectedEvidenceTargetRecallPercent:evidenceTargets.length?Number((evidenceTargets.filter(target=>target.selectedHit).length/evidenceTargets.length*100).toFixed(1)):null,
   selectedExactTargetMatchPercent:defaultSelection.length?Number((defaultSelection.filter(source=>targetedPageKeys.has(String(source.bookId)+':'+source.page)).length/defaultSelection.length*100).toFixed(1)):null,
   unannotatedSubmittedSourceCount:unannotatedSubmittedSources.length,
-  booksScanned:foundSets.reduce((n,r)=>n+(Number(r.booksScanned)||0),0),
+  booksScanned,
   elapsedMs:Math.round(performance.now()-start),retrievalPass:groups.every(g=>g.retrieved)&&!issues.some(issue=>issue.code==='selected_book_scope_leak'),
   defaultSelectionPass:groups.every(g=>g.defaultSelected),candidateSourcesVerified:groups.every(g=>g.sourceVerified),
   defaultSelectionVerified:groups.every(g=>g.defaultSourceVerified),sourceIdentityIssues:issues};
@@ -246,7 +260,7 @@ function markdown(report){
  }).join('\n');
  return `## Reading Companion public-library evaluation\n\n`+
  `v${m.version}: ${m.indexedBookRecords} indexed records / ${m.indexedPages.toLocaleString()} pages; ${m.catalogTitles} distinct catalog titles; ${m.fingerprintedBooks}/${m.indexedBookRecords} books fingerprinted.\n\n`+
- `Expected-source recall: ${s.candidateGroupRecallPercent}% across merged candidates; ${s.defaultSelectedGroupRecallPercent}% in the production answer-source set (up to four passages, preferring distinct works). `+
+ `Expected-source recall: ${s.candidateGroupRecallPercent}% across merged candidates; ${s.defaultSelectedGroupRecallPercent}% in the production answer-source set (up to six passages, preferring distinct works). `+
  `Fingerprint-verified recall: ${s.verifiedCandidateGroupRecallPercent}% across candidates and ${s.verifiedDefaultGroupRecallPercent}% in the submitted source set. `+
  (s.evidenceTargetCount?`Annotated page targets: ${s.evidenceTargetCount}; candidate target recall ${s.candidateEvidenceTargetRecallPercent}%; submitted-source target recall ${s.selectedEvidenceTargetRecallPercent}%; exact annotated-page match rate ${s.selectedExactTargetMatchPercent}% (${s.unannotatedSubmittedSourceCount} submitted pages lack an exact target annotation). `:'')+
  `Cases passing retrieval: ${s.retrievalPassCases}/${s.caseCount}; identity issues: ${s.sourceIdentityIssueCount}; fingerprint errors: ${s.fingerprintErrors}; execution errors: ${s.executionErrorCount}; excluded oversized pages: ${s.oversizedPageCount}; mean search ${s.meanSearchMs} ms.\n\n`+
@@ -277,7 +291,7 @@ async function main(){
  }
  const catalogTitles=new Set((catalog.books||[]).map(b=>String(b.title||'').trim()).filter(Boolean));
  const report={schema:'antilogicalism-reading-companion-public-eval-v1',suiteId:suite.suite_id,
-  generatedAt:new Date().toISOString(),corpusRoot:args.corpusRoot,
+  generatedAt:new Date().toISOString(),corpusRoot:args.corpusRoot,retrievalConfig:{...LIVE_RETRIEVAL_CONFIG},
   corpus:{version:manifest.version,indexedBookRecords:Object.keys(manifest.books).length,indexedPages:manifest.pages,
    catalogEntries:(catalog.books||[]).length,catalogTitles:catalogTitles.size,fingerprintedBooks:allowedBookIds.size,
    fingerprintCoveragePercent:Number((allowedBookIds.size/Object.keys(manifest.books).length*100).toFixed(1))},

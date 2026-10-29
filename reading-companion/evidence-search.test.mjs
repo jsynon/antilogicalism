@@ -1472,8 +1472,8 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
  assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text,candidatePartIds\}\)=>\(\{bookId,page,text,candidatePartIds,libraryVersion:49\}\)\)/);
  assert.match(js,/selectAnswerSources\(candidates,q,token,\{history,\s*maxSources:MAX_ANSWER_SOURCES,\s*plannedFacetCount:/);
- assert.match(js,/maxCandidates:MAX_RETRIEVAL_CANDIDATES,maxBooks:4/);
- assert.match(js,/candidates=populated\.slice\(0,MAX_RETRIEVAL_CANDIDATES\)/);
+ assert.match(js,/\.\.\.LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT/);
+ assert.match(js,/candidates=populated\.slice\(0,LIVE_RETRIEVAL_CONFIG\.maxCandidates\)/);
  assert.doesNotMatch(js,/searchPages\(|lastSearch|checked passages will guide/i);
  assert.match(js,/data\.outcome==='insufficient-evidence'/);
  assert.doesNotMatch(js,/innerHTML\s*=/);

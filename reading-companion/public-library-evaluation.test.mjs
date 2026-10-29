@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {mergeFacetSearches} from './evidence-search.mjs';
+import {mergeFacetSearches,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 import {evaluateCase,selectEvaluationAnswerSources,sourceIdentityIssues,summarize,validateSuite,verifyFingerprint} from './public-library-evaluation.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -66,18 +66,21 @@ test('selected-book evaluation constrains every search facet to the requested bo
  const result=await evaluateCase(item,{library,manifest,allowedBookIds:new Set(['7']),
   fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
  assert.equal(scopeArgs.length,3);
- assert.ok(scopeArgs.every(options=>options.allowedBookIds.size===1&&options.allowedBookIds.has('7')&&options.pagesPerBook===4));
+ assert.ok(scopeArgs.every(options=>options.allowedBookIds.size===1&&options.allowedBookIds.has('7')&&
+  options.maxBooks===LIVE_RETRIEVAL_CONFIG.maxBooks&&
+  options.pagesPerBook===LIVE_RETRIEVAL_CONFIG.pagesPerBook));
  assert.equal(result.retrievalPass,true);
  assert.equal(result.candidateSourcesVerified,true);
  assert.equal(result.sourceIdentityIssues.length,0);
 });
 
-test('selected-book evaluation fails if retrieval leaks a passage from another book',async()=>{
+test('shared retriever filters results that violate selected-book scope',async()=>{
  const text='A passage returned from an unrelated work must fail selected-book scope.';
  const drive=`https://drive.google.com/file/d/${DRIVE}/view`;
  const source={id:'S1',bookId:'12',title:'Politics — Aristotle',page:14,globalPageId:0,
   url:drive+'?usp=sharing#page=14',preview:text,score:10};
- const manifest={page_books:['12'],books:{'12':{title:source.title,drive_url:drive}}};
+ const manifest={page_books:['7','12'],books:{'7':{title:'Nicomachean Ethics — Aristotle',drive_url:drive},
+  '12':{title:source.title,drive_url:drive}}};
  const sha256=createHash('sha256').update(Buffer.from(text,'utf8')).digest('hex');
  const packet={schema:'antilogicalism-reader-fingerprints-v3',hashAlgorithm:'SHA-256-utf8-exact',
   libraryVersion:49,bookId:'12',chunk:0,pages:[{page:14,globalPageId:0,utf8Bytes:Buffer.byteLength(text),sha256}]};
@@ -86,10 +89,11 @@ test('selected-book evaluation fails if retrieval leaks a passage from another b
   selected_book_id:'7',question:'How does Aristotle explain becoming virtuous through repeated actions?',
   planner_queries:['Aristotle virtue habituation','Aristotle moral character actions'],
   required_source_groups:[{label:'Nicomachean Ethics',book_ids:['7','12']}]};
- const result=await evaluateCase(item,{library,manifest,allowedBookIds:new Set(['12']),
+ const result=await evaluateCase(item,{library,manifest,allowedBookIds:new Set(['7','12']),
   fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
  assert.equal(result.retrievalPass,false);
- assert.ok(result.sourceIdentityIssues.some(issue=>issue.code==='selected_book_scope_leak'));
+ assert.deepEqual(result.candidates,[]);
+ assert.equal(result.sourceIdentityIssues.some(issue=>issue.code==='selected_book_scope_leak'),false);
 });
 
 test('the production facet merger preserves both facets and ranks stronger passage evidence first',()=>{
@@ -154,7 +158,8 @@ test('fourth per-book search result can reach the verified answer-source set',as
   fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
  assert.equal(optionsSeen.length,3);
  assert.ok(optionsSeen.every(options=>options.pagesPerBook===4));
- assert.ok(optionsSeen.every(options=>options.maxBooks===3));
+ assert.ok(optionsSeen.every(options=>options.maxBooks===LIVE_RETRIEVAL_CONFIG.maxBooks));
+ assert.ok(optionsSeen.every(options=>options.pagesPerBook===LIVE_RETRIEVAL_CONFIG.pagesPerBook));
  assert.equal(result.selectedEvidenceTargetRecallPercent,100);
  assert.equal(result.submittedSources[0].page,53);
 });
@@ -214,6 +219,12 @@ test('summary distinguishes exact annotated-page matches from submitted pages wi
  assert.equal(result.unannotatedSubmittedSourceCount,1);
 });
 
+test('retrieval-only answer packet allows all six production source slots',()=>{
+ const pages=Array.from({length:8},(_,index)=>({bookId:String(100+index),page:index+1,
+  text:'A distinct verified work with enough text for the production packet.'}));
+ const selected=selectEvaluationAnswerSources(pages,'Explain the topic across these sources.');
+ assert.equal(selected.length,6);
+});
 test('evaluation mirrors production source selection and covers distinct works before alternate pages',()=>{
  const candidates=[
   {bookId:'54',page:19,text:'Nietzsche source page one with enough usable text.'},

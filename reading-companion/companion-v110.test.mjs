@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import {RemoteLibrary} from './remote-library.mjs';
+import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
@@ -19,6 +20,12 @@ test('response citation labels are plain ordered numbers while IDs stay internal
 test('public response renderer omits the structured missing-evidence notice',()=>{
  assert.doesNotMatch(client,/data\\.missing/);
  assert.doesNotMatch(client,/Evidence gaps:|Evidence check:/);
+});
+test('live browser uses shared 24-candidate, four-book retrieval settings',()=>{
+ assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:24,maxBooks:4,pagesPerBook:4});
+ assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
+ assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.15.0'));
 });
 test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);
@@ -125,7 +132,7 @@ test('book selector search matches title or author without changing source entri
 });
 
 test('current browser client validates the v3 fingerprint coverage manifest',()=>{
- assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.14\.0'/,
+ assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.15\.0'/,
   'the active client cache-busts the changed shared retriever');
  assert(clientV49.includes("reader-fingerprints-v3/coverage-v3.json"));
  assert.match(clientV49,/antilogicalism-reader-coverage-v3/);
