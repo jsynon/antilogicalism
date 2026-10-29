@@ -100,45 +100,6 @@ export function queryTerms(question) {
     .filter(t => t.length >= 3 && !STOP.has(t)).slice(0, 24);
 }
 
-// Some established technical phrases have multiple English translations.
-// Keep each phrase family as one relevance concept: matching both words in
-// "dependent arising" must not count as two independent query concepts, while
-// the index can still find either wording. Add only explicit, source-attested
-// phrase equivalences here; this is not open-ended synonym expansion.
-const SOURCE_PHRASE_EQUIVALENCES=Object.freeze([
-  Object.freeze(['dependent origination','dependent arising'])
-]);
-function sourcePhraseTermGroups(question,terms){
- const normalized=String(question||'').toLocaleLowerCase().normalize('NFKD')
-  .replace(/[\u0300-\u036f]/g,'').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
- const remaining=new Set(terms),groups=[];
- for(const equivalence of SOURCE_PHRASE_EQUIVALENCES){
-  const matched=equivalence.find(phrase=>(' '+normalized+' ').includes(' '+phrase+' '));
-  if(!matched)continue;
-  const matchedWords=matched.split(' ');
-  if(!matchedWords.every(word=>remaining.has(word)))continue;
-  matchedWords.forEach(word=>remaining.delete(word));
-  groups.push([...new Set(equivalence.flatMap(phrase=>phrase.split(' ')))]);
- }
- for(const term of remaining)groups.push([term]);
- return groups;
-}
-
-// Kant's Critique states its account of causal necessity under the heading
-// "Second Analogy" and explains it through succession, a rule, and cause and
-// effect. A reader's modern wording may not contain those indexed terms. Add
-// this source-native vocabulary only inside the named primary work, keeping
-// the reader's own terms and the same local search call.
-function sourceNativeQueryTerms(question,title){
-  const isKantCritique=/\bcritique of pure reason\b/i.test(String(title||''))&&
-    /\bkant\b/i.test(String(title||''));
-  const asksAboutCausality=/\b(?:causal|causality|causation|cause(?:s|d|ing)?\s+and\s+effect|necessary\s+connection)\b/i
-    .test(String(question||''));
-  return isKantCritique&&asksAboutCausality
-    ?['second','analogy','succession','rule','cause','effect','experience','objective']
-    :[];
-}
-
 // Correct a single-character typo only when it uniquely matches a catalog
 // author's surname. Keep this metadata correction separate from page evidence.
 function editDistanceOne(left,right){
@@ -488,13 +449,14 @@ export class RemoteLibrary {
     const hasTopicTerm=queryTokens.some(term=>!fuzzyAuthorCandidates.has(term)&&
       !authorTerms.has(wordStem(term))&&manifest.partitions.includes(term.slice(0,2)));
     const fuzzyAuthorMatches=hasTopicTerm?fuzzyAuthorCandidates:new Map();
-    const rawBaseTerms=[...new Set([...queryTokens,...sourceNativeQueryTerms(question,selectedTitle)])]
+    const rawBaseTerms=[...new Set(queryTokens)]
       .filter(term=>!fuzzyAuthorMatches.has(term))
       .filter(term=>!authorTerms.has(wordStem(term)));
     const baseTerms=rawBaseTerms.filter(term=>manifest.partitions.includes(term.slice(0,2)));
-    const queryGroups=sourcePhraseTermGroups(question,rawBaseTerms)
-      .map(group=>group.filter(term=>manifest.partitions.includes(term.slice(0,2))))
-      .filter(group=>group.length);
+    // The index uses only the reader's wording here. The planner may add
+    // alternate source-language searches; a term-level whitelist would make
+    // retrieval depend on a growing set of question-specific exceptions.
+    const queryGroups=baseTerms.map(term=>[term]);
     const terms=[...new Set(queryGroups.flat())];
     const phrase=requestedPhrase(question);
     if (!terms.length) return {terms:[], sources:[], elapsedMs:Math.round(performance.now() - started)};
