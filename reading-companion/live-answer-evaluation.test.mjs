@@ -234,7 +234,7 @@ test('acceptance mode preserves its baseline and adds three calibration cases',(
  const cases=selectLiveCases({cases:[]},'acceptance');
  assert.equal(cases.length,10);
  assert.ok(cases.every(item=>item.id.startsWith('acceptance-')&&item.selected_book_ids.length===0));
- assert.equal(new Set(cases.map(item=>item.id)).size,9);
+ assert.equal(new Set(cases.map(item=>item.id)).size,10);
  for(const id of ['acceptance-descartes-cogito','acceptance-mill-harm-principle','acceptance-epictetus-freedom',
   'acceptance-augustine-memory','acceptance-aristotle-tragedy-plot','acceptance-boethius-fortune',
   'acceptance-locke-political-authority'])assert.ok(cases.some(item=>item.id===id),id+' remains in the baseline');
