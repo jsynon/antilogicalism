@@ -38,6 +38,7 @@ on:
           - acceptance-locke-political-authority
           - acceptance-god-is-love
           - acceptance-simulation-hypothesis
+          - acceptance-buddha-on-death
         default: all
         required: true
       answer_variant:
