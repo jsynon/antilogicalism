@@ -8,8 +8,8 @@ import {createHash} from 'node:crypto';
 import {mkdir,readFile,writeFile} from 'node:fs/promises';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {RemoteLibrary,DEFAULT_INDEX_ROOT,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources} from './evidence-search.mjs';
+import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
 const SUITE_PATH=resolve(ROOT,'benchmarks/reading-companion-public-v1.json');
@@ -144,9 +144,9 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
  const selectedBookId=item.selected_book_id===undefined?'':String(item.selected_book_id);
  const searchAllowedBookIds=selectedBookId?new Set([selectedBookId]):allowedBookIds;
  const foundSets=await Promise.all(searchQueries.map(query=>library.search(query,{
-  allowedBookIds:searchAllowedBookIds,maxBooks:3,pagesPerBook:PRODUCTION_PAGES_PER_BOOK
+  allowedBookIds:searchAllowedBookIds,...LIVE_RETRIEVAL_CONFIG
  })));
- const merged=mergeFacetSearches(foundSets,8);
+ const merged=mergeFacetSearches(foundSets,LIVE_RETRIEVAL_CONFIG.maxCandidates);
  const issues=merged.flatMap((source,index)=>sourceIdentityIssues(source,manifest).map(code=>({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code})));
  if(selectedBookId)for(const [index,source] of merged.entries())if(String(source.bookId)!==selectedBookId)
   issues.push({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code:'selected_book_scope_leak'});
@@ -277,7 +277,7 @@ async function main(){
  }
  const catalogTitles=new Set((catalog.books||[]).map(b=>String(b.title||'').trim()).filter(Boolean));
  const report={schema:'antilogicalism-reading-companion-public-eval-v1',suiteId:suite.suite_id,
-  generatedAt:new Date().toISOString(),corpusRoot:args.corpusRoot,
+  generatedAt:new Date().toISOString(),corpusRoot:args.corpusRoot,retrievalConfig:{...LIVE_RETRIEVAL_CONFIG},
   corpus:{version:manifest.version,indexedBookRecords:Object.keys(manifest.books).length,indexedPages:manifest.pages,
    catalogEntries:(catalog.books||[]).length,catalogTitles:catalogTitles.size,fingerprintedBooks:allowedBookIds.size,
    fingerprintCoveragePercent:Number((allowedBookIds.size/Object.keys(manifest.books).length*100).toFixed(1))},
