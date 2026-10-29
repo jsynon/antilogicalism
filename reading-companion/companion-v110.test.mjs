@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import {RemoteLibrary} from './remote-library.mjs';
+import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
@@ -21,6 +22,7 @@ test('public response renderer omits the structured missing-evidence notice',()=
  assert.doesNotMatch(client,/Evidence gaps:|Evidence check:/);
 });
 test('live browser uses shared 24-candidate, four-book retrieval settings',()=>{
+ assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:24,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
  assert.ok(html.includes('companion-v112.mjs?v=1.15.0'));
