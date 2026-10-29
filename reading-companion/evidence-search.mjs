@@ -3,6 +3,13 @@ import {catalogIdentity} from './reader-contract.mjs';
 
 // Keep live browser and workflow retrieval breadth on one shared contract.
 export const LIVE_RETRIEVAL_CONFIG=Object.freeze({maxCandidates:24,maxBooks:4,pagesPerBook:4});
+// The wider profile is for controlled evaluations. Public traffic keeps the
+// proven baseline until saved-trace review shows a recall gain without weaker
+// final source packets or unacceptable latency.
+export const RETRIEVAL_PROFILES=Object.freeze({
+ baseline:LIVE_RETRIEVAL_CONFIG,
+ expanded:Object.freeze({maxCandidates:48,maxBooks:6,pagesPerBook:4})
+});
 
 /* Merge two independently retrieved question facets, retaining alternatives
  * for source selection and manual inspection.
@@ -617,18 +624,19 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
   const overlap=terms.length?best.overlap:2;
   const required=Math.min(2,terms.length);
   const weak=terms.length>0&&overlap<required;
+  const indexLikeIsStrongest=bestIndex.overlap>best.overlap;
   const coverageReason=weak
-   ?indexLikeSource?'index-like-candidates-not-counted':'no-coherent-term-cluster'
+   ?indexLikeIsStrongest?'index-like-candidates-not-counted':'no-coherent-term-cluster'
    :'coherent-prose-cluster-found';
-  // When index-like text is the strongest lexical match, keep those terms in
-  // the trace so the bounded follow-up planner can disambiguate the collision.
-  const diagnosticMatch=best.overlap?best:bestIndex;
+  // Only blame an index candidate when it is the strongest lexical match;
+  // unrelated index pages must not misdescribe the best prose candidate.
+  const diagnosticMatch=indexLikeIsStrongest?bestIndex:best;
   const matchedTerms=terms.length
-   ?(weak&&!best.overlap&&bestIndex.matchedTerms.length
+   ?(weak&&indexLikeIsStrongest&&bestIndex.matchedTerms.length
      ?bestIndex.matchedTerms:best.matchedTerms):[];
   return {...part,overlap,matchedTerms,
    distinctiveTermCount:terms.length,coverageSignal:weak?'weak-coherent-text':'coherent-text-found',
-   coverageReason,coverageSource:best.source||diagnosticMatch.source||indexLikeSource};
+   coverageReason,coverageSource:diagnosticMatch.source||indexLikeSource};
  }).filter(part=>part.coverageSignal==='weak-coherent-text');
  return {weakParts,shouldSearch:weakParts.length>0};
 }

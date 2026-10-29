@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
+import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG,RETRIEVAL_PROFILES} from './evidence-search.mjs';
 import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -193,6 +193,12 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   const ids=new Set(['acceptance-simulation-hypothesis','acceptance-buddha-on-death']);
   const selected=ACCEPTANCE_CASES.filter(item=>ids.has(item.id));
   if(selected.length!==ids.size)throw Error('The repeated calibration cases are missing from the acceptance suite.');
+  return selected.map(copyEvaluationCase);
+ }
+ if(mode==='acceptance'&&caseId==='quality-calibration'){
+  const ids=new Set(['acceptance-god-is-love','acceptance-simulation-hypothesis','acceptance-buddha-on-death']);
+  const selected=ACCEPTANCE_CASES.filter(item=>ids.has(item.id));
+  if(selected.length!==ids.size)throw Error('The quality calibration cases are missing from the acceptance suite.');
   return selected.map(copyEvaluationCase);
  }
  if(caseId&&caseId!=='all'){
@@ -452,12 +458,13 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   evidenceHighlightCount:highlights.length,evidenceHighlights,citationHighlightAudit,
   highlightRelevance,
   manualReview,structuralPassed,
+  answerQualityStatus:'pending-human-review',answerQualityPass:null,
   passed:reviewStatus==='answer-draft-unverified'?null:structuralPassed};
 }
 const MANUAL_REVIEW_DIMENSIONS=['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness'];
 export function summarizeManualReviews(cases){
- const entries=(cases||[]).flatMap(item=>Array.isArray(item?.reviewAblation?.variants)?
-  item.reviewAblation.variants.map(variant=>({id:item.id,attemptNumber:item.attemptNumber,
+ const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
+  (item.answerVariantComparison||item.reviewAblation).variants.map(variant=>({id:item.id,attemptNumber:item.attemptNumber,
    answerVariant:variant.answerVariant,review:variant.manualReview})):
   [{id:item.id,attemptNumber:item.attemptNumber,answerVariant:item.answerVariant||'with-review',review:item.manualReview}]);
  const completed=entries.filter(entry=>MANUAL_REVIEW_DIMENSIONS.every(key=>
@@ -473,10 +480,10 @@ export function summarizeManualReviews(cases){
   note:'Human scores are independent of automated structural pass/fail. No semantic score is inferred from model review.'};
 }
 export function summarizeAnswerVariants(cases){
- const entries=(cases||[]).flatMap(item=>Array.isArray(item?.reviewAblation?.variants)?
-  item.reviewAblation.variants.map(variant=>({id:item.id,...variant})):
+ const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
+  (item.answerVariantComparison||item.reviewAblation).variants.map(variant=>({id:item.id,...variant})):
   [{id:item.id,answerVariant:item.answerVariant||'with-review',structuralPassed:item.structuralPassed}]);
- return Object.fromEntries(['with-review','compose-only'].map(answerVariant=>{
+ return Object.fromEntries(['with-review','compose-only','with-expansion'].map(answerVariant=>{
   const selected=entries.filter(item=>item.answerVariant===answerVariant);
   return [answerVariant,{cases:selected.length,
    structuralPassed:selected.filter(item=>item.structuralPassed===true).length,
@@ -500,8 +507,9 @@ export function recheckQualityReport(report){
    definition.required_part_source_groups||[],{scope:item.scope||
     (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books'),
     plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null});
-  const reviewAblation=Array.isArray(item.reviewAblation?.variants)?{...item.reviewAblation,
-   variants:item.reviewAblation.variants.map(variant=>{
+  const previousComparison=item.answerVariantComparison||item.reviewAblation;
+  const answerVariantComparison=Array.isArray(previousComparison?.variants)?{...previousComparison,
+   variants:previousComparison.variants.map(variant=>{
     const variantAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
      citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
      evidenceHighlights:variant.evidenceHighlights,workerVersionId:variant.workerVersionId,
@@ -510,8 +518,10 @@ export function recheckQualityReport(report){
       (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books'),
       plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null});
     return {...variant,...variantAudit,manualReview:variant.manualReview};
-   })}:item.reviewAblation;
-  return {...item,...(reviewAblation?{reviewAblation}:{}),offlineRecheck:{passed:audit.passed,sourceGroups:audit.sourceGroups,
+   })}:previousComparison;
+  return {...item,...(answerVariantComparison?{answerVariantComparison}:{}),
+   ...(item.reviewAblation&&answerVariantComparison?{reviewAblation:answerVariantComparison}:{}),
+   offlineRecheck:{passed:audit.passed,sourceGroups:audit.sourceGroups,
    sourcePartAlignment:audit.sourcePartAlignment,
    questionPartCoverage:audit.questionPartCoverage,partEvidenceAudit:audit.partEvidenceAudit,
    partEvidenceComplete:audit.partEvidenceComplete,
@@ -591,12 +601,12 @@ function makeCachedFetch(root){
 }
 async function fetchJson(url){const response=await fetch(url,{headers:{accept:'application/json'},cache:'no-store'});if(!response.ok)throw Error(url+' returned HTTP '+response.status);return response.json();}
 async function loadSources(item,queries,{library,manifest,allowed,directFallback=false,
- partQueries=[],partQuestions=[],gapQueries=[]}){
+ partQueries=[],partQuestions=[],gapQueries=[],retrievalConfig=LIVE_RETRIEVAL_CONFIG}){
  const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,partQuestions,gapQueries,directFallback,
   library,books:bookCatalog,allowedBookIds:allowed,selectedBookIds,
-  ...LIVE_RETRIEVAL_CONFIG,
+  ...retrievalConfig,
   pageLoader:async source=>{
    const shard=await library.jsonGzip('book-'+String(source.bookId)+'.json');
    const pages=shard.pages?.filter(page=>page.id===source.globalPageId&&page.page===source.page)||[];
@@ -619,9 +629,10 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   matchedFacets,candidatePartIds,excerpt:String(preview||text||'').slice(0,1200)}));
  return {selected,searches:retrieval.searches,retrievalCandidates};
 }
-export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,preparedPlan=null,answerVariant='with-review',onProgress=async()=>{}}){
- if(!['with-review','compose-only','paired-review-ablation'].includes(answerVariant))
-  throw Error('Answer variant must be with-review, compose-only, or paired-review-ablation.');
+export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,preparedPlan=null,answerVariant='with-review',retrievalProfile='baseline',onProgress=async()=>{}}){
+ if(!['with-review','compose-only','paired-review-ablation','with-expansion','paired-expansion-ablation'].includes(answerVariant))
+  throw Error('Unsupported answer variant.');
+ if(!Object.hasOwn(RETRIEVAL_PROFILES,retrievalProfile))throw Error('Unknown retrieval profile.');
  const startTime=Date.now();
  const progressEvent=async event=>onProgress({caseId:item.id,...event});
  const progress=async(stage,status,message,details={})=>progressEvent({stage,status,message,...details});
@@ -676,7 +687,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  await progress('retrieval','started',`Searching ${new Set([...queries,...partQueries.map(value=>value.query)]).size} distinct facets and assembling source pages.`,
   {queryCount:queries.length,partFacetCount:partQueries.length,partFacetWarnings:partFacets.warnings});
  try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,
-  partQueries,partQuestions});}
+  partQueries,partQuestions,retrievalConfig:RETRIEVAL_PROFILES[retrievalProfile]});}
  catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   error.requestFailure.plannerFallback=plannerFallback;
   error.requestFailure.plannerSkipped=plannerSkipped;
@@ -685,7 +696,9 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  let gapQueries=[],gapPlannerFailure=null;
- const initialRetrievalCoverage=assessEvidenceCoverage(loaded.retrievalCandidates,item.question,partQuestions);
+ const initialSearches=loaded.searches;
+ const initialRetrievalCandidates=loaded.retrievalCandidates;
+ const initialRetrievalCoverage=assessEvidenceCoverage(initialRetrievalCandidates,item.question,partQuestions);
  let retrievalCoverage=initialRetrievalCoverage;
  const gapSearchTriggered=initialRetrievalCoverage.shouldSearch;
  let gapRetrievalRerun=false;
@@ -710,7 +723,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     {queryCount:gapQueries.length,usage:gap.usage||null});
    if(gapQueries.length){
     loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,
-     partQueries,partQuestions,gapQueries});
+     partQueries,partQuestions,gapQueries,retrievalConfig:RETRIEVAL_PROFILES[retrievalProfile]});
     gapRetrievalRerun=true;
     retrievalCoverage=assessEvidenceCoverage(loaded.retrievalCandidates,item.question,partQuestions);
    }
@@ -737,7 +750,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   (retrievalFallbackCount?` Recovered ${retrievalFallbackCount} empty source-side search using the counterpart topic within the planned source scope.`:''),
   {searchCount:searches.length,retrievalFallbackCount,candidatePages:retrievalCandidates.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]})),
    selectedPages:selected.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]}))});
- const variants=answerVariant==='paired-review-ablation'?['with-review','compose-only']:[answerVariant];
+ const variants=answerVariant==='paired-review-ablation'?['with-review','compose-only']:
+  answerVariant==='paired-expansion-ablation'?['with-review','with-expansion']:[answerVariant];
  const variantResults=[];
  try{
   for(const variant of variants){
@@ -745,7 +759,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     {variant,sourceCount:selected.length});
    const data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
     bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
-    answerVariant:variant==='compose-only'?'compose-only':'with-review',
+    answerVariant:variant==='compose-only'?'compose-only':variant==='with-expansion'?'with-expansion':'with-review',
     // The evaluator loads v49 text; the Worker defaults omitted versions to v48.
     sources:selected.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds,libraryVersion:49}))},beforeCall,'answer',progressEvent);
    const audit=auditLiveAnswer(data,selected,item.required_source_groups,
@@ -764,15 +778,19 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const primary=variantResults.find(result=>result.answerVariant==='with-review')||variantResults[0];
- const reviewAblation=answerVariant==='paired-review-ablation'?{
-  comparison:'same resolved question, planner result and submitted source pages; only the final model-review call is omitted in compose-only',
+ const answerVariantComparison=['paired-review-ablation','paired-expansion-ablation'].includes(answerVariant)?{
+  comparison:answerVariant==='paired-expansion-ablation'?
+   'Same resolved question and submitted pages; compare ordinary composition with post-composition expansion before the same evidence review.':
+   'Same resolved question, planner result and submitted source pages; only the final model-review call is omitted in compose-only',
   variants:variantResults
  }:null;
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerReused,
   plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,plannerWorkerSourceRevision,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
-  ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,searches,retrievalCandidates,
+  ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,
+  searchesBeforeGap:initialSearches,retrievalCandidatesBeforeGap:initialRetrievalCandidates,
+  searches,retrievalCandidates,
   retrievalCoverage:{triggered:gapSearchTriggered,
    weakParts:initialRetrievalCoverage.weakParts},
   ...(gapRetrievalRerun?{retrievalCoverageAfterGap:{weakParts:retrievalCoverage.weakParts}}:{}),
@@ -782,7 +800,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
   pipeline:variantResults.map(result=>result.pipeline).find(Boolean)||null,
   partFacetWarnings:partFacets.warnings,
-  answerVariant,...(answerVariant==='paired-review-ablation'?{reviewAblation}:{}),
+  answerVariant,retrievalProfile,...(answerVariantComparison?{answerVariantComparison}:{}),
+  ...(answerVariant==='paired-review-ablation'?{reviewAblation:answerVariantComparison}:{}),
   elapsedMs:Date.now()-startTime};
 }
 export async function evaluatePlannerCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},onProgress=async()=>{}}={}){
@@ -923,15 +942,16 @@ export async function runPairedScopeCases(cases,{evaluateCase=evaluateLiveCase,e
  }
  return {results,stopReason};
 }
-function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',scope:process.env.LIVE_EVAL_SCOPE||'selected-books',caseId:process.env.LIVE_EVAL_CASE_ID||'',answerVariant:process.env.LIVE_EVAL_ANSWER_VARIANT||'with-review',repeatCount:Number(process.env.LIVE_EVAL_REPEAT_COUNT||1),output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
+function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',scope:process.env.LIVE_EVAL_SCOPE||'selected-books',caseId:process.env.LIVE_EVAL_CASE_ID||'',answerVariant:process.env.LIVE_EVAL_ANSWER_VARIANT||'with-review',retrievalProfile:process.env.LIVE_EVAL_RETRIEVAL_PROFILE||'baseline',repeatCount:Number(process.env.LIVE_EVAL_REPEAT_COUNT||1),reportOnly:process.env.LIVE_EVAL_REPORT_ONLY==='true',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
  for(let i=0;i<argv.length;i++){const [flag,inline]=argv[i].split('=',2),key=flag.replace(/^--/,'');if(flag==='--help'||flag==='-h'){out.help=true;continue;}
-  if(!['mode','scope','case','answer-variant','repeat','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
-  if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='repeat')out.repeatCount=Number(value);else if(key==='output')out.output=value;else out.confirm=value==='true';}
+  if(!['mode','scope','case','answer-variant','retrieval-profile','repeat','report-only','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
+  if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='retrieval-profile')out.retrievalProfile=value;else if(key==='repeat')out.repeatCount=Number(value);else if(key==='report-only')out.reportOnly=value==='true';else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|full] [--scope selected-books|all-books|paired] [--answer-variant with-review|compose-only|paired-review-ablation] [--case case-id] [--repeat 1..3] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|full] [--scope selected-books|all-books|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
- if(!['with-review','compose-only','paired-review-ablation'].includes(args.answerVariant))throw Error('Answer variant must be with-review, compose-only, or paired-review-ablation.');
+ if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
+ if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
  const usesEvaluationMode=['quality','focused','paired','holdout','acceptance'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, paired, holdout or acceptance mode.');
@@ -939,7 +959,7 @@ async function main(){
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
   throw Error('Repeat count must be an integer from 1 to 3.');
- if(args.repeatCount!==1&&!(args.mode==='acceptance'&&args.caseId==='repeatable-calibration'))
+ if(args.repeatCount!==1&&!(args.mode==='acceptance'&&['repeatable-calibration','quality-calibration'].includes(args.caseId)))
   throw Error('Repeated runs are limited to the repeatable calibration case set.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
@@ -953,21 +973,23 @@ async function main(){
  const evaluationUsesPlanner=evaluationUsesLivePlanner(args.mode,args.scope);
  const plannerCalls=args.mode==='paired'?cases.length:usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
  const answerCallsPerCase=args.answerVariant==='paired-review-ablation'?3:
-  args.answerVariant==='compose-only'?1:2;
+  args.answerVariant==='paired-expansion-ablation'?5:2;
  const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:args.mode==='paired'?
   plannerCalls+cases.length*2*answerCallsPerCase:plannerCalls+cases.length*answerCallsPerCase;
  const reportCaseCount=args.mode==='paired'?cases.length*2:cases.length;
  const conditionalGapPlannerCallAllowance=args.mode==='planner'?0:reportCaseCount;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
-  answerVariant:args.answerVariant,retrievalConfig:{...LIVE_RETRIEVAL_CONFIG},caseCount:reportCaseCount,pairedQuestionCount:args.mode==='paired'?cases.length:undefined,
+  answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,
+  retrievalConfig:{...RETRIEVAL_PROFILES[args.retrievalProfile]},caseCount:reportCaseCount,pairedQuestionCount:args.mode==='paired'?cases.length:undefined,
   repeatCount:args.repeatCount>1?args.repeatCount:undefined,
   repeatedCaseIds:args.repeatCount>1?baseCases.map(item=>item.id):undefined,
   estimatedWorkerAiCalls,conditionalGapPlannerCallAllowance,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
-   '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope; no automatic composer regeneration':
-   (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case, plus up to one conditional gap-planner call when page text weakly covers a requested part; no automatic composer regeneration',
+   '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope':
+   (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer pipeline calls per case, plus up to one conditional gap-planner call when page text weakly covers a requested part',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
-   'Automated checks cover source identity, per-part citation linkage, named-work-to-question-part alignment, and coverage consistency. They do not judge factual truth or whether cited passages semantically support the prose. Each answer includes a blank human rubric: rate accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong).',
+   'Structural checks cover source identity and citation linkage. Answer quality remains pending until a human scores accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong). A structural pass is not a quality pass.',
+  qualityStatus:args.mode==='planner'?'not-assessed':'pending-human-review',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],workerSourceRevisions:[],stopReason:'',cases:[]};
  const outputPath=args.output?resolve(args.output):'';
  let activeLibrary=null;
@@ -1062,10 +1084,10 @@ async function main(){
    });
   };
   const run=await (args.mode==='paired'?runPairedScopeCases(cases,{evaluateCase:evaluateLiveCase,
-   evaluateOptions:{library,manifest,allowed,token,beforeCall,answerVariant:args.answerVariant,onProgress:printProgress},onResult}):
+   evaluateOptions:{library,manifest,allowed,token,beforeCall,answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,onProgress:printProgress},onResult}):
    runLiveCases(cases,{evaluateCase:evaluateWithAttempt,maxConsecutiveWorkerFailures:args.repeatCount>1?6:2,
   evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:usesEvaluationMode&&!evaluationUsesPlanner,
-   answerVariant:args.answerVariant,onProgress:printProgress},onResult}));
+   answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,onProgress:printProgress},onResult}));
   report.cases=run.results;report.stopReason=run.stopReason;
   report.completedCases=run.results.length;report.notRunCases=report.caseCount-run.results.length;
   report.requestFailureCases=run.results.filter(item=>item.requestFailure).length;
@@ -1074,6 +1096,9 @@ async function main(){
   report.summary={passedCases:report.cases.filter(item=>item.passed===true).length,
    failedCases:report.cases.filter(item=>item.passed===false).length,
    unscoredCases:report.cases.filter(item=>item.passed===null||item.passed===undefined).length,
+   structuralPassedCases:report.cases.filter(item=>item.structuralPassed===true).length,
+   structuralFailedCases:report.cases.filter(item=>item.structuralPassed===false).length,
+   answerQualityStatus:args.mode==='planner'?'not-assessed':'pending-human-review',
    requestFailureCases:report.requestFailureCases,
    plannerFallbackCases:report.plannerFallbackCases,
    humanReview:summarizeManualReviews(report.cases),
@@ -1090,7 +1115,7 @@ async function main(){
    'Done: '+report.summary.passedCases+'/'+report.caseCount+' planner plans retrieved at least one expected book; no answers were generated.':
    (args.mode==='paired'?'Done: '+report.summary.passedCases+'/'+report.caseCount+' scope results met structural gates; paired scope totals are in scopeSummary. ':'Done: '+report.summary.passedCases+'/'+report.caseCount+' reviewed answers met structural gates; ')+report.summary.failedCases+' failed and '+report.summary.unscoredCases+' are unscored. Semantic answer quality requires the separate human rubric.');
   return report.requestFailureCases||(args.mode==='planner'&&report.summary.failedCases)||
-   (usesEvaluationMode&&report.summary.failedCases>0)?1:0;
+   (usesEvaluationMode&&report.summary.failedCases>0&&!args.reportOnly)?1:0;
  }catch(error){
   clearInterval(startupHeartbeat);
   report.executionStatus=report.cases.length?'interrupted':'setup-failed';
