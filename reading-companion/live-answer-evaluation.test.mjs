@@ -789,19 +789,14 @@ test('review ablation compares both answer paths against the identical source pa
  assert.equal(result.reviewAblation.variants[1].passed,null);
 });
 
-test('planner 502 fallback retrieves and submits Bible evidence for God is love',async()=>{
+test('planner 502 fallback searches only the unchanged reader question',async()=>{
  const calls=[],searched=[];
  const question='What does “God is love” mean?';
- const bibleQuery='1 John 4:7-12 God is love and love one another';
  const library={search:async query=>{
    searched.push(query);
-   if(query===bibleQuery)return {sources:[{id:'B1',bookId:'638',title:'The New Oxford Annotated Bible',
-    page:1821,globalPageId:1821,preview:'God is love; let us love one another.',score:42}]};
-   return {sources:[{id:'W1',bookId:'427',title:'Waiting for God — Simone Weil',
-    page:140,globalPageId:140,preview:'Before all things, God is love; divine love joins nearness and distance.',score:99}]};
-  },jsonGzip:async bookFile=>bookFile==='book-638.json'
-   ?{pages:[{id:1821,page:1821,text:'God is love; let us love one another, because love is from God.'}]}
-   :{pages:[{id:140,page:140,text:'Before all things, God is love; divine love joins nearness and distance.'}]}};
+   return {sources:[{id:'B1',bookId:'638',title:'The New Oxford Annotated Bible',
+    page:1821,globalPageId:1821,preview:'God is love; let us love one another.',score:99}]};
+  },jsonGzip:async()=>({pages:[{id:1821,page:1821,text:'God is love; let us love one another, because love is from God.'}]})};
  const item={id:'planner-outage',question,required_source_groups:[{label:'Bible',book_ids:['638']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'The New Oxford Annotated Bible'},427:{title:'Waiting for God'}}},
   allowed:new Set(['638','427']),token:'x'.repeat(40),
@@ -815,8 +810,7 @@ test('planner 502 fallback retrieves and submits Bible evidence for God is love'
  assert.equal(result.plannerFallback,true);
  assert.deepEqual(result.plannerQueries,[]);
  assert.deepEqual(result.plannerFailure,{httpStatus:502,failureCode:'search-planning-failed'});
- assert.deepEqual(searched,[bibleQuery,question]);
- assert.ok(result.searches.some(search=>search.query===bibleQuery));
+ assert.deepEqual(searched,[question]);
  assert.ok(result.searches.some(search=>search.query===question));
  assert.ok(result.submittedSources.some(source=>source.bookId==='638'&&source.page===1821),
   'the Bible page must survive retrieval and reach the Worker packet');

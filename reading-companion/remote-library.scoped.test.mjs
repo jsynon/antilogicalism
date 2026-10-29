@@ -30,166 +30,33 @@ test('OCR index pages with a folio before the heading are excluded while prose i
  assert.equal(isNavigationPage('An index of the evidence can be useful. The author then explains how the argument depends on experience and judgment.'),false);
 });
 
-test('Kant causal-necessity search adds the Critique’s indexed Second Analogy vocabulary',async()=>{
- const query='Kant Critique of Pure Reason causal necessity transcendental deduction categories';
- const aliases=['second','analogy','succession','rule','cause','effect','experience','objective'];
- const base=queryTerms(query);
- const terms=[...new Set([...base,...aliases])];
+test('index search uses only terms from the submitted query',async()=>{
+ const queries=[
+  'Kant Critique of Pure Reason causal necessity transcendental deduction categories',
+  'sunyata explained through emptiness and dependent arising'
+ ];
+ const terms=queries.flatMap(query=>queryTerms(query));
  const prefixes=[...new Set(terms.map(term=>term.slice(0,2)))];
  const corpus={
-  'manifest.json':{
-   version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:2,
-   page_books:[40,40],partitions:prefixes,
-   books:{'40':{title:'Critique of Pure Reason — Immanuel Kant',
-    drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
-  },
-  'book-40.json':{pages:[
-   {id:0,page:58,text:'Kant explains that pure concepts of understanding require a transcendental deduction to establish the objective validity of categories.'},
-   {id:1,page:98,text:'B. SECOND ANALOGY. All changes take place according to the law of causality. Objective succession is determined by a rule connecting cause and effect, making necessary experience possible.'}
-  ]}
- };
- for(const term of terms){
-  const pageIds=[];
-  if(base.includes(term))pageIds.push(0);
-  if(aliases.includes(term))pageIds.push(1);
-  const prefix=term.slice(0,2);
-  const key='terms-'+prefix+'.json';
-  corpus[key]||={};
-  corpus[key][term]=pageIds;
- }
- const localFetch=async url=>{
-  const name=String(url).split('/').pop().replace(/\.gz$/,'');
-  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
-  return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
-   new Response('Not found',{status:404});
- };
- const finder=new RemoteLibrary('https://example.test/v48/',localFetch);
- const result=await finder.search(query,{bookId:'40',allowedBookIds:new Set(['40']),
-  maxBooks:1,pagesPerBook:2});
- assert.ok(aliases.every(term=>result.terms.includes(term)),
-  'the reader’s terms are retained alongside the source-native query vocabulary');
- assert.equal(result.sources[0]?.page,98,
-  'the passage explaining causal succession and its rule should outrank a general deduction passage');
-});
-
-test('run 62 Buddhist phrase variant retrieves the linked page without counting phrase words twice',async()=>{
- const question='What is sunyata?';
- const firstQuery='definition and essential nature of sunyata in Buddhist texts';
- const failedRun61Query='how sunyata functions as emptiness or lack of inherent existence';
- const run62Query='sunyata explained through emptiness and dependent origination';
- const sourceNativeQuery='sunyata Nagarjuna dependent arising emptiness';
- const driveUrl=id=>'https://drive.google.com/file/d/'+id+'/view';
- const books=[
-  {id:'183',title:'The Self-Overcoming of Nihilism — Keiji Nishitani'},
-  {id:'185',title:'Last Writings: Nothingness and the Religious Worldview — Kitarō Nishida'},
-  {id:'178',title:'Mūlamadhyamakakārikā — Nāgārjuna'},
-  {id:'400',title:'Buddhist Studies Reader — Various authors'}
- ];
- const pages={
-  '183:224':'The locus of Buddhist emptiness opens a world of dependent origination in which everything is related to everything else.',
-  '185:18':'INTRODUCTION. This account connects sunyata with dependent co-arising and describes co-origination in Nagarjuna’s text.',
-  // OCR excerpt from v48 book 178, PDF page 88. This is Kalupahana's
-  // introduction discussing Nagarjuna, not a Nagarjuna verse.
-  '178:88':`With that analys.is, Nagarjuna was ready to defend the four noble truths, reconciling it with his cooception of emptiness (ibid. 20-21). 'Whoever perceives dependent arising also perceives sufferiag, its arising, its ceasing and the patb [leadiog to its ceasing]," (ibid 40).`,
-  '400:41':'This page mentions dependent Buddhist thought but does not discuss emptiness or sunyata.',
-  '400:42':'The doctrine of dependent arising is noted as one historical phrase among several themes, with no account of its implications.'
- };
- const corpus={
-  'manifest.json':{
-   version:49,postings_encoding:'delta-json-v1',prefix_length:2,pages:5,
-   page_books:[183,185,178,400,400],
-   partitions:['ar','bu','de','em','es','na','op','or','su','te'],
-   books:Object.fromEntries(books.map(book=>[book.id,{
-    title:book.title,drive_url:driveUrl(driveId)
-   }]))
-  },
-  'terms-ar.json':{arising:[2,2]},'terms-bu.json':{},'terms-de.json':{dependent:[0,1,1,1,1]},
-  'terms-em.json':{emptiness:[0,2]},'terms-es.json':{},'terms-na.json':{nagarjuna:[2]},
-  'terms-op.json':{},'terms-or.json':{origination:[0,1]},
-  'terms-su.json':{sunyata:[1]},'terms-te.json':{},
-  'book-183.json':{pages:[{id:0,page:224,text:pages['183:224']}]},
-  'book-185.json':{pages:[{id:1,page:18,text:pages['185:18']}]},
-  'book-178.json':{pages:[{id:2,page:88,text:pages['178:88']}]},
-  'book-400.json':{pages:[{id:3,page:41,text:pages['400:41']},{id:4,page:42,text:pages['400:42']}]}
+  'manifest.json':{version:49,postings_encoding:'delta-json-v1',prefix_length:2,
+   pages:0,page_books:[],partitions:prefixes,books:{}},
+  'url-suppressions.json':{scopes:[]},
+  ...Object.fromEntries(prefixes.map(prefix=>['terms-'+prefix+'.json',{}]))
  };
  const localFetch=async url=>{
   const name=String(url).split('/').pop().replace(/\.gz$/,'');
-  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
   return name in corpus?new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
    new Response('Not found',{status:404});
  };
  const library=new RemoteLibrary('https://example.test/data-v49/',localFetch);
- const allowedBookIds=new Set(books.map(book=>book.id));
- const partQuestions=[{partId:'P1',question}];
- const retrieveWithFacet=query=>retrieveEvidence({question,queries:[firstQuery,query],
-  partQueries:[{partId:'P1',query:question}],partQuestions,library,books,
-  allowedBookIds,pageLoader:async source=>({text:pages[`${source.bookId}:${source.page}`]||''})});
- const failedRun61=await retrieveWithFacet(failedRun61Query);
- assert.equal(failedRun61.candidates.some(source=>source.bookId==='178'&&source.page===88),false,
-  'the exact run-61 wording still has only one indexed match on the page and should remain below the existing floor');
- const run62=await retrieveWithFacet(run62Query);
- const run62Nagarjuna=run62.candidates.find(source=>source.bookId==='178'&&source.page===88);
- assert.ok(run62Nagarjuna,
-  'the exact run-62 facet should find the page through the established dependent-origination/dependent-arising wording variant');
- assert.ok(run62Nagarjuna.candidatePartIds.includes('P1'),
-  'the variant-matched page must remain linked to the definition part');
- const run62Packet=selectAnswerSources(run62.candidates,question,'token',{
-  maxSources:6,maxBytes:39000,maxSourceBytes:35000,
-  plannedFacetCount:run62.searchQueries.length-1,partQuestions
- });
- assert.ok(run62Packet.some(source=>source.bookId==='178'&&source.page===88),
-  'the variant-matched page must survive the existing answer-packet limits');
- assert.equal(run62.candidates.some(source=>source.bookId==='400'&&source.page===42),false,
-  'the two words of the equivalent phrase alone must not satisfy the page evidence floor');
- const expandedSearch=await library.search(run62Query,{allowedBookIds,maxBooks:3,pagesPerBook:4});
- assert.ok(expandedSearch.terms.includes('arising'),
-  'the index search should include the text’s established alternate wording');
- const reverseSearch=await library.search('sunyata explained through emptiness and dependent arising',
-  {allowedBookIds,maxBooks:3,pagesPerBook:4});
- assert.ok(reverseSearch.terms.includes('origination'),
-  'the same phrase family should work when the planner uses the indexed wording first');
- const nonSunyataRun62Facets=[
-  'Kant’s definition and principles of transcendental idealism',
-  'Søren Kierkegaard definition or nature of faith',
-  'Friedrich Nietzsche critique of Christian morality and values',
-  'Søren Kierkegaard concept of the leap of faith and subjective truth'
- ];
- for(const query of nonSunyataRun62Facets){
-  const other=await library.search(query,{allowedBookIds,maxBooks:3,pagesPerBook:4});
-  assert.equal(other.terms.includes('arising'),false,
-   'a vocabulary variant must not alter unrelated run-62 facets: '+query);
- }
- const unrelated=await retrieveEvidence({question,queries:[
-  'definition and nature of Buddhist philosophy',
-  'general account of a different metaphysical doctrine'
- ],partQueries:[{partId:'P1',query:question}],partQuestions,library,books,
- allowedBookIds,pageLoader:async()=>null});
- assert.ok(unrelated.partFacetIndices.every(item=>item.facet>=2),
-  'generic planner wording without the part’s subject term must not gain a single-part eligibility link');
- const retrieved=await retrieveWithFacet(sourceNativeQuery);
- const nagaPage=retrieved.candidates.find(source=>source.bookId==='178'&&source.page===88);
- assert.ok(nagaPage,'the source-native query matches Nagarjuna, dependent arising, and emptiness on the v49 page');
- assert.ok(nagaPage.candidatePartIds.includes('P1'),
-  'the page found by the dependent-origination planner facet must remain linked to the Sunyata part');
- const answerPacket=selectAnswerSources(retrieved.candidates,question,'token',{
-  maxSources:6,maxBytes:39000,maxSourceBytes:35000,
-  plannedFacetCount:retrieved.searchQueries.length-1,partQuestions
- });
- assert.ok(answerPacket.some(source=>source.bookId==='178'&&source.page===88),
-  'the passage must survive the existing bounded source-packet selector');
- assert.match(nagaPage.text,/reconciling it with his cooception of emptiness/u);
- assert.match(nagaPage.text,/Whoever perceives dependent arising/u,
-  'the retrieved page retains the actual v49 OCR passage for downstream source-voice review');
- assert.equal(substantivePageEvidence(
-  'dependent '+Array(140).fill('ordinary').join(' ')+' emptiness',
-  ['sunyata','operates','dependent','origination','emptiness']).localUnique,1,
-  'two terms separated beyond the local evidence window do not qualify');
- assert.equal(substantivePageEvidence(
-  'The doctrine of dependent arising is noted as one historical phrase among several themes.',
-  [['dependent','origination','arising'],'emptiness']).localUnique,1,
-  'equivalent phrase words count as one concept, so they cannot satisfy the evidence threshold by themselves');
- assert.deepEqual(retrieved.candidates.filter(source=>source.bookId==='400'),[],
-  'a page with only one matching topic term remains below the evidence floor');
+ const kantTerms=(await library.search(queries[0],{allowedBookIds:new Set()})).terms;
+ assert.equal(kantTerms.includes('second'),false);
+ assert.equal(kantTerms.includes('analogy'),false);
+ assert.equal(kantTerms.includes('succession'),false);
+ const buddhistTerms=(await library.search(queries[1],{allowedBookIds:new Set()})).terms;
+ assert.equal(buddhistTerms.includes('origination'),false);
+ assert.equal(buddhistTerms.includes('dependent'),true);
+ assert.equal(buddhistTerms.includes('arising'),true);
 });
 
 test('remote library records the exact bytes of each corpus file used',async()=>{

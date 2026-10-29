@@ -283,9 +283,9 @@ export async function retrieveEvidence({question,queries,partQueries=[],library,
  // source-side query without spending additional retrieval work.
  if(new Set(partQueries.map(item=>item.query.trim().toLocaleLowerCase())).size>6)
   throw Error('Too many distinct part-specific retrieval queries.');
- // Keep caller-supplied direct fallback constrained to the unchanged question;
- // only this local deterministic helper may add a recognized source facet.
- const fallbackQueries=useDirect?directFallbackQueries(direct,{selectedBookIds:selected}):queries;
+ // Direct fallback uses only the unchanged question. Topic or source-language
+ // expansions belong in the planner output, where they remain visible in traces.
+ const fallbackQueries=useDirect?[direct]:queries;
  const baseQueries=buildSearchFacets(direct,fallbackQueries);
  const searchQueries=[...baseQueries];
  for(const item of partQueries){
@@ -587,21 +587,6 @@ export function buildSearchFacets(question,plannedQueries,bookId=''){
  if(!direct||planned.some(query=>query.trim().toLowerCase()===direct.toLowerCase()))
   return [...planned];
  return [...planned,direct];
-}
-
-/* A planner outage should still preserve the reader's exact wording. For this
- * canonical scriptural phrase, add one deterministic 1 John facet so All
- * Books mode can retrieve the passage that gives the phrase its context. Keep
- * the direct question last because packet balancing treats that as its own
- * facet. Selected-book scope stays exact; it never gains a cross-book query.
- */
-export function directFallbackQueries(question,{selectedBookIds=[]}={}){
- const direct=String(question||'').trim();
- if(!direct)return [];
- if((Array.isArray(selectedBookIds)&&selectedBookIds.length)||
-   explicitScriptureReferences(direct).length||!/\bgod\s+is\s+love\b/i.test(direct))
-  return [direct];
- return ['1 John 4:7-12 God is love and love one another',direct];
 }
 
 /* Resolve explicit work names and author mentions against the published
