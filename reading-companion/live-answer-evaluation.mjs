@@ -189,6 +189,12 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  const evaluationCases=mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
+ if(mode==='acceptance'&&caseId==='repeatable-calibration'){
+  const ids=new Set(['acceptance-simulation-hypothesis','acceptance-buddha-on-death']);
+  const selected=ACCEPTANCE_CASES.filter(item=>ids.has(item.id));
+  if(selected.length!==ids.size)throw Error('The repeated calibration cases are missing from the acceptance suite.');
+  return selected.map(copyEvaluationCase);
+ }
  if(caseId&&caseId!=='all'){
   if(!['quality','focused','paired','holdout','acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode.');
   const selected=evaluationCases.find(item=>item.id===caseId);
@@ -451,14 +457,16 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
 const MANUAL_REVIEW_DIMENSIONS=['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness'];
 export function summarizeManualReviews(cases){
  const entries=(cases||[]).flatMap(item=>Array.isArray(item?.reviewAblation?.variants)?
-  item.reviewAblation.variants.map(variant=>({id:item.id,answerVariant:variant.answerVariant,review:variant.manualReview})):
-  [{id:item.id,answerVariant:item.answerVariant||'with-review',review:item.manualReview}]);
+  item.reviewAblation.variants.map(variant=>({id:item.id,attemptNumber:item.attemptNumber,
+   answerVariant:variant.answerVariant,review:variant.manualReview})):
+  [{id:item.id,attemptNumber:item.attemptNumber,answerVariant:item.answerVariant||'with-review',review:item.manualReview}]);
  const completed=entries.filter(entry=>MANUAL_REVIEW_DIMENSIONS.every(key=>
   Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2));
  const averageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,completed.length?
   Number((completed.reduce((sum,entry)=>sum+entry.review.scores[key],0)/completed.length).toFixed(2)):null]));
  return {scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,reviewed:completed.length,
   pending:entries.length-completed.length,entries:entries.map(entry=>({id:entry.id,
+   ...(Number.isInteger(entry.attemptNumber)?{attemptNumber:entry.attemptNumber}:{}),
    answerVariant:entry.answerVariant,status:MANUAL_REVIEW_DIMENSIONS.every(key=>
     Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2)?'complete':'pending'})),
   averageScores,qualityPass:null,
@@ -864,13 +872,13 @@ export async function runPairedScopeCases(cases,{evaluateCase=evaluateLiveCase,e
  }
  return {results,stopReason};
 }
-function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',scope:process.env.LIVE_EVAL_SCOPE||'selected-books',caseId:process.env.LIVE_EVAL_CASE_ID||'',answerVariant:process.env.LIVE_EVAL_ANSWER_VARIANT||'with-review',output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
+function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',scope:process.env.LIVE_EVAL_SCOPE||'selected-books',caseId:process.env.LIVE_EVAL_CASE_ID||'',answerVariant:process.env.LIVE_EVAL_ANSWER_VARIANT||'with-review',repeatCount:Number(process.env.LIVE_EVAL_REPEAT_COUNT||1),output:process.env.LIVE_EVAL_OUTPUT||'',confirm:process.env.CONFIRM_LIVE_AI==='true'};
  for(let i=0;i<argv.length;i++){const [flag,inline]=argv[i].split('=',2),key=flag.replace(/^--/,'');if(flag==='--help'||flag==='-h'){out.help=true;continue;}
-  if(!['mode','scope','case','answer-variant','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
-  if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='output')out.output=value;else out.confirm=value==='true';}
+  if(!['mode','scope','case','answer-variant','repeat','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
+  if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='repeat')out.repeatCount=Number(value);else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|full] [--scope selected-books|all-books|paired] [--answer-variant with-review|compose-only|paired-review-ablation] [--case case-id] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|full] [--scope selected-books|all-books|paired] [--answer-variant with-review|compose-only|paired-review-ablation] [--case case-id] [--repeat 1..3] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation'].includes(args.answerVariant))throw Error('Answer variant must be with-review, compose-only, or paired-review-ablation.');
  const usesEvaluationMode=['quality','focused','paired','holdout','acceptance'].includes(args.mode);
@@ -878,11 +886,19 @@ async function main(){
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, paired, holdout or acceptance mode.');
  if(usesEvaluationMode&&args.mode!=='paired'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
+ if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
+  throw Error('Repeat count must be an integer from 1 to 3.');
+ if(args.repeatCount!==1&&!(args.mode==='acceptance'&&args.caseId==='repeatable-calibration'))
+  throw Error('Repeated runs are limited to the repeatable calibration case set.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
  const selectedCases=selectLiveCases(suite,args.mode,args.caseId);
- const cases=args.mode==='paired'?selectedCases:usesEvaluationMode?applyQualityScope(selectedCases,args.scope):selectedCases;
+ const baseCases=args.mode==='paired'?selectedCases:usesEvaluationMode?applyQualityScope(selectedCases,args.scope):selectedCases;
+ // Interleave repetitions so service or corpus changes do not affect all
+ // attempts of one question before the other question is evaluated.
+ const cases=args.repeatCount>1?Array.from({length:args.repeatCount},(_,index)=>
+  baseCases.map(item=>({...item,repeatAttempt:index+1}))).flat():baseCases;
  const evaluationUsesPlanner=evaluationUsesLivePlanner(args.mode,args.scope);
  const plannerCalls=args.mode==='paired'?cases.length:usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
  const answerCallsPerCase=args.answerVariant==='paired-review-ablation'?3:
@@ -892,6 +908,8 @@ async function main(){
  const reportCaseCount=args.mode==='paired'?cases.length*2:cases.length;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   answerVariant:args.answerVariant,retrievalConfig:{...LIVE_RETRIEVAL_CONFIG},caseCount:reportCaseCount,pairedQuestionCount:args.mode==='paired'?cases.length:undefined,
+  repeatCount:args.repeatCount>1?args.repeatCount:undefined,
+  repeatedCaseIds:args.repeatCount>1?baseCases.map(item=>item.id):undefined,
   estimatedWorkerAiCalls,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
    '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; no automatic composer regeneration':
@@ -907,7 +925,10 @@ async function main(){
   if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');
  };
  await saveReport();
- console.log('Initializing '+args.mode+' evaluation for '+(args.mode==='paired'?cases.length+' paired questions ('+reportCaseCount+' scope results)':cases.length+' question'+(cases.length===1?'':'s'))+
+ console.log('Initializing '+args.mode+' evaluation for '+(args.repeatCount>1?
+  args.repeatCount+' attempts each for '+baseCases.length+' calibration questions ('+cases.length+' answers)':
+  args.mode==='paired'?cases.length+' paired questions ('+reportCaseCount+' scope results)':
+  cases.length+' question'+(cases.length===1?'':'s'))+
   '; loading the published fingerprint coverage and corpus manifest before retrieval.');
  const startupHeartbeat=setInterval(()=>console.log('['+new Date().toISOString()+
   '] SETUP WAIT: still loading the published fingerprint coverage and corpus manifest.'),15_000);
@@ -926,8 +947,10 @@ async function main(){
   report.executionStatus='running';await saveReport();
   let previousCall=0;
   const beforeCall=async()=>{if(previousCall){const due=Math.max(0,CALL_GAP_MS-(Date.now()-previousCall));if(due)await new Promise(resolve=>setTimeout(resolve,due));}previousCall=Date.now();};
+  let activeRepeatAttempt=0;
   const printProgress=event=>{
    const details=[];
+   if(activeRepeatAttempt)details.push('attempt='+activeRepeatAttempt);
    if(event.variant)details.push('variant='+event.variant);
    if(event.scope)details.push('scope='+event.scope);
    if(Number.isFinite(event.queryCount))details.push('queries='+event.queryCount);
@@ -945,6 +968,8 @@ async function main(){
     String(event.message||'')+(details.length?' ('+details.join('; ')+')':''));
   };
   const onResult=async(result,results)=>{
+   const scheduledCase=cases[results.length-1];
+   if(scheduledCase?.repeatAttempt)result.attemptNumber=scheduledCase.repeatAttempt;
    report.cases=results;report.completedCases=results.length;
    report.notRunCases=report.caseCount-results.length;
    report.requestFailureCases=results.filter(item=>item.requestFailure).length;
@@ -953,6 +978,17 @@ async function main(){
    report.plannerReusedCases=results.filter(item=>item.plannerReused).length;
    report.humanReview=summarizeManualReviews(results);
    report.answerVariants=summarizeAnswerVariants(results);
+   if(args.repeatCount>1){
+    report.repeatSummary=Object.fromEntries(baseCases.map(item=>{
+     const attempts=results.filter(value=>value.id===item.id);
+     const wordCounts=attempts.map(value=>(String(value.answerText||'').match(/\S+/gu)||[]).length);
+     return [item.id,{completedAttempts:attempts.length,structuralPasses:attempts.filter(value=>value.passed===true).length,
+      structuralFailures:attempts.filter(value=>value.passed===false).length,requestFailures:attempts.filter(value=>value.requestFailure).length,
+      answerWordCounts:attempts.map(value=>({attempt:value.attemptNumber,words:(String(value.answerText||'').match(/\S+/gu)||[]).length,
+       citedSources:Number(value.citationCount)||0,distinctCitedBooks:[...new Set((value.citationBookIds||[]).map(String))].length})),
+      meanAnswerWords:wordCounts.length?Math.round(wordCounts.reduce((sum,count)=>sum+count,0)/wordCounts.length):0}];
+    }));
+   }
    report.workerVersionIds=[...new Set(results.flatMap(item=>[item.plannerWorkerVersionId,item.answerWorkerVersionId]).filter(value=>typeof value==='string'&&value))];
    report.workerSourceRevisions=[...new Set(results.flatMap(item=>[item.plannerWorkerSourceRevision,item.answerWorkerSourceRevision]).filter(value=>typeof value==='string'&&/^[a-f0-9]{40}$/.test(value)))];
    report.scopeSummary=Object.fromEntries(['all-books','selected-books'].map(scope=>{
@@ -967,9 +1003,15 @@ async function main(){
    const label=args.mode==='planner'?'PLANNER':'STRUCTURAL';
    console.log((result.passed===true?label+'-PASS':result.passed===null?'UNSCORED':result.requestFailure?'REQUEST-FAIL':label+'-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
   };
+  const evaluateWithAttempt=async(item,options)=>{
+   activeRepeatAttempt=item.repeatAttempt||0;
+   return (args.mode==='planner'?evaluatePlannerCase:evaluateLiveCase)(item,{
+    ...options,onProgress:event=>printProgress(event)
+   });
+  };
   const run=await (args.mode==='paired'?runPairedScopeCases(cases,{evaluateCase:evaluateLiveCase,
    evaluateOptions:{library,manifest,allowed,token,beforeCall,answerVariant:args.answerVariant,onProgress:printProgress},onResult}):
-   runLiveCases(cases,{evaluateCase:args.mode==='planner'?evaluatePlannerCase:evaluateLiveCase,
+   runLiveCases(cases,{evaluateCase:evaluateWithAttempt,maxConsecutiveWorkerFailures:args.repeatCount>1?6:2,
   evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:usesEvaluationMode&&!evaluationUsesPlanner,
    answerVariant:args.answerVariant,onProgress:printProgress},onResult}));
   report.cases=run.results;report.stopReason=run.stopReason;

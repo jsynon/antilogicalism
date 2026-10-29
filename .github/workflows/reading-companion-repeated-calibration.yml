@@ -1,0 +1,59 @@
+name: Reading Companion repeated calibration
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_ai:
+        description: Run simulation and Buddha answers three times each in All Books mode (about 18 baseline Worker inference calls, plus conditional repairs)
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reading-companion-live-answer-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: ${{ inputs.confirm_live_ai }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CONFIRM_LIVE_AI: ${{ inputs.confirm_live_ai }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate explicit cost confirmation
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          test "$CONFIRM_LIVE_AI" = "true"
+          test -n "$PILOT_EVALUATION_TOKEN"
+      - name: Check evaluator guards and report contracts
+        run: node --test reading-companion/live-answer-evaluation.test.mjs
+      - name: Run three All Books attempts per calibration question
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+          LIVE_EVAL_OUTPUT: ${{ github.workspace }}/reading-companion-repeated-calibration.json
+        run: >-
+          node reading-companion/live-answer-evaluation.mjs
+          --mode acceptance
+          --scope all-books
+          --answer-variant with-review
+          --case repeatable-calibration
+          --repeat 3
+          --confirm-live-ai true
+          --output "$LIVE_EVAL_OUTPUT"
+      - name: Save repeated calibration report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-companion-repeated-calibration
+          path: ${{ github.workspace }}/reading-companion-repeated-calibration.json
+          if-no-files-found: warn
+          retention-days: 14

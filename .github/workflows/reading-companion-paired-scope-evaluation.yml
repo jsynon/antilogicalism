@@ -27,7 +27,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: reading-companion-paired-scope-evaluation
+  group: reading-companion-live-answer-evaluation
   cancel-in-progress: false
 
 jobs:

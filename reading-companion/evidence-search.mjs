@@ -624,6 +624,13 @@ function catalogWorkTitles(title){
 function catalogAuthorNames(title){
  return catalogIdentity(title).authors;
 }
+function namedSpeakerPhrase(question){
+ const match=String(question||'').match(/\b(?:what|how)\s+(?:did|does|do|would)\s+([\p{L}][\p{L}\p{M}.'’\-]*(?:\s+[\p{L}][\p{L}\p{M}.'’\-]*){0,3})\s+(?:say|says|said|teach|teaches|taught|think|thinks|thought|argue|argues|argued|believe|believes|believed|write|writes|wrote|hold|holds|held)\b/iu);
+ if(!match)return '';
+ const name=match[1].trim();
+ return new Set(['it','they','he','she','the author','the book','the text','people','someone','anyone'])
+  .has(normalizeCatalogText(name))?'':name;
+}
 function explicitlyNamedAuthorGroups(question,candidates){
  const groups=new Map();
  for(const candidate of candidates){
@@ -731,9 +738,21 @@ export function targetBooksForFacet(query,books,allowedBookIds=null){
  // all-books facet. RemoteLibrary.search recognizes the same locator and
  // boosts indexed Bible editions when it searches the full catalog.
  if(hasExplicitScriptureReference(String(query||'')))return scoped?.length?scoped:[null];
- const matches=matchExplicitBookIds(String(query||''),books)
+ const text=String(query||'');
+ const matches=matchExplicitBookIds(text,books)
   .filter(id=>!scoped||scoped.includes(String(id)));
  if(matches.length)return matches;
+ // If a named teacher appears only in the title of a compiled work, target
+ // that book for this named-speaker facet alone. Do not let this subject-title
+ // match constrain sibling topical facets or all-books source diversity.
+ const speakerKey=normalizeCatalogText(namedSpeakerPhrase(text));
+ if(speakerKey){
+  const subjectTitles=(books||[]).filter(book=>
+   /^[1-9]\d{0,3}$/.test(String(book?.id||''))&&
+   catalogWorkTitles(book?.title).some(title=>questionContainsPhrase(title,speakerKey)))
+   .map(book=>String(book.id)).filter(id=>!scoped||scoped.includes(id));
+  if(subjectTitles.length)return [...new Set(subjectTitles)].slice(0,8);
+ }
  return scoped?.length?scoped:[null];
 }
 
