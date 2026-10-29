@@ -769,6 +769,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   const pool=loaded.candidates.slice(0,48);
   const parts=(partQuestions.length?partQuestions:[{partId:'P1',question:item.question}]).slice(0,6);
   const candidateById=new Map(pool.map((candidate,index)=>['C'+(index+1),candidate]));
+  const idByCandidate=new Map(pool.map((candidate,index)=>[candidate,'C'+(index+1)]));
   const compactCandidates=pool.map((candidate,index)=>({id:'C'+(index+1),title:String(candidate.title||'').slice(0,200),
    page:candidate.page,excerpt:String(candidate.preview||candidate.text||'').slice(0,520)}));
   try{
@@ -784,8 +785,11 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     candidatePool:pool.map((candidate,index)=>({id:'C'+(index+1),bookId:candidate.bookId,title:candidate.title,page:candidate.page,
      score:candidate.score,facet:candidate.facet,facetRanks:candidate.facetRanks,candidatePartIds:candidate.candidatePartIds||[],
      excerpt:String(candidate.preview||candidate.text||'').slice(0,520)})),
-    deterministicSelected:loaded.selected.map(candidate=>({bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
-    modelSelected:modelSources.map(candidate=>({bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
+    deterministicSelected:loaded.selected.map(candidate=>({candidateId:idByCandidate.get(candidate)||null,bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
+    deterministicExcludedCandidateIds:pool.filter(candidate=>!loaded.selected.includes(candidate)).map(candidate=>idByCandidate.get(candidate)),
+    modelSelected:modelSources.map(candidate=>({candidateId:idByCandidate.get(candidate)||null,bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
+    modelExcludedCandidateIds:pool.filter(candidate=>!modelSources.includes(candidate)).map(candidate=>idByCandidate.get(candidate)),
+    modelBudgetExcludedCandidateIds:decision.selectedCandidateIds.filter(id=>candidateById.has(id)&&!modelSources.includes(candidateById.get(id))),
     decision:{selectedCandidateIds:decision.selectedCandidateIds,parts:decision.parts,usage:decision.usage,model:decision.model},
     selectorWorkerVersionId:decision.workerVersionId||null,selectorWorkerSourceBuild:decision.workerSourceBuild||null,
     selectorWorkerSourceRevision:decision.workerSourceRevision||null,modelSources};
