@@ -432,7 +432,10 @@ function renderResponse(data,turnQuestion=''){
       if(attribution)card.append(node('p',attribution,'companion-source-attribution'));
       if(excerpts.length){
         excerpts.forEach(excerpt=>{
-          const quote=node('p',excerpt,'companion-key-quote');
+          // Use semantic blockquote markup so each verified passage reads as
+          // a distinct quotation instead of another paragraph in the source list.
+          const quote=node('blockquote',undefined,'companion-key-quote');
+          quote.append(node('p',excerpt));
           card.append(quote);
         });
         const read=node('button','Read passages','companion-inline-read');
@@ -444,7 +447,7 @@ function renderResponse(data,turnQuestion=''){
         card.append(read);
       }else{
         card.append(node('p','No verified passage highlight is available for this citation.',
-          'companion-key-quote'));
+          'companion-key-note'));
         const read=node('button','Read passages','companion-inline-read');
         read.type='button';
         read.addEventListener('click',async()=>{
