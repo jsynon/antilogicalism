@@ -606,9 +606,9 @@ test('offline report recheck refreshes both paired variant audits and preserves 
 
 test('quality case uses fixed queries, skips planning, and restricts retrieval to its selected book',async()=>{
  const calls=[],searchOptions=[];
- const library={search:async(query,options)=>{searchOptions.push({query,options});return {sources:[{id:'S1',bookId:'529',title:'On the Origin of Species',page:10,globalPageId:10,preview:'A sufficiently long preview passage for testing.',score:4}]};},
-  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
- const item={id:'selected-book-test',question:'Explain Darwin in a named book with enough detail.',discipline:'science',selected_book_ids:['529'],
+ const library={search:async(query,options)=>{searchOptions.push({query,options});return {sources:[{id:'S1',bookId:'529',title:'On the Origin of Species',page:10,globalPageId:10,preview:'Charles Darwin discusses species variation and natural selection.',score:4}]};},
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'Charles Darwin discusses species variation and natural selection in the source.'}]})};
+ const item={id:'selected-book-test',question:'What did Darwin explain about natural selection?',discipline:'science',selected_book_ids:['529'],
   planner_queries:['first distinct fixed search concept','second distinct fixed search concept'],review_focus:['Check causal explanation.'],
   required_source_groups:[{label:'Darwin',book_ids:['529']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{529:{title:'On the Origin of Species'}}},allowed:new Set(['529','102']),token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,
@@ -620,10 +620,10 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  assert.equal(result.answerWorkerSourceBuild,'gateway-build-9');
  assert.equal(result.answerWorkerSourceRevision,'abcdef0123456789abcdef0123456789abcdef01');
  assert.equal(result.selectedBookIds[0],'529');assert.equal(result.reviewFocus[0],'Check causal explanation.');
- assert.equal(result.submittedSources[0].excerpt,'A sufficiently long preview passage for testing.');
+ assert.equal(result.submittedSources[0].excerpt,'Charles Darwin discusses species variation and natural selection.');
  assert.equal(result.retrievalCandidates.length,1);
  assert.equal(result.retrievalCandidates[0].bookId,'529');
- assert.equal(result.retrievalCandidates[0].excerpt,'A sufficiently long preview passage for testing.');
+ assert.equal(result.retrievalCandidates[0].excerpt,'Charles Darwin discusses species variation and natural selection.');
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
  assert.ok(searchOptions.every(({options})=>options.maxBooks===LIVE_RETRIEVAL_CONFIG.maxBooks&&
   options.pagesPerBook===LIVE_RETRIEVAL_CONFIG.pagesPerBook));
@@ -728,11 +728,11 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  const calls=[],searched=[],progress=[];
  const library={search:async(query)=>{searched.push(query);return {sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]};},
   jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
- const item={question:'Explain the source question with enough detail.',selected_book_ids:['638'],required_source_groups:[{label:'Bible',book_ids:['638']}]};
+ const item={question:'Explain the source question.',selected_book_ids:['638'],required_source_groups:[{label:'Bible',book_ids:['638']}]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
   beforeCall:async()=>{},onProgress:event=>progress.push(event),fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body),authorization:options.headers.authorization});
    return new Response(JSON.stringify(url.endsWith('pilot-plan')?{queries:['first distinct search concept','second distinct search concept'],
-    plan:{parts:[{id:'P1',question:'Explain the source question with enough detail.'}]},
+    plan:{parts:[{id:'P1',question:item.question}]},
     workerVersionId:'plan-worker-3',workerSourceBuild:'gateway-build-3'}:
     {outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',workerVersionId:'answer-worker-3',workerSourceBuild:'gateway-build-3',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(calls.length,2);
@@ -760,12 +760,45 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  assert.ok(!JSON.stringify(progress).includes('x'.repeat(40)));
 });
 
+test('conditional search can recover when the initial retrieval returns no pages',async()=>{
+ const calls=[],searched=[];
+ const pageText='Experience and perception provide evidence about the external world.';
+ const library={search:async query=>{
+  searched.push(query);
+  return query.includes('alternate wording')?{sources:[{id:'S1',bookId:'638',title:'A Source',
+   page:4,globalPageId:44,preview:pageText,score:8}]}:{sources:[]};
+ },jsonGzip:async()=>({pages:[{id:44,page:4,text:pageText}]})};
+ const item={id:'empty-first-pass',question:'What are the properties of the external world?',
+  selected_book_ids:['638'],review_focus:['Evaluator-only note'],
+  planner_queries:['external world reality existence query','properties of perceived reality query'],
+  required_source_groups:[{label:'A Source',book_ids:['638']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'A Source'}}},
+  allowed:new Set(['638']),token:'x'.repeat(40),useFixedQueries:true,
+  fetcher:async(url,options)=>{
+   const body=JSON.parse(options.body);calls.push({url,body});
+   if(body.retrievalGap)return new Response(JSON.stringify({queries:['alternate wording search lead']}),
+    {status:200,headers:{'content-type':'application/json'}});
+   return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',
+    reviewStatus:'review',answer:'The source discusses experience and perception [S1].',
+    citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),
+    {status:200,headers:{'content-type':'application/json'}});
+  }});
+ assert.equal(calls.length,2);
+ assert.ok(calls[0].body.retrievalGap);
+ assert.equal('reviewFocus' in calls[0].body,false);
+ assert.equal(result.gapPlannerAttempted,true);
+ assert.deepEqual(result.gapQueries,['alternate wording search lead']);
+ assert.deepEqual(result.retrievalCoverageAfterGap.weakParts,[]);
+ assert.ok(searched.some(query=>query==='alternate wording search lead'));
+ assert.equal(result.passed,true);
+});
+
 test('review ablation compares both answer paths against the identical source packet',async()=>{
  const calls=[];
  const library={search:async()=>({sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,
   url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]}),
   jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
- const item={id:'paired-test',question:'Explain the source question with enough detail.',selected_book_ids:['638'],
+const item={id:'paired-test',question:'Explain the source question.',selected_book_ids:['638'],
   planner_queries:['first distinct query concept','second distinct query concept'],
   required_source_groups:[{label:'Bible',book_ids:['638']}],review_focus:[]};
  const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),
@@ -789,7 +822,7 @@ test('review ablation compares both answer paths against the identical source pa
  assert.equal(result.reviewAblation.variants[1].passed,null);
 });
 
-test('planner 502 fallback searches only the unchanged reader question',async()=>{
+test('planner and conditional gap fallback keep the unchanged reader question in scope',async()=>{
  const calls=[],searched=[];
  const question='What does “God is love” mean?';
  const library={search:async query=>{
@@ -805,11 +838,13 @@ test('planner 502 fallback searches only the unchanged reader question',async()=
    return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',
     answer:'In 1 John, God’s love is revealed and calls people to love one another [S1].',
     citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
- assert.equal(calls.length,2);
- assert.match(calls[0].url,/pilot-plan$/);assert.match(calls[1].url,/pilot-answer$/);
+ assert.equal(calls.length,3);
+ assert.match(calls[0].url,/pilot-plan$/);assert.match(calls[1].url,/pilot-plan$/);
+ assert.ok(calls[1].body.retrievalGap);assert.match(calls[2].url,/pilot-answer$/);
  assert.equal(result.plannerFallback,true);
  assert.deepEqual(result.plannerQueries,[]);
  assert.deepEqual(result.plannerFailure,{httpStatus:502,failureCode:'search-planning-failed'});
+ assert.equal(result.gapPlannerFailure,'search-planning-failed');
  assert.deepEqual(searched,[question]);
  assert.ok(result.searches.some(search=>search.query===question));
  assert.ok(result.submittedSources.some(source=>source.bookId==='638'&&source.page===1821),

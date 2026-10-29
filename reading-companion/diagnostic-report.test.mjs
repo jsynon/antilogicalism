@@ -159,13 +159,30 @@ test('diagnostics expose bounded question-part coverage tied to submitted source
    {part:'x'.repeat(200),status:'partial',evidenceIds:['S2','S1','S2']}
   ]
  });
- assert.equal(report.clientBuild,'v1.17-part-evidence-diagnostics');
+ assert.equal(report.clientBuild,'v1.18-conditional-gap-search');
  assert.deepEqual(report.answer.questionParts,[
   {part:'definition',status:'supported',evidenceIds:['S1','S2','S3','S4','S5','S6']},
   {part:'contrast with skill',status:'unsupported',evidenceIds:[]},
   {part:'x'.repeat(140),status:'partial',evidenceIds:['S2','S1']}
  ]);
  assert.match(client,/diagnosticState\.questionParts=data\.questionParts/);
+});
+test('diagnostics record bounded conditional retrieval decisions without excerpts',()=>{
+ const report=createDiagnosticReport({retrievalCoverage:{triggered:true,weakParts:[
+  {question:'How is reality known?',overlap:1},{question:'x'.repeat(300),overlap:0}]},
+  gapPlannerAttempted:true,
+  gapQueries:['experience and external reality','perception and certainty','third bounded query','fourth ignored'],
+  gapPlannerFailure:'search-planning-failed',
+  retrievalCoverageAfterGap:{weakParts:[{question:'How is reality known?',overlap:3}]},
+  candidates:[{excerpt:'must never be copied into diagnostic output'}]});
+ assert.equal(report.gapSearch.triggered,true);
+ assert.equal(report.gapSearch.plannerAttempted,true);
+ assert.equal(report.gapSearch.weakParts.length,2);
+ assert.equal(report.gapSearch.weakParts[1].part.length,240);
+ assert.equal(report.gapSearch.queries.length,3);
+ assert.equal(report.gapSearch.failureCode,'search-planning-failed');
+ assert.equal(report.gapSearch.afterGap[0].overlap,3);
+ assert.equal(JSON.stringify(report).includes('must never be copied'),false);
 });
 
 test('diagnostics preserve bounded per-part search and selected-page mappings',()=>{
