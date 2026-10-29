@@ -230,7 +230,7 @@ test('holdout mode selects a separate seven-question set across disciplines',()=
  assert.equal(selectLiveCases({cases:[]},'quality').length,7,'the original quality baseline remains intact');
 });
 
-test('acceptance mode preserves its baseline and adds God is love followed by the simulation calibration case',()=>{
+test('acceptance mode preserves its baseline and adds three calibration cases',()=>{
  const cases=selectLiveCases({cases:[]},'acceptance');
  assert.equal(cases.length,9);
  assert.ok(cases.every(item=>item.id.startsWith('acceptance-')&&item.selected_book_ids.length===0));
