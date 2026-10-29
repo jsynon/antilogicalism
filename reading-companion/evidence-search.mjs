@@ -255,7 +255,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  */
 export async function retrieveEvidence({question,queries,partQueries=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
- maxCandidates=12,maxBooks=3,pagesPerBook=4,pageLimit=14000}={}){
+ maxCandidates=24,maxBooks=4,pagesPerBook=4,pageLimit=14000}={}){
  const direct=String(question||'').trim();
  if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
  if(!library||typeof library.search!=='function'||!Array.isArray(books)||
@@ -1069,25 +1069,30 @@ export function selectAnswerSources(candidates,question,turnstileToken,
   if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
  }
  if(partRepresentatives.length){
-  // Once every requested part has one candidate, use spare packet slots for
-  // another linked book when available. This gives a direct definition or
-  // comparison a second independent source before sending pages that have no
-  // question-part link. A link is still only an eligibility signal; the Worker
-  // performs the claim-level evidence review.
+  // After each part has one representative, spend spare slots on distinct
+  // linked works. A broad one-part question may reserve two alternatives, so
+  // three independent works can reach composition when retrieval finds them.
+  // Multi-part questions reserve one alternate per part to protect coverage.
+  // Part links are eligibility hints only; the Worker still reviews every claim.
   const diverseRepresentatives=[];
+  const alternatesPerPart=partIds.length===1?2:1;
   for(const partId of partIds){
    const representedBooks=new Set([...reservedPartPages]
     .filter(value=>value.candidatePartIds?.includes(partId)).map(value=>String(value.bookId)));
-   const eligible=ordered.filter(value=>!reservedPartPages.has(value)&&
-    value.candidatePartIds?.includes(partId)&&!representedBooks.has(String(value.bookId)));
-   if(!eligible.length)continue;
    const targetQuestion=partQuestionById.get(partId)||question;
-   const candidate=eligible.reduce((best,value)=>{
-    const overlap=directFacetTextMatch(targetQuestion,value.text??value.preview);
-    const bestOverlap=directFacetTextMatch(targetQuestion,best.text??best.preview);
-    return overlap>bestOverlap||overlap===bestOverlap&&(Number(value.score)||0)>(Number(best.score)||0)?value:best;
-   },eligible[0]);
-   diverseRepresentatives.push(candidate);reservedPartPages.add(candidate);
+   for(let alternate=0;alternate<alternatesPerPart;alternate++){
+    const eligible=ordered.filter(value=>!reservedPartPages.has(value)&&
+     value.candidatePartIds?.includes(partId)&&!representedBooks.has(String(value.bookId)));
+    if(!eligible.length)break;
+    const candidate=eligible.reduce((best,value)=>{
+     const overlap=directFacetTextMatch(targetQuestion,value.text??value.preview);
+     const bestOverlap=directFacetTextMatch(targetQuestion,best.text??best.preview);
+     return overlap>bestOverlap||overlap===bestOverlap&&(Number(value.score)||0)>(Number(best.score)||0)?value:best;
+    },eligible[0]);
+    diverseRepresentatives.push(candidate);
+    reservedPartPages.add(candidate);
+    representedBooks.add(String(candidate.bookId));
+   }
   }
   const remainingLinked=ordered.filter(value=>!reservedPartPages.has(value)&&
    Array.isArray(value.candidatePartIds)&&value.candidatePartIds.length);

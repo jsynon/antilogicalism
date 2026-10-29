@@ -230,16 +230,16 @@ test('holdout mode selects a separate seven-question set across disciplines',()=
  assert.equal(selectLiveCases({cases:[]},'quality').length,7,'the original quality baseline remains intact');
 });
 
-test('acceptance mode preserves its baseline and adds God is love followed by the simulation calibration case',()=>{
+test('acceptance mode preserves its baseline and adds three calibration cases',()=>{
  const cases=selectLiveCases({cases:[]},'acceptance');
- assert.equal(cases.length,9);
+ assert.equal(cases.length,10);
  assert.ok(cases.every(item=>item.id.startsWith('acceptance-')&&item.selected_book_ids.length===0));
- assert.equal(new Set(cases.map(item=>item.id)).size,9);
+ assert.equal(new Set(cases.map(item=>item.id)).size,10);
  for(const id of ['acceptance-descartes-cogito','acceptance-mill-harm-principle','acceptance-epictetus-freedom',
   'acceptance-augustine-memory','acceptance-aristotle-tragedy-plot','acceptance-boethius-fortune',
   'acceptance-locke-political-authority'])assert.ok(cases.some(item=>item.id===id),id+' remains in the baseline');
- assert.deepEqual(cases.slice(-2).map(item=>item.id),[
-  'acceptance-god-is-love','acceptance-simulation-hypothesis']);
+ assert.deepEqual(cases.slice(-3).map(item=>item.id),[
+  'acceptance-god-is-love','acceptance-simulation-hypothesis','acceptance-buddha-on-death']);
  const focused=selectLiveCases({cases:[]},'acceptance','acceptance-god-is-love');
  assert.equal(focused.length,1);
  assert.deepEqual(focused[0].required_source_groups.map(group=>group.book_ids),[
@@ -252,13 +252,18 @@ test('acceptance mode preserves its baseline and adds God is love followed by th
   ['25'],['19','20','35']]);
  assert.match(simulation[0].review_focus[0],/do not establish whether we live in a computer simulation/);
  assert.match(simulation[0].review_focus[2],/as evidence for a computational simulation/);
+ const buddha=selectLiveCases({cases:[]},'acceptance','acceptance-buddha-on-death');
+ assert.equal(buddha.length,1);
+ assert.deepEqual(buddha[0].required_source_groups.map(group=>group.book_ids),[
+  ['22','23','104','225']]);
+ assert.match(buddha[0].review_focus[1],/more than one distinct work/);
  assert.throws(()=>selectLiveCases({cases:[]},'acceptance','holdout-history-herodotus-helen'),/Unknown acceptance case/);
 });
 
-test('acceptance workflow lists the simulation case immediately after God is love',async()=>{
+test('acceptance workflow lists the three calibration cases in sequence',async()=>{
  const {readFileSync}=await import('node:fs');
  const workflow=readFileSync(new URL('../.github/workflows/reading-companion-holdout-answer-evaluation.yml',import.meta.url),'utf8');
- assert.match(workflow, /^\s+- acceptance-god-is-love\s*\n\s+- acceptance-simulation-hypothesis\s*$/m);
+ assert.match(workflow, /^\s+- acceptance-god-is-love\s*\n\s+- acceptance-simulation-hypothesis\s*\n\s+- acceptance-buddha-on-death\s*$/m);
 });
 
 test('holdout all-books scope and single-case selection behave independently of the baseline',()=>{

@@ -1,4 +1,4 @@
-/* Antilogicalism Reading Companion v1.13.0 — staged verified-library alpha.
+/* Antilogicalism Reading Companion v1.14.0 — staged verified-library alpha.
  * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
  * The Worker independently validates every submitted source page against v49
  * fingerprints before any inference. The verified scope comes from the
@@ -7,7 +7,7 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence} from './evidence-search.mjs?v=1.13.0';
+import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence} from './evidence-search.mjs?v=1.14.0';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -19,6 +19,8 @@ const API='https://antilogicalism-companion-public.jsynon.workers.dev';
 const FALLBACK_BOOK={id:'152',title:'History of the Peloponnesian War — Thucydides'};
 const PDF_PAGE_LIMIT=14000;
 const MAX_ANSWER_SOURCES=6;
+// Keep a workbench-sized recall pool; the verified answer packet stays capped at six pages.
+const MAX_RETRIEVAL_CANDIDATES=24;
 const el=id=>document.getElementById(id);
 const question=el('companion-question');
 const form=el('companion-question-form');
@@ -267,7 +269,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
         directFallback:plannerFallback||!plannedQueries,
         library,books:bookList,allowedBookIds:allowed,
         selectedBookIds:bookFilter.value?[bookFilter.value]:[],allowedPage,
-        maxCandidates:12,pageLimit:PDF_PAGE_LIMIT,
+        maxCandidates:MAX_RETRIEVAL_CANDIDATES,maxBooks:4,pageLimit:PDF_PAGE_LIMIT,
         pageLoader:async source=>{
           const shard=await bookShard(source.bookId);
           const page=shard.pages?.find(item=>item.id===source.globalPageId&&item.page===source.page);
@@ -279,7 +281,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
       }
       if(diagnosticState&&plan)diagnosticState.plannerPlan=plan;
     }
-    candidates=populated.slice(0,12);
+    candidates=populated.slice(0,MAX_RETRIEVAL_CANDIDATES);
     if(diagnosticState){
       diagnosticState.candidates=candidates;
       diagnosticState.stage=candidates.length?'sources_retrieved':'no_matches';

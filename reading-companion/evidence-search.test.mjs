@@ -147,6 +147,45 @@ test('linked definition evidence from distinct books reaches composition before 
  assert.ok(new Set(selected.slice(0,4).map(candidate=>candidate.bookId)).size>=3,
   'the extra evidence slot should prefer a separate source book when relevant candidates exist');
 });
+test('broad one-part selection reserves three relevant works when available',()=>{
+ const question='What did Buddha say about death?';
+ const passage='The Buddha teaches about death, loss, and the path beyond suffering.';
+ const candidates=[
+  {...page(409,'104'),score:80,candidatePartIds:['P1'],text:passage},
+  {...page(122,'225'),score:70,candidatePartIds:['P1'],text:passage},
+  {...page(180,'22'),score:60,candidatePartIds:['P1'],text:passage},
+  {...page(70,'222'),score:50,candidatePartIds:['P1'],text:passage},
+  {...page(410,'104'),score:49,candidatePartIds:['P1'],text:passage+' Another passage.'},
+ ];
+ const selected=selectAnswerSources(candidates,question,'token',{maxSources:6,
+  partQuestions:[{partId:'P1',question}]});
+ assert.deepEqual(selected.slice(0,3).map(source=>source.bookId),['104','225','22']);
+});
+
+test('broad retrieval keeps a workbench-sized candidate pool across four books',async()=>{
+ const question='What did Buddha say about death?';
+ const ids=['104','225','22','23'];
+ const books=ids.map(id=>({id,title:'Buddhist source '+id}));
+ const sources=Array.from({length:24},(_,index)=>({
+  ...page(index%6+1,ids[Math.floor(index/6)]),
+  title:'Buddhist source '+ids[Math.floor(index/6)],
+  globalPageId:index,score:100-index,
+  preview:'Buddhist teaching discusses Buddha, death, rebirth, and suffering.'
+ }));
+ const observed=[];
+ const result=await retrieveEvidence({question,
+  queries:['Buddha teaching about death and dying','Buddhist accounts of death and rebirth'],
+  partQueries:[{partId:'P1',query:question}],
+  partQuestions:[{partId:'P1',question}],
+  library:{search:async(_query,options)=>{observed.push(options);return {sources};}},
+  books,allowedBookIds:new Set(ids),
+  pageLoader:async source=>({text:source.preview+' This passage gives a substantive explanation of death.'})
+ });
+ assert.equal(result.candidates.length,24);
+ assert.ok(observed.length>0&&observed.every(options=>options.maxBooks===4),
+  'all-books index searches should keep the four-book breadth limit');
+});
+
 test('explicit work titles narrow searches to matching catalog books',()=>{
  const books=[
   {id:'7',title:'Nicomachean Ethics — Aristotle'},
@@ -1433,6 +1472,8 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
  assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text,candidatePartIds\}\)=>\(\{bookId,page,text,candidatePartIds,libraryVersion:49\}\)\)/);
  assert.match(js,/selectAnswerSources\(candidates,q,token,\{history,\s*maxSources:MAX_ANSWER_SOURCES,\s*plannedFacetCount:/);
+ assert.match(js,/maxCandidates:MAX_RETRIEVAL_CANDIDATES,maxBooks:4/);
+ assert.match(js,/candidates=populated\.slice\(0,MAX_RETRIEVAL_CANDIDATES\)/);
  assert.doesNotMatch(js,/searchPages\(|lastSearch|checked passages will guide/i);
  assert.match(js,/data\.outcome==='insufficient-evidence'/);
  assert.doesNotMatch(js,/innerHTML\s*=/);
