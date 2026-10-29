@@ -281,7 +281,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
       }
       if(diagnosticState&&plan)diagnosticState.plannerPlan=plan;
     }
-    candidates=populated.slice(0,12);
+    candidates=populated.slice(0,MAX_RETRIEVAL_CANDIDATES);
     if(diagnosticState){
       diagnosticState.candidates=candidates;
       diagnosticState.stage=candidates.length?'sources_retrieved':'no_matches';
