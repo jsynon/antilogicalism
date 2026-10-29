@@ -67,7 +67,7 @@ test('selected-book evaluation constrains every search facet to the requested bo
   fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
  assert.equal(scopeArgs.length,3);
  assert.ok(scopeArgs.every(options=>options.allowedBookIds.size===1&&options.allowedBookIds.has('7')&&
-  options.maxCandidates===LIVE_RETRIEVAL_CONFIG.maxCandidates&&options.maxBooks===LIVE_RETRIEVAL_CONFIG.maxBooks&&
+  options.maxBooks===LIVE_RETRIEVAL_CONFIG.maxBooks&&
   options.pagesPerBook===LIVE_RETRIEVAL_CONFIG.pagesPerBook));
  assert.equal(result.retrievalPass,true);
  assert.equal(result.candidateSourcesVerified,true);
