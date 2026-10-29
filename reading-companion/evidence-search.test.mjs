@@ -162,6 +162,30 @@ test('broad one-part selection reserves three relevant works when available',()=
  assert.deepEqual(selected.slice(0,3).map(source=>source.bookId),['104','225','22']);
 });
 
+test('broad retrieval keeps a workbench-sized candidate pool across four books',async()=>{
+ const question='What did Buddha say about death?';
+ const ids=['104','225','22','23'];
+ const books=ids.map(id=>({id,title:'Buddhist source '+id}));
+ const sources=Array.from({length:24},(_,index)=>({
+  ...page(index%6+1,ids[Math.floor(index/6)]),
+  title:'Buddhist source '+ids[Math.floor(index/6)],
+  globalPageId:index,score:100-index,
+  preview:'Buddhist teaching discusses Buddha, death, rebirth, and suffering.'
+ }));
+ const observed=[];
+ const result=await retrieveEvidence({question,
+  queries:['Buddha teaching about death and dying','Buddhist accounts of death and rebirth'],
+  partQueries:[{partId:'P1',query:question}],
+  partQuestions:[{partId:'P1',question}],
+  library:{search:async(_query,options)=>{observed.push(options);return {sources};}},
+  books,allowedBookIds:new Set(ids),
+  pageLoader:async source=>({text:source.preview+' This passage gives a substantive explanation of death.'})
+ });
+ assert.equal(result.candidates.length,24);
+ assert.ok(observed.length>0&&observed.every(options=>options.maxBooks===4),
+  'all-books index searches should keep the four-book breadth limit');
+});
+
 test('explicit work titles narrow searches to matching catalog books',()=>{
  const books=[
   {id:'7',title:'Nicomachean Ethics — Aristotle'},
