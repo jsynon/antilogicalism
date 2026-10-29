@@ -583,11 +583,11 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  })),searchQueries,namedBookIds};
 }
 
-/* Text overlap is a retrieval diagnostic, never a relevance verdict. Keep
- * matched terms close together in the same excerpt window: a whole-page count
- * can mistake two separate senses of an ambiguous word for coverage. A weak
- * result triggers the existing librarian retry; only answer review can decide
- * whether a passage actually supports a claim.
+/* Text overlap is a retrieval diagnostic, never a relevance verdict. Count
+ * terms only within a sentence or clause, and keep reference-list pages from
+ * acting as evidence. Index entries can put unrelated words close together;
+ * weak coherent prose triggers the existing librarian retry, while answer
+ * review still decides whether a passage supports a claim.
  */
 export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
  const parts=Array.isArray(partQuestions)&&partQuestions.length
@@ -595,21 +595,41 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
     partId:item.partId||'',question:item.question}))
   :[{partId:'P1',question:String(question||'')}];
  const weakParts=parts.map(part=>{
-  let best={overlap:0,matchedTerms:[],windowStart:-1};
+  let best={overlap:0,matchedTerms:[],windowStart:-1,source:null};
+  let bestIndex={overlap:0,matchedTerms:[],windowStart:-1,source:null};
+  let indexLikeSource=null;
   // Strip generic prompt scaffolding so evaluation templates such as
   // "Explain the source question" do not create artificial search calls.
   const coverageQuestion=part.question.replace(/\b(?:explain|source|question|detail|specific|named|book|passage|answer|enough|sufficiently|testing|fake)\b/giu,' ');
   for(const source of Array.isArray(candidates)?candidates:[]){
-   const match=localFacetTextMatch(coverageQuestion,source?.preview||source?.text||source?.excerpt||'');
-   if(match.overlap>best.overlap)best=match;
+   const text=source?.text||source?.preview||source?.excerpt||'';
+   if(isIndexLikeText(text)){
+    if(!indexLikeSource)indexLikeSource=coverageSourceRef(source);
+    const indexMatch=textFacetMatch(coverageQuestion,text);
+    if(indexMatch.overlap>bestIndex.overlap)
+     bestIndex={...indexMatch,source:coverageSourceRef(source)};
+    continue;
+   }
+   const match=localFacetTextMatch(coverageQuestion,text);
+   if(match.overlap>best.overlap)best={...match,source:coverageSourceRef(source)};
   }
   const terms=facetTerms(coverageQuestion);
   const overlap=terms.length?best.overlap:2;
   const required=Math.min(2,terms.length);
   const weak=terms.length>0&&overlap<required;
-  return {...part,overlap,matchedTerms:terms.length?best.matchedTerms:[],
-   distinctiveTermCount:terms.length,coverageSignal:weak?'weak-text-cluster':'text-cluster-found'};
- }).filter(part=>part.coverageSignal==='weak-text-cluster');
+  const coverageReason=weak
+   ?indexLikeSource?'index-like-candidates-not-counted':'no-coherent-term-cluster'
+   :'coherent-prose-cluster-found';
+  // When index-like text is the strongest lexical match, keep those terms in
+  // the trace so the bounded follow-up planner can disambiguate the collision.
+  const diagnosticMatch=best.overlap?best:bestIndex;
+  const matchedTerms=terms.length
+   ?(weak&&!best.overlap&&bestIndex.matchedTerms.length
+     ?bestIndex.matchedTerms:best.matchedTerms):[];
+  return {...part,overlap,matchedTerms,
+   distinctiveTermCount:terms.length,coverageSignal:weak?'weak-coherent-text':'coherent-text-found',
+   coverageReason,coverageSource:best.source||diagnosticMatch.source||indexLikeSource};
+ }).filter(part=>part.coverageSignal==='weak-coherent-text');
  return {weakParts,shouldSearch:weakParts.length>0};
 }
 export function validSearchPlan(value){
@@ -870,19 +890,50 @@ function directFacetTextMatch(question,text){
  for(const term of questionTerms)if(textTerms.has(term))score++;
  return score;
 }
-function localFacetTextMatch(question,text,windowSize=22){
+function coverageSourceRef(source){
+ if(!source||typeof source!=='object')return null;
+ const ref={};
+ for(const key of ['bookId','page','globalPageId']){
+  const value=source[key];
+  if((typeof value==='string'&&value.length<=120)||
+     (Number.isSafeInteger(value)&&value>0))ref[key]=value;
+ }
+ return Object.keys(ref).length?ref:null;
+}
+function isIndexLikeText(text){
+ const value=String(text||'');
+ if(/^\s*(?:index|subject index|general index|topical index)\s*$/imu.test(value))return true;
+ const lines=value.split(/\n+/u).map(line=>line.trim()).filter(Boolean);
+ const entries=lines.length>1?lines:value.split(/\s*;\s*/u).map(line=>line.trim()).filter(Boolean);
+ if(entries.length<5)return false;
+ const pageReferenceEntries=entries.filter(entry=>/(?:[,;:]\s*\d{1,4}(?:\s*[-–]\s*\d{1,4})?\s*[.;,]?$|\bpp?\.\s*\d{1,4})$/iu.test(entry));
+ const shortEntries=entries.filter(entry=>(entry.match(/[\p{L}\p{N}]+/gu)||[]).length<=18);
+ return pageReferenceEntries.length>=4&&pageReferenceEntries.length/entries.length>=0.55&&
+  shortEntries.length/entries.length>=0.6;
+}
+function textFacetMatch(question,text,windowSize=22){
  const terms=facetTerms(question);
  if(!terms.length)return {overlap:0,matchedTerms:[],windowStart:-1};
- const words=(String(text||'').toLowerCase().match(/[a-z0-9]+/g)||[]).map(normalize);
  let best={overlap:0,matchedTerms:[],windowStart:-1};
- for(let start=0;start<words.length;start++){
-  const window=new Set(words.slice(start,start+windowSize));
-  const matchedTerms=terms.filter(term=>window.has(term));
-  if(matchedTerms.length>best.overlap)
-   best={overlap:matchedTerms.length,matchedTerms,windowStart:start};
-  if(best.overlap===terms.length)break;
+ let offset=0;
+ // Sentence, clause, and list boundaries keep nearby but unrelated entries
+ // from combining into an apparently complete answer facet.
+ for(const segment of String(text||'').split(/(?<=[.!?;])\s+|[\n\r•▪]+/u)){
+  const words=(segment.toLowerCase().match(/[a-z0-9]+/g)||[]).map(normalize);
+  for(let start=0;start<words.length;start++){
+   const window=new Set(words.slice(start,start+windowSize));
+   const matchedTerms=terms.filter(term=>window.has(term));
+   if(matchedTerms.length>best.overlap)
+    best={overlap:matchedTerms.length,matchedTerms,windowStart:offset+start};
+   if(best.overlap===terms.length)return best;
+  }
+  offset+=words.length;
  }
  return best;
+}
+function localFacetTextMatch(question,text,windowSize=22){
+ const match=textFacetMatch(question,text,windowSize);
+ return isIndexLikeText(text)?{...match,overlap:0,matchedTerms:[],indexLike:true}:match;
 }
 function singlePartFacetTextMatch(facet,partQuestion){
  const searchFraming=/\b(?:definition|nature|concept|concepts|meaning|explain|explains|explained|explaining|philosophy|philosophical|texts|text|account|accounts|theory|theories|role|function)\b/giu;
@@ -1022,7 +1073,10 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    partQuestions=[]}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||
     typeof turnstileToken!=='string')return [];
- candidates=dedupeEditionCopies(candidates);
+ // Index/list pages can help diagnose a retrieval miss, but their entries are
+ // not answer passages. Keep them in retrieval traces and exclude them here.
+ candidates=dedupeEditionCopies(candidates.filter(candidate=>
+  !isIndexLikeText(candidate?.text||candidate?.preview||candidate?.excerpt||'')));
  const chosen=[],firstPerBook=[],seenBooks=new Set();
  for(const candidate of candidates){
    const key=String(candidate?.bookId||'');
@@ -1185,10 +1239,9 @@ export function selectAnswerSources(candidates,question,turnstileToken,
  return chosen;
 }
 
-/* Some catalogs publish the same source text in several edition records.
- * Collapse exact and near-identical pages only when their normalized work
- * titles also match. A high three-word-shingle similarity catches OCR and
- * punctuation differences while preserving materially different translations. */
+/* Some catalogs publish the same passage in several edition records, with
+ * different surrounding text or page lengths. Collapse only same-work copies
+ * whose smaller passage is almost wholly contained in the larger one. */
 function dedupeEditionCopies(candidates){
  const seenByTitle=new Map(),out=[];
  for(const candidate of candidates){
@@ -1228,13 +1281,11 @@ function copyShingles(tokens){
  return shingles;
 }
 function nearDuplicateCopy(previous,tokens,shingles){
- const longest=Math.max(previous.tokens.length,tokens.length);
- const shortest=Math.min(previous.tokens.length,tokens.length);
- if(!longest||shortest/longest<0.86)return false;
  const common=[...shingles].reduce((count,shingle)=>
   count+(previous.shingles.has(shingle)?1:0),0);
- // Divide by the larger set so added or substantially revised text counts
- // against a duplicate match instead of being ignored as an appended suffix.
- return common/Math.max(1,Math.max(shingles.size,previous.shingles.size))>=0.94;
+ // Normalize against the smaller shingle set: page excerpts may differ greatly
+ // in length while containing the same quoted passage. Substantial rewrites
+ // still fail because many shingles from the shorter passage are absent.
+ return common/Math.max(1,Math.min(shingles.size,previous.shingles.size))>=0.94;
 }
 
