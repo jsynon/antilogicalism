@@ -1233,6 +1233,8 @@ function nearDuplicateCopy(previous,tokens,shingles){
  if(!longest||shortest/longest<0.86)return false;
  const common=[...shingles].reduce((count,shingle)=>
   count+(previous.shingles.has(shingle)?1:0),0);
- return common/Math.max(1,Math.min(shingles.size,previous.shingles.size))>=0.94;
+ // Divide by the larger set so added or substantially revised text counts
+ // against a duplicate match instead of being ignored as an appended suffix.
+ return common/Math.max(1,Math.max(shingles.size,previous.shingles.size))>=0.94;
 }
 
