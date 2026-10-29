@@ -25,7 +25,7 @@ test('live browser uses shared 24-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:24,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.15.0'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.16.0'));
 });
 test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);
@@ -192,8 +192,10 @@ test('answer citations open in the local page reader while Sources keeps the PDF
  assert.ok(clientV49.includes('citationExcerptsForAnswer(answer,evidenceMap)'));
  assert.ok(clientV49.includes('const evidenceMap=Array.isArray(data.evidenceMap)?data.evidenceMap:[];'));
  assert.ok(clientV49.includes('sourceReader.open({...source,excerpts},a)'));
- assert.match(clientV49,/excerpts\.forEach\(excerpt=>\{\s*const quote=node\('p',excerpt,'companion-key-quote'\);\s*card\.append\(quote\);\s*\}\);\s*const read=node\('button','Read passages'/,
-  'each citation card renders its excerpts behind one source-level reader button');
+ assert.ok(clientV49.includes("const quote=node('blockquote',undefined,'companion-key-quote')"));
+ assert.ok(clientV49.includes('quote.append(node(\'p\',excerpt))'));
+ assert.ok(clientV49.includes("const read=node('button','Read passages','companion-inline-read')"),
+  'each citation card keeps one source-level reader button');
  assert.match(clientV49,/node\('button','Read passages','companion-inline-read'\)/);
  assert.doesNotMatch(clientV49,/Read highlighted passages|node\('button','Read passage'/);
  assert.match(html,/“Read passages” opens the cited excerpts here/);
