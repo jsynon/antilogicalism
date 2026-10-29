@@ -238,8 +238,8 @@ test('acceptance mode preserves its baseline and adds three calibration cases',(
  for(const id of ['acceptance-descartes-cogito','acceptance-mill-harm-principle','acceptance-epictetus-freedom',
   'acceptance-augustine-memory','acceptance-aristotle-tragedy-plot','acceptance-boethius-fortune',
   'acceptance-locke-political-authority'])assert.ok(cases.some(item=>item.id===id),id+' remains in the baseline');
- assert.deepEqual(cases.slice(-2).map(item=>item.id),[
-  'acceptance-god-is-love','acceptance-simulation-hypothesis']);
+ assert.deepEqual(cases.slice(-3).map(item=>item.id),[
+  'acceptance-god-is-love','acceptance-simulation-hypothesis','acceptance-buddha-on-death']);
  const focused=selectLiveCases({cases:[]},'acceptance','acceptance-god-is-love');
  assert.equal(focused.length,1);
  assert.deepEqual(focused[0].required_source_groups.map(group=>group.book_ids),[
