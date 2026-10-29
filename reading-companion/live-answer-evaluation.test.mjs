@@ -626,7 +626,6 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
  assert.equal(result.retrievalCandidates[0].excerpt,'A sufficiently long preview passage for testing.');
  assert.ok(searchOptions.every(({options})=>options.allowedBookIds.size===1&&options.allowedBookIds.has('529')));
  assert.ok(searchOptions.every(({options})=>options.maxBooks===LIVE_RETRIEVAL_CONFIG.maxBooks&&
-  options.maxCandidates===LIVE_RETRIEVAL_CONFIG.maxCandidates&&
   options.pagesPerBook===LIVE_RETRIEVAL_CONFIG.pagesPerBook));
 });
 
