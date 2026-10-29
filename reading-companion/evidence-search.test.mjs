@@ -462,12 +462,13 @@ test('conditional coverage is a weak-overlap signal, not a source verdict',()=>{
   'How do we know that reality exists?');
  assert.equal(covered.shouldSearch,false);
 });
-test('answer selection collapses exact edition copies but retains distinct passages',()=>{
+test('answer selection collapses near-identical edition copies but retains distinct passages',()=>{
  const excerpt=Array.from({length:45},(_,i)=>'the same verified source text word'+i).join(' ');
+ const distinctExcerpt=excerpt+' '+Array.from({length:30},(_,i)=>'distinctive'+i).join(' ');
  const selected=selectAnswerSources([
   {...page(12,'101'),title:'The Teaching of the Buddha, 1986 edition',score:2,text:excerpt},
   {...page(18,'102'),title:'The Teaching of the Buddha, 2019 edition',score:5,text:excerpt},
-  {...page(22,'103'),title:'The Teaching of the Buddha, 2019 edition',score:4,text:excerpt+' changed translation'}
+  {...page(22,'103'),title:'The Teaching of the Buddha, 2019 edition',score:4,text:distinctExcerpt}
  ],'What does this passage teach?','token',{maxSources:3});
  assert.deepEqual(selected.map(source=>source.bookId),['102','103']);
 });
