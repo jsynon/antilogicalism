@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {dirname,resolve} from 'node:path';
 import {fileURLToPath} from 'node:url';
-import {mergeFacetSearches} from './evidence-search.mjs';
+import {mergeFacetSearches,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 import {evaluateCase,selectEvaluationAnswerSources,sourceIdentityIssues,summarize,validateSuite,verifyFingerprint} from './public-library-evaluation.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -154,7 +154,9 @@ test('fourth per-book search result can reach the verified answer-source set',as
   fetcher:async()=>new Response(JSON.stringify(packet),{status:200})});
  assert.equal(optionsSeen.length,3);
  assert.ok(optionsSeen.every(options=>options.pagesPerBook===4));
- assert.ok(optionsSeen.every(options=>options.maxBooks===3));
+ assert.ok(optionsSeen.every(options=>options.maxBooks===LIVE_RETRIEVAL_CONFIG.maxBooks));
+ assert.ok(optionsSeen.every(options=>options.maxCandidates===LIVE_RETRIEVAL_CONFIG.maxCandidates));
+ assert.ok(optionsSeen.every(options=>options.pagesPerBook===LIVE_RETRIEVAL_CONFIG.pagesPerBook));
  assert.equal(result.selectedEvidenceTargetRecallPercent,100);
  assert.equal(result.submittedSources[0].page,53);
 });
