@@ -147,6 +147,21 @@ test('linked definition evidence from distinct books reaches composition before 
  assert.ok(new Set(selected.slice(0,4).map(candidate=>candidate.bookId)).size>=3,
   'the extra evidence slot should prefer a separate source book when relevant candidates exist');
 });
+test('broad one-part selection reserves three relevant works when available',()=>{
+ const question='What did Buddha say about death?';
+ const passage='The Buddha teaches about death, loss, and the path beyond suffering.';
+ const candidates=[
+  {...page(409,'104'),score:80,candidatePartIds:['P1'],text:passage},
+  {...page(122,'225'),score:70,candidatePartIds:['P1'],text:passage},
+  {...page(180,'22'),score:60,candidatePartIds:['P1'],text:passage},
+  {...page(70,'222'),score:50,candidatePartIds:['P1'],text:passage},
+  {...page(410,'104'),score:49,candidatePartIds:['P1'],text:passage+' Another passage.'},
+ ];
+ const selected=selectAnswerSources(candidates,question,'token',{maxSources:6,
+  partQuestions:[{partId:'P1',question}]});
+ assert.deepEqual(selected.slice(0,3).map(source=>source.bookId),['104','225','22']);
+});
+
 test('explicit work titles narrow searches to matching catalog books',()=>{
  const books=[
   {id:'7',title:'Nicomachean Ethics — Aristotle'},
