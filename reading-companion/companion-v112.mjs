@@ -1,4 +1,4 @@
-/* Antilogicalism Reading Companion v1.15.0 — staged verified-library alpha.
+/* Antilogicalism Reading Companion v1.16.0 — staged verified-library alpha.
  * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
  * The Worker independently validates every submitted source page against v49
  * fingerprints before any inference. The verified scope comes from the
