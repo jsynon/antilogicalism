@@ -269,7 +269,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
         directFallback:plannerFallback||!plannedQueries,
         library,books:bookList,allowedBookIds:allowed,
         selectedBookIds:bookFilter.value?[bookFilter.value]:[],allowedPage,
-        maxCandidates:12,pageLimit:PDF_PAGE_LIMIT,
+        maxCandidates:MAX_RETRIEVAL_CANDIDATES,maxBooks:4,pageLimit:PDF_PAGE_LIMIT,
         pageLoader:async source=>{
           const shard=await bookShard(source.bookId);
           const page=shard.pages?.find(item=>item.id===source.globalPageId&&item.page===source.page);
