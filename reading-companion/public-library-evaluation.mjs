@@ -153,7 +153,7 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
    const pages=shard.pages?.filter(page=>page.id===source.globalPageId&&page.page===source.page)||[];
    return pages.length===1&&typeof pages[0].text==='string'?{text:pages[0].text}:null;
   }});
- const searchQueries=retrieval.searches.map(search=>search.query.replace(/ \\[named books: [^\\]]+\\]$/,''));
+ const searchQueries=retrieval.searches.map(search=>search.query.replace(/ \[named books: .*$/,''));
  const merged=retrieval.candidates;
  const issues=merged.flatMap((source,index)=>sourceIdentityIssues(source,manifest).map(code=>({sourceId:source.id||'S'+(index+1),bookId:String(source.bookId),page:source.page,code})));
  if(selectedBookId)for(const [index,source] of merged.entries())if(String(source.bookId)!==selectedBookId)
@@ -169,7 +169,7 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
  }
  const fingerprintChecks=await Promise.all(candidates.map(async source=>({bookId:String(source.bookId),page:source.page,
   globalPageId:source.globalPageId,...await verifyFingerprint(source,library,allowedBookIds,fetcher)})));
- // Mirror the production answer request: up to four full pages, with one
+ // Mirror the production answer request: up to six full pages, with one
  // passage per work preferred before alternate pages from the same work.
  // The benchmark has no prior-turn context, so use empty history and a fixed
  // placeholder token solely for request byte-budget accounting.
