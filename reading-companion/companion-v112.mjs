@@ -12,7 +12,7 @@ import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
 import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
-import {claimQuotesForCitation} from './citation-evidence.mjs';
+import {citationExcerptsForAnswer} from './citation-evidence.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -299,11 +299,12 @@ function sourcePage(source){
   return candidates.find(page=>page.bookId===String(source.bookId) &&
     page.page===Number(source.page))||null;
 }
-function appendCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map()){
+function appendCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map(),
+  citationExcerpts=[],citationCursor={index:0}){
   const byId=new Map(citations.map(s=>[s.id,s]));
   const groups=inlineCitationGroups(answer);
   let at=0;
-  const appendCitation=(id,citationGroup)=>{
+  const appendCitation=(id,citationGroup,groupExcerpts)=>{
     const source=byId.get(id);
     if(source){
       const a=document.createElement('button');
@@ -318,7 +319,7 @@ function appendCitationTokens(target,answer,citations,evidenceMap=[],numbering=n
       // three-quote page summary is only for source cards and may omit a
       // claim's quote; falling back to its primary quote could highlight a
       // different claim on the same page.
-      const excerpts=claimQuotesForCitation(answer,citationGroup.start,source.id,evidenceMap);
+      const excerpts=Array.isArray(groupExcerpts?.[source.id])?groupExcerpts[source.id]:[];
       a.addEventListener('click',async()=>{
         try{
           await sourceReader.open({...source,excerpts},a);
@@ -329,12 +330,13 @@ function appendCitationTokens(target,answer,citations,evidenceMap=[],numbering=n
   };
   for(const group of groups){
     if(group.start>at)target.append(document.createTextNode(answer.slice(at,group.start)));
+    const groupExcerpts=citationExcerpts[citationCursor.index++]||{};
     const citationGroup=document.createElement('span');
     citationGroup.style.whiteSpace='nowrap';
     citationGroup.append(document.createTextNode('['));
     group.ids.forEach((id,index)=>{
       if(index)citationGroup.append(document.createTextNode(', '));
-      appendCitation(id,citationGroup);
+      appendCitation(id,citationGroup,groupExcerpts);
     });
     citationGroup.append(document.createTextNode(']'));
     target.append(citationGroup);
@@ -342,30 +344,33 @@ function appendCitationTokens(target,answer,citations,evidenceMap=[],numbering=n
   }
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
 }
-function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map()){
+function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map(),
+  citationExcerpts=[],citationCursor={index:0}){
   const pattern=/\*\*([^*\n]+?)\*\*|__([^_\n]+?)__|\*([^*\n]+?)\*|_([^_\n]+?)_/g;
   let at=0;
   for(const match of answer.matchAll(pattern)){
     if(match.index>at)appendCitationTokens(target,answer.slice(at,match.index),
-      citations,evidenceMap,numbering);
+      citations,evidenceMap,numbering,citationExcerpts,citationCursor);
     const isBold=match[1]!==undefined||match[2]!==undefined;
     const formatted=document.createElement(isBold?'strong':'em');
     appendCitationTokens(formatted,match[1]??match[2]??match[3]??match[4],
-      citations,evidenceMap,numbering);
+      citations,evidenceMap,numbering,citationExcerpts,citationCursor);
     target.append(formatted);
     at=match.index+match[0].length;
   }
   if(at<answer.length)appendCitationTokens(target,answer.slice(at),
-    citations,evidenceMap,numbering);
+    citations,evidenceMap,numbering,citationExcerpts,citationCursor);
 }
-function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new Map()){
+function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new Map(),citationExcerpts=[]){
   let paragraph=[];
   let list=null;
   let listType='';
+  const citationCursor={index:0};
   const flushParagraph=()=>{
     if(!paragraph.length)return;
     const p=document.createElement('p');
-    putCitationTokens(p,paragraph.join(' ').trim(),citations,evidenceMap,numbering);
+    putCitationTokens(p,paragraph.join(' ').trim(),citations,evidenceMap,numbering,
+      citationExcerpts,citationCursor);
     target.append(p);
     paragraph=[];
   };
@@ -380,7 +385,8 @@ function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new 
         listType=nextListType;
       }
       const item=document.createElement('li');
-      putCitationTokens(item,bullet[1],citations,evidenceMap,numbering);
+      putCitationTokens(item,bullet[1],citations,evidenceMap,numbering,
+        citationExcerpts,citationCursor);
       list.append(item);
       continue;
     }
@@ -403,10 +409,11 @@ function renderResponse(data,turnQuestion=''){
   const orderedCitations=sortCitationsByNumber(citations,numbering);
   const highlights=Array.isArray(data.evidenceHighlights)?data.evidenceHighlights:[];
   const evidenceMap=Array.isArray(data.evidenceMap)?data.evidenceMap:[];
+  const citationExcerpts=citationExcerptsForAnswer(answer,evidenceMap);
   turn.append(node('h2',data.outcome==='insufficient-evidence'?
     'Insufficient evidence':'Reading Companion answer'));
   const reply=node('div',undefined,'companion-answer-text');
-  putMarkdownBlocks(reply,answer,citations,evidenceMap,numbering);
+  putMarkdownBlocks(reply,answer,citations,evidenceMap,numbering,citationExcerpts);
   turn.append(reply);
   if(orderedCitations.length){
     const panel=node('section',undefined,'companion-highlights');
