@@ -255,7 +255,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  */
 export async function retrieveEvidence({question,queries,partQueries=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
- maxCandidates=12,maxBooks=3,pagesPerBook=4,pageLimit=14000}={}){
+ maxCandidates=24,maxBooks=4,pagesPerBook=4,pageLimit=14000}={}){
  const direct=String(question||'').trim();
  if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
  if(!library||typeof library.search!=='function'||!Array.isArray(books)||
