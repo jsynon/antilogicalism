@@ -20,6 +20,11 @@ test('public response renderer omits the structured missing-evidence notice',()=
  assert.doesNotMatch(client,/data\\.missing/);
  assert.doesNotMatch(client,/Evidence gaps:|Evidence check:/);
 });
+test('live browser uses shared 24-candidate, four-book retrieval settings',()=>{
+ assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
+ assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.15.0'));
+});
 test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);
  assert.match(client,/maxSources:MAX_ANSWER_SOURCES/);
