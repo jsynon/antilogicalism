@@ -145,8 +145,14 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
  const selectedBookIds=selectedBookId?[selectedBookId]:[];
  // Exercise the same facet expansion, ranking, page hydration, and candidate
  // cap as the browser; only the query plan and remote page loader are fixed here.
+ let booksScanned=0;
+ const trackedLibrary={search:async(...args)=>{
+  const result=await library.search(...args);
+  booksScanned+=Number(result?.booksScanned)||0;
+  return result;
+ }};
  const retrieval=await retrieveEvidence({question:item.question,queries:item.planner_queries,
-  library,books:Object.entries(manifest.books).map(([id,book])=>({id,title:book.title})),
+  library:trackedLibrary,books:Object.entries(manifest.books).map(([id,book])=>({id,title:book.title})),
   allowedBookIds:searchAllowedBookIds,selectedBookIds,...LIVE_RETRIEVAL_CONFIG,
   pageLoader:async source=>{
    const shard=await library.jsonGzip('book-'+String(source.bookId)+'.json');
@@ -205,7 +211,7 @@ export async function evaluateCase(item,{library,manifest,allowedBookIds,fetcher
   selectedEvidenceTargetRecallPercent:evidenceTargets.length?Number((evidenceTargets.filter(target=>target.selectedHit).length/evidenceTargets.length*100).toFixed(1)):null,
   selectedExactTargetMatchPercent:defaultSelection.length?Number((defaultSelection.filter(source=>targetedPageKeys.has(String(source.bookId)+':'+source.page)).length/defaultSelection.length*100).toFixed(1)):null,
   unannotatedSubmittedSourceCount:unannotatedSubmittedSources.length,
-  booksScanned:foundSets.reduce((n,r)=>n+(Number(r.booksScanned)||0),0),
+  booksScanned,
   elapsedMs:Math.round(performance.now()-start),retrievalPass:groups.every(g=>g.retrieved)&&!issues.some(issue=>issue.code==='selected_book_scope_leak'),
   defaultSelectionPass:groups.every(g=>g.defaultSelected),candidateSourcesVerified:groups.every(g=>g.sourceVerified),
   defaultSelectionVerified:groups.every(g=>g.defaultSourceVerified),sourceIdentityIssues:issues};
