@@ -1072,10 +1072,39 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
  return ordered;
 }
 
-/* The answer flow may send six full pages. Keep their exact request below
- * both the Worker body limit and its separate verified-text limit. Candidate
- * order is already facet-balanced; preserve it so comparison parts stay covered.
- */
+/* Share the exact pre-packet exclusions with the experimental selector so
+ * the comparison changes page ranking only, not what counts as a candidate. */
+export function prepareAnswerCandidates(candidates){
+ if(!Array.isArray(candidates))return [];
+ return dedupeEditionCopies(candidates.filter(candidate=>
+  !isIndexLikeText(candidate?.text||candidate?.preview||candidate?.excerpt||'')));
+}
+
+/* Apply the live request's existing byte and page limits to an already-ranked
+ * list. The evaluation-only model selector uses this same gate after ranking. */
+export function boundAnswerSources(candidates,question,turnstileToken,
+  {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[]}={}){
+ if(!Array.isArray(candidates)||typeof question!=='string'||typeof turnstileToken!=='string')return [];
+ const chosen=[];let selectedSourceBytes=0;
+ for(const candidate of candidates){
+  if(chosen.length>=maxSources)break;
+  if(!candidate||typeof candidate.text!=='string'||
+     !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
+     !Number.isSafeInteger(candidate.page)||candidate.page<1)continue;
+  const candidateBytes=new TextEncoder().encode(candidate.text).byteLength;
+  if(selectedSourceBytes+candidateBytes>maxSourceBytes)continue;
+  const next=[...chosen,candidate];
+  const bytes=new TextEncoder().encode(JSON.stringify({question,turnstileToken,history,
+   sources:next.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
+    ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{})}))})).byteLength;
+  if(bytes<=maxBytes){chosen.push(candidate);selectedSourceBytes+=candidateBytes;}
+ }
+ return chosen;
+}
+
+/* The public answer flow still facet-balances before applying the shared six-
+ * page and byte limits. The model ablation uses the same limits without
+ * reordering its model-ranked candidates. */
 export function selectAnswerSources(candidates,question,turnstileToken,
   {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[],plannedFacetCount=0,
    partQuestions=[]}={}){
@@ -1083,9 +1112,8 @@ export function selectAnswerSources(candidates,question,turnstileToken,
     typeof turnstileToken!=='string')return [];
  // Index/list pages can help diagnose a retrieval miss, but their entries are
  // not answer passages. Keep them in retrieval traces and exclude them here.
- candidates=dedupeEditionCopies(candidates.filter(candidate=>
-  !isIndexLikeText(candidate?.text||candidate?.preview||candidate?.excerpt||'')));
- const chosen=[],firstPerBook=[],seenBooks=new Set();
+ candidates=prepareAnswerCandidates(candidates);
+ const firstPerBook=[],seenBooks=new Set();
  for(const candidate of candidates){
    const key=String(candidate?.bookId||'');
    if(key&&!seenBooks.has(key)){seenBooks.add(key);firstPerBook.push(candidate);}
@@ -1230,21 +1258,7 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    (!Array.isArray(value.candidatePartIds)||!value.candidatePartIds.length));
   ordered=[...partRepresentatives,...diverseRepresentatives,...remainingLinked,...remainingUnlinked];
  }
- let selectedSourceBytes=0;
- for(const candidate of ordered){
-   if(chosen.length>=maxSources)break;
-   if(!candidate||typeof candidate.text!=='string'||
-      !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
-      !Number.isSafeInteger(candidate.page)||candidate.page<1)continue;
-   const candidateBytes=new TextEncoder().encode(candidate.text).byteLength;
-   if(selectedSourceBytes+candidateBytes>maxSourceBytes)continue;
-   const next=[...chosen,candidate];
-   const bytes=new TextEncoder().encode(JSON.stringify({question,turnstileToken,history,
-     sources:next.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
-      ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{})}))})).byteLength;
-   if(bytes<=maxBytes){chosen.push(candidate);selectedSourceBytes+=candidateBytes;}
- }
- return chosen;
+ return boundAnswerSources(ordered,question,turnstileToken,{maxSources,maxBytes,maxSourceBytes,history});
 }
 
 /* Some catalogs publish the same passage in several edition records, with
