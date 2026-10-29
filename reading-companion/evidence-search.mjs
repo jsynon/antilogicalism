@@ -846,9 +846,9 @@ function directFacetTitleMatch(question,title){
 
 function directFacetTextMatch(question,text){
  const stop=new Set(['what','when','where','which','who','whom','whose','why','how','does','did','has','have','had','are','was','were','the','and','for','from','with','into','about','between','this','that','these','those','there','their','they','them','than','then','your','our','also','only','could','would','should',
-  // In a cross-work comparison, author/title names and the comparison verb
-  // identify bibliographic scope, not the passage's topical relevance.
-  'hume','kant','enquiry','critique','pure','reason','differ','differs','different','difference','differences','compare','comparison','contrast','versus']);
+  // Comparison framing does not describe passage content; source names and
+  // titles remain ordinary query terms and are not listed here.
+  'differ','differs','different','difference','differences','compare','comparison','contrast','versus']);
  const normalize=term=>/^(?:cause|causal|causality|causes|caused|causing)$/.test(term)?'caus':
   term.startsWith('necess')?'necess':term.startsWith('experienc')?'experienc':term;
  const questionTerms=new Set((String(question||'').toLowerCase().match(/[a-z0-9]+/g)||[])
