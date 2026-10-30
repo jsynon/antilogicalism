@@ -276,6 +276,12 @@ node reading-companion/recheck-live-answer-evaluation.mjs --input path/to/report
 
 The output JSON includes `offlinePassageReview`, with separate counts for best passages absent from retrieval and best passages retrieved but omitted from the packet. Its counts are diagnostics, not a semantic score or a live workflow gate. No model or network call is made.
 
+### Evidence-stage audit (current)
+
+New evaluation traces preserve compact book/page IDs, a bounded title, and a short excerpt for every result in each bounded search result set. The offline audit uses the human-reviewed labels to compare four stages: a labeled passage appears in a search result, survives into `retrievalCandidates`, reaches `submittedSources`, and is linked to the requested claim by a located review highlight. It also records which search query surfaced a labeled passage. Run the same offline recheck command above after extracting any live artifact; this needs no deployment, network request, or model call.
+
+Read the counters as a diagnosis of where reviewed evidence was lost: search miss, candidate-assembly miss, answer-packet miss, or passage present but not linked to a claim. Candidate assembly includes deduplication, passage hydration, and the candidate cap, so the trace does not attribute every loss specifically to ranking. Old artifacts do not have complete per-query page traces, so missing hits are marked unknown instead of being counted as search misses. A claim-linked, located highlight remains a structural trace signal; it does not establish that the answer interprets the passage correctly. The labels are strictly evaluation data and are never used in live retrieval, source routing, ranking, or prompts.
+
 ## October 27, 2026: post-merge run #25 offline passage replay
 
 Paired-scope run [#40589127363](https://github.com/jsynon/antilogicalism/actions/runs/40589127363) used library v48, site revision `9dd40ca5f496f8cfc135c37e37ee0e985e827efe`, and deployed Worker source revision `339504ccb57bd9f209d912b047866b5c65bf3326`. All ten cases completed, with no request failures or planner fallbacks. The live workflow passed 7/10 structural cases (All Books 3/5; Selected Books 4/5), for 16 supported, three partial, and one unsupported part. Ten human-review entries remain pending. The workflow used about 25 Worker AI calls.

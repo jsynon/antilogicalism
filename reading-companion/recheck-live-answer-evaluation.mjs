@@ -40,11 +40,15 @@ async function main(){
  console.log('Question parts: '+summary.questionPartStatusCounts.supported+' supported, '+
   summary.questionPartStatusCounts.partial+' partial, '+summary.questionPartStatusCounts.unsupported+' unsupported.');
  console.log('AI calls: 0. Network calls: 0.');
- console.log('Passage gold review: '+result.offlinePassageReview.checkedCases+' cases; '+
-  result.offlinePassageReview.bestCandidateRetrievalMisses+' best passages not retrieved, '+
-  result.offlinePassageReview.bestCandidatePacketMisses+' retrieved best passages omitted from the packet, '+
-  result.offlinePassageReview.nonBestHighlights+' non-best highlights, '+
-  result.offlinePassageReview.statusMismatches+' review-to-answer status mismatches.');
+ const passageReview=result.offlinePassageReview;
+ console.log('Passage gold review: '+passageReview.checkedCases+' cases; '+
+  passageReview.bestCandidateSearchMisses+' best passages absent from complete search traces, '+
+  passageReview.bestCandidateSearchUnknown+' search outcomes unknown in older/partial traces, '+
+  passageReview.bestCandidateAssemblyMisses+' search hits not retained in the candidate pool, '+
+  passageReview.bestCandidatePacketMisses+' candidate hits omitted from the answer packet, '+
+  passageReview.bestCandidateUseMisses+' submitted passages without a claim-linked located highlight, '+
+  passageReview.nonBestHighlights+' non-best highlights, '+
+  passageReview.statusMismatches+' review-to-answer status mismatches.');
  console.log('Report: '+output);
 }
 
