@@ -1,4 +1,4 @@
-/* Antilogicalism Reading Companion v1.18.0 — staged verified-library alpha.
+/* Antilogicalism Reading Companion v1.18.1 — staged verified-library alpha.
  * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
  * The Worker independently validates every submitted source page against v49
  * fingerprints before any inference. The verified scope comes from the
@@ -362,10 +362,8 @@ function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new 
   if(at<answer.length)appendCitationTokens(target,answer.slice(at),
     citations,evidenceMap,numbering,citationExcerpts,citationCursor);
 }
-function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new Map(),citationExcerpts=[]){
+function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new Map(),citationExcerpts=[],allowLists=false){
   let paragraph=[];
-  let list=null;
-  let listType='';
   const citationCursor={index:0};
   const flushParagraph=()=>{
     if(!paragraph.length)return;
@@ -383,28 +381,34 @@ function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new 
   for(const line of markdown.split('\n')){
     const bullet=line.match(/^\s*(?:[*+-]|\d+[.)])\s+(.+?)\s*$/);
     if(bullet){
-      flushParagraph();
-      const nextListType=/^\s*\d/.test(line)?'ol':'ul';
-      if(!list||listType!==nextListType){
-        list=document.createElement(nextListType);
-        target.append(list);
-        listType=nextListType;
+      if(allowLists){
+        flushParagraph();
+        const listType=/^\s*\d/.test(line)?'ol':'ul';
+        const list=target.lastElementChild?.tagName.toLowerCase()===listType
+          ?target.lastElementChild:document.createElement(listType);
+        if(list!==target.lastElementChild)target.append(list);
+        const item=document.createElement('li');
+        putCitationTokens(item,bullet[1],citations,evidenceMap,numbering,
+          citationExcerpts,citationCursor);
+        list.append(item);
+      }else{
+        // Stray model list markers are not allowed to turn a normal answer
+        // into a list. Fold their text into connected prose; render an actual
+        // list only when the reader explicitly asks for enumeration.
+        paragraph.push(bullet[1]);
       }
-      const item=document.createElement('li');
-      putCitationTokens(item,bullet[1],citations,evidenceMap,numbering,
-        citationExcerpts,citationCursor);
-      list.append(item);
       continue;
     }
     if(!line.trim()){
       flushParagraph();
       continue;
     }
-    list=null;
-    listType='';
     paragraph.push(line);
   }
   flushParagraph();
+}
+function questionRequestsEnumeration(question){
+  return /\b(?:list|enumerate|number the)\b/i.test(String(question||''));
 }
 function renderResponse(data,turnQuestion=''){
   const turn=node('article',undefined,'companion-turn');
@@ -419,7 +423,8 @@ function renderResponse(data,turnQuestion=''){
   turn.append(node('h2',data.outcome==='insufficient-evidence'?
     'Insufficient evidence':'Reading Companion answer'));
   const reply=node('div',undefined,'companion-answer-text');
-  putMarkdownBlocks(reply,answer,citations,evidenceMap,numbering,citationExcerpts);
+  putMarkdownBlocks(reply,answer,citations,evidenceMap,numbering,citationExcerpts,
+    questionRequestsEnumeration(turnQuestion));
   turn.append(reply);
   if(orderedCitations.length){
     const panel=node('section',undefined,'companion-highlights');

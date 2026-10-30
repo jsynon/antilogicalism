@@ -60,7 +60,7 @@ test('the live response path uses reviewed evidence, not the capped page summary
   assert.match(client,/import \{citationExcerptsForAnswer\} from '\.\/citation-evidence\.mjs'/);
   assert.match(client,/const evidenceMap=Array\.isArray\(data\.evidenceMap\)/);
   assert.match(client,/citationExcerptsForAnswer\(answer,evidenceMap\)/);
-  assert.match(client,/putMarkdownBlocks\(reply,answer,citations,evidenceMap,numbering,citationExcerpts\)/);
+  assert.match(client,/putMarkdownBlocks\(reply,answer,citations,evidenceMap,numbering,citationExcerpts,/);
   assert.match(client,/groupExcerpts\[source\.id\]/);
   assert.doesNotMatch(client,/citationExcerptsForAnswer\(answer,evidenceHighlights\)/);
 });

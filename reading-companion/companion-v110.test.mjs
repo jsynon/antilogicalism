@@ -21,11 +21,17 @@ test('public response renderer omits the structured missing-evidence notice',()=
  assert.doesNotMatch(client,/data\\.missing/);
  assert.doesNotMatch(client,/Evidence gaps:|Evidence check:/);
 });
-test('live browser uses shared 24-candidate, four-book retrieval settings',()=>{
- assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:24,maxBooks:4,pagesPerBook:4});
+test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
+ assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.18.0'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.18.1'));
+});
+test('v49 answer renderer keeps default prose out of accidental ordered lists',()=>{
+ assert.match(clientV49,/questionRequestsEnumeration\(turnQuestion\)/);
+ assert.match(clientV49,/if\(allowLists\)/);
+ assert.match(clientV49,/paragraph\.push\(bullet\[1\]\)/);
+ assert.match(clientV49,/render an actual[\s\S]{0,50}list only when the reader explicitly asks/);
 });
 test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);
