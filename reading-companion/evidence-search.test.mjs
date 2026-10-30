@@ -1475,7 +1475,7 @@ test('website only trusts planned search strings and still submits original full
 });
 
 
-\ntest('a linked conceptual gap query reaches its part and selection coverage records the handoff',async()=>{
+test('a linked conceptual gap query reaches its part and selection coverage records the handoff',async()=>{
  const question='How do we know reality exists?';
  const query='experience of the external world';
  const text='Experience of the external world is discussed as a ground for knowledge and belief.';
