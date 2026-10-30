@@ -25,13 +25,16 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.18.2'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.18.3'));
 });
 test('v49 answer renderer keeps default prose out of accidental ordered lists',()=>{
  assert.match(clientV49,/questionRequestsEnumeration\(turnQuestion\)/);
  assert.match(clientV49,/if\(allowLists\)/);
  assert.match(clientV49,/const heading=line\.match/);
  assert.match(clientV49,/document\.createElement\('h3'\)/);
+ assert.match(clientV49,/function unwrapOverlongInlineItalics/);
+ assert.match(clientV49,/\{141,\}/,
+  'a stray emphasis pair cannot italicize a multi-sentence answer section');
  assert.match(clientV49,/paragraph\.push\(bullet\[1\]\)/);
  assert.match(clientV49,/render an actual[\s\S]{0,50}list only when the reader explicitly asks/);
 });
