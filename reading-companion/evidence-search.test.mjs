@@ -447,7 +447,7 @@ test('author-only mentions search across the named author’s catalog works',()=
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage} from './evidence-search.mjs';
 import {catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
 import {sourceAttributionLabel} from './citation-numbering.mjs';
 
@@ -1455,7 +1455,7 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/const found=await retrieveSources\(planned\?\.queries\|\|null,\{plannerFallback,/);
  assert.match(js,/assessEvidenceCoverage\(candidates,q,partQuestions\)/);
  assert.match(js,/requestRetrievalGap\(q,gapToken,history/);
- assert.ok(js.includes('partQuestions,gapQueries}'));
+ assert.ok(js.includes('partQuestions,gapQueries,gapQueryPartLinks}'));
  assert.doesNotMatch(js,/retrievalGap:[^}]*reviewFocus/s);
  assert.match(js,/const queries=\[\.\.\.new Set\(data\.queries\.map/);
  assert.match(js,/const markdown=String\(answer\)\.replace/);
@@ -1474,3 +1474,24 @@ test('website only trusts planned search strings and still submits original full
  assert.doesNotMatch(js,/innerHTML\s*=/);
 });
 
+
+test('a linked conceptual gap query reaches its part and selection coverage records the handoff',async()=>{
+ const question='How do we know reality exists?';
+ const query='experience of the external world';
+ const text='Experience of the external world is discussed as a ground for knowledge and belief.';
+ const library={search:async value=>value===query?{sources:[{
+  bookId:'19',title:'A philosophical source',page:4,globalPageId:4,score:50,preview:text
+ }]}:{sources:[]}};
+ const partQuestions=[{partId:'P1',question}];
+ const retrieval=await retrieveEvidence({question,
+  queries:['reality exists empirical knowledge','how reality is known'],partQuestions,
+  gapQueries:[query],gapQueryPartLinks:[{query,partIds:['P1']}],
+  library,books:[{id:'19',title:'A philosophical source'}],
+  allowedBookIds:new Set(['19']),pageLoader:async()=>({text})});
+ assert.ok(retrieval.candidates.some(candidate=>candidate.candidatePartIds.includes('P1')),
+  'a query explicitly linked to the weak part should remain eligible for it');
+ const selected=selectAnswerSources(retrieval.candidates,question,'token',{maxSources:2,
+  plannedFacetCount:2,partQuestions});
+ assert.deepEqual(auditSelectionCoverage(retrieval.candidates,selected,partQuestions),
+  [{partId:'P1',linkedCandidateCount:1,selectedCount:1,status:'selected'}]);
+});
