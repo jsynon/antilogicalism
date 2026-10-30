@@ -1464,8 +1464,10 @@ body {
 }
 
 .site-theme-toggle .site-theme-label {
-	display: inline;
+	display: inline-block;
+	flex: 0 0 5.5em;
 	font: inherit;
+	text-align: left;
 	white-space: nowrap;
 }
 
