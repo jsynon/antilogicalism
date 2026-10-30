@@ -610,9 +610,13 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
   ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),
   // The offline gold audit needs to distinguish a search miss from evidence
-  // lost during candidate assembly. Preserve compact IDs for every bounded result.
+  // lost during candidate assembly. Keep IDs plus a short excerpt for every
+  // bounded result, so reviewers can judge search-only hits without a full page dump.
   sourceTraceComplete:true,
-  sources:set.sources.map(({bookId,page,globalPageId})=>({bookId,page,globalPageId}))
+  sources:set.sources.map(source=>({bookId:source.bookId,page:source.page,
+   globalPageId:source.globalPageId,title:String(source.title||'').slice(0,180),
+   ...(source.score!==undefined?{score:Number(source.score)||0}:{}),
+   excerpt:String(source.preview||source.excerpt||'').slice(0,360)}))
  })),searchQueries,namedBookIds};
 }
 
