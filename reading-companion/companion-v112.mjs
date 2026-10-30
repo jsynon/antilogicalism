@@ -222,7 +222,7 @@ async function bookShard(id){
   }
   return sourceShards.get(id);
 }
-async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=null,partQuestions=[],gapQueries=[],allowEmpty=false}={}){
+async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=null,partQuestions=[],gapQueries=[],gapQueryPartLinks=[],allowEmpty=false}={}){
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   candidates=[];
@@ -260,7 +260,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
     }else{
       const retrieval=await retrieveEvidence({question:q,
         queries:plannerFallback||!plannedQueries?[q]:plannedQueries,
-        gapQueries,
+        gapQueries,gapQueryPartLinks,
         partQuestions,
         partQueries:!plannerFallback&&Array.isArray(plan?.parts)?plan.parts.flatMap(part=>
           (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
@@ -538,7 +538,7 @@ async function requestSourcePlan(q,verificationToken,history){
 }
 async function requestRetrievalGap(q,verificationToken,history,originalQueries,partQuestions,coverage,candidates){
   if(diagnosticState){diagnosticState.stage='gap-planning';diagnosticState.gapPlannerAttempted=true;}
-  const weakParts=coverage.weakParts.slice(0,6).map(item=>({part:item.question,
+  const weakParts=coverage.weakParts.slice(0,6).map(item=>({partId:item.partId,part:item.question,
     overlap:item.overlap,matchedTerms:item.matchedTerms,
     coverageReason:item.coverageReason,coverageSource:item.coverageSource}));
   const evidence=candidates.slice(0,6).map(source=>({title:source.title,
@@ -557,9 +557,20 @@ async function requestRetrievalGap(q,verificationToken,history,originalQueries,p
     typeof value!=='string'||value.trim().length<8||value.trim().length>160))
     throw Error('The conditional evidence search plan was incomplete.');
   const queries=[...new Set(data.queries.map(value=>value.trim()))];
+  const requestedPartIds=new Set(weakParts.map(item=>item.partId));
+  let queryPartLinks=Array.isArray(data.queryPartLinks)?data.queryPartLinks.filter(link=>
+    link&&typeof link.query==='string'&&queries.some(query=>
+      query.toLocaleLowerCase()===link.query.trim().toLocaleLowerCase())&&
+    Array.isArray(link.partIds)&&link.partIds.length>0&&
+    link.partIds.every(id=>requestedPartIds.has(id))):[];
+  // Older Workers return strings only. Preserve association when there is one
+  // weak part, where every optional gap lead has an unambiguous destination.
+  if(!queryPartLinks.length&&weakParts.length===1)
+    queryPartLinks=queries.map(query=>({query,partIds:[weakParts[0].partId]}));
   if(diagnosticState){diagnosticState.gapQueries=queries;
+    diagnosticState.gapQueryPartLinks=queryPartLinks;
     diagnosticState.gapUsage=data.usage||null;refreshDiagnostic();}
-  return queries;
+  return {queries,queryPartLinks};
 }
 async function nextTurnstileToken(){
   if(!window.turnstile||turnstileId===null)
@@ -629,11 +640,12 @@ async function askQuestion(questionText){
         triggered:coverage.shouldSearch};refreshDiagnostic();}
       if(coverage.shouldSearch){
         turnstileToken='';
-        let gapQueries=[];
+        let gapQueries=[],gapQueryPartLinks=[];
         try{
           const gapToken=await nextTurnstileToken();turnstileToken='';
-          gapQueries=await requestRetrievalGap(q,gapToken,history,planned?.queries||[q],
+          const gapPlan=await requestRetrievalGap(q,gapToken,history,planned?.queries||[q],
             partQuestions,coverage,candidates);
+          gapQueries=gapPlan.queries;gapQueryPartLinks=gapPlan.queryPartLinks;
         }catch(error){
           if(!canFallbackToDirectSearch(diagnosticState?.gapFailureHttpStatus,
             diagnosticState?.gapFailureCode))throw error;
@@ -642,7 +654,7 @@ async function askQuestion(questionText){
         }
         if(gapQueries.length){
           const expanded=await retrieveSources(planned?.queries||null,{plannerFallback,
-            plan:planned?.plan||null,partQuestions,gapQueries});
+            plan:planned?.plan||null,partQuestions,gapQueries,gapQueryPartLinks});
           if(!expanded)return;
           const secondCoverage=assessEvidenceCoverage(candidates,q,partQuestions);
           if(diagnosticState)diagnosticState.retrievalCoverageAfterGap={
