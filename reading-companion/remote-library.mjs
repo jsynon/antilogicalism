@@ -3,6 +3,9 @@
  * Original shard IDs, physical PDF pages and manifest PDF URLs are preserved.
  */
 export const DEFAULT_INDEX_ROOT = 'https://jsynon.github.io/antilogicalism-library-data/data-v49/';
+// Keep the per-query corpus search bound aligned with the shared live/evaluator
+// retrieval contract. Callers may ask for fewer works, but never more than four.
+export const PRODUCTION_MAX_BOOKS = 4;
 export const PRODUCTION_PAGES_PER_BOOK = 4;
 const SCRIPTURE_BOOK_NAMES = [
   'genesis','exodus','leviticus','numbers','deuteronomy','joshua','judges','ruth',
@@ -423,7 +426,7 @@ export class RemoteLibrary {
     }
     return this.partitions.get(prefix);
   }
-  async search(question, {bookId = '', allowedBookIds = null, maxBooks = 3, pagesPerBook = PRODUCTION_PAGES_PER_BOOK} = {}) {
+  async search(question, {bookId = '', allowedBookIds = null, maxBooks = PRODUCTION_MAX_BOOKS, pagesPerBook = PRODUCTION_PAGES_PER_BOOK} = {}) {
     const started = performance.now();
     const manifest = await this.manifest();
     const suppressionPolicy = await this.urlSuppressions();
@@ -572,7 +575,7 @@ export class RemoteLibrary {
     }
     const sources = [];
     let booksScanned = 0, discardedNavigation = 0;
-    const bookLimit = Math.max(1, Math.min(maxBooks, 3));
+    const bookLimit = Math.max(1, Math.min(maxBooks, PRODUCTION_MAX_BOOKS));
     const pageLimit = Math.max(1, Math.min(pagesPerBook, PRODUCTION_PAGES_PER_BOOK));
     // A small reserve of candidate works allows replacement of an index-
     // only book, without downloading all 644 book shards.
