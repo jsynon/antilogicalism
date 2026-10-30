@@ -316,6 +316,9 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const missingInline=citationAudit.inlineIdsWithoutSource;
  const citationBookIds=[...new Set(citations.map(source=>String(source?.bookId||'')))];
  const submittedBookIds=[...new Set(submitted.map(source=>String(source?.bookId||'')))];
+ const candidateSources=Array.isArray(options.candidateSources)?options.candidateSources:null;
+ const candidateBookIds=candidateSources?
+  [...new Set(candidateSources.map(source=>String(source?.bookId||'')).filter(Boolean))]:null;
  const questionParts=Array.isArray(data?.questionParts)?data.questionParts:[];
  const evidenceMap=Array.isArray(data?.evidenceMap)?data.evidenceMap:[];
  // The answer endpoint accepts locators in order and the Worker assigns the
@@ -343,9 +346,11 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   .flatMap(part=>part.citedEvidenceIds));
  const sourceGroups=requiredGroups.map(group=>{
   const expectedBookIds=group.book_ids.map(String);
-  const retrievedBookIds=submittedBookIds.filter(id=>expectedBookIds.includes(id));
+  const candidateGroupBookIds=candidateBookIds?
+   candidateBookIds.filter(id=>expectedBookIds.includes(id)):null;
+  const selectedBookIds=submittedBookIds.filter(id=>expectedBookIds.includes(id));
   const citedBookIds=citationBookIds.filter(id=>expectedBookIds.includes(id));
-  const retrieved=submitted.some(source=>expectedBookIds.includes(String(source?.bookId||'')));
+  const selectedForComposition=submitted.some(source=>expectedBookIds.includes(String(source?.bookId||'')));
   const cited=citations.some(source=>expectedBookIds.includes(String(source?.bookId||'')));
   const supportedPartLabels=questionParts.filter(part=>part?.status==='supported'&&
    (Array.isArray(part?.evidenceIds)?part.evidenceIds:[]).some(id=>citations.some(source=>
@@ -357,8 +362,13 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
     String(source?.id||'')===String(id)&&completePartialEvidenceIds.has(String(id))&&
      expectedBookIds.includes(String(source?.bookId||''))))
   ).map(part=>String(part?.part||''));
-  return {label:group.label,expectedBookIds,retrievedBookIds,citedBookIds,foundBookIds:citedBookIds,
-   retrieved,cited,found:cited,supportedPartLabels,partialPartLabels,
+  return {label:group.label,expectedBookIds,
+   candidateBookIds:candidateGroupBookIds,candidateFound:candidateGroupBookIds===null?null:candidateGroupBookIds.length>0,
+   selectedBookIds,selectedForComposition,
+   // Keep these established field names for existing reports and scripts;
+   // new consumers should use candidateFound and selectedForComposition.
+   retrievedBookIds:selectedBookIds,retrieved:selectedForComposition,
+   citedBookIds,foundBookIds:citedBookIds,cited,found:cited,supportedPartLabels,partialPartLabels,
    linkedToSupportedEvidence:questionParts.length?supportedPartLabels.length>0:null,
    linkedToPartialEvidence:questionParts.length?partialPartLabels.length>0:null};
  });
@@ -518,7 +528,8 @@ export function recheckQualityReport(report){
   },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups,
    definition.required_part_source_groups||[],{scope:item.scope||
     (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books'),
-    plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null});
+    plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null,
+    candidateSources:Array.isArray(item.retrievalCandidates)?item.retrievalCandidates:null});
   const previousComparison=item.answerVariantComparison||item.reviewAblation;
   const answerVariantComparison=Array.isArray(previousComparison?.variants)?{...previousComparison,
    variants:previousComparison.variants.map(variant=>{
@@ -529,7 +540,8 @@ export function recheckQualityReport(report){
      Array.isArray(variant.submittedSources)?variant.submittedSources:Array.isArray(item.submittedSources)?item.submittedSources:[],
      definition.required_source_groups,definition.required_part_source_groups||[],{scope:item.scope||
       (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books'),
-      plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null});
+      plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null,
+      candidateSources:Array.isArray(item.retrievalCandidates)?item.retrievalCandidates:null});
     return {...variant,...variantAudit,manualReview:variant.manualReview};
    })}:previousComparison;
   return {...item,...(answerVariantComparison?{answerVariantComparison}:{}),
@@ -844,7 +856,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     sources:answerSources.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds,libraryVersion:49}))},beforeCall,'answer',progressEvent);
    const audit=auditLiveAnswer(data,answerSources,item.required_source_groups,
     item.required_part_source_groups||[],{scope:item.selected_book_ids?.length?'selected-books':'all-books',
-     plannerPlan:plan?.plan||null});
+     plannerPlan:plan?.plan||null,candidateSources:retrievalCandidates});
    variantResults.push({answerVariant:answerVariant==='paired-selection-ablation'?'with-review':variant,
     ...(answerVariant==='paired-selection-ablation'?{selectionVariant:variant==='model-selection'&&selectionComparison?.status!=='completed'?'model-selection-fallback':variant}:{}),
     selectionCoverage:auditSelectionCoverage(loaded.candidates,answerSources,partQuestions),
@@ -925,13 +937,19 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
   (retrievalFallbackCount?` Recovered ${retrievalFallbackCount} empty source-side search using the counterpart topic within the planned source scope.`:''),
   {searchCount:searches.length,retrievalFallbackCount,candidatePages:retrievalCandidates.map(source=>({bookId:source.bookId,page:source.page})),
    selectedPages:selected.map(source=>({bookId:source.bookId,page:source.page}))});
- const retrievedBookIds=[...new Set(selected.map(source=>String(source.bookId)))];
+ const candidateBookIds=[...new Set(retrievalCandidates.map(source=>String(source.bookId)))];
+ const selectedBookIdsInPacket=[...new Set(selected.map(source=>String(source.bookId)))];
  const sourceGroups=(item.required_source_groups||[]).map(group=>{
   const expectedBookIds=group.book_ids.map(String);
-  const groupBookIds=retrievedBookIds.filter(id=>expectedBookIds.includes(id));
-  const retrieved=groupBookIds.length>0;
-  return {label:group.label,expectedBookIds,retrievedBookIds:groupBookIds,
-   citedBookIds:[],foundBookIds:[],retrieved,cited:false,found:false};
+  const candidateGroupBookIds=candidateBookIds.filter(id=>expectedBookIds.includes(id));
+  const selectedGroupBookIds=selectedBookIdsInPacket.filter(id=>expectedBookIds.includes(id));
+  const candidateFound=candidateGroupBookIds.length>0;
+  const selectedForComposition=selectedGroupBookIds.length>0;
+  return {label:group.label,expectedBookIds,candidateBookIds:candidateGroupBookIds,candidateFound,
+   selectedBookIds:selectedGroupBookIds,selectedForComposition,
+   // Preserve the older names for report consumers; they mean packet selection here.
+   retrievedBookIds:selectedGroupBookIds,retrieved:selectedForComposition,
+   citedBookIds:[],foundBookIds:[],cited:false,found:false};
  });
  const passed=sourceGroups.every(group=>group.retrieved);
  return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds,
