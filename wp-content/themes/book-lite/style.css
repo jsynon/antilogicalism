@@ -2460,3 +2460,11 @@ html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:fo
 html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:active {
 	color: #fff;
 }
+
+
+/* Match the Search Posts footer heading to the RSS widget headings. */
+#first h2.widget-title {
+	font-size: 1.9rem;
+	font-weight: bold;
+	text-transform: uppercase;
+}
