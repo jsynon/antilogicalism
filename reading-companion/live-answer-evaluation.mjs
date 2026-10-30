@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {validSearchPlan,selectAnswerSources,prepareAnswerCandidates,boundAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG,RETRIEVAL_PROFILES} from './evidence-search.mjs';
+import {validSearchPlan,selectAnswerSources,prepareAnswerCandidates,boundAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,LIVE_RETRIEVAL_CONFIG,RETRIEVAL_PROFILES} from './evidence-search.mjs';
 import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -615,10 +615,10 @@ function makeCachedFetch(root){
 }
 async function fetchJson(url){const response=await fetch(url,{headers:{accept:'application/json'},cache:'no-store'});if(!response.ok)throw Error(url+' returned HTTP '+response.status);return response.json();}
 async function loadSources(item,queries,{library,manifest,allowed,directFallback=false,
- partQueries=[],partQuestions=[],gapQueries=[],retrievalConfig=LIVE_RETRIEVAL_CONFIG}){
+ partQueries=[],partQuestions=[],gapQueries=[],gapQueryPartLinks=[],retrievalConfig=LIVE_RETRIEVAL_CONFIG}){
  const bookCatalog=Object.entries(manifest.books).map(([id,book])=>({id,title:book.title}));
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
- const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,partQuestions,gapQueries,directFallback,
+ const retrieval=await retrieveEvidence({question:item.question,queries,partQueries,partQuestions,gapQueries,gapQueryPartLinks,directFallback,
   library,books:bookCatalog,allowedBookIds:allowed,selectedBookIds,
   ...retrievalConfig,
   pageLoader:async source=>{
@@ -638,10 +638,12 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   const book=manifest.books[String(source.bookId)];
   if(!book)throw Error('A selected source is absent from the published manifest.');
  }
+ const answerCandidates=prepareAnswerCandidates(populated);
  const retrievalCandidates=populated.map(({bookId,title,page,globalPageId,score,facet,facetRanks,
   matchedFacets,candidatePartIds,preview,text})=>({bookId,title,page,globalPageId,score,facet,facetRanks,
   matchedFacets,candidatePartIds,excerpt:String(preview||text||'').slice(0,1200)}));
- return {selected,candidates:prepareAnswerCandidates(populated),searches:retrieval.searches,retrievalCandidates};
+ return {selected,candidates:answerCandidates,searches:retrieval.searches,retrievalCandidates,
+  selectionCoverage:auditSelectionCoverage(answerCandidates,selected,partQuestions)};
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,preparedPlan=null,answerVariant='with-review',retrievalProfile='baseline',onProgress=async()=>{}}){
  if(!['with-review','compose-only','paired-review-ablation','with-expansion','paired-expansion-ablation','paired-selection-ablation'].includes(answerVariant))
@@ -709,7 +711,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
- let gapQueries=[],gapPlannerFailure=null;
+ let gapQueries=[],gapQueryPartLinks=[],gapPlannerFailure=null;
  const initialSearches=loaded.searches;
  const initialRetrievalCandidates=loaded.retrievalCandidates;
  const initialRetrievalCoverage=assessEvidenceCoverage(initialRetrievalCandidates,item.question,partQuestions);
@@ -722,7 +724,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   try{
    const gap=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,
     bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token',retrievalGap:{
-     weakParts:retrievalCoverage.weakParts.slice(0,6).map(part=>({part:part.question,
+     weakParts:retrievalCoverage.weakParts.slice(0,6).map(part=>({partId:part.partId,part:part.question,
       overlap:part.overlap,matchedTerms:part.matchedTerms,
       coverageReason:part.coverageReason,coverageSource:part.coverageSource})),
      originalQueries:[...queries,...partQueries.map(value=>value.query)].slice(0,7),
@@ -733,11 +735,19 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     throw attachRequestFailure(new Error('Conditional retrieval planner returned invalid queries.'),
      'gap-planner',{httpStatus:200,failureCode:'invalid-response',workerFailure:false});
    gapQueries=[...new Set(gap.queries.map(value=>value.trim()))];
+   const weakPartIds=new Set(retrievalCoverage.weakParts.slice(0,6).map(part=>part.partId));
+   gapQueryPartLinks=Array.isArray(gap.queryPartLinks)?gap.queryPartLinks.filter(link=>
+    link&&typeof link.query==='string'&&gapQueries.some(query=>
+      query.toLocaleLowerCase()===link.query.trim().toLocaleLowerCase())&&
+    Array.isArray(link.partIds)&&link.partIds.length>0&&
+    link.partIds.every(id=>weakPartIds.has(id))):[];
+   if(!gapQueryPartLinks.length&&weakPartIds.size===1)
+    gapQueryPartLinks=gapQueries.map(query=>({query,partIds:[[...weakPartIds][0]]}));
    await progress('gap-planner','completed',`Conditional retrieval returned ${gapQueries.length} optional search terms.`,
     {queryCount:gapQueries.length,usage:gap.usage||null});
    if(gapQueries.length){
     loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,
-     partQueries,partQuestions,gapQueries,retrievalConfig:RETRIEVAL_PROFILES[retrievalProfile]});
+     partQueries,partQuestions,gapQueries,gapQueryPartLinks,retrievalConfig:RETRIEVAL_PROFILES[retrievalProfile]});
     gapRetrievalRerun=true;
     retrievalCoverage=assessEvidenceCoverage(loaded.retrievalCandidates,item.question,partQuestions);
    }
@@ -785,6 +795,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     candidatePool:pool.map((candidate,index)=>({id:'C'+(index+1),bookId:candidate.bookId,title:candidate.title,page:candidate.page,
      score:candidate.score,facet:candidate.facet,facetRanks:candidate.facetRanks,candidatePartIds:candidate.candidatePartIds||[],
      excerpt:String(candidate.preview||candidate.text||'').slice(0,520)})),
+    deterministicSelectionCoverage:loaded.selectionCoverage,
+    modelSelectionCoverage:auditSelectionCoverage(loaded.candidates,modelSources,parts),
     deterministicSelected:loaded.selected.map(candidate=>({candidateId:idByCandidate.get(candidate)||null,bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
     deterministicExcludedCandidateIds:pool.filter(candidate=>!loaded.selected.includes(candidate)).map(candidate=>idByCandidate.get(candidate)),
     modelSelected:modelSources.map(candidate=>({candidateId:idByCandidate.get(candidate)||null,bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
@@ -820,6 +832,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
      plannerPlan:plan?.plan||null});
    variantResults.push({answerVariant:answerVariant==='paired-selection-ablation'?'with-review':variant,
     ...(answerVariant==='paired-selection-ablation'?{selectionVariant:variant==='model-selection'&&selectionComparison?.status!=='completed'?'model-selection-fallback':variant}:{}),
+    selectionCoverage:auditSelectionCoverage(loaded.candidates,answerSources,partQuestions),
     submittedSources:answerSources.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,excerpt:String(preview||'').slice(0,1200)})),
     pipeline:data.pipeline||null,...audit,usage:data.usage||null,
     ...(data.trace?{evidenceTrace:data.trace}:{})});
@@ -853,7 +866,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   retrievalCoverage:{triggered:gapSearchTriggered,
    weakParts:initialRetrievalCoverage.weakParts},
   ...(gapRetrievalRerun?{retrievalCoverageAfterGap:{weakParts:retrievalCoverage.weakParts}}:{}),
-  gapPlannerAttempted:gapSearchTriggered,gapQueries,...(gapPlannerFailure?{gapPlannerFailure}:{}),
+  gapPlannerAttempted:gapSearchTriggered,gapQueries,gapQueryPartLinks,
+  selectionCoverage:loaded.selectionCoverage,...(gapPlannerFailure?{gapPlannerFailure}:{}),
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
   ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
