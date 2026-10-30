@@ -263,10 +263,11 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  * difference (the browser has a shard cache; the evaluator reads the shard
  * through RemoteLibrary directly).
  */
-export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],library,books,allowedBookIds,
+export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],gapQueryPartLinks=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
  maxCandidates=LIVE_RETRIEVAL_CONFIG.maxCandidates,maxBooks=LIVE_RETRIEVAL_CONFIG.maxBooks,
- pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000}={}){
+ pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000,
+ gapQueryPartLinks=[]}={}){
  const direct=String(question||'').trim();
  if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
  if(!library||typeof library.search!=='function'||!Array.isArray(books)||
@@ -293,6 +294,14 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  if(!Array.isArray(gapQueries)||gapQueries.length>3||gapQueries.some(query=>
    typeof query!=='string'||query.trim().length<8||query.trim().length>160))
   throw Error('Conditional retrieval queries are invalid.');
+ const knownPartIds=new Set(partQuestions.map(part=>part?.partId).filter(id=>
+  typeof id==='string'&&/^P[1-9]\\d*$/.test(id)));
+ if(!Array.isArray(gapQueryPartLinks)||gapQueryPartLinks.length>3||
+    gapQueryPartLinks.some(link=>!link||typeof link.query!=='string'||
+     !gapQueries.some(query=>query.trim().toLocaleLowerCase()===link.query.trim().toLocaleLowerCase())||
+     !Array.isArray(link.partIds)||link.partIds.length<1||link.partIds.length>6||
+     link.partIds.some(id=>!knownPartIds.has(id))))
+  throw Error('Conditional retrieval query links are invalid');
  // Direct fallback uses only the unchanged question. Topic or source-language
  // expansions belong in the planner output, where they remain visible in traces.
  const fallbackQueries=useDirect?[direct]:queries;
@@ -313,6 +322,16 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  }
  const partFacetIndices=partQueries.map(item=>({partId:item.partId,
   facet:searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===item.query.trim().toLocaleLowerCase())}));
+ // Keep each optional gap lead attached to the weak part it was generated for.
+ // This affects candidate eligibility only; exact-span review still decides
+ // whether any retrieved passage actually supports an answer.
+ for(const link of gapQueryPartLinks){
+  const facet=searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===link.query.trim().toLocaleLowerCase());
+  for(const partId of link.partIds){
+   if(facet>=0&&!partFacetIndices.some(item=>item.partId===partId&&item.facet===facet))
+    partFacetIndices.push({partId,facet,kind:'gap'});
+  }
+ }
  // The planner's main queries can be more useful than the part's natural-
  // language search query. Associate a focused planner facet with a part when
  // they share at least two distinctive terms. For a single-part plan, one
@@ -416,7 +435,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  for(const part of partQuestions){
   if(typeof part?.partId!=='string')continue;
   const explicit=Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):[];
-  const resolved=partFacetIndices.filter(item=>item.partId===part.partId)
+  const resolved=partFacetIndices.filter(item=>item.partId===part.partId&&item.kind!=='gap')
    .flatMap(item=>searchSets[item.facet]?.targetBookIds||[]);
   const ids=[...new Set(explicit.length?explicit:resolved)];
   if(ids.length)partSourceBookIds.set(part.partId,ids);
@@ -514,7 +533,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   searchSet.inheritedPartScope=part.partId;
  }
  const partFacetScopes=partQuestions.length?partFacetIndices.map(item=>({partId:item.partId,facet:item.facet,
-  sourceBookIds:partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[]})):[];
+  sourceBookIds:item.kind==='gap'?(partSourceBookIds.get(item.partId)||[]):
+   (partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[])})):[];
  const directQuestionFacetIndex=searchQueries.findIndex(value=>
   value.trim().toLocaleLowerCase()===direct.toLocaleLowerCase());
  // Give each deterministic outage-only source facet a candidate slot before
@@ -1074,6 +1094,20 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
 
 /* Share the exact pre-packet exclusions with the experimental selector so
  * the comparison changes page ranking only, not what counts as a candidate. */
+export function auditSelectionCoverage(candidates,selected,partQuestions=[]){
+ const selectedKeys=new Set((Array.isArray(selected)?selected:[])
+  .map(item=>String(item?.bookId)+':'+String(item?.page)));
+ return (Array.isArray(partQuestions)?partQuestions:[])
+  .filter(part=>typeof part?.partId==='string'&&/^P[1-9]\\d*$/.test(part.partId))
+  .map(part=>{
+   const eligible=(Array.isArray(candidates)?candidates:[]).filter(candidate=>
+    Array.isArray(candidate?.candidatePartIds)&&candidate.candidatePartIds.includes(part.partId));
+   const selectedCount=eligible.filter(candidate=>
+    selectedKeys.has(String(candidate.bookId)+':'+String(candidate.page))).length;
+   return {partId:part.partId,linkedCandidateCount:eligible.length,selectedCount,
+    status:!eligible.length?'no-linked-candidate':selectedCount?'selected':'candidate-not-selected'};
+  });
+}
 export function prepareAnswerCandidates(candidates){
  if(!Array.isArray(candidates))return [];
  return dedupeEditionCopies(candidates.filter(candidate=>
