@@ -2474,9 +2474,10 @@ html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:ac
 
 
 /* Keep dark-mode links white until hover, including the navigation and RSS headings. */
-html[data-theme="dark"] .site-navigation a:hover,
-html[data-theme="dark"] .site-navigation a:focus-visible,
-html[data-theme="dark"] .site-navigation .site-theme-toggle:hover,
-html[data-theme="dark"] .site-navigation .site-theme-toggle:focus-visible {
+html[data-theme="dark"] body .site-navigation .menu-primary-container > ul.menu > li:hover > a,
+html[data-theme="dark"] body .site-navigation .menu-primary-container > ul.menu > li > a:hover,
+html[data-theme="dark"] body .site-navigation .menu-primary-container > ul.menu > li > a:focus-visible,
+html[data-theme="dark"] body .site-navigation .site-theme-toggle:hover,
+html[data-theme="dark"] body .site-navigation .site-theme-toggle:focus-visible {
 	color: var(--site-link-hover);
 }
