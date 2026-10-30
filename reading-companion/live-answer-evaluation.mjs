@@ -185,6 +185,13 @@ function sourceRevision(){
  catch{return null;}
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
+/* Save only an identity digest for the exact page text sent to the Worker.
+ * Replay can reload the pinned public corpus without putting book pages in
+ * GitHub Actions artifacts. */
+function sourceTextSha256(text){
+ if(typeof text!=='string')throw Error('Selected source text is missing from the evaluation packet.');
+ return createHash('sha256').update(text,'utf8').digest('hex');
+}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
  const evaluationCases=mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
@@ -885,7 +892,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   gapPlannerAttempted:gapSearchTriggered,gapQueries,gapQueryPartLinks,
   selectionCoverage:loaded.selectionCoverage,selectionAudit:loaded.selectionAudit,
   ...(gapPlannerFailure?{gapPlannerFailure,gapPlannerFailureDiagnostics}:{}),
-  submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
+  submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds,text})=>({bookId,title,page,globalPageId,candidatePartIds,libraryVersion:49,textSha256:sourceTextSha256(text),
    excerpt:String(preview||'').slice(0,1200)})),
   ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
   pipeline:variantResults.map(result=>result.pipeline).find(Boolean)||null,
@@ -939,7 +946,7 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
   plannerQueries:plan.queries,plannerFallback:false,partFacetWarnings:partFacets.warnings,
   plannerWorkerVersionId:plan.workerVersionId||null,plannerWorkerSourceBuild:plan.workerSourceBuild||null,plannerWorkerSourceRevision:plan.workerSourceRevision||null,
   answerWorkerVersionId:null,answerWorkerSourceBuild:null,searches,retrievalCandidates,
-  submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
+  submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds,text})=>({bookId,title,page,globalPageId,candidatePartIds,libraryVersion:49,textSha256:sourceTextSha256(text),
    excerpt:String(preview||'').slice(0,1200)})),
   submittedSourceCount:selected.length,sourceGroups,passed,
   outcome:passed?'planner-retrieval-ready':'planner-retrieval-miss',
