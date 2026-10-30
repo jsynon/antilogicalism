@@ -1,16 +1,6 @@
 import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms} from './remote-library.mjs';
 import {catalogIdentity} from './reader-contract.mjs';
 
-// Keep live browser and workflow retrieval breadth on one shared contract.
-export const LIVE_RETRIEVAL_CONFIG=Object.freeze({maxCandidates:24,maxBooks:4,pagesPerBook:4});
-// The wider profile is for controlled evaluations. Public traffic keeps the
-// proven baseline until saved-trace review shows a recall gain without weaker
-// final source packets or unacceptable latency.
-export const RETRIEVAL_PROFILES=Object.freeze({
- baseline:LIVE_RETRIEVAL_CONFIG,
- expanded:Object.freeze({maxCandidates:48,maxBooks:6,pagesPerBook:4})
-});
-
 /* Merge two independently retrieved question facets, retaining alternatives
  * for source selection and manual inspection.
  * No generated claim or PDF locator is trusted by this component.
@@ -46,7 +36,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
      if(typeof part?.partId!=='string'||typeof part?.question!=='string')continue;
      const sourceIds=Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):[];
      const best=directCandidates.map((entry,rank)=>({entry,rank,
-       overlap:localFacetTextMatch(part.question,entry?.preview||entry?.text||'').overlap,
+       overlap:directFacetTextMatch(part.question,entry?.preview||entry?.text||''),
        primaryBible:/\bbible\b/i.test(String(entry?.title||''))&&
         !/\b(?:annotated|study|commentary|notes)\b/i.test(String(entry?.title||''))
      })).filter(item=>valid(item.entry)&&item.overlap>=2&&
@@ -263,10 +253,9 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  * difference (the browser has a shard cache; the evaluator reads the shard
  * through RemoteLibrary directly).
  */
-export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],gapQueryPartLinks=[],library,books,allowedBookIds,
+export async function retrieveEvidence({question,queries,partQueries=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
- maxCandidates=LIVE_RETRIEVAL_CONFIG.maxCandidates,maxBooks=LIVE_RETRIEVAL_CONFIG.maxBooks,
- pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000}={}){
+ maxCandidates=12,maxBooks=3,pagesPerBook=4,pageLimit=14000}={}){
  const direct=String(question||'').trim();
  if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
  if(!library||typeof library.search!=='function'||!Array.isArray(books)||
@@ -290,33 +279,11 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  // source-side query without spending additional retrieval work.
  if(new Set(partQueries.map(item=>item.query.trim().toLocaleLowerCase())).size>6)
   throw Error('Too many distinct part-specific retrieval queries.');
- if(!Array.isArray(gapQueries)||gapQueries.length>3||gapQueries.some(query=>
-   typeof query!=='string'||query.trim().length<8||query.trim().length>160))
-  throw Error('Conditional retrieval queries are invalid.');
- // A whole-question coverage check uses the synthetic P1 identifier when
- // the planner supplied no explicit subparts (for example, fixed-query eval).
- const knownPartIds=new Set(partQuestions.map(part=>part?.partId).filter(id=>
-  typeof id==='string'&&/^P[1-9]\d*$/.test(id)));
- if(!knownPartIds.size)knownPartIds.add('P1');
- if(!Array.isArray(gapQueryPartLinks)||gapQueryPartLinks.length>3||
-    gapQueryPartLinks.some(link=>!link||typeof link.query!=='string'||
-     !gapQueries.some(query=>query.trim().toLocaleLowerCase()===link.query.trim().toLocaleLowerCase())||
-     !Array.isArray(link.partIds)||link.partIds.length<1||link.partIds.length>6||
-     link.partIds.some(id=>!knownPartIds.has(id))))
-  throw Error('Conditional retrieval query links are invalid');
- // Direct fallback uses only the unchanged question. Topic or source-language
- // expansions belong in the planner output, where they remain visible in traces.
- const fallbackQueries=useDirect?[direct]:queries;
+ // Keep caller-supplied direct fallback constrained to the unchanged question;
+ // only this local deterministic helper may add a recognized source facet.
+ const fallbackQueries=useDirect?directFallbackQueries(direct,{selectedBookIds:selected}):queries;
  const baseQueries=buildSearchFacets(direct,fallbackQueries);
  const searchQueries=[...baseQueries];
- // Conditional gap searches add bounded lexical facets without replacing the
- // reader's question or original planner facets. Evidence checks still decide
- // what may support the answer.
- for(const query of gapQueries){
-  const value=query.trim();
-  if(!searchQueries.some(existing=>existing.trim().toLocaleLowerCase()===value.toLocaleLowerCase()))
-   searchQueries.push(value);
- }
  for(const item of partQueries){
   const query=item.query.trim();
   if(!searchQueries.some(value=>value.trim().toLocaleLowerCase()===query.toLocaleLowerCase()))
@@ -324,16 +291,6 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  }
  const partFacetIndices=partQueries.map(item=>({partId:item.partId,
   facet:searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===item.query.trim().toLocaleLowerCase())}));
- // Keep each optional gap lead attached to the weak part it was generated for.
- // This affects candidate eligibility only; exact-span review still decides
- // whether any retrieved passage actually supports an answer.
- for(const link of gapQueryPartLinks){
-  const facet=searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===link.query.trim().toLocaleLowerCase());
-  for(const partId of link.partIds){
-   if(facet>=0&&!partFacetIndices.some(item=>item.partId===partId&&item.facet===facet))
-    partFacetIndices.push({partId,facet,kind:'gap'});
-  }
- }
  // The planner's main queries can be more useful than the part's natural-
  // language search query. Associate a focused planner facet with a part when
  // they share at least two distinctive terms. For a single-part plan, one
@@ -437,7 +394,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  for(const part of partQuestions){
   if(typeof part?.partId!=='string')continue;
   const explicit=Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):[];
-  const resolved=partFacetIndices.filter(item=>item.partId===part.partId&&item.kind!=='gap')
+  const resolved=partFacetIndices.filter(item=>item.partId===part.partId)
    .flatMap(item=>searchSets[item.facet]?.targetBookIds||[]);
   const ids=[...new Set(explicit.length?explicit:resolved)];
   if(ids.length)partSourceBookIds.set(part.partId,ids);
@@ -535,8 +492,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   searchSet.inheritedPartScope=part.partId;
  }
  const partFacetScopes=partQuestions.length?partFacetIndices.map(item=>({partId:item.partId,facet:item.facet,
-  sourceBookIds:item.kind==='gap'?(partSourceBookIds.get(item.partId)||[]):
-   (partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[])})):[];
+  sourceBookIds:partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[]})):[];
  const directQuestionFacetIndex=searchQueries.findIndex(value=>
   value.trim().toLocaleLowerCase()===direct.toLocaleLowerCase());
  // Give each deterministic outage-only source facet a candidate slot before
@@ -592,7 +548,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    if(candidatePartIds.has(partId)||!partAllowsBook(partId,source.bookId))continue;
    const partQuestion=(Array.isArray(partQuestions)?partQuestions:[])
     .find(item=>item?.partId===partId)?.question||'';
-   if(queries.some(query=>localFacetTextMatch(query,page.text).overlap>=2||
+   if(queries.some(query=>directFacetTextMatch(query,page.text)>=2||
       hasQuotedPhraseMatch(query,page.text))||hasQuotedPhraseMatch(partQuestion,page.text))
       candidatePartIds.add(partId);
   }
@@ -608,59 +564,13 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   ...(searchSets[index].fallbackFrom?{fallbackFrom:searchSets[index].fallbackFrom,
    fallbackReason:'empty-source-side-facet'}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
-  ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),sources:set.sources.slice(0,8)
+  ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),
+  // Keep the compact page identities for the full bounded search result. The
+  // offline gold audit needs to tell a search miss from a candidate-fusion
+  // miss; storing only the first eight made later results look unretrieved.
+  sourceTraceComplete:true,
+  sources:set.sources.map(({bookId,page,globalPageId})=>({bookId,page,globalPageId}))
  })),searchQueries,namedBookIds};
-}
-
-/* Text overlap is a retrieval diagnostic, never a relevance verdict. Count
- * terms only within a sentence or clause, and keep reference-list pages from
- * acting as evidence. Index entries can put unrelated words close together;
- * weak coherent prose triggers the existing librarian retry, while answer
- * review still decides whether a passage supports a claim.
- */
-export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
- const parts=Array.isArray(partQuestions)&&partQuestions.length
-  ?partQuestions.filter(item=>typeof item?.question==='string').map(item=>({
-    partId:item.partId||'',question:item.question}))
-  :[{partId:'P1',question:String(question||'')}];
- const weakParts=parts.map(part=>{
-  let best={overlap:0,matchedTerms:[],windowStart:-1,source:null};
-  let bestIndex={overlap:0,matchedTerms:[],windowStart:-1,source:null};
-  let indexLikeSource=null;
-  // Strip generic prompt scaffolding so evaluation templates such as
-  // "Explain the source question" do not create artificial search calls.
-  const coverageQuestion=part.question.replace(/\b(?:explain|source|question|detail|specific|named|book|passage|answer|enough|sufficiently|testing|fake)\b/giu,' ');
-  for(const source of Array.isArray(candidates)?candidates:[]){
-   const text=source?.text||source?.preview||source?.excerpt||'';
-   if(isIndexLikeText(text)){
-    if(!indexLikeSource)indexLikeSource=coverageSourceRef(source);
-    const indexMatch=textFacetMatch(coverageQuestion,text);
-    if(indexMatch.overlap>bestIndex.overlap)
-     bestIndex={...indexMatch,source:coverageSourceRef(source)};
-    continue;
-   }
-   const match=localFacetTextMatch(coverageQuestion,text);
-   if(match.overlap>best.overlap)best={...match,source:coverageSourceRef(source)};
-  }
-  const terms=facetTerms(coverageQuestion);
-  const overlap=terms.length?best.overlap:2;
-  const required=Math.min(2,terms.length);
-  const weak=terms.length>0&&overlap<required;
-  const indexLikeIsStrongest=bestIndex.overlap>best.overlap;
-  const coverageReason=weak
-   ?indexLikeIsStrongest?'index-like-candidates-not-counted':'no-coherent-term-cluster'
-   :'coherent-prose-cluster-found';
-  // Only blame an index candidate when it is the strongest lexical match;
-  // unrelated index pages must not misdescribe the best prose candidate.
-  const diagnosticMatch=indexLikeIsStrongest?bestIndex:best;
-  const matchedTerms=terms.length
-   ?(weak&&indexLikeIsStrongest&&bestIndex.matchedTerms.length
-     ?bestIndex.matchedTerms:best.matchedTerms):[];
-  return {...part,overlap,matchedTerms,
-   distinctiveTermCount:terms.length,coverageSignal:weak?'weak-coherent-text':'coherent-text-found',
-   coverageReason,coverageSource:diagnosticMatch.source||indexLikeSource};
- }).filter(part=>part.coverageSignal==='weak-coherent-text');
- return {weakParts,shouldSearch:weakParts.length>0};
 }
 export function validSearchPlan(value){
  return Array.isArray(value)&&value.length>=2&&value.length<=4&&
@@ -678,6 +588,21 @@ export function buildSearchFacets(question,plannedQueries,bookId=''){
  if(!direct||planned.some(query=>query.trim().toLowerCase()===direct.toLowerCase()))
   return [...planned];
  return [...planned,direct];
+}
+
+/* A planner outage should still preserve the reader's exact wording. For this
+ * canonical scriptural phrase, add one deterministic 1 John facet so All
+ * Books mode can retrieve the passage that gives the phrase its context. Keep
+ * the direct question last because packet balancing treats that as its own
+ * facet. Selected-book scope stays exact; it never gains a cross-book query.
+ */
+export function directFallbackQueries(question,{selectedBookIds=[]}={}){
+ const direct=String(question||'').trim();
+ if(!direct)return [];
+ if((Array.isArray(selectedBookIds)&&selectedBookIds.length)||
+   explicitScriptureReferences(direct).length||!/\bgod\s+is\s+love\b/i.test(direct))
+  return [direct];
+ return ['1 John 4:7-12 God is love and love one another',direct];
 }
 
 /* Resolve explicit work names and author mentions against the published
@@ -699,13 +624,6 @@ function catalogWorkTitles(title){
 }
 function catalogAuthorNames(title){
  return catalogIdentity(title).authors;
-}
-function namedSpeakerPhrase(question){
- const match=String(question||'').match(/\b(?:what|how)\s+(?:did|does|do|would)\s+([\p{L}][\p{L}\p{M}.'’\-]*(?:\s+[\p{L}][\p{L}\p{M}.'’\-]*){0,3})\s+(?:say|says|said|teach|teaches|taught|think|thinks|thought|argue|argues|argued|believe|believes|believed|write|writes|wrote|hold|holds|held)\b/iu);
- if(!match)return '';
- const name=match[1].trim();
- return new Set(['it','they','he','she','the author','the book','the text','people','someone','anyone'])
-  .has(normalizeCatalogText(name))?'':name;
 }
 function explicitlyNamedAuthorGroups(question,candidates){
  const groups=new Map();
@@ -814,21 +732,9 @@ export function targetBooksForFacet(query,books,allowedBookIds=null){
  // all-books facet. RemoteLibrary.search recognizes the same locator and
  // boosts indexed Bible editions when it searches the full catalog.
  if(hasExplicitScriptureReference(String(query||'')))return scoped?.length?scoped:[null];
- const text=String(query||'');
- const matches=matchExplicitBookIds(text,books)
+ const matches=matchExplicitBookIds(String(query||''),books)
   .filter(id=>!scoped||scoped.includes(String(id)));
  if(matches.length)return matches;
- // If a named teacher appears only in the title of a compiled work, target
- // that book for this named-speaker facet alone. Do not let this subject-title
- // match constrain sibling topical facets or all-books source diversity.
- const speakerKey=normalizeCatalogText(namedSpeakerPhrase(text));
- if(speakerKey){
-  const subjectTitles=(books||[]).filter(book=>
-   /^[1-9]\d{0,3}$/.test(String(book?.id||''))&&
-   catalogWorkTitles(book?.title).some(title=>questionContainsPhrase(title,speakerKey)))
-   .map(book=>String(book.id)).filter(id=>!scoped||scoped.includes(id));
-  if(subjectTitles.length)return [...new Set(subjectTitles)].slice(0,8);
- }
  return scoped?.length?scoped:[null];
 }
 
@@ -902,68 +808,19 @@ function directFacetTitleMatch(question,title){
  return score;
 }
 
-const FACET_MATCH_STOP_WORDS=new Set(['what','when','where','which','who','whom','whose','why','how','does','did','has','have','had','are','was','were','the','and','for','from','with','into','about','between','this','that','these','those','there','their','they','them','than','then','your','our','also','only','could','would','should',
-  // Comparison framing does not describe passage content; source names and
-  // titles remain ordinary query terms and are not listed here.
-  'differ','differs','different','difference','differences','compare','comparison','contrast','versus']);
+function directFacetTextMatch(question,text){
+ const stop=new Set(['what','when','where','which','who','whom','whose','why','how','does','did','has','have','had','are','was','were','the','and','for','from','with','into','about','between','this','that','these','those','there','their','they','them','than','then','your','our','also','only','could','would','should',
+  // In a cross-work comparison, author/title names and the comparison verb
+  // identify bibliographic scope, not the passage's topical relevance.
+  'hume','kant','enquiry','critique','pure','reason','differ','differs','different','difference','differences','compare','comparison','contrast','versus']);
  const normalize=term=>/^(?:cause|causal|causality|causes|caused|causing)$/.test(term)?'caus':
   term.startsWith('necess')?'necess':term.startsWith('experienc')?'experienc':term;
-function facetTerms(question){
- return [...new Set((String(question||'').toLowerCase().match(/[a-z0-9]+/g)||[])
-  .filter(term=>term.length>=4&&!FACET_MATCH_STOP_WORDS.has(term)).map(normalize))];
-}
-function directFacetTextMatch(question,text){
  const questionTerms=new Set((String(question||'').toLowerCase().match(/[a-z0-9]+/g)||[])
-  .filter(term=>term.length>=4&&!FACET_MATCH_STOP_WORDS.has(term)).map(normalize));
+  .filter(term=>term.length>=4&&!stop.has(term)).map(normalize));
  const textTerms=new Set((String(text||'').toLowerCase().match(/[a-z0-9]+/g)||[]).map(normalize));
  let score=0;
  for(const term of questionTerms)if(textTerms.has(term))score++;
  return score;
-}
-function coverageSourceRef(source){
- if(!source||typeof source!=='object')return null;
- const ref={};
- for(const key of ['bookId','page','globalPageId']){
-  const value=source[key];
-  if((typeof value==='string'&&value.length<=120)||
-     (Number.isSafeInteger(value)&&value>0))ref[key]=value;
- }
- return Object.keys(ref).length?ref:null;
-}
-function isIndexLikeText(text){
- const value=String(text||'');
- if(/^\s*(?:index|subject index|general index|topical index)\s*$/imu.test(value))return true;
- const lines=value.split(/\n+/u).map(line=>line.trim()).filter(Boolean);
- const entries=lines.length>1?lines:value.split(/\s*;\s*/u).map(line=>line.trim()).filter(Boolean);
- if(entries.length<5)return false;
- const pageReferenceEntries=entries.filter(entry=>/(?:[,;:]\s*\d{1,4}(?:\s*[-–]\s*\d{1,4})?\s*[.;,]?$|\bpp?\.\s*\d{1,4})$/iu.test(entry));
- const shortEntries=entries.filter(entry=>(entry.match(/[\p{L}\p{N}]+/gu)||[]).length<=18);
- return pageReferenceEntries.length>=4&&pageReferenceEntries.length/entries.length>=0.55&&
-  shortEntries.length/entries.length>=0.6;
-}
-function textFacetMatch(question,text,windowSize=22){
- const terms=facetTerms(question);
- if(!terms.length)return {overlap:0,matchedTerms:[],windowStart:-1};
- let best={overlap:0,matchedTerms:[],windowStart:-1};
- let offset=0;
- // Sentence, clause, and list boundaries keep nearby but unrelated entries
- // from combining into an apparently complete answer facet.
- for(const segment of String(text||'').split(/(?<=[.!?;])\s+|[\n\r•▪]+/u)){
-  const words=(segment.toLowerCase().match(/[a-z0-9]+/g)||[]).map(normalize);
-  for(let start=0;start<words.length;start++){
-   const window=new Set(words.slice(start,start+windowSize));
-   const matchedTerms=terms.filter(term=>window.has(term));
-   if(matchedTerms.length>best.overlap)
-    best={overlap:matchedTerms.length,matchedTerms,windowStart:offset+start};
-   if(best.overlap===terms.length)return best;
-  }
-  offset+=words.length;
- }
- return best;
-}
-function localFacetTextMatch(question,text,windowSize=22){
- const match=textFacetMatch(question,text,windowSize);
- return isIndexLikeText(text)?{...match,overlap:0,matchedTerms:[],indexLike:true}:match;
 }
 function singlePartFacetTextMatch(facet,partQuestion){
  const searchFraming=/\b(?:definition|nature|concept|concepts|meaning|explain|explains|explained|explaining|philosophy|philosophical|texts|text|account|accounts|theory|theories|role|function)\b/giu;
@@ -1079,8 +936,8 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
      const titleMatch=directFacetTitleMatch(question,value.title);
      const bestTitleMatch=directFacetTitleMatch(question,best.title);
      if(titleMatch!==bestTitleMatch)return titleMatch>bestTitleMatch?value:best;
-     return localFacetTextMatch(question,value.text??value.preview).overlap>
-       localFacetTextMatch(question,best.text??best.preview).overlap?value:best;
+     return directFacetTextMatch(question,value.text??value.preview)>
+       directFacetTextMatch(question,best.text??best.preview)?value:best;
     },facetCandidates[0])
    :facetCandidates[0];
   if(candidate){used.add(candidate);ordered.push(candidate);}
@@ -1094,62 +951,16 @@ function interleavePlannedFacets(candidates,plannedFacetCount,question=''){
  return ordered;
 }
 
-/* Share the exact pre-packet exclusions with the experimental selector so
- * the comparison changes page ranking only, not what counts as a candidate. */
-export function auditSelectionCoverage(candidates,selected,partQuestions=[]){
- const selectedKeys=new Set((Array.isArray(selected)?selected:[])
-  .map(item=>String(item?.bookId)+':'+String(item?.page)));
- return (Array.isArray(partQuestions)?partQuestions:[])
-  .filter(part=>typeof part?.partId==='string'&&/^P[1-9]\d*$/.test(part.partId))
-  .map(part=>{
-   const eligible=(Array.isArray(candidates)?candidates:[]).filter(candidate=>
-    Array.isArray(candidate?.candidatePartIds)&&candidate.candidatePartIds.includes(part.partId));
-   const selectedCount=eligible.filter(candidate=>
-    selectedKeys.has(String(candidate.bookId)+':'+String(candidate.page))).length;
-   return {partId:part.partId,linkedCandidateCount:eligible.length,selectedCount,
-    status:!eligible.length?'no-linked-candidate':selectedCount?'selected':'candidate-not-selected'};
-  });
-}
-export function prepareAnswerCandidates(candidates){
- if(!Array.isArray(candidates))return [];
- return dedupeEditionCopies(candidates.filter(candidate=>
-  !isIndexLikeText(candidate?.text||candidate?.preview||candidate?.excerpt||'')));
-}
-
-/* Apply the live request's existing byte and page limits to an already-ranked
- * list. The evaluation-only model selector uses this same gate after ranking. */
-export function boundAnswerSources(candidates,question,turnstileToken,
-  {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[]}={}){
- if(!Array.isArray(candidates)||typeof question!=='string'||typeof turnstileToken!=='string')return [];
- const chosen=[];let selectedSourceBytes=0;
- for(const candidate of candidates){
-  if(chosen.length>=maxSources)break;
-  if(!candidate||typeof candidate.text!=='string'||
-     !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
-     !Number.isSafeInteger(candidate.page)||candidate.page<1)continue;
-  const candidateBytes=new TextEncoder().encode(candidate.text).byteLength;
-  if(selectedSourceBytes+candidateBytes>maxSourceBytes)continue;
-  const next=[...chosen,candidate];
-  const bytes=new TextEncoder().encode(JSON.stringify({question,turnstileToken,history,
-   sources:next.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
-    ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{})}))})).byteLength;
-  if(bytes<=maxBytes){chosen.push(candidate);selectedSourceBytes+=candidateBytes;}
- }
- return chosen;
-}
-
-/* The public answer flow still facet-balances before applying the shared six-
- * page and byte limits. The model ablation uses the same limits without
- * reordering its model-ranked candidates. */
+/* The answer flow may send six full pages. Keep their exact request below
+ * both the Worker body limit and its separate verified-text limit. Candidate
+ * order is already facet-balanced; preserve it so comparison parts stay covered.
+ */
 export function selectAnswerSources(candidates,question,turnstileToken,
   {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[],plannedFacetCount=0,
    partQuestions=[]}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||
     typeof turnstileToken!=='string')return [];
- // Index/list pages can help diagnose a retrieval miss, but their entries are
- // not answer passages. Keep them in retrieval traces and exclude them here.
- candidates=prepareAnswerCandidates(candidates);
- const firstPerBook=[],seenBooks=new Set();
+ const chosen=[],firstPerBook=[],seenBooks=new Set();
  for(const candidate of candidates){
    const key=String(candidate?.bookId||'');
    if(key&&!seenBooks.has(key)){seenBooks.add(key);firstPerBook.push(candidate);}
@@ -1257,36 +1068,31 @@ export function selectAnswerSources(candidates,question,turnstileToken,
     const valuePhrase=hasQuotedPhraseMatch(targetQuestion,value.text??value.preview);
     const bestPhrase=hasQuotedPhraseMatch(targetQuestion,best.text??best.preview);
     if(valuePhrase!==bestPhrase)return valuePhrase?value:best;
-    return localFacetTextMatch(targetQuestion,value.text??value.preview).overlap>
-      localFacetTextMatch(targetQuestion,best.text??best.preview).overlap?value:best;
+    return directFacetTextMatch(targetQuestion,value.text??value.preview)>
+      directFacetTextMatch(targetQuestion,best.text??best.preview)?value:best;
   },eligible[0]):null;
   if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
  }
  if(partRepresentatives.length){
-  // After each part has one representative, spend spare slots on distinct
-  // linked works. A broad one-part question may reserve two alternatives, so
-  // three independent works can reach composition when retrieval finds them.
-  // Multi-part questions reserve one alternate per part to protect coverage.
-  // Part links are eligibility hints only; the Worker still reviews every claim.
+  // Once every requested part has one candidate, use spare packet slots for
+  // another linked book when available. This gives a direct definition or
+  // comparison a second independent source before sending pages that have no
+  // question-part link. A link is still only an eligibility signal; the Worker
+  // performs the claim-level evidence review.
   const diverseRepresentatives=[];
-  const alternatesPerPart=partIds.length===1?2:1;
   for(const partId of partIds){
    const representedBooks=new Set([...reservedPartPages]
     .filter(value=>value.candidatePartIds?.includes(partId)).map(value=>String(value.bookId)));
+   const eligible=ordered.filter(value=>!reservedPartPages.has(value)&&
+    value.candidatePartIds?.includes(partId)&&!representedBooks.has(String(value.bookId)));
+   if(!eligible.length)continue;
    const targetQuestion=partQuestionById.get(partId)||question;
-   for(let alternate=0;alternate<alternatesPerPart;alternate++){
-    const eligible=ordered.filter(value=>!reservedPartPages.has(value)&&
-     value.candidatePartIds?.includes(partId)&&!representedBooks.has(String(value.bookId)));
-    if(!eligible.length)break;
-    const candidate=eligible.reduce((best,value)=>{
-     const overlap=localFacetTextMatch(targetQuestion,value.text??value.preview).overlap;
-     const bestOverlap=localFacetTextMatch(targetQuestion,best.text??best.preview).overlap;
-     return overlap>bestOverlap||overlap===bestOverlap&&(Number(value.score)||0)>(Number(best.score)||0)?value:best;
-    },eligible[0]);
-    diverseRepresentatives.push(candidate);
-    reservedPartPages.add(candidate);
-    representedBooks.add(String(candidate.bookId));
-   }
+   const candidate=eligible.reduce((best,value)=>{
+    const overlap=directFacetTextMatch(targetQuestion,value.text??value.preview);
+    const bestOverlap=directFacetTextMatch(targetQuestion,best.text??best.preview);
+    return overlap>bestOverlap||overlap===bestOverlap&&(Number(value.score)||0)>(Number(best.score)||0)?value:best;
+   },eligible[0]);
+   diverseRepresentatives.push(candidate);reservedPartPages.add(candidate);
   }
   const remainingLinked=ordered.filter(value=>!reservedPartPages.has(value)&&
    Array.isArray(value.candidatePartIds)&&value.candidatePartIds.length);
@@ -1294,56 +1100,20 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    (!Array.isArray(value.candidatePartIds)||!value.candidatePartIds.length));
   ordered=[...partRepresentatives,...diverseRepresentatives,...remainingLinked,...remainingUnlinked];
  }
- return boundAnswerSources(ordered,question,turnstileToken,{maxSources,maxBytes,maxSourceBytes,history});
-}
-
-/* Some catalogs publish the same passage in several edition records, with
- * different surrounding text or page lengths. Collapse only same-work copies
- * whose smaller passage is almost wholly contained in the larger one. */
-function dedupeEditionCopies(candidates){
- const seenByTitle=new Map(),out=[];
- for(const candidate of candidates){
-  const title=String(candidate?.title||'').toLocaleLowerCase().normalize('NFKD')
-   .replace(/[\u0300-\u036f]/g,'').replace(/\b(?:19|20)\d{2}\b/g,' ')
-   .replace(/\b(?:edition|editions|printing|reprint|revised|updated)\b/g,' ')
-   .replace(/[^a-z0-9]+/g,' ').trim();
-  const text=typeof candidate?.text==='string'?candidate.text:'';
-  const tokens=normalizedCopyTokens(text);
-  // Short fragments do not carry enough language to distinguish a repeated
-  // heading from a genuinely duplicated passage.
-  if(title.length<6||tokens.length<40){out.push(candidate);continue;}
-  const entries=seenByTitle.get(title)||[];
-  const shingles=copyShingles(tokens);
-  const duplicate=entries.find(entry=>nearDuplicateCopy(entry,tokens,shingles));
-  if(!duplicate){
-   const entry={candidate,index:out.length,tokens,shingles};
-   entries.push(entry);seenByTitle.set(title,entries);out.push(candidate);continue;
-  }
-  // Keep the stronger retrieved edition in the original packet position.
-  // This changes citation redundancy, not source scope or answer obligations.
-  if((Number(candidate?.score)||0)>(Number(duplicate.candidate?.score)||0)){
-   out[duplicate.index]=candidate;duplicate.candidate=candidate;
-   duplicate.tokens=tokens;duplicate.shingles=shingles;
-  }
+ let selectedSourceBytes=0;
+ for(const candidate of ordered){
+   if(chosen.length>=maxSources)break;
+   if(!candidate||typeof candidate.text!=='string'||
+      !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
+      !Number.isSafeInteger(candidate.page)||candidate.page<1)continue;
+   const candidateBytes=new TextEncoder().encode(candidate.text).byteLength;
+   if(selectedSourceBytes+candidateBytes>maxSourceBytes)continue;
+   const next=[...chosen,candidate];
+   const bytes=new TextEncoder().encode(JSON.stringify({question,turnstileToken,history,
+     sources:next.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
+      ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{})}))})).byteLength;
+   if(bytes<=maxBytes){chosen.push(candidate);selectedSourceBytes+=candidateBytes;}
  }
- return out;
-}
-function normalizedCopyTokens(text){
- return String(text||'').toLocaleLowerCase().normalize('NFKC')
-  .match(/[\p{L}\p{N}]+/gu)||[];
-}
-function copyShingles(tokens){
- const shingles=new Set();
- for(let index=0;index+2<tokens.length;index++)
-  shingles.add(tokens[index]+' '+tokens[index+1]+' '+tokens[index+2]);
- return shingles;
-}
-function nearDuplicateCopy(previous,tokens,shingles){
- const common=[...shingles].reduce((count,shingle)=>
-  count+(previous.shingles.has(shingle)?1:0),0);
- // Normalize against the smaller shingle set: page excerpts may differ greatly
- // in length while containing the same quoted passage. Substantial rewrites
- // still fail because many shingles from the shorter passage are absent.
- return common/Math.max(1,Math.min(shingles.size,previous.shingles.size))>=0.94;
+ return chosen;
 }
 

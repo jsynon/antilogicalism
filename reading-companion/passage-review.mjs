@@ -1,6 +1,7 @@
-/* Compare a saved evaluation trace with a small, human-reviewed passage set.
- * The labels are a bounded gold review of captured candidates, not an AI score
- * or a claim that we searched every page in the library.
+/* Compare saved evaluation traces with human-reviewed passage annotations.
+ * Gold labels are evaluation-only: they never enter runtime prompts, search,
+ * ranking, or answer selection. They describe reviewed examples, not every
+ * useful passage in the library.
  */
 function pageKey(value){
  const bookId=String(value?.bookId||'');
@@ -15,6 +16,25 @@ function sourcePageMap(item){
 
 function tracePageSet(items){
  return new Set((Array.isArray(items)?items:[]).map(pageKey).filter(Boolean));
+}
+
+function searchTrace(item){
+ const searches=Array.isArray(item?.searches)?item.searches:[];
+ const pages=new Set();
+ const pageQueries=new Map();
+ for(const search of searches){
+  for(const source of Array.isArray(search?.sources)?search.sources:[]){
+   const key=pageKey(source);
+   if(!key)continue;
+   pages.add(key);
+   if(!pageQueries.has(key))pageQueries.set(key,[]);
+   pageQueries.get(key).push({query:String(search?.query||''),
+    partIds:Array.isArray(search?.partIds)?search.partIds.map(String):[]});
+  }
+ }
+ return {available:searches.length>0,
+  complete:searches.length>0&&searches.every(search=>search?.sourceTraceComplete===true),
+  pages,pageQueries};
 }
 
 function finalStatusByPart(item){
@@ -36,8 +56,9 @@ function reviewerStatusByPart(item){
  }));
 }
 
-/* Return trace facts separately from interpretation so tests and reports can
- * distinguish candidate loss, a non-best highlight, and a stale status field. */
+/* Report observed stage transitions independently. A located, claim-linked
+ * highlight is useful trace evidence, but still does not prove semantic
+ * support; reviewers must inspect the answer alongside the cited passage. */
 export function auditPassageGoldReview(report,gold){
  if(!report||!Array.isArray(report.cases))throw Error('Input must be a saved live evaluation report.');
  if(gold?.schema!=='antilogicalism-reading-companion-passage-gold-v1'||!Array.isArray(gold.cases))
@@ -48,6 +69,7 @@ export function auditPassageGoldReview(report,gold){
   if(!item)return {id:spec.id,found:false,claimChecks:[],statusChecks:[]};
   const candidates=tracePageSet(item.retrievalCandidates);
   const submitted=tracePageSet(item.submittedSources);
+  const searches=searchTrace(item);
   const sources=sourcePageMap(item);
   const highlights=Array.isArray(item.evidenceHighlights)?item.evidenceHighlights:[];
   const claimChecks=(spec.claims||[]).map(claim=>{
@@ -62,10 +84,20 @@ export function auditPassageGoldReview(report,gold){
      return {bookId:String(source?.bookId||''),page:Number.isSafeInteger(source?.page)?source.page:null,
       label:passage?.label||'unrated',quoteLocated:value?.quoteLocated===true};
     });
+   const bestSearchHit=best.some(page=>searches.pages.has(pageKey(page)));
+   const bestInPool=best.some(page=>candidates.has(pageKey(page)));
+   const bestSubmitted=best.some(page=>submitted.has(pageKey(page)));
+   const bestClaimLinkedLocated=claimHighlights.some(value=>
+    ['best','tied','acceptable'].includes(value.label)&&value.quoteLocated);
    return {claimId:claim.claimId,partId:claim.partId,
     bestCandidates:best.map(page=>({bookId:page.bookId,page:page.page})),
-    bestCandidateInPool:best.some(page=>candidates.has(pageKey(page))),
-    bestCandidateSubmitted:best.some(page=>submitted.has(pageKey(page))),
+    // An absent passage is a definite search miss only when every result page
+    // from every query was retained in this trace. Older artifacts are partial.
+    bestCandidateSearchHit:searches.available?(bestSearchHit||(!searches.complete?null:false)):null,
+    bestCandidateSearchHitQueries:best.flatMap(page=>searches.pageQueries.get(pageKey(page))||[]),
+    bestCandidateInPool:bestInPool,
+    bestCandidateSubmitted:bestSubmitted,
+    bestCandidateClaimLinkedLocated:bestClaimLinkedLocated,
     submittedPassages:passages.filter(page=>submitted.has(pageKey(page)))
      .map(({bookId,page,label})=>({bookId,page,label})),
     highlights:claimHighlights,
@@ -78,19 +110,35 @@ export function auditPassageGoldReview(report,gold){
    return {...expected,...observed,consistent:observed.reviewFinalStatus===
     (observed.returnedStatus==='supported'?'answered':observed.returnedStatus)};
   });
-  return {id:spec.id,found:true,claimChecks,statusChecks};
+  return {id:spec.id,found:true,
+   searchTrace:{available:searches.available,complete:searches.complete,
+    recordedSearches:Array.isArray(item.searches)?item.searches.length:0},claimChecks,statusChecks};
  });
  const checked=cases.filter(item=>item.found);
  const claimChecks=checked.flatMap(item=>item.claimChecks);
  const statusChecks=checked.flatMap(item=>item.statusChecks);
- return {schema:'antilogicalism-reading-companion-passage-review-audit-v1',
+ const claimsWithBest=claimChecks.filter(item=>item.bestCandidates.length>0);
+ const searchObservable=claimsWithBest.filter(item=>item.bestCandidateSearchHit!==null);
+ const stageCounts={eligibleClaims:claimsWithBest.length,
+  observedSearchHit:searchObservable.filter(item=>item.bestCandidateSearchHit).length,
+  candidatePool:claimsWithBest.filter(item=>item.bestCandidateInPool).length,
+  submittedPacket:claimsWithBest.filter(item=>item.bestCandidateSubmitted).length,
+  claimLinkedLocatedQuote:claimsWithBest.filter(item=>item.bestCandidateClaimLinkedLocated).length};
+ return {schema:'antilogicalism-reading-companion-passage-review-audit-v2',
   sourceRunId:gold.sourceRun?.runId??null,
   scope:gold.sourceRun?.scope||'',networkCalls:0,aiCalls:0,
-  checkedCases:checked.length,missingCases:cases.length-checked.length,
-  // Separate retrieval misses from packet loss so a zero packet-loss count
-  // cannot hide a passage that never reached the candidate pool.
-  bestCandidateRetrievalMisses:claimChecks.filter(item=>item.bestCandidates.length>0&&!item.bestCandidateInPool).length,
-  bestCandidatePacketMisses:claimChecks.filter(item=>item.bestCandidateInPool&&!item.bestCandidateSubmitted).length,
+  checkedCases:checked.length,missingCases:cases.length-checked.length,stageCounts,
+  // Search misses are counted only with a complete trace. Older reports stored
+  // a result prefix, so absence in them cannot distinguish a miss from truncation.
+  bestCandidateSearchMisses:claimsWithBest.filter(item=>item.bestCandidateSearchHit===false).length,
+  bestCandidateSearchUnknown:claimsWithBest.filter(item=>item.bestCandidateSearchHit===null).length,
+  // Keep the original field's candidate-pool meaning for older report readers.
+  bestCandidateRetrievalMisses:claimsWithBest.filter(item=>!item.bestCandidateInPool).length,
+  bestCandidateFusionMisses:claimsWithBest.filter(item=>item.bestCandidateSearchHit===true&&!item.bestCandidateInPool).length,
+  bestCandidatePacketMisses:claimsWithBest.filter(item=>item.bestCandidateInPool&&!item.bestCandidateSubmitted).length,
+  bestCandidateUseMisses:claimsWithBest.filter(item=>item.bestCandidateSubmitted&&!item.bestCandidateClaimLinkedLocated).length,
   nonBestHighlights:claimChecks.reduce((sum,item)=>sum+item.nonBestHighlights.length,0),
-  statusMismatches:statusChecks.filter(item=>!item.consistent).length,cases};
+  statusMismatches:statusChecks.filter(item=>!item.consistent).length,
+  interpretation:'Search hits, candidate retention, packet inclusion, and claim-linked located highlights are trace checks only. They do not prove that cited text semantically supports the answer.',
+  cases};
 }
