@@ -23,10 +23,12 @@ const SCRIPTURE_BOOK_NAMES = [
 const scriptureBookPattern=SCRIPTURE_BOOK_NAMES
   .map(name=>name.replace(/\s+/g,'\\s+')).join('|');
 const SCRIPTURE_REFERENCE=new RegExp(
-  `\\b(?:${scriptureBookPattern})\\s+\\d{1,3}\\s*[:.]\\s*\\d{1,3}(?:\\s*[-–—]\\s*\\d{1,3})?\\b`,'i');
+  // A chapter-only reference is still a useful scripture signal: planners
+  // often return forms such as “1 John 4” without narrowing to a verse range.
+  `\\b(?:${scriptureBookPattern})\\s+\\d{1,3}(?:\\s*[:.]\\s*\\d{1,3}(?:\\s*[-–—]\\s*\\d{1,3})?)?\\b`,'i');
 function scriptureEditionBoost(title,question){
   if(!hasExplicitScriptureReference(question)||!/\bbible\b/i.test(String(title||'')))return 0;
-  // A verse citation asks for the passage itself. Study and annotated
+  // A chapter or verse reference asks for the passage itself. Study and annotated
   // editions can contain the passage, but their notes can match more strongly
   // than the verses and crowd primary translations out of the small all-books
   // result budget. Keep them eligible as a fallback while ranking unannotated

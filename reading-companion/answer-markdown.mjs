@@ -62,13 +62,20 @@ function splitInlineListMarkers(line){
  return line.replace(/([.!?:])\s+(?=(?:[*+-]\s+(?:\*\*|__)|\d+[.)]\s+))/g,'$1\n');
 }
 
+function splitInlineSectionHeadings(line){
+ // A bold section label written after a complete sentence is a block boundary,
+ // not emphasis inside that paragraph. Restrict this to colon-ended labels so
+ // ordinary bold phrases and prose remain untouched.
+ return line.replace(/([.!?])\s+(?=(?:\*\*[^*\n]{3,90}:\*\*|__[^_\n]{3,90}:__))(?=\s*\S)/gu,'$1\n');
+}
+
 function inlineHeading(line){
  const match=line.match(/^\s*(?:\*\*([^*\n]{3,90})\*\*|__([^_\n]{3,90})__)(?:\s+)(\S.*)$/u);
  if(!match)return null;
  const title=match[1]??match[2];
  // Bold sentence leads such as “In short,” stay in the paragraph.
- if(/[.!?:;,]$/u.test(title.trim()))return null;
- return {title:title.trim(),body:match[3].trim()};
+ if(/[.!?;,]$/u.test(title.trim()))return null;
+ return {title:title.trim().replace(/:$/u,'').trim(),body:match[3].trim()};
 }
 
 function cleanListItem(value,line,hasPriorListItem){
@@ -90,12 +97,16 @@ export function parseAnswerMarkdown(value,{allowLists=false}={}){
   paragraph=[];
  };
  const flushList=()=>{
-  if(allowLists&&listItems.length)blocks.push({type:'list',ordered:listType==='ol',items:listItems});
+  if(listItems.length){
+   if(allowLists)blocks.push({type:'list',ordered:listType==='ol',items:listItems});
+   else for(const text of listItems)blocks.push({type:'paragraph',text});
+  }
   listItems=[];listType='';
  };
  const flushAll=()=>{flushParagraph();flushList();listRun=false;};
  const rawLines=String(value||'').replace(/\r\n?/g,'\n').split('\n');
- const lines=rawLines.flatMap(line=>splitInlineListMarkers(line).split('\n'));
+ const lines=rawLines.flatMap(line=>splitInlineSectionHeadings(line)
+  .split('\n').flatMap(part=>splitInlineListMarkers(part).split('\n')));
  for(const original of lines){
   const line=original.trim();
   if(!line){flushAll();continue;}
@@ -110,18 +121,14 @@ export function parseAnswerMarkdown(value,{allowLists=false}={}){
   const bullet=line.match(/^(?:[*+-]|\d+[.)])\s+(.+?)\s*$/u);
   if(bullet){
    const type=/^\d/u.test(line)?'ol':'ul';
-   if(allowLists){
-    flushParagraph();
-    if(listType&&listType!==type)flushList();
-    listType=type;listItems.push(cleanListItem(bullet[1],line,listRun));listRun=true;
-   }else{
-    paragraph.push(cleanListItem(bullet[1],line,listRun));listRun=true;
-   }
+   flushParagraph();
+   if(listType&&listType!==type)flushList();
+   listType=type;listItems.push(cleanListItem(bullet[1],line,listRun));listRun=true;
    continue;
   }
   if(listRun){
-   // A continuation line belongs to the last list item or folded prose.
-   if(allowLists&&listItems.length)listItems[listItems.length-1]+=' '+line;
+   // A continuation line belongs to the last list item in the run.
+   if(listItems.length)listItems[listItems.length-1]+=' '+line;
    else if(paragraph.length)paragraph[paragraph.length-1]+=' '+line;
    else paragraph.push(line);
    continue;
