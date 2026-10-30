@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -57,6 +57,17 @@ test('planner facet links obey the shared unique-query and total-link budgets',(
  assert.ok(result.partQueries.length<=12);
  assert.ok(new Set(result.partQueries.map(item=>item.query.toLowerCase())).size<=6);
  assert.ok(result.warnings.includes('part-query-budget-exceeded'));
+});
+
+test('live answer audit preserves a valid no-evidence selector result as an empty selected set',()=>{
+ const retrievalPacket=[{id:'C1',bookId:'283',page:412}];
+ assert.deepEqual(sourcesUsedForWorkerSelection(
+  {status:'no-relevant-evidence'},[],retrievalPacket),[]);
+ assert.deepEqual(sourcesUsedForWorkerSelection(
+  {status:'selected'},[{id:'S1',bookId:'7',page:20}],retrievalPacket),
+  [{id:'S1',bookId:'7',page:20}]);
+ assert.deepEqual(sourcesUsedForWorkerSelection(
+  {status:'deterministic-fallback'},[],retrievalPacket),retrievalPacket);
 });
 
 test('smoke mode is exactly scripture plus two representative existing cases',()=>{

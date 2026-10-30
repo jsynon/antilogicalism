@@ -444,6 +444,19 @@ test('author-only mentions search across the named author’s catalog works',()=
  assert.deepEqual(matchExplicitBookIds(
   'In Leviathan, how does Hobbes describe the state of nature?',books),['163']);
 });
+test('generic author wording does not scope all-books retrieval to collective bylines',()=>{
+ const books=[...Array.from({length:8},(_,index)=>({
+  id:String(283+index),title:`The Ante-Nicene Fathers, Volume ${index+1} — Various authors`
+ })),
+  {id:'40',title:'Critique of Pure Reason — Immanuel Kant'},
+  {id:'239',title:'The Portable Nietzsche — Friedrich Nietzsche'}];
+ const question="How do different authors in the library approach the question of life's meaning?";
+ assert.deepEqual(matchExplicitBookIds(question,books),[]);
+ assert.deepEqual(targetBooksForFacet(question,books),[null],
+  'an ordinary plural noun must leave the search in all-books scope');
+ assert.deepEqual(matchExplicitBookIds('What did Kant say about reality?',books),['40']);
+ assert.deepEqual(matchExplicitBookIds('What does The Portable Nietzsche say about reality?',books),['239']);
+});
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';

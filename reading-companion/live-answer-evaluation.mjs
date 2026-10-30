@@ -675,6 +675,14 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
  return {selected,candidates:answerCandidates,candidatePacket,searches:retrieval.searches,retrievalCandidates,
   selectionCoverage:auditSelectionCoverage(answerCandidates,selected,partQuestions),selectionAudit};
 }
+export function sourcesUsedForWorkerSelection(selection,workerSelected,submittedPool){
+ // A valid no-evidence decision deliberately has no Worker-selected pages.
+ // Preserve that empty set in quality audits instead of silently substituting
+ // the broader retrieval packet and making it look like answer evidence.
+ if(selection?.status==='no-relevant-evidence')return [];
+ return workerSelected.length?workerSelected:submittedPool;
+}
+
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,preparedPlan=null,answerVariant='with-review',retrievalProfile='baseline',onProgress=async()=>{}}){
  if(!['with-review','compose-only','paired-review-ablation','with-expansion','paired-expansion-ablation','paired-selection-ablation'].includes(answerVariant))
   throw Error('Unsupported answer variant.');
@@ -839,7 +847,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
      const candidate=candidateByLocator.get(String(source.bookId)+':'+source.page);
      return candidate?{...candidate,id:source.id,candidatePartIds:source.candidatePartIds||[]}:null;
     }).filter(Boolean);
-   const submitted=workerSelected.length?workerSelected:answerSources;
+   const submitted=sourcesUsedForWorkerSelection(data.sourceSelection,workerSelected,answerSources);
    const audit=auditLiveAnswer(data,submitted,item.required_source_groups,
     item.required_part_source_groups||[],{scope:item.selected_book_ids?.length?'selected-books':'all-books',
      plannerPlan:plan?.plan||null,candidateSources:retrievalCandidates});

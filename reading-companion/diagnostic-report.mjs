@@ -200,7 +200,7 @@ export function createDiagnosticReport(input={}){
     submittedSources:Array.isArray(input.submittedSources)?
       input.submittedSources.slice(0,6).map(sourceSummary).filter(Boolean):[],
     sourceSelection:input.sourceSelection&&typeof input.sourceSelection==='object'?{
-      status:['selected','deterministic-fallback','legacy'].includes(input.sourceSelection.status)?input.sourceSelection.status:'unknown',
+      status:['selected','no-relevant-evidence','deterministic-fallback','legacy'].includes(input.sourceSelection.status)?input.sourceSelection.status:'unknown',
       candidateCount:Number.isSafeInteger(input.sourceSelection.candidateCount)?input.sourceSelection.candidateCount:null,
       pages:Array.isArray(input.sourceSelection.pages)?input.sourceSelection.pages.slice(0,6).map(sourceSummary).filter(Boolean):[],
       usage:input.sourceSelection.usage&&typeof input.sourceSelection.usage==='object'?{
