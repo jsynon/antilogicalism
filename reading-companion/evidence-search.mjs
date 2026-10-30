@@ -973,6 +973,38 @@ function localFacetTextMatch(question,text,windowSize=22){
  const match=textFacetMatch(question,text,windowSize);
  return isIndexLikeText(text)?{...match,overlap:0,matchedTerms:[],indexLike:true}:match;
 }
+
+/* Rank with inspectable text signals before using the search score. These
+ * signals reward a close, coherent term cluster; they are retrieval heuristics,
+ * never a claim that the passage semantically supports an answer. */
+function candidateEvidenceFit(candidate,question){
+ const text=String(candidate?.text||candidate?.preview||candidate?.excerpt||'');
+ const match=localFacetTextMatch(question,text);
+ const distinctiveTermCount=facetTerms(question).length;
+ return {quotedPhraseMatch:hasQuotedPhraseMatch(question,text),
+  matchedTerms:match.matchedTerms,matchedTermCount:match.overlap,
+  distinctiveTermCount,
+  coverageRatio:distinctiveTermCount?match.overlap/distinctiveTermCount:0,
+  retrievalScore:Number.isFinite(candidate?.score)?candidate.score:null};
+}
+function compareEvidenceFit(left,right){
+ if(left.quotedPhraseMatch!==right.quotedPhraseMatch)return left.quotedPhraseMatch?-1:1;
+ if(left.coverageRatio!==right.coverageRatio)return right.coverageRatio-left.coverageRatio;
+ if(left.matchedTermCount!==right.matchedTermCount)return right.matchedTermCount-left.matchedTermCount;
+ return 0;
+}
+function compareEvidenceCandidates(left,right,question,representedBooks=new Set()){
+ const fitOrder=compareEvidenceFit(candidateEvidenceFit(left,question),candidateEvidenceFit(right,question));
+ if(fitOrder)return fitOrder;
+ // Source diversity is only a tie-breaker between equally close passages; a
+ // second book cannot displace a more relevant passage simply to raise counts.
+ const leftNew=!representedBooks.has(String(left?.bookId||''));
+ const rightNew=!representedBooks.has(String(right?.bookId||''));
+ if(leftNew!==rightNew)return leftNew?-1:1;
+ const leftScore=Number.isFinite(left?.score)?left.score:Number.NEGATIVE_INFINITY;
+ const rightScore=Number.isFinite(right?.score)?right.score:Number.NEGATIVE_INFINITY;
+ return rightScore-leftScore;
+}
 function singlePartFacetTextMatch(facet,partQuestion){
  const searchFraming=/\b(?:definition|nature|concept|concepts|meaning|explain|explains|explained|explaining|philosophy|philosophical|texts|text|account|accounts|theory|theories|role|function)\b/giu;
  return directFacetTextMatch(String(facet||'').replace(searchFraming,' '),
@@ -1124,6 +1156,43 @@ export function prepareAnswerCandidates(candidates){
   !isIndexLikeText(candidate?.text||candidate?.preview||candidate?.excerpt||'')));
 }
 
+/* Offline evaluation view of the evidence packet. The local term-coherence
+ * signals explain ranking behavior but do not grade semantic relevance. */
+export function auditEvidencePacketSelection(candidates,selected,question,partQuestions=[]){
+ const selectedKeys=new Set((Array.isArray(selected)?selected:[])
+  .map(item=>String(item?.bookId)+':'+String(item?.page)));
+ const parts=Array.isArray(partQuestions)&&partQuestions.length
+  ?partQuestions.filter(item=>typeof item?.partId==='string'&&typeof item?.question==='string')
+   .map(item=>({partId:item.partId,question:item.question}))
+  :[{partId:'P1',question:String(question||'')}];
+ const describe=(candidate,part,linked)=>({
+  bookId:String(candidate?.bookId||''),title:String(candidate?.title||'').slice(0,200),
+  page:Number.isSafeInteger(candidate?.page)?candidate.page:null,
+  selected:selectedKeys.has(String(candidate?.bookId)+':'+String(candidate?.page)),
+  linkedToPart:linked,signals:candidateEvidenceFit(candidate,part.question)
+ });
+ const partAudits=parts.map(part=>{
+  const all=Array.isArray(candidates)?candidates:[];
+  const linked=all.filter(candidate=>Array.isArray(candidate?.candidatePartIds)&&
+   candidate.candidatePartIds.includes(part.partId));
+  const pool=linked.length?linked:all;
+  const ranked=[...pool].sort((left,right)=>compareEvidenceCandidates(left,right,part.question));
+  return {partId:part.partId,linkedCandidateCount:linked.length,
+   rankedCandidateCount:pool.length,
+   selectedCount:pool.filter(candidate=>selectedKeys.has(
+    String(candidate?.bookId)+':'+String(candidate?.page))).length,
+   bestCandidates:ranked.slice(0,8).map(candidate=>describe(candidate,part,
+    linked.includes(candidate))),
+   selectedPages:pool.filter(candidate=>selectedKeys.has(
+    String(candidate?.bookId)+':'+String(candidate?.page))).map(candidate=>describe(candidate,part,
+     linked.includes(candidate)))};
+ });
+ return {version:'evidence-packet-audit-v1',
+  method:'local-phrase-and-coherent-term-cluster-ranking',
+  semanticRelevanceScored:false,candidateCount:Array.isArray(candidates)?candidates.length:0,
+  selectedCount:Array.isArray(selected)?selected.length:0,parts:partAudits};
+}
+
 /* Apply the live request's existing byte and page limits to an already-ranked
  * list. The evaluation-only model selector uses this same gate after ranking. */
 export function boundAnswerSources(candidates,question,turnstileToken,
@@ -1244,9 +1313,9 @@ export function selectAnswerSources(candidates,question,turnstileToken,
      ordered=[...firstPerBook,...facetBalanced.filter(candidate=>!firstPerBook.includes(candidate))];
    }
  }
- // Reserve a directly matched page for each requested part before ordinary
- // facet balancing. This keeps the six-page budget from dropping an entire
- // question part when a broad planner query dominates the shortlist.
+ // Preserve one strongest linked page for every requested part, then rank
+ // the remaining packet by local passage fit. Distinct books break ties only;
+ // source diversity is useful when evidence is equally relevant, not a quota.
  const partRepresentatives=[],reservedPartPages=new Set();
  const partIds=[...new Set(candidates.flatMap(candidate=>candidate.candidatePartIds||[]))];
  const partQuestionById=new Map((Array.isArray(partQuestions)?partQuestions:[])
@@ -1256,51 +1325,39 @@ export function selectAnswerSources(candidates,question,turnstileToken,
  for(const partId of partIds){
   const eligible=candidates.filter(value=>value.candidatePartIds?.includes(partId)&&
    !reservedPartPages.has(value));
-  // Aggregate vector rank can favor a page that mentions the topic without
-  // answering this specific part. Among pages already linked to the part,
-  // prefer the one whose actual prose covers more of the part's distinctive
-  // terms. The original question remains the fallback and comparison target.
   const targetQuestion=partQuestionById.get(partId)||question;
-  const candidate=eligible.length?eligible.reduce((best,value)=>{
-    const valuePhrase=hasQuotedPhraseMatch(targetQuestion,value.text??value.preview);
-    const bestPhrase=hasQuotedPhraseMatch(targetQuestion,best.text??best.preview);
-    if(valuePhrase!==bestPhrase)return valuePhrase?value:best;
-    return localFacetTextMatch(targetQuestion,value.text??value.preview).overlap>
-      localFacetTextMatch(targetQuestion,best.text??best.preview).overlap?value:best;
-  },eligible[0]):null;
+  const candidate=eligible.length?eligible.reduce((best,value)=>
+    compareEvidenceCandidates(value,best,targetQuestion)<0?value:best,eligible[0]):null;
   if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
  }
  if(partRepresentatives.length){
-  // After each part has one representative, spend spare slots on distinct
-  // linked works. A broad one-part question may reserve two alternatives, so
-  // three independent works can reach composition when retrieval finds them.
-  // Multi-part questions reserve one alternate per part to protect coverage.
-  // Part links are eligibility hints only; the Worker still reviews every claim.
-  const diverseRepresentatives=[];
-  const alternatesPerPart=partIds.length===1?2:1;
-  for(const partId of partIds){
-   const representedBooks=new Set([...reservedPartPages]
-    .filter(value=>value.candidatePartIds?.includes(partId)).map(value=>String(value.bookId)));
-   const targetQuestion=partQuestionById.get(partId)||question;
-   for(let alternate=0;alternate<alternatesPerPart;alternate++){
-    const eligible=ordered.filter(value=>!reservedPartPages.has(value)&&
-     value.candidatePartIds?.includes(partId)&&!representedBooks.has(String(value.bookId)));
-    if(!eligible.length)break;
-    const candidate=eligible.reduce((best,value)=>{
-     const overlap=localFacetTextMatch(targetQuestion,value.text??value.preview).overlap;
-     const bestOverlap=localFacetTextMatch(targetQuestion,best.text??best.preview).overlap;
-     return overlap>bestOverlap||overlap===bestOverlap&&(Number(value.score)||0)>(Number(best.score)||0)?value:best;
-    },eligible[0]);
-    diverseRepresentatives.push(candidate);
-    reservedPartPages.add(candidate);
+  const rankRemaining=(pool)=>{
+   const remaining=pool.filter(value=>!reservedPartPages.has(value));
+   const ranked=[],representedBooks=new Set(partRepresentatives.map(value=>String(value.bookId)));
+   const questionFor=(candidate)=>{
+    const linked=(candidate.candidatePartIds||[]).map(id=>partQuestionById.get(id)).filter(Boolean);
+    if(!linked.length)return question;
+    return linked.reduce((best,value)=>
+      compareEvidenceFit(candidateEvidenceFit(candidate,value),
+        candidateEvidenceFit(candidate,best))<0?value:best,linked[0]);
+   };
+   while(remaining.length){
+    let bestIndex=0;
+    for(let index=1;index<remaining.length;index++){
+     if(compareEvidenceCandidates(remaining[index],remaining[bestIndex],
+       questionFor(remaining[index]),representedBooks)<0)bestIndex=index;
+    }
+    const [candidate]=remaining.splice(bestIndex,1);
+    ranked.push(candidate);
     representedBooks.add(String(candidate.bookId));
    }
-  }
+   return ranked;
+  };
   const remainingLinked=ordered.filter(value=>!reservedPartPages.has(value)&&
    Array.isArray(value.candidatePartIds)&&value.candidatePartIds.length);
   const remainingUnlinked=ordered.filter(value=>!reservedPartPages.has(value)&&
    (!Array.isArray(value.candidatePartIds)||!value.candidatePartIds.length));
-  ordered=[...partRepresentatives,...diverseRepresentatives,...remainingLinked,...remainingUnlinked];
+  ordered=[...partRepresentatives,...rankRemaining(remainingLinked),...rankRemaining(remainingUnlinked)];
  }
  return boundAnswerSources(ordered,question,turnstileToken,{maxSources,maxBytes,maxSourceBytes,history});
 }
