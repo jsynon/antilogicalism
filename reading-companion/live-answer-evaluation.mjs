@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {validSearchPlan,selectAnswerSources,prepareAnswerCandidates,boundAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,auditEvidencePacketSelection,LIVE_RETRIEVAL_CONFIG,RETRIEVAL_PROFILES} from './evidence-search.mjs';
+import {validSearchPlan,selectAnswerSources,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,auditEvidencePacketSelection,LIVE_RETRIEVAL_CONFIG,RETRIEVAL_PROFILES} from './evidence-search.mjs';
 import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -505,7 +505,7 @@ export function summarizeAnswerVariants(cases){
 export function summarizeSelectionVariants(cases){
  const entries=(cases||[]).flatMap(item=>Array.isArray(item?.answerVariantComparison?.variants)?
   item.answerVariantComparison.variants.filter(variant=>variant.selectionVariant).map(variant=>({id:item.id,...variant})):[]);
- return Object.fromEntries(['deterministic-selection','model-selection','model-selection-fallback'].map(selectionVariant=>{
+ return Object.fromEntries(['narrow-retrieval-pool','full-retrieval-pool'].map(selectionVariant=>{
   const selected=entries.filter(item=>item.selectionVariant===selectionVariant);
   return [selectionVariant,{cases:selected.length,
    structuralPassed:selected.filter(item=>item.structuralPassed===true).length,
@@ -654,11 +654,20 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   if(!book)throw Error('A selected source is absent from the published manifest.');
  }
  const answerCandidates=prepareAnswerCandidates(populated);
+ // Keep expanded retrieval comparable to the browser: the Worker may receive
+ // up to 48 candidates, but transport stays bounded before fingerprint checks.
+ const candidatePacket=[];let candidateTextBytes=0;
+ for(const source of answerCandidates){
+  const bytes=new TextEncoder().encode(source.text||'').byteLength;
+  if(candidatePacket.length>=retrievalConfig.maxCandidates)break;
+  if(bytes<25||bytes>14000||candidateTextBytes+bytes>250000)continue;
+  candidatePacket.push(source);candidateTextBytes+=bytes;
+ }
  const selectionAudit=auditEvidencePacketSelection(answerCandidates,selected,item.question,partQuestions);
  const retrievalCandidates=populated.map(({bookId,title,page,globalPageId,score,facet,facetRanks,
   matchedFacets,candidatePartIds,preview,text})=>({bookId,title,page,globalPageId,score,facet,facetRanks,
   matchedFacets,candidatePartIds,excerpt:String(preview||text||'').slice(0,1200)}));
- return {selected,candidates:answerCandidates,searches:retrieval.searches,retrievalCandidates,
+ return {selected,candidates:answerCandidates,candidatePacket,searches:retrieval.searches,retrievalCandidates,
   selectionCoverage:auditSelectionCoverage(answerCandidates,selected,partQuestions),selectionAudit};
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,preparedPlan=null,answerVariant='with-review',retrievalProfile='baseline',onProgress=async()=>{}}){
@@ -786,8 +795,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     {failureCode:gapPlannerFailure,failureDetail:gapPlannerFailureDiagnostics.failureDetail});
   }
  }
- if(!loaded.selected.length){
-  const error=attachRequestFailure(new Error('Retrieval produced no fingerprint-eligible pages that fit the answer packet.'),
+ if(!loaded.candidatePacket.length){
+  const error=attachRequestFailure(new Error('Retrieval produced no fingerprint-eligible candidate pages.'),
    'retrieval',{failureCode:'no-eligible-sources',workerFailure:false});
   error.requestFailure.gapPlannerAttempted=gapSearchTriggered;
   if(gapPlannerFailure)error.requestFailure.gapPlannerFailure=gapPlannerFailure;
@@ -795,73 +804,46 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  }
  const {selected,searches,retrievalCandidates}=loaded;
  const retrievalFallbackCount=searches.filter(value=>value.fallbackFrom).length;
- await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; selected ${selected.length} verified pages.`+
+ await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; assembled ${loaded.candidatePacket.length} verified candidate pages for Worker selection.`+
   (retrievalFallbackCount?` Recovered ${retrievalFallbackCount} empty source-side search using the counterpart topic within the planned source scope.`:''),
   {searchCount:searches.length,retrievalFallbackCount,candidatePages:retrievalCandidates.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]})),
    selectedPages:selected.map(source=>({bookId:source.bookId,page:source.page,partIds:source.candidatePartIds||[]}))});
  let selectionComparison=null;
- if(answerVariant==='paired-selection-ablation'){
-  const pool=loaded.candidates.slice(0,48);
-  const parts=(partQuestions.length?partQuestions:[{partId:'P1',question:item.question}]).slice(0,6);
-  const candidateById=new Map(pool.map((candidate,index)=>['C'+(index+1),candidate]));
-  const idByCandidate=new Map(pool.map((candidate,index)=>[candidate,'C'+(index+1)]));
-  const compactCandidates=pool.map((candidate,index)=>({id:'C'+(index+1),title:String(candidate.title||'').slice(0,200),
-   page:candidate.page,excerpt:String(candidate.preview||candidate.text||'').slice(0,520)}));
-  try{
-   await progress('selector','started',`Asking the evaluation-only selector to rank ${pool.length} retrieved pages before the six-page limit.`,{candidateCount:pool.length});
-   const decision=await callJson(fetcher,API+'/api/pilot-select-evidence',token,{question:item.question,
-    parts:parts.map((part,index)=>({partId:/^P[1-9]\d*$/.test(part.partId)?part.partId:'P'+(index+1),question:part.question})),
-    candidates:compactCandidates},beforeCall,'selector',progressEvent);
-   const ordered=decision.selectedCandidateIds.map(id=>candidateById.get(id)).filter(Boolean);
-   const modelSources=boundAnswerSources(ordered,item.question,'evaluation-runner-token',
-    {maxSources:6,maxBytes:39_000,maxSourceBytes:35_000,history:[]});
-   if(!modelSources.length)throw new Error('Evidence selector returned no pages that fit the answer packet.');
-   selectionComparison={status:'completed',candidateCount:pool.length,
-    candidatePool:pool.map((candidate,index)=>({id:'C'+(index+1),bookId:candidate.bookId,title:candidate.title,page:candidate.page,
-     score:candidate.score,facet:candidate.facet,facetRanks:candidate.facetRanks,candidatePartIds:candidate.candidatePartIds||[],
-     excerpt:String(candidate.preview||candidate.text||'').slice(0,520)})),
-    deterministicSelectionCoverage:loaded.selectionCoverage,
-    deterministicSelectionAudit:loaded.selectionAudit,
-    modelSelectionCoverage:auditSelectionCoverage(loaded.candidates,modelSources,parts),
-    modelSelectionAudit:auditEvidencePacketSelection(loaded.candidates,modelSources,item.question,parts),
-    deterministicSelected:loaded.selected.map(candidate=>({candidateId:idByCandidate.get(candidate)||null,bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
-    deterministicExcludedCandidateIds:pool.filter(candidate=>!loaded.selected.includes(candidate)).map(candidate=>idByCandidate.get(candidate)),
-    modelSelected:modelSources.map(candidate=>({candidateId:idByCandidate.get(candidate)||null,bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
-    modelExcludedCandidateIds:pool.filter(candidate=>!modelSources.includes(candidate)).map(candidate=>idByCandidate.get(candidate)),
-    modelBudgetExcludedCandidateIds:decision.selectedCandidateIds.filter(id=>candidateById.has(id)&&!modelSources.includes(candidateById.get(id))),
-    decision:{selectedCandidateIds:decision.selectedCandidateIds,parts:decision.parts,usage:decision.usage,model:decision.model},
-    selectorWorkerVersionId:decision.workerVersionId||null,selectorWorkerSourceBuild:decision.workerSourceBuild||null,
-    selectorWorkerSourceRevision:decision.workerSourceRevision||null,modelSources};
-   await progress('selector','completed',`Selector returned ${modelSources.length} pages that fit the existing request budget.`,{sourceCount:modelSources.length,usage:decision.usage||null});
-  }catch(error){
-   selectionComparison={status:'failed',failureCode:error.requestFailure?.failureCode||'selector-failed',
-    message:String(error.message||error).slice(0,240),candidateCount:pool.length,
-    deterministicSelected:loaded.selected.map(candidate=>({bookId:candidate.bookId,title:candidate.title,page:candidate.page})),modelSources:loaded.selected};
-   await progress('selector','fallback','Selector failed; preserving the baseline packet for a clearly marked fallback answer.',{failureCode:selectionComparison.failureCode});
-  }
- }
+ if(answerVariant==='paired-selection-ablation')selectionComparison={
+  status:'candidate-pool-comparison',candidateCount:loaded.candidatePacket.length,
+  selectionMethod:'Worker semantic selector after fingerprint verification',
+  narrowPool:loaded.selected.map(candidate=>({bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
+  fullPool:loaded.candidatePacket.map(candidate=>({bookId:candidate.bookId,title:candidate.title,page:candidate.page}))};
  const variants=answerVariant==='paired-review-ablation'?['with-review','compose-only']:
   answerVariant==='paired-expansion-ablation'?['with-review','with-expansion']:
-  answerVariant==='paired-selection-ablation'?['deterministic-selection','model-selection']:[answerVariant];
+  answerVariant==='paired-selection-ablation'?['narrow-retrieval-pool','full-retrieval-pool']:[answerVariant];
  const variantResults=[];
  try{
   for(const variant of variants){
-   const answerSources=variant==='model-selection'?(selectionComparison?.modelSources||selected):selected;
-   await progress('answer','started',`Submitting ${variant} answer request with ${answerSources.length} verified pages; waiting for the Worker's compose/review pipeline.`,
+   const answerSources=variant==='narrow-retrieval-pool'?selected:loaded.candidatePacket;
+   await progress('answer','started',`Submitting ${answerSources.length} verified retrieval candidates; the Worker will select evidence before composition.`,
     {variant,sourceCount:answerSources.length});
    const data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
     bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
     answerVariant:variant==='compose-only'?'compose-only':variant==='with-expansion'?'with-expansion':'with-review',
     // The evaluator loads v49 text; the Worker defaults omitted versions to v48.
-    sources:answerSources.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds,libraryVersion:49}))},beforeCall,'answer',progressEvent);
-   const audit=auditLiveAnswer(data,answerSources,item.required_source_groups,
+    sources:answerSources.map(({bookId,page,text})=>({bookId,page,text,libraryVersion:49}))},beforeCall,'answer',progressEvent);
+   const candidateByLocator=new Map(loaded.candidates.map(source=>[String(source.bookId)+':'+source.page,source]));
+   const workerSelected=(Array.isArray(data.sourceSelection?.pages)?data.sourceSelection.pages:[])
+    .map(source=>{
+     const candidate=candidateByLocator.get(String(source.bookId)+':'+source.page);
+     return candidate?{...candidate,id:source.id,candidatePartIds:source.candidatePartIds||[]}:null;
+    }).filter(Boolean);
+   const submitted=workerSelected.length?workerSelected:answerSources;
+   const audit=auditLiveAnswer(data,submitted,item.required_source_groups,
     item.required_part_source_groups||[],{scope:item.selected_book_ids?.length?'selected-books':'all-books',
      plannerPlan:plan?.plan||null,candidateSources:retrievalCandidates});
    variantResults.push({answerVariant:answerVariant==='paired-selection-ablation'?'with-review':variant,
-    ...(answerVariant==='paired-selection-ablation'?{selectionVariant:variant==='model-selection'&&selectionComparison?.status!=='completed'?'model-selection-fallback':variant}:{}),
-    selectionCoverage:auditSelectionCoverage(loaded.candidates,answerSources,partQuestions),
-    selectionAudit:auditEvidencePacketSelection(loaded.candidates,answerSources,item.question,partQuestions),
-    submittedSources:answerSources.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,excerpt:String(preview||'').slice(0,1200)})),
+    selectionVariant:answerVariant==='paired-selection-ablation'?variant:null,
+    selectionStatus:data.sourceSelection?.status||null,
+    selectionCoverage:auditSelectionCoverage(loaded.candidates,submitted,partQuestions),
+    selectionAudit:auditEvidencePacketSelection(loaded.candidates,submitted,item.question,partQuestions),
+    submittedSources:submitted.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,excerpt:String(preview||'').slice(0,1200)})),
     pipeline:data.pipeline||null,...audit,usage:data.usage||null,
     ...(data.trace?{evidenceTrace:data.trace}:{})});
    await progress('answer','completed',`${variant} returned ${audit.outcome||'no outcome'} with ${audit.coverage} coverage and ${audit.citationCount} citations.`,
@@ -876,11 +858,11 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
  const primary=variantResults.find(result=>result.answerVariant==='with-review')||variantResults[0];
  const answerVariantComparison=['paired-review-ablation','paired-expansion-ablation','paired-selection-ablation'].includes(answerVariant)?{
-  ...(answerVariant==='paired-selection-ablation'?{selectionComparison:selectionComparison?{...selectionComparison,modelSources:undefined}:null}:{}),
+  ...(answerVariant==='paired-selection-ablation'?{selectionComparison}:{}),
   comparison:answerVariant==='paired-expansion-ablation'?
    'Same resolved question and submitted pages; compare ordinary composition with post-composition expansion before the same evidence review.':
    answerVariant==='paired-selection-ablation'?
-   'Same planner result and retrieved candidate pool; compare deterministic ranking with one evaluation-only model selection call before applying the same six-page and byte limits.':
+   'Both answers use the same verified Worker semantic selector, composer and reviewer; compare a six-page browser candidate pool with the full retrieved candidate pool.':
    'Same resolved question, planner result and submitted source pages; only the final model-review call is omitted in compose-only',
   variants:variantResults
  }:null;
@@ -895,9 +877,11 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    weakParts:initialRetrievalCoverage.weakParts},
   ...(gapRetrievalRerun?{retrievalCoverageAfterGap:{weakParts:retrievalCoverage.weakParts}}:{}),
   gapPlannerAttempted:gapSearchTriggered,gapQueries,gapQueryPartLinks,
-  selectionCoverage:loaded.selectionCoverage,selectionAudit:loaded.selectionAudit,
+  retrievalBaselineSelectionCoverage:loaded.selectionCoverage,
+  retrievalBaselineSelectionAudit:loaded.selectionAudit,
   ...(gapPlannerFailure?{gapPlannerFailure,gapPlannerFailureDiagnostics}:{}),
-  submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
+  submittedSources:primary.submittedSources||[],sourceSelectionStatus:primary.selectionStatus||null,
+  deterministicBaselineSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
   ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
   pipeline:variantResults.map(result=>result.pipeline).find(Boolean)||null,
@@ -1080,9 +1064,10 @@ async function main(){
   baseCases.map(item=>({...item,repeatAttempt:index+1}))).flat():baseCases;
  const evaluationUsesPlanner=evaluationUsesLivePlanner(args.mode,args.scope);
  const plannerCalls=args.mode==='paired'?cases.length:usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
- const answerCallsPerCase=args.answerVariant==='paired-review-ablation'?3:
-  args.answerVariant==='paired-expansion-ablation'?5:
-  args.answerVariant==='paired-selection-ablation'?5:2;
+ const answerCallsPerCase=args.answerVariant==='paired-review-ablation'?5:
+  args.answerVariant==='paired-expansion-ablation'?7:
+  args.answerVariant==='paired-selection-ablation'?6:
+  args.answerVariant==='compose-only'?2:3;
  const estimatedWorkerAiCalls=args.mode==='planner'?cases.length:args.mode==='paired'?
   plannerCalls+cases.length*2*answerCallsPerCase:plannerCalls+cases.length*answerCallsPerCase;
  const reportCaseCount=args.mode==='paired'?cases.length*2:cases.length;
@@ -1094,11 +1079,11 @@ async function main(){
   repeatedCaseIds:args.repeatCount>1?baseCases.map(item=>item.id):undefined,
   estimatedWorkerAiCalls,conditionalGapPlannerCallAllowance,
   callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
-   (args.answerVariant==='paired-selection-ablation'?'1 shared planner + 5 answer/selection calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope':
+   (args.answerVariant==='paired-selection-ablation'?'1 shared planner + 6 Worker selection/composition/review calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope':
     '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope'):
    (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer/selection calls per case'+
-   (args.answerVariant==='paired-selection-ablation'?' (one selector call, then two compose-and-review answer runs)':'')+
-   ', plus up to one conditional gap-planner call when page text weakly covers a requested part',
+   (args.answerVariant==='paired-selection-ablation'?' (each answer run performs Worker selection, composition and review)':'')+
+   ', including one Worker evidence-selection call before composition; plus up to one conditional gap-planner call when page text weakly covers a requested part',
   answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
    'Structural checks cover source identity and citation linkage. Answer quality remains pending until a human scores accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong). A structural pass is not a quality pass.',
   qualityStatus:args.mode==='planner'?'not-assessed':'pending-human-review',

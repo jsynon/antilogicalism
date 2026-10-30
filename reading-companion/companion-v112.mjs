@@ -1,4 +1,4 @@
-/* Antilogicalism Reading Companion v1.16.0 — staged verified-library alpha.
+/* Antilogicalism Reading Companion v1.18.0 — staged verified-library alpha.
  * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
  * The Worker independently validates every submitted source page against v49
  * fingerprints before any inference. The verified scope comes from the
@@ -7,7 +7,7 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,selectAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.16.0';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.16.0';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -18,7 +18,6 @@ const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
 const FALLBACK_BOOK={id:'152',title:'History of the Peloponnesian War — Thucydides'};
 const PDF_PAGE_LIMIT=14000;
-const MAX_ANSWER_SOURCES=6;
 const el=id=>document.getElementById(id);
 const question=el('companion-question');
 const form=el('companion-question-form');
@@ -608,6 +607,7 @@ async function askQuestion(questionText){
   beginDiagnostic(q);
   answering=true;updateButtons();sourceReader.reset();
   try{
+    let currentPlan=null;
     let token=turnstileToken;
     if(!token)token=await nextTurnstileToken();
     const history=recentConversation();
@@ -629,6 +629,7 @@ async function askQuestion(questionText){
           diagnosticState.failureCode='';
         }
       }
+      currentPlan=planned?.plan||null;
       partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>
         ({partId:part.id,question:part.question,sourceBookIds:part.sourceBookIds})):[];
       if(planned)setStatus('Gathering passages from across the collection…');
@@ -667,23 +668,32 @@ async function askQuestion(questionText){
       const found=await retrieveSources();
       if(!found)return;
     }
-    const chosen=selectAnswerSources(candidates,q,token,{history,
-      maxSources:MAX_ANSWER_SOURCES,
-      plannedFacetCount:Math.max(0,(diagnosticState?.searches?.length||0)-1),
-      partQuestions});
-    if(!chosen.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
+    // Keep the full bounded retrieval pool intact until the Worker has
+    // verified its page identities and can make the semantic selection with
+    // the answer contract in view. Browser ranking is for retrieval only.
+    const candidatePacket=[];
+    let candidateTextBytes=0;
+    for(const source of prepareAnswerCandidates(candidates).slice(0,LIVE_RETRIEVAL_CONFIG.maxCandidates)){
+      const textBytes=new TextEncoder().encode(source.text).byteLength;
+      if(candidatePacket.length>=LIVE_RETRIEVAL_CONFIG.maxCandidates)break;
+      if(!Number.isSafeInteger(textBytes)||textBytes<25||textBytes>14000||
+         candidateTextBytes+textBytes>250000)continue;
+      candidatePacket.push(source);
+      candidateTextBytes+=textBytes;
+    }
+    if(!candidatePacket.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
     if(diagnosticState){
-      diagnosticState.submittedSources=chosen.map((source,index)=>({...source,id:'S'+(index+1)}));
-      diagnosticState.stage='answering';
+      diagnosticState.candidatePool=candidatePacket.map((source,index)=>({...source,id:'C'+(index+1)}));
+      diagnosticState.stage='worker_selecting_evidence';
       refreshDiagnostic();
     }
     turnstileToken='';
-    setStatus('Preparing an answer from the selected passages… This can take a little while.');
+    setStatus('Checking the retrieved passages and preparing a cited answer… This can take a little while.');
     const response=await fetch(API+'/api/pilot-answer',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
-        history,bookId:bookFilter.value||'',plan:diagnosticState?.plannerPlan||undefined,
-        sources:chosen.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,candidatePartIds,libraryVersion:49}))})
+        history,bookId:bookFilter.value||'',plan:currentPlan||undefined,
+        sources:candidatePacket.map(({bookId,page,text})=>({bookId,page,text,libraryVersion:49}))})
     });
     let data;
     try{data=await response.json();}catch{
@@ -691,6 +701,10 @@ async function askQuestion(questionText){
       throw Error('The answer service returned an invalid response.');
     }
     if(diagnosticState){
+      diagnosticState.sourceSelection=data.sourceSelection||null;
+      diagnosticState.submittedSources=Array.isArray(data.sourceSelection?.pages)?
+        data.sourceSelection.pages:[];
+      diagnosticState.stage='answering';
       diagnosticState.answerWorkerVersionId=data.workerVersionId;
       diagnosticState.answerWorkerVersionTag=data.workerVersionTag;
       diagnosticState.answerWorkerVersionTimestamp=data.workerVersionTimestamp;
@@ -737,8 +751,10 @@ async function askQuestion(questionText){
     renderResponse(data,q);
     if(data.outcome==='verified-source-draft'&&typeof data.answer==='string'&&data.answer.trim())
       rememberTurn(q,data.answer);
-    setStatus(data.outcome==='insufficient-evidence'?
-      'These passages don’t provide enough evidence for a complete answer. Try different wording or choose another book.':'');
+    setStatus(data.sourceSelectionStatus==='deterministic-fallback'?
+      'The evidence selector was unavailable, so this answer uses retrieved passages in search order. Check the citations against the books.':
+      data.outcome==='insufficient-evidence'?
+       'These passages don’t provide enough evidence for a complete answer. Try different wording or choose another book.':'');
   }catch(error){
     console.error('Reading Companion request failed:',error);
     if(diagnosticState){
