@@ -1455,7 +1455,7 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/const found=await retrieveSources\(planned\?\.queries\|\|null,\{plannerFallback,/);
  assert.match(js,/assessEvidenceCoverage\(candidates,q,partQuestions\)/);
  assert.match(js,/requestRetrievalGap\(q,gapToken,history/);
- assert.ok(js.includes('partQuestions,gapQueries}'));
+ assert.ok(js.includes('partQuestions,gapQueries,gapQueryPartLinks}'));
  assert.doesNotMatch(js,/retrievalGap:[^}]*reviewFocus/s);
  assert.match(js,/const queries=\[\.\.\.new Set\(data\.queries\.map/);
  assert.match(js,/const markdown=String\(answer\)\.replace/);
@@ -1484,7 +1484,7 @@ test('a linked conceptual gap query reaches its part and selection coverage reco
  }]}:{sources:[]}};
  const partQuestions=[{partId:'P1',question}];
  const retrieval=await retrieveEvidence({question,
-  queries:['reality exists empirical knowledge'],partQuestions,
+  queries:['reality exists empirical knowledge','how reality is known'],partQuestions,
   gapQueries:[query],gapQueryPartLinks:[{query,partIds:['P1']}],
   library,books:[{id:'19',title:'A philosophical source'}],
   allowedBookIds:new Set(['19']),pageLoader:async()=>({text})});
