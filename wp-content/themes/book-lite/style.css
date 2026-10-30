@@ -1418,24 +1418,25 @@ body {
 }
 
 
-/* Persistent theme control: independent of the page links and mobile menu state. */
+/* Integrated theme control: styled like a navigation item on desktop and a compact icon on mobile. */
 .site-navigation {
 	position: relative;
 }
 
 .site-theme-toggle {
 	align-items: center;
-	background: rgba(0, 0, 0, .2);
-	border: 1px solid rgba(255, 255, 255, .38);
-	border-radius: 6px;
+	background: transparent;
+	border: 0;
+	border-radius: 0;
 	box-sizing: border-box;
-	color: #fff;
+	color: #ccc;
 	cursor: pointer;
 	display: inline-flex;
+	font: inherit;
 	gap: 6px;
-	height: 34px;
+	height: auto;
 	justify-content: center;
-	padding: 0 10px;
+	padding: 4px 0;
 	position: absolute;
 	right: max(1.5rem, calc((100vw - 750px) / 2 - 20rem));
 	top: 50%;
@@ -1444,32 +1445,41 @@ body {
 	z-index: 100000;
 }
 
+.site-theme-toggle::before {
+	color: rgba(255, 255, 255, .72);
+	content: "◆";
+	font-size: .5em;
+	line-height: 1;
+	margin-right: 8px;
+}
+
 .site-theme-toggle svg {
 	fill: none;
-	height: 18px;
+	height: 16px;
 	stroke: currentColor;
 	stroke-linecap: round;
 	stroke-linejoin: round;
 	stroke-width: 1.8;
-	width: 18px;
+	width: 16px;
 }
 
 .site-theme-toggle .site-theme-label {
 	display: inline;
-	font: 600 13px/1 Arial, sans-serif;
+	font: inherit;
 	white-space: nowrap;
 }
 
 .site-theme-toggle:hover,
 .site-theme-toggle:focus-visible {
-	background: rgba(255, 255, 255, .12);
-	border-color: rgba(255, 255, 255, .72);
+	background: transparent;
 	color: #fff;
+	text-decoration: underline;
+	text-underline-offset: 4px;
 }
 
 .site-theme-toggle:focus-visible {
-	outline: 3px solid #fff;
-	outline-offset: 3px;
+	outline: 2px solid #fff;
+	outline-offset: 5px;
 }
 
 @media (max-width: 1200px) {
@@ -1479,14 +1489,22 @@ body {
 	}
 
 	.site-theme-toggle {
-		background: rgba(0, 0, 0, .2);
-		height: 38px;
+		background: transparent;
+		height: 40px;
 		padding: 8px;
 		right: 12px;
 		top: 12px;
 		transform: none;
-		width: 38px;
+		width: 40px;
 		z-index: 100001;
+	}
+
+	.site-theme-toggle::before {
+		display: none;
+	}
+
+	.site-theme-toggle:hover {
+		background: rgba(255, 255, 255, .08);
 	}
 
 	.site-theme-toggle .site-theme-label {
