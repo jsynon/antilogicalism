@@ -266,8 +266,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
 export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],gapQueryPartLinks=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
  maxCandidates=LIVE_RETRIEVAL_CONFIG.maxCandidates,maxBooks=LIVE_RETRIEVAL_CONFIG.maxBooks,
- pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000,
- gapQueryPartLinks=[]}={}){
+ pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000}={}){
  const direct=String(question||'').trim();
  if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
  if(!library||typeof library.search!=='function'||!Array.isArray(books)||
@@ -295,7 +294,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    typeof query!=='string'||query.trim().length<8||query.trim().length>160))
   throw Error('Conditional retrieval queries are invalid.');
  const knownPartIds=new Set(partQuestions.map(part=>part?.partId).filter(id=>
-  typeof id==='string'&&/^P[1-9]\\d*$/.test(id)));
+  typeof id==='string'&&/^P[1-9]\d*$/.test(id)));
  if(!Array.isArray(gapQueryPartLinks)||gapQueryPartLinks.length>3||
     gapQueryPartLinks.some(link=>!link||typeof link.query!=='string'||
      !gapQueries.some(query=>query.trim().toLocaleLowerCase()===link.query.trim().toLocaleLowerCase())||
@@ -1098,7 +1097,7 @@ export function auditSelectionCoverage(candidates,selected,partQuestions=[]){
  const selectedKeys=new Set((Array.isArray(selected)?selected:[])
   .map(item=>String(item?.bookId)+':'+String(item?.page)));
  return (Array.isArray(partQuestions)?partQuestions:[])
-  .filter(part=>typeof part?.partId==='string'&&/^P[1-9]\\d*$/.test(part.partId))
+  .filter(part=>typeof part?.partId==='string'&&/^P[1-9]\d*$/.test(part.partId))
   .map(part=>{
    const eligible=(Array.isArray(candidates)?candidates:[]).filter(candidate=>
     Array.isArray(candidate?.candidatePartIds)&&candidate.candidatePartIds.includes(part.partId));
