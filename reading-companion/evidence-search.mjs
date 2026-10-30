@@ -293,8 +293,11 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  if(!Array.isArray(gapQueries)||gapQueries.length>3||gapQueries.some(query=>
    typeof query!=='string'||query.trim().length<8||query.trim().length>160))
   throw Error('Conditional retrieval queries are invalid.');
+ // A whole-question coverage check uses the synthetic P1 identifier when
+ // the planner supplied no explicit subparts (for example, fixed-query eval).
  const knownPartIds=new Set(partQuestions.map(part=>part?.partId).filter(id=>
   typeof id==='string'&&/^P[1-9]\d*$/.test(id)));
+ if(!knownPartIds.size)knownPartIds.add('P1');
  if(!Array.isArray(gapQueryPartLinks)||gapQueryPartLinks.length>3||
     gapQueryPartLinks.some(link=>!link||typeof link.query!=='string'||
      !gapQueries.some(query=>query.trim().toLocaleLowerCase()===link.query.trim().toLocaleLowerCase())||
