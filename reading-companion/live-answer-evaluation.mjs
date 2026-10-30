@@ -166,6 +166,11 @@ const ACCEPTANCE_CASES=[
  // evidence that the world is literally a computer simulation.
  {id:'acceptance-simulation-hypothesis',discipline:'philosophy',question:'Are we living in a simulation?',selected_book_ids:[],planner_queries:['computer simulation hypothesis whether reality is a computer generated world evidence','Descartes Meditations dream argument doubt external world sensory experience','Berkeley idealism perception matter Hume empiricism experience external world'],required_source_groups:[{label:'Descartes on skeptical doubt about sensory experience',book_ids:['25']},{label:'Berkeley or Hume on perception and reality',book_ids:['19','20','35']}],review_focus:['Answer directly and calibrate the conclusion: the cited library passages do not establish whether we live in a computer simulation.','Use Descartes on skeptical doubt and at least one of Berkeley or Hume to explain limits or alternatives in accounts of reality; attribute each view and connect it to the question.','Do not treat skepticism, empiricism, idealism, hallucination, or a theological use of “simulation” as evidence for a computational simulation. Explain that these are related questions, not proof.','If no source directly discusses the contemporary simulation hypothesis, say so and keep the distinction between a possibility and evidence for it clear.']},
  {id:'acceptance-buddha-on-death',discipline:'religion',question:'What did Buddha say about death?',selected_book_ids:[],planner_queries:['Buddhist teaching on death dying rebirth and liberation','Buddha final days death impermanence and parinirvana'],required_source_groups:[{label:'Buddhist primary or teaching texts',book_ids:['22','23','104','225']}],review_focus:['Answer the question directly and center the account in Buddhist teaching texts that actually address death, dying, impermanence, rebirth, or liberation.','When more than one distinct work offers relevant support, synthesize their contributions and explain how they relate; do not add a citation merely to increase the count.','Distinguish a compiled teaching text or later interpretation from a verified verbatim historical statement by the Buddha. Attribute each source voice carefully.','Use later scholarship or interpretation only as clearly labeled context, and do not let it replace the Buddhist texts that ground the answer.']},
+ // This broad comparison case has no author-specific search plan or required
+ // works. It tests whether all-books retrieval can discover relevant voices
+ // and whether the answer synthesizes them without mistaking topical overlap
+ // for an account of life's meaning.
+ {id:'acceptance-life-meaning-authors',discipline:'philosophy',question:'How do different authors in the library approach the question of life\'s meaning?',selected_book_ids:[],planner_queries:[],required_source_groups:[],review_focus:['Answer how the cited authors approach life’s meaning, rather than listing works that merely touch education, religion, science, ethics, or other adjacent topics.','When the evidence supports multiple distinct approaches, identify each source voice, explain the meaningful difference, and connect that difference directly to the question.','Do not infer that an author addresses life’s meaning from a shared keyword or broad subject label alone. If the retrieved passages do not support a direct comparison, say so clearly.']},
 ];
 const PLANNER_CASE_IDS=[
  'quality-philosophy-aristotle-practical-wisdom',
@@ -196,7 +201,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return selected.map(copyEvaluationCase);
  }
  if(mode==='acceptance'&&caseId==='quality-calibration'){
-  const ids=new Set(['acceptance-god-is-love','acceptance-simulation-hypothesis','acceptance-buddha-on-death']);
+  const ids=new Set(['acceptance-god-is-love','acceptance-simulation-hypothesis','acceptance-buddha-on-death','acceptance-life-meaning-authors']);
   const selected=ACCEPTANCE_CASES.filter(item=>ids.has(item.id));
   if(selected.length!==ids.size)throw Error('The quality calibration cases are missing from the acceptance suite.');
   return selected.map(copyEvaluationCase);
