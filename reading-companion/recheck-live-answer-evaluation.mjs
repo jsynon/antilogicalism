@@ -47,8 +47,8 @@ async function main(){
   passageReview.bestCandidateFusionMisses+' search hits lost before the candidate pool, '+
   passageReview.bestCandidatePacketMisses+' candidate hits omitted from the answer packet, '+
   passageReview.bestCandidateUseMisses+' submitted passages without a claim-linked located highlight, '+
-  result.offlinePassageReview.nonBestHighlights+' non-best highlights, '+
-  result.offlinePassageReview.statusMismatches+' review-to-answer status mismatches.');
+  passageReview.nonBestHighlights+' non-best highlights, '+
+  passageReview.statusMismatches+' review-to-answer status mismatches.');
  console.log('Report: '+output);
 }
 

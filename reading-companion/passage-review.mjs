@@ -1,7 +1,6 @@
-/* Compare saved evaluation traces with human-reviewed passage annotations.
- * Gold labels are evaluation-only: they never enter runtime prompts, search,
- * ranking, or answer selection. They describe reviewed examples, not every
- * useful passage in the library.
+/* Compare a saved evaluation trace with a small, human-reviewed passage set.
+ * The labels are a bounded gold review of captured candidates, not an AI score
+ * or a claim that we searched every page in the library.
  */
 function pageKey(value){
  const bookId=String(value?.bookId||'');
@@ -56,9 +55,9 @@ function reviewerStatusByPart(item){
  }));
 }
 
-/* Report observed stage transitions independently. A located, claim-linked
- * highlight is useful trace evidence, but still does not prove semantic
- * support; reviewers must inspect the answer alongside the cited passage. */
+/* Gold labels remain evaluation-only. Report each observed pipeline stage
+ * separately; a located, claim-linked quote is a trace fact, not proof of
+ * semantic support. */
 export function auditPassageGoldReview(report,gold){
  if(!report||!Array.isArray(report.cases))throw Error('Input must be a saved live evaluation report.');
  if(gold?.schema!=='antilogicalism-reading-companion-passage-gold-v1'||!Array.isArray(gold.cases))
@@ -91,8 +90,8 @@ export function auditPassageGoldReview(report,gold){
     ['best','tied','acceptable'].includes(value.label)&&value.quoteLocated);
    return {claimId:claim.claimId,partId:claim.partId,
     bestCandidates:best.map(page=>({bookId:page.bookId,page:page.page})),
-    // An absent passage is a definite search miss only when every result page
-    // from every query was retained in this trace. Older artifacts are partial.
+    // A missing search hit is conclusive only when the full bounded result set
+    // was recorded. Older artifacts retained only a result prefix.
     bestCandidateSearchHit:searches.available?(bestSearchHit||(!searches.complete?null:false)):null,
     bestCandidateSearchHitQueries:best.flatMap(page=>searches.pageQueries.get(pageKey(page))||[]),
     bestCandidateInPool:bestInPool,
@@ -128,14 +127,13 @@ export function auditPassageGoldReview(report,gold){
   sourceRunId:gold.sourceRun?.runId??null,
   scope:gold.sourceRun?.scope||'',networkCalls:0,aiCalls:0,
   checkedCases:checked.length,missingCases:cases.length-checked.length,stageCounts,
-  // Search misses are counted only with a complete trace. Older reports stored
-  // a result prefix, so absence in them cannot distinguish a miss from truncation.
+  // Separate retrieval misses from packet loss so a zero packet-loss count
+  // cannot hide a passage that never reached the candidate pool.
+  bestCandidateRetrievalMisses:claimChecks.filter(item=>item.bestCandidates.length>0&&!item.bestCandidateInPool).length,
+  bestCandidatePacketMisses:claimChecks.filter(item=>item.bestCandidateInPool&&!item.bestCandidateSubmitted).length,
   bestCandidateSearchMisses:claimsWithBest.filter(item=>item.bestCandidateSearchHit===false).length,
   bestCandidateSearchUnknown:claimsWithBest.filter(item=>item.bestCandidateSearchHit===null).length,
-  // Keep the original field's candidate-pool meaning for older report readers.
-  bestCandidateRetrievalMisses:claimsWithBest.filter(item=>!item.bestCandidateInPool).length,
   bestCandidateFusionMisses:claimsWithBest.filter(item=>item.bestCandidateSearchHit===true&&!item.bestCandidateInPool).length,
-  bestCandidatePacketMisses:claimsWithBest.filter(item=>item.bestCandidateInPool&&!item.bestCandidateSubmitted).length,
   bestCandidateUseMisses:claimsWithBest.filter(item=>item.bestCandidateSubmitted&&!item.bestCandidateClaimLinkedLocated).length,
   nonBestHighlights:claimChecks.reduce((sum,item)=>sum+item.nonBestHighlights.length,0),
   statusMismatches:statusChecks.filter(item=>!item.consistent).length,
