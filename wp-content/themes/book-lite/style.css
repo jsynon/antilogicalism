@@ -2449,7 +2449,3 @@ html body .site-navigation .site-theme-toggle:focus-visible {
 	color: #999;
 }
 
-html body .site-navigation .site-theme-toggle:hover::before,
-html body .site-navigation .site-theme-toggle:focus-visible::before {
-	color: #999;
-}
