@@ -2453,11 +2453,16 @@ html body .site-navigation .site-theme-toggle:focus-visible {
 
 
 
-/* Keep the two footer RSS feed headings white in dark mode. */
-html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title,
-html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title:visited,
-html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title:hover,
-html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title:focus-visible,
-html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title:active {
+/* Keep only the Arts & Letters Daily and Quanta footer headings white in dark mode. */
+html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title,
+html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title:visited,
+html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title:hover,
+html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title:focus-visible,
+html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title:active,
+html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title,
+html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:visited,
+html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:hover,
+html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:focus-visible,
+html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:active {
 	color: #fff;
 }
