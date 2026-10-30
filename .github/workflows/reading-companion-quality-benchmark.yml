@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Run the three repeated calibration questions or the full frozen acceptance set
+        description: Run the four repeated calibration questions or the full frozen acceptance set
         type: choice
         options:
           - calibration

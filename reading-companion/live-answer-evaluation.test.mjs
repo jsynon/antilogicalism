@@ -276,6 +276,8 @@ test('acceptance workflow lists all four calibration cases in sequence',async()=
  const {readFileSync}=await import('node:fs');
  const workflow=readFileSync(new URL('../.github/workflows/reading-companion-holdout-answer-evaluation.yml',import.meta.url),'utf8');
  assert.match(workflow, /^\s+- acceptance-god-is-love\s*\n\s+- acceptance-simulation-hypothesis\s*\n\s+- acceptance-buddha-on-death\s*\n\s+- acceptance-life-meaning-authors\s*$/m);
+ const benchmark=readFileSync(new URL('../.github/workflows/reading-companion-quality-benchmark.yml',import.meta.url),'utf8');
+ assert.match(benchmark,/Run the four repeated calibration questions/);
 });
 
 test('holdout all-books scope and single-case selection behave independently of the baseline',()=>{
