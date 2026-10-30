@@ -103,6 +103,14 @@ test('worker failure diagnostics retain only bounded safe detail',()=>{
  assert.equal(unsafe.failureAnswerCharacters,null);
  assert.equal(unsafe.failureDetail,null);
 });
+
+test('diagnostic reports preserve the selector no-relevant-evidence status',()=>{
+ const report=createDiagnosticReport({sourceSelection:{status:'no-relevant-evidence',
+  candidateCount:24,pages:[],usage:{calls:1,neurons:3,inputTokens:120,outputTokens:40}}});
+ assert.equal(report.sourceSelection.status,'no-relevant-evidence');
+ assert.equal(report.sourceSelection.candidateCount,24);
+ assert.deepEqual(report.sourceSelection.pages,[]);
+});
 test('diagnostic failure codes preserve useful status categories without raw error text',()=>{
  assert.equal(diagnosticFailureCode(403),'visitor-or-origin-rejected');
  assert.equal(diagnosticFailureCode(422),'source-verification-rejected');

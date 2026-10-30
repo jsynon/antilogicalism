@@ -708,8 +708,13 @@ function questionContainsPhrase(question,phrase){
 function catalogWorkTitles(title){
  return catalogIdentity(title).aliases.filter(value=>normalizeCatalogText(value).length>=4);
 }
+const COLLECTIVE_BYLINE=/^(?:various(?: authors)?|multiple authors|anonymous|unknown(?: author)?)$/u;
 function catalogAuthorNames(title){
- return catalogIdentity(title).authors;
+ // Collective credits are useful catalog metadata, but they are not people.
+ // Excluding them here keeps ordinary words such as “authors” from turning
+ // an all-books question into a search scoped to every compiled anthology.
+ return catalogIdentity(title).authors.filter(name=>
+  !COLLECTIVE_BYLINE.test(normalizeCatalogText(name)));
 }
 function namedSpeakerPhrase(question){
  const match=String(question||'').match(/\b(?:what|how)\s+(?:did|does|do|would)\s+([\p{L}][\p{L}\p{M}.'’\-]*(?:\s+[\p{L}][\p{L}\p{M}.'’\-]*){0,3})\s+(?:say|says|said|teach|teaches|taught|think|thinks|thought|argue|argues|argued|believe|believes|believed|write|writes|wrote|hold|holds|held)\b/iu);
