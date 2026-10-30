@@ -127,8 +127,8 @@ export function auditPassageGoldReview(report,gold){
   sourceRunId:gold.sourceRun?.runId??null,
   scope:gold.sourceRun?.scope||'',networkCalls:0,aiCalls:0,
   checkedCases:checked.length,missingCases:cases.length-checked.length,stageCounts,
-  // Separate retrieval misses from packet loss so a zero packet-loss count
-  // cannot hide a passage that never reached the candidate pool.
+  // Preserve the historical candidate-pool miss metric; the new search metric
+  // above separates an actual search miss from a later assembly loss.
   bestCandidateRetrievalMisses:claimChecks.filter(item=>item.bestCandidates.length>0&&!item.bestCandidateInPool).length,
   bestCandidatePacketMisses:claimChecks.filter(item=>item.bestCandidateInPool&&!item.bestCandidateSubmitted).length,
   bestCandidateSearchMisses:claimsWithBest.filter(item=>item.bestCandidateSearchHit===false).length,

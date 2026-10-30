@@ -609,8 +609,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    fallbackReason:'empty-source-side-facet'}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
   ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),
-  // The offline gold audit needs to distinguish a search miss from candidate
-  // fusion loss. Preserve compact IDs for every bounded result, not just eight.
+  // The offline gold audit needs to distinguish a search miss from evidence
+  // lost during candidate assembly. Preserve compact IDs for every bounded result.
   sourceTraceComplete:true,
   sources:set.sources.map(({bookId,page,globalPageId})=>({bookId,page,globalPageId}))
  })),searchQueries,namedBookIds};
