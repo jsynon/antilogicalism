@@ -37,8 +37,9 @@ function fakeFetch(url){
   new Response('Not found',{status:404}));
 }
 
-test('explicit Bible book chapter-and-verse references are recognized',()=>{
+test('explicit Bible book chapter and verse references are recognized',()=>{
  assert.equal(hasExplicitScriptureReference('According to 1 John 4:7–12, what does “God is love” mean?'),true);
+ assert.equal(hasExplicitScriptureReference('Search for meaning of “God is love” in 1 John 4'),true);
  assert.equal(hasExplicitScriptureReference('Compare Aristotle, Ethics II.1 with Darwin.'),false);
  assert.equal(hasExplicitScriptureReference('The book of John discusses love.'),false);
  assert.deepEqual(explicitScriptureReferences('Read James 2:14–26 and John 3:16.'),

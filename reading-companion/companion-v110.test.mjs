@@ -26,7 +26,7 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.18.4'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.18.5'));
 });
 test('v49 answer renderer keeps default prose out of accidental ordered lists',()=>{
  assert.match(clientV49,/questionRequestsEnumeration\(turnQuestion\)/);
@@ -37,13 +37,10 @@ test('v49 answer renderer keeps default prose out of accidental ordered lists',(
  const blocks=parseAnswerMarkdown(raw);
  assert.equal(blocks[0].type,'heading');
  assert.equal(blocks[1].type,'paragraph');
- assert.doesNotMatch(blocks[1].text,/\s\*\s+\*\*/,
-  'inline list markers after a colon are folded into readable prose');
- const inline=parseInlineMarkdown(blocks[1].text);
- assert.equal(inline.filter(token=>token.type==='em').length,0,
-  'a list marker cannot wrap the section in italics');
- assert.ok(inline.filter(token=>token.type==='strong').length>=3,
-  'bold labels inside the list remain available to the renderer');
+ assert.equal(blocks[1].text,'The phrase establishes a standard:');
+ assert.deepEqual(blocks.slice(2).map(block=>block.type),['paragraph','paragraph','paragraph']);
+ assert.ok(blocks.slice(2).every(block=>block.text.includes('**')),
+  'bold labels survive when a list is rendered as separate prose blocks');
  const longWithBold='*A long stretch containing **a bold label** '+('and ordinary explanation '.repeat(8))+'*';
  assert.equal(parseInlineMarkdown(longWithBold).some(token=>token.type==='em'),false,
   'overlong emphasis is removed even when bold markup is nested inside it');
