@@ -2431,3 +2431,25 @@ html[data-theme="dark"] .sd-sharing .share-facebook > a.site-dark-facebook-share
 	margin-right: 4px;
 	width: 14px;
 }
+
+
+/* Keep the top navigation white in both themes and use one shared hover color. */
+html body .site-navigation .menu-primary-container > ul.menu > li > a,
+html body .site-navigation .menu-primary-container > ul.menu > li > a:visited,
+html body .site-navigation .site-theme-toggle {
+	color: #fff;
+}
+
+html body .site-navigation .menu-primary-container > ul.menu > li:hover > a,
+html body .site-navigation .menu-primary-container > ul.menu > li > a:hover,
+html body .site-navigation .menu-primary-container > ul.menu > li > a:focus-visible,
+html body .site-navigation .site-theme-toggle:hover,
+html body .site-navigation .site-theme-toggle:focus-visible {
+	background: transparent;
+	color: #999;
+}
+
+html body .site-navigation .site-theme-toggle:hover::before,
+html body .site-navigation .site-theme-toggle:focus-visible::before {
+	color: #999;
+}
