@@ -1,4 +1,4 @@
-/* Antilogicalism Reading Companion v1.18.2 — staged verified-library alpha.
+/* Antilogicalism Reading Companion v1.18.3 — staged verified-library alpha.
  * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
  * The Worker independently validates every submitted source page against v49
  * fingerprints before any inference. The verified scope comes from the
@@ -345,8 +345,15 @@ function appendCitationTokens(target,answer,citations,evidenceMap=[],numbering=n
   }
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
 }
+function unwrapOverlongInlineItalics(answer){
+  // Italics are useful for work titles, but a stray marker pair should not
+  // turn several sentences into one enormous emphasized passage.
+  return String(answer).replace(/(^|[^*])\*([^*\n]{141,})\*(?!\*)/g,
+    (_match,prefix,text)=>prefix+text);
+}
 function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map(),
   citationExcerpts=[],citationCursor={index:0}){
+  answer=unwrapOverlongInlineItalics(answer);
   const pattern=/\*\*([^*\n]+?)\*\*|__([^_\n]+?)__|\*([^*\n]+?)\*|_([^_\n]+?)_/g;
   let at=0;
   for(const match of answer.matchAll(pattern)){
