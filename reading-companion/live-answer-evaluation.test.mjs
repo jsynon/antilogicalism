@@ -230,16 +230,17 @@ test('holdout mode selects a separate seven-question set across disciplines',()=
  assert.equal(selectLiveCases({cases:[]},'quality').length,7,'the original quality baseline remains intact');
 });
 
-test('acceptance mode preserves its baseline and adds three calibration cases',()=>{
+test('acceptance mode preserves its baseline and adds four calibration cases',()=>{
  const cases=selectLiveCases({cases:[]},'acceptance');
- assert.equal(cases.length,10);
+ assert.equal(cases.length,11);
  assert.ok(cases.every(item=>item.id.startsWith('acceptance-')&&item.selected_book_ids.length===0));
- assert.equal(new Set(cases.map(item=>item.id)).size,10);
+ assert.equal(new Set(cases.map(item=>item.id)).size,11);
  for(const id of ['acceptance-descartes-cogito','acceptance-mill-harm-principle','acceptance-epictetus-freedom',
   'acceptance-augustine-memory','acceptance-aristotle-tragedy-plot','acceptance-boethius-fortune',
   'acceptance-locke-political-authority'])assert.ok(cases.some(item=>item.id===id),id+' remains in the baseline');
- assert.deepEqual(cases.slice(-3).map(item=>item.id),[
-  'acceptance-god-is-love','acceptance-simulation-hypothesis','acceptance-buddha-on-death']);
+ assert.deepEqual(cases.slice(-4).map(item=>item.id),[
+  'acceptance-god-is-love','acceptance-simulation-hypothesis','acceptance-buddha-on-death',
+  'acceptance-life-meaning-authors']);
  const focused=selectLiveCases({cases:[]},'acceptance','acceptance-god-is-love');
  assert.equal(focused.length,1);
  assert.deepEqual(focused[0].required_source_groups.map(group=>group.book_ids),[
@@ -257,13 +258,24 @@ test('acceptance mode preserves its baseline and adds three calibration cases',(
  assert.deepEqual(buddha[0].required_source_groups.map(group=>group.book_ids),[
   ['22','23','104','225']]);
  assert.match(buddha[0].review_focus[1],/more than one distinct work/);
+ const meaning=selectLiveCases({cases:[]},'acceptance','acceptance-life-meaning-authors');
+ assert.equal(meaning.length,1);
+ assert.equal(meaning[0].question,"How do different authors in the library approach the question of life's meaning?");
+ assert.deepEqual(meaning[0].planner_queries,[]);
+ assert.deepEqual(meaning[0].required_source_groups,[]);
+ assert.match(meaning[0].review_focus[0],/rather than listing works/);
+ assert.match(meaning[0].review_focus[1],/multiple distinct approaches/);
+ const calibration=selectLiveCases({cases:[]},'acceptance','quality-calibration');
+ assert.deepEqual(calibration.map(item=>item.id),[
+  'acceptance-god-is-love','acceptance-simulation-hypothesis','acceptance-buddha-on-death',
+  'acceptance-life-meaning-authors']);
  assert.throws(()=>selectLiveCases({cases:[]},'acceptance','holdout-history-herodotus-helen'),/Unknown acceptance case/);
 });
 
-test('acceptance workflow lists the three calibration cases in sequence',async()=>{
+test('acceptance workflow lists all four calibration cases in sequence',async()=>{
  const {readFileSync}=await import('node:fs');
  const workflow=readFileSync(new URL('../.github/workflows/reading-companion-holdout-answer-evaluation.yml',import.meta.url),'utf8');
- assert.match(workflow, /^\s+- acceptance-god-is-love\s*\n\s+- acceptance-simulation-hypothesis\s*\n\s+- acceptance-buddha-on-death\s*$/m);
+ assert.match(workflow, /^\s+- acceptance-god-is-love\s*\n\s+- acceptance-simulation-hypothesis\s*\n\s+- acceptance-buddha-on-death\s*\n\s+- acceptance-life-meaning-authors\s*$/m);
 });
 
 test('holdout all-books scope and single-case selection behave independently of the baseline',()=>{

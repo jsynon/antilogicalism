@@ -39,6 +39,7 @@ on:
           - acceptance-god-is-love
           - acceptance-simulation-hypothesis
           - acceptance-buddha-on-death
+          - acceptance-life-meaning-authors
         default: all
         required: true
       answer_variant:
