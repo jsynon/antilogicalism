@@ -1,8 +1,10 @@
-import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms} from './remote-library.mjs';
+import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms,
+ PRODUCTION_MAX_BOOKS,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 import {catalogIdentity} from './reader-contract.mjs';
 
 // Keep live browser and workflow retrieval breadth on one shared contract.
-export const LIVE_RETRIEVAL_CONFIG=Object.freeze({maxCandidates:24,maxBooks:4,pagesPerBook:4});
+export const LIVE_RETRIEVAL_CONFIG=Object.freeze({maxCandidates:24,
+ maxBooks:PRODUCTION_MAX_BOOKS,pagesPerBook:PRODUCTION_PAGES_PER_BOOK});
 // The wider profile is for controlled evaluations. Public traffic keeps the
 // proven baseline until saved-trace review shows a recall gain without weaker
 // final source packets or unacceptable latency.
