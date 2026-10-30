@@ -1445,7 +1445,7 @@ test('planner-facet part links preserve named-source scope and the decisive Kant
   'the part-linked Kant page must reach the bounded answer packet');
 });
 
-test('website only trusts planned search strings and still submits original full pages for fingerprint checks',async()=>{
+test('browser sends bounded full candidate pages and leaves semantic selection to the verified Worker',async()=>{
  const {readFileSync}=await import('node:fs');
  const js=readFileSync(new URL('./companion-v112.mjs',import.meta.url),'utf8');
  assert.match(js,/API\+'\/api\/pilot-plan'/);
@@ -1465,8 +1465,12 @@ test('website only trusts planned search strings and still submits original full
  assert.match(js,/Search planning is temporarily unavailable; searching with your question/);
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
- assert.match(js,/sources:chosen\.map\(\(\{bookId,page,text,candidatePartIds\}\)=>\(\{bookId,page,text,candidatePartIds,libraryVersion:49\}\)\)/);
- assert.match(js,/selectAnswerSources\(candidates,q,token,\{history,\s*maxSources:MAX_ANSWER_SOURCES,\s*plannedFacetCount:/);
+ assert.match(js,/const candidatePacket=\[\]/);
+ assert.match(js,/prepareAnswerCandidates\(candidates\)\.slice\(0,LIVE_RETRIEVAL_CONFIG\.maxCandidates\)/);
+ assert.match(js,/candidateTextBytes\+textBytes>250000/);
+ assert.match(js,/sources:candidatePacket\.map\(\(\{bookId,page,text\}\)=>\(\{bookId,page,text,libraryVersion:49\}\)\)/);
+ assert.doesNotMatch(js,/sources:chosen\.map/);
+ assert.match(js,/plan:currentPlan\|\|undefined/);
  assert.match(js,/\.\.\.LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT/);
  assert.match(js,/candidates=populated\.slice\(0,LIVE_RETRIEVAL_CONFIG\.maxCandidates\)/);
  assert.doesNotMatch(js,/searchPages\(|lastSearch|checked passages will guide/i);

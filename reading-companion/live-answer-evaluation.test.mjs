@@ -756,7 +756,7 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  const retrievalCompleted=progress.find(event=>event.stage==='retrieval'&&event.status==='completed');
  assert.deepEqual(retrievalCompleted.candidatePages,[{bookId:'638',page:10,partIds:['P1']}]);
  assert.deepEqual(retrievalCompleted.selectedPages,[{bookId:'638',page:10,partIds:['P1']}]);
- assert.ok(progress.some(event=>event.stage==='answer'&&event.status==='started'&&/waiting for the Worker/.test(event.message)));
+ assert.ok(progress.some(event=>event.stage==='answer'&&event.status==='started'&&/Worker will select evidence before composition/.test(event.message)));
  assert.ok(progress.some(event=>event.stage==='answer'&&event.status==='completed'&&/verified-source-draft/.test(event.message)));
  assert.ok(!JSON.stringify(progress).includes('x'.repeat(40)));
 });
