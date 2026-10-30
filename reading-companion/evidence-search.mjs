@@ -1331,22 +1331,30 @@ export function selectAnswerSources(candidates,question,turnstileToken,
   if(candidate){partRepresentatives.push(candidate);reservedPartPages.add(candidate);}
  }
  if(partRepresentatives.length){
+  const representedBooks=new Set(partRepresentatives.map(value=>String(value.bookId)));
   const rankRemaining=(pool)=>{
    const remaining=pool.filter(value=>!reservedPartPages.has(value));
-   const ranked=[],representedBooks=new Set(partRepresentatives.map(value=>String(value.bookId)));
-   const questionFor=(candidate)=>{
+   const ranked=[];
+   const bestFit=(candidate)=>{
     const linked=(candidate.candidatePartIds||[]).map(id=>partQuestionById.get(id)).filter(Boolean);
-    if(!linked.length)return question;
-    return linked.reduce((best,value)=>
-      compareEvidenceFit(candidateEvidenceFit(candidate,value),
-        candidateEvidenceFit(candidate,best))<0?value:best,linked[0]);
+    const questions=linked.length?linked:[question];
+    return questions.map(value=>candidateEvidenceFit(candidate,value)).reduce((best,value)=>
+      compareEvidenceFit(value,best)<0?value:best);
+   };
+   const compareRank=(left,right)=>{
+    const fitOrder=compareEvidenceFit(bestFit(left),bestFit(right));
+    if(fitOrder)return fitOrder;
+    const leftNew=!representedBooks.has(String(left?.bookId||''));
+    const rightNew=!representedBooks.has(String(right?.bookId||''));
+    if(leftNew!==rightNew)return leftNew?-1:1;
+    const leftScore=Number.isFinite(left?.score)?left.score:Number.NEGATIVE_INFINITY;
+    const rightScore=Number.isFinite(right?.score)?right.score:Number.NEGATIVE_INFINITY;
+    return rightScore-leftScore;
    };
    while(remaining.length){
     let bestIndex=0;
-    for(let index=1;index<remaining.length;index++){
-     if(compareEvidenceCandidates(remaining[index],remaining[bestIndex],
-       questionFor(remaining[index]),representedBooks)<0)bestIndex=index;
-    }
+    for(let index=1;index<remaining.length;index++)
+     if(compareRank(remaining[index],remaining[bestIndex])<0)bestIndex=index;
     const [candidate]=remaining.splice(bestIndex,1);
     ranked.push(candidate);
     representedBooks.add(String(candidate.bookId));
