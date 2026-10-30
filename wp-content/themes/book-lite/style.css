@@ -1472,7 +1472,6 @@ body {
 .site-theme-toggle:hover,
 .site-theme-toggle:focus-visible {
 	background: transparent;
-	border-color: transparent;
 	color: #fff;
 	text-decoration: underline;
 	text-underline-offset: 4px;
@@ -1491,7 +1490,6 @@ body {
 
 	.site-theme-toggle {
 		background: transparent;
-		border: 0;
 		height: 40px;
 		padding: 8px;
 		right: 12px;
@@ -1507,26 +1505,6 @@ body {
 
 	.site-theme-toggle:hover {
 		background: rgba(255, 255, 255, .08);
-	}
-
-	.site-theme-toggle .site-theme-label {
-		display: none;
-	}
-@media (max-width: 1200px) {
-	.site-theme-toggle svg {
-		height: 20px;
-		width: 20px;
-	}
-
-	.site-theme-toggle {
-		background: rgba(0, 0, 0, .2);
-		height: 38px;
-		padding: 8px;
-		right: 12px;
-		top: 12px;
-		transform: none;
-		width: 38px;
-		z-index: 100001;
 	}
 
 	.site-theme-toggle .site-theme-label {
