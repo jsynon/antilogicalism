@@ -195,9 +195,21 @@ export function createDiagnosticReport(input={}){
       partIds:partIds(search?.partIds),
       sources:Array.isArray(search?.sources)?search.sources.slice(0,8).map(sourceSummary).filter(Boolean):[]
     })):[],
-    candidates:Array.isArray(input.candidates)?input.candidates.slice(0,8).map(sourceSummary).filter(Boolean):[],
+    candidates:Array.isArray(input.candidates)?input.candidates.slice(0,24).map(sourceSummary).filter(Boolean):[],
+    candidatePool:Array.isArray(input.candidatePool)?input.candidatePool.slice(0,24).map(sourceSummary).filter(Boolean):[],
     submittedSources:Array.isArray(input.submittedSources)?
       input.submittedSources.slice(0,6).map(sourceSummary).filter(Boolean):[],
+    sourceSelection:input.sourceSelection&&typeof input.sourceSelection==='object'?{
+      status:['selected','deterministic-fallback','legacy'].includes(input.sourceSelection.status)?input.sourceSelection.status:'unknown',
+      candidateCount:Number.isSafeInteger(input.sourceSelection.candidateCount)?input.sourceSelection.candidateCount:null,
+      pages:Array.isArray(input.sourceSelection.pages)?input.sourceSelection.pages.slice(0,6).map(sourceSummary).filter(Boolean):[],
+      usage:input.sourceSelection.usage&&typeof input.sourceSelection.usage==='object'?{
+        calls:Number.isSafeInteger(input.sourceSelection.usage.calls)?input.sourceSelection.usage.calls:null,
+        neurons:Number.isFinite(input.sourceSelection.usage.neurons)?input.sourceSelection.usage.neurons:null,
+        inputTokens:Number.isFinite(input.sourceSelection.usage.inputTokens)?input.sourceSelection.usage.inputTokens:null,
+        outputTokens:Number.isFinite(input.sourceSelection.usage.outputTokens)?input.sourceSelection.usage.outputTokens:null
+      }:null
+    }:null,
     answer:{
       outcome:string(input.outcome,48),
       coverage:string(input.coverage,24),

@@ -629,7 +629,7 @@ test('quality case uses fixed queries, skips planning, and restricts retrieval t
   options.pagesPerBook===LIVE_RETRIEVAL_CONFIG.pagesPerBook));
 });
 
-test('all-books evaluation sends the same six-page evidence budget as the public companion',async()=>{
+test('all-books evaluation sends retrieved candidates for Worker selection before the six-page answer budget',async()=>{
  const item={id:'all-books-six-source-budget',
   question:'How do Darwin in On the Origin of Species and Hawking in A Brief History of Time explain their evidence?',
   selected_book_ids:[],planner_queries:['Darwin On the Origin of Species natural selection evidence',
@@ -745,7 +745,8 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  assert.deepEqual(searched,['first distinct search concept','second distinct search concept',item.question]);
  assert.equal(result.searches[2].query,item.question+' [named books: 638]');
  assert.equal(calls[1].body.bookId,'638');
- assert.deepEqual(calls[1].body.sources[0].candidatePartIds,['P1']);
+ assert.equal(Object.hasOwn(calls[1].body.sources[0],'candidatePartIds'),false,
+  'browser retrieval links are eligibility hints, so the Worker selector assigns final part links');
  assert.deepEqual(result.submittedSources[0].candidatePartIds,['P1']);
  assert.deepEqual(result.retrievalCandidates.map(source=>source.bookId+':'+source.page),['638:10']);
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));

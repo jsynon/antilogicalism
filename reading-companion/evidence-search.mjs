@@ -260,10 +260,11 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
 }
 
 /* Shared browser/evaluator retrieval assembly. Both callers search the same
- * facet pool, hydrate the same canonical page text, and hand the same candidate
- * ordering to selectAnswerSources. `pageLoader` is the only environment
- * difference (the browser has a shard cache; the evaluator reads the shard
- * through RemoteLibrary directly).
+ * facet pool and hydrate the same canonical candidate pages. The browser and
+ * evaluator pass this ordered pool to the Worker; final semantic selection
+ * happens only after the Worker verifies page fingerprints. `pageLoader` is
+ * the only environment difference (browser shard cache versus evaluator
+ * RemoteLibrary access).
  */
 export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],gapQueryPartLinks=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
@@ -1195,8 +1196,9 @@ export function auditEvidencePacketSelection(candidates,selected,question,partQu
   selectedCount:Array.isArray(selected)?selected.length:0,parts:partAudits};
 }
 
-/* Apply the live request's existing byte and page limits to an already-ranked
- * list. The evaluation-only model selector uses this same gate after ranking. */
+/* Build the bounded six-page comparison arm used by the candidate-pool
+ * ablation. The live Worker applies the same page and byte limits after its
+ * semantic selector maps IDs back to fingerprint-verified pages. */
 export function boundAnswerSources(candidates,question,turnstileToken,
   {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[]}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||typeof turnstileToken!=='string')return [];
