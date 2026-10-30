@@ -1473,8 +1473,7 @@ body {
 .site-theme-toggle:focus-visible {
 	background: transparent;
 	color: #fff;
-	text-decoration: underline;
-	text-underline-offset: 4px;
+	text-decoration: none;
 }
 
 .site-theme-toggle:focus-visible {
