@@ -31,3 +31,8 @@ The shared retrieval code now reserves the best page from each distinct work on 
 The browser and live evaluator both call `retrieveEvidence` and `selectAnswerSources` from `reading-companion/evidence-search.mjs`, so this selection change applies to the website and the evaluation runner. It adds no model calls and does not relax page fingerprint checks, source allowlists, packet limits, or citation validation.
 
 If live planning fails, All Books direct fallback retains the exact question and adds a bounded 1 John 4:7–12 query for the recognized phrase “God is love.” The facet is reserved in the candidate pool before the unchanged six-page Worker packet is selected. Selected Books does not add a cross-book scripture search. The query is deterministic and makes no extra model call; the saved live-answer artifact exposes it under `searches` for offline diagnosis.
+# Evaluation notes
+
+An explicitly reviewed `general-context-answer` with full coverage and no expected source groups is structurally eligible without library citations. The report marks its evidence applicability as `not-applicable`; it does not treat the answer as library-supported or assign human quality scores. Cases with expected sources, unresolved inline citations, or failed review remain structural misses.
+
+Standalone Markdown headings in an answer render as separate subsection headings rather than being folded into a neighboring paragraph. Actual lists remain opt-in when the reader asks for an enumeration. The in-progress status copy now describes the book search and answer preparation in reader-friendly language, while still making fallback and insufficient-evidence outcomes clear.

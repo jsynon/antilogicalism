@@ -25,11 +25,13 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.18.1'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.18.2'));
 });
 test('v49 answer renderer keeps default prose out of accidental ordered lists',()=>{
  assert.match(clientV49,/questionRequestsEnumeration\(turnQuestion\)/);
  assert.match(clientV49,/if\(allowLists\)/);
+ assert.match(clientV49,/const heading=line\.match/);
+ assert.match(clientV49,/document\.createElement\('h3'\)/);
  assert.match(clientV49,/paragraph\.push\(bullet\[1\]\)/);
  assert.match(clientV49,/render an actual[\s\S]{0,50}list only when the reader explicitly asks/);
 });
@@ -83,7 +85,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/function refreshStatusState\(\)/);
  assert.match(client,/status\.setAttribute\('aria-busy',String\(busy\)\)/);
  assert.match(client,/askButton\.textContent=searching\|\|answering\?'Working…':'Ask Reading Companion'/);
- assert.match(client,/Preparing an answer from the selected passages… This can take a little while\./);
+ assert.match(clientV49,/Now I’m bringing the best passages together and checking the sources\. This can take a little while…/);
  assert.doesNotMatch(html,/Press Enter to ask|companion-question-help/);
  assert.match(client,/question\.addEventListener\('keydown',event=>\{/);
  assert.match(client,/event\.key!=='Enter'\|\|event\.shiftKey\|\|event\.isComposing/);
