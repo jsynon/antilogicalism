@@ -1496,7 +1496,7 @@ test('browser sends bounded full candidate pages and leaves semantic selection t
  assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions,allowEmpty:true\}/);
  assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
  assert.match(js,/diagnosticState\.fallbackMode=true/);
- assert.match(js,/Search planning is temporarily unavailable; searching with your question/);
+ assert.match(js,/My usual book-finding step hit a snag, so I’m searching with your question instead/);
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
  assert.match(js,/const candidatePacket=\[\]/);

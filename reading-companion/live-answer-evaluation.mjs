@@ -324,8 +324,8 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const reviewStatus=String(data?.reviewStatus||'');
  // A reviewed source-free answer is structurally valid only when the Worker
  // explicitly classifies it as general context and the case asks for no
- library source groups. This keeps evidence-free answers distinct from
- missing or failed source review.
+ // library source groups. This keeps evidence-free answers distinct from
+ // missing or failed source review.
  const generalContextOnly=outcome==='general-context-answer'&&
   reviewStatus==='general-context-review'&&String(data?.coverage||'')==='full'&&
   citations.length===0&&inline.length===0&&missingInline.length===0&&

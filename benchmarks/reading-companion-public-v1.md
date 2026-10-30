@@ -34,3 +34,5 @@ If live planning fails, All Books direct fallback retains the exact question and
 # Evaluation notes
 
 An explicitly reviewed `general-context-answer` with full coverage and no expected source groups is structurally eligible without library citations. The report marks its evidence applicability as `not-applicable`; it does not treat the answer as library-supported or assign human quality scores. Cases with expected sources, unresolved inline citations, or failed review remain structural misses.
+
+Standalone Markdown headings in an answer render as separate subsection headings rather than being folded into a neighboring paragraph. Actual lists remain opt-in when the reader asks for an enumeration. The in-progress status copy now describes the book search and answer preparation in reader-friendly language, while still making fallback and insufficient-evidence outcomes clear.

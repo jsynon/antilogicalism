@@ -1,4 +1,4 @@
-/* Antilogicalism Reading Companion v1.18.1 — staged verified-library alpha.
+/* Antilogicalism Reading Companion v1.18.2 — staged verified-library alpha.
  * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
  * The Worker independently validates every submitted source page against v49
  * fingerprints before any inference. The verified scope comes from the
@@ -227,8 +227,8 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
   candidates=[];
   if(diagnosticState)diagnosticState.stage='retrieving';
   searching=true;updateButtons();setStatus(plannerFallback?
-    'Search planning is temporarily unavailable; searching with your question…':
-    'Searching for relevant passages…');
+    'My usual book-finding step hit a snag, so I’m searching with your question instead…':
+    'I’m browsing the books for passages that might help…');
   try{
     let populated=[];
     if(oldPilotFallback){
@@ -288,10 +288,10 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
       refreshDiagnostic();
     }
     if(!candidates.length){
-      setStatus('No matching passages found. Try different wording or choose another book.');
+      setStatus('No promising passages turned up yet. Try another wording or choose a different book.');
       return allowEmpty;
     }
-    setStatus('Checking the source passages…');
+    setStatus('I found a few promising pages. I’m checking that they fit your question…');
     return true;
   }finally{searching=false;updateButtons();}
 }
@@ -379,6 +379,17 @@ function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new 
   const markdown=String(answer).replace(/\r\n?/g,'\n')
     .replace(/([.!?])\s+(?=(?:[*+-]|\d+[.)])\s{1,})/g,'$1\n');
   for(const line of markdown.split('\n')){
+    // Treat standalone Markdown headings as real blocks. Without this, a
+    // model's bold heading followed by a soft line break runs into its prose.
+    const heading=line.match(/^\s*(?:#{1,3}\s+(.+?)\s*|\*\*([^*\n]+)\*\*|__([^_\n]+)__)\s*$/);
+    if(heading){
+      flushParagraph();
+      const subheading=document.createElement('h3');
+      putCitationTokens(subheading,heading[1]??heading[2]??heading[3],
+        citations,evidenceMap,numbering,citationExcerpts,citationCursor);
+      target.append(subheading);
+      continue;
+    }
     const bullet=line.match(/^\s*(?:[*+-]|\d+[.)])\s+(.+?)\s*$/);
     if(bullet){
       if(allowLists){
@@ -591,7 +602,7 @@ async function nextTurnstileToken(){
     },120000);
     pendingTurnstile=waiter;
   });
-  setStatus('Complete the quick check to continue.');
+  setStatus('One quick check, then we can get reading.');
   window.turnstile.reset(turnstileId);
   challengeBox.scrollIntoView({behavior:'smooth',block:'center'});
   const token=await pending;
@@ -621,7 +632,7 @@ async function askQuestion(questionText){
       // invent answers. It consumes a single-use Turnstile token. A SECOND
       // fresh verification is required for the fingerprint-protected answer.
       turnstileToken='';
-      setStatus('Looking across the collection for useful passages…');
+      setStatus('On a little book hunt for passages that might help…');
       let planned=null,plannerFallback=false;
       try{planned=await requestSourcePlan(q,token,history);}
       catch(error){
@@ -637,7 +648,7 @@ async function askQuestion(questionText){
       currentPlan=planned?.plan||null;
       partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>
         ({partId:part.id,question:part.question,sourceBookIds:part.sourceBookIds})):[];
-      if(planned)setStatus('Gathering passages from across the collection…');
+      if(planned)setStatus('I found a few promising leads. Let me find the pages themselves…');
       const found=await retrieveSources(planned?.queries||null,{plannerFallback,
         plan:planned?.plan||null,partQuestions,allowEmpty:true});
       if(!found)return;
@@ -645,6 +656,7 @@ async function askQuestion(questionText){
       if(diagnosticState){diagnosticState.retrievalCoverage={weakParts:coverage.weakParts,
         triggered:coverage.shouldSearch};refreshDiagnostic();}
       if(coverage.shouldSearch){
+        setStatus('I’ve found some useful pages. I’m looking for a couple more that might round out the answer…');
         turnstileToken='';
         let gapQueries=[],gapQueryPartLinks=[];
         try{
@@ -667,7 +679,7 @@ async function askQuestion(questionText){
             weakParts:secondCoverage.weakParts,triggered:true};
         }
       }
-      if(!candidates.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
+      if(!candidates.length){setStatus('No promising passages turned up yet. Try another wording or choose a different book.');return;}
       token=await nextTurnstileToken();
     }else{
       const found=await retrieveSources();
@@ -686,14 +698,14 @@ async function askQuestion(questionText){
       candidatePacket.push(source);
       candidateTextBytes+=textBytes;
     }
-    if(!candidatePacket.length){setStatus('No matching passages found. Try different wording or choose another book.');return;}
+    if(!candidatePacket.length){setStatus('No promising passages turned up yet. Try another wording or choose a different book.');return;}
     if(diagnosticState){
       diagnosticState.candidatePool=candidatePacket.map((source,index)=>({...source,id:'C'+(index+1)}));
       diagnosticState.stage='worker_selecting_evidence';
       refreshDiagnostic();
     }
     turnstileToken='';
-    setStatus('Checking the retrieved passages and preparing a cited answer… This can take a little while.');
+    setStatus('Now I’m bringing the best passages together and checking the sources. This can take a little while…');
     const response=await fetch(API+'/api/pilot-answer',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
@@ -757,9 +769,9 @@ async function askQuestion(questionText){
     if(data.outcome==='verified-source-draft'&&typeof data.answer==='string'&&data.answer.trim())
       rememberTurn(q,data.answer);
     setStatus(data.sourceSelectionStatus==='deterministic-fallback'?
-      'The evidence selector was unavailable, so this answer uses retrieved passages in search order. Check the citations against the books.':
+      'My usual passage picker hit a snag, so I used the closest matches I found. Please check the citations against the books.':
       data.outcome==='insufficient-evidence'?
-       'These passages don’t provide enough evidence for a complete answer. Try different wording or choose another book.':'');
+       'These pages don’t quite answer the question yet. Try another wording or choose a different book.':'');
   }catch(error){
     console.error('Reading Companion request failed:',error);
     if(diagnosticState){
