@@ -659,7 +659,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  await progress('case','started',`Starting ${answerVariant} evaluation for this question.`);
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
- let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false,plannerReused=false,
+ let plan,queries,plannerFallback=false,plannerFailure=null,plannerFailureDiagnostics=null,plannerSkipped=false,plannerReused=false,
   plannerWorkerVersionId=null,plannerWorkerSourceBuild=null,plannerWorkerSourceRevision=null;
  if(preparedPlan&&(validSearchPlan(preparedPlan.queries)||
    (preparedPlan.plannerFallback===true&&Array.isArray(preparedPlan.queries)&&
@@ -696,7 +696,10 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   plannerWorkerSourceRevision=failure.workerSourceRevision||null;
   if(!canFallbackToDirectSearch(failure.httpStatus,failure.failureCode))throw error;
   plannerFallback=true;
-  plannerFailure={stage:'planner',workerFailureStage:failure.workerFailureStage||'planning',
+  plannerFailure={httpStatus:failure.httpStatus,failureCode:failure.failureCode};
+  // Keep the established compact field stable for existing artifact readers;
+  // richer safe stage/class details live beside it in a versionable field.
+  plannerFailureDiagnostics={stage:'planner',workerFailureStage:failure.workerFailureStage||'planning',
    httpStatus:failure.httpStatus,failureCode:failure.failureCode,
    failureDetail:failure.failureDetail||'unknown',workerFailure:failure.workerFailure===true};
   queries=[item.question];
@@ -716,7 +719,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerVersionId=plannerWorkerVersionId;
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
-  if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
+  if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;
+   if(plannerFailureDiagnostics)error.requestFailure.plannerFailureDiagnostics=plannerFailureDiagnostics;throw error;}
  let gapQueries=[],gapQueryPartLinks=[],gapPlannerFailure=null,gapPlannerFailureDiagnostics=null;
  const initialSearches=loaded.searches;
  const initialRetrievalCandidates=loaded.retrievalCandidates;
@@ -872,7 +876,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerReused,
   plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,plannerWorkerSourceRevision,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
-  ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,
+  ...(plannerFailure?{plannerFailure}:{}),...(plannerFailureDiagnostics?{plannerFailureDiagnostics}:{}),plannerPlan:plan?.plan||null,
   searchesBeforeGap:initialSearches,retrievalCandidatesBeforeGap:initialRetrievalCandidates,
   searches,retrievalCandidates,
   retrievalCoverage:{triggered:gapSearchTriggered,
