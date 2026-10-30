@@ -320,6 +320,16 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const citationAudit=auditCitationIds(answer,citations);
  const inline=citationAudit.inlineIds;
  const missingInline=citationAudit.inlineIdsWithoutSource;
+ const outcome=String(data?.outcome||'');
+ const reviewStatus=String(data?.reviewStatus||'');
+ // A reviewed source-free answer is structurally valid only when the Worker
+ // explicitly classifies it as general context and the case asks for no
+ library source groups. This keeps evidence-free answers distinct from
+ missing or failed source review.
+ const generalContextOnly=outcome==='general-context-answer'&&
+  reviewStatus==='general-context-review'&&String(data?.coverage||'')==='full'&&
+  citations.length===0&&inline.length===0&&missingInline.length===0&&
+  requiredGroups.length===0&&requiredPartSources.length===0;
  const citationBookIds=[...new Set(citations.map(source=>String(source?.bookId||'')))];
  const submittedBookIds=[...new Set(submitted.map(source=>String(source?.bookId||'')))];
  const candidateSources=Array.isArray(options.candidateSources)?options.candidateSources:null;
@@ -339,9 +349,11 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   const citedEvidenceIds=evidenceIds.filter(id=>citationIds.has(id));
   const submittedEvidenceIds=evidenceIds.filter(id=>submittedIds.has(id));
   const structurallyComplete=part?.status==='unsupported'?null:
+   generalContextOnly&&evidenceIds.length===0?null:
    evidenceIds.length>0&&mappedEvidenceIdsForPart.length===evidenceIds.length&&
    citedEvidenceIds.length===evidenceIds.length&&submittedEvidenceIds.length===evidenceIds.length;
   return {part:String(part?.part||''),status:String(part?.status||''),evidenceIds,
+   evidenceApplicability:generalContextOnly&&evidenceIds.length===0?'not-applicable':'required',
    mappedEvidenceIds:mappedEvidenceIdsForPart,citedEvidenceIds,submittedEvidenceIds,structurallyComplete};
  });
  const completeSupportedEvidenceIds=new Set(partEvidenceAudit
@@ -454,14 +466,12 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const partEvidenceComplete=questionParts.length===0?null:
   partEvidenceAudit.every(part=>part.structurallyComplete!==false);
  const evidenceAuditScope='Evidence IDs are checked for consistent linkage across question parts, the reviewed evidence map, cited sources, and submitted pages. This is a structural check, not a semantic judge of whether a passage truly supports a claim; review the answer and source text.';
- const outcome=String(data?.outcome||'');
- const reviewStatus=String(data?.reviewStatus||'');
  const failureCode=typeof data?.failureCode==='string'?data.failureCode:'';
  const failureStage=typeof data?.failureStage==='string'?data.failureStage:'';
  const manualReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
   accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
  const structuralPassed=coverage==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
-  missingInline.length===0&&citations.length>0&&answerCoverageConsistent!==false&&partEvidenceComplete!==false&&
+  missingInline.length===0&&(citations.length>0||generalContextOnly)&&answerCoverageConsistent!==false&&partEvidenceComplete!==false&&
   sourcePartAlignment.every(item=>item.aligned)&&!failureCode&&reviewStatus!=='pipeline-failed'&&
   reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed';
  return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,reviewStatus,failureCode,failureStage,
@@ -469,6 +479,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
   sourceGroups,questionParts,questionPartCoverage,partEvidenceAudit,partEvidenceComplete,
+  evidenceApplicability:generalContextOnly?'not-applicable':'required',
   sourcePartAlignment,
   answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
   evidenceHighlightCount:highlights.length,evidenceHighlights,citationHighlightAudit,
