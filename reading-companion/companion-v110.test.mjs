@@ -3,6 +3,7 @@ import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 import {RemoteLibrary} from './remote-library.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
+import {parseAnswerMarkdown,parseInlineMarkdown} from './answer-markdown.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
 const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
@@ -25,18 +26,32 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.18.3'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.18.4'));
 });
 test('v49 answer renderer keeps default prose out of accidental ordered lists',()=>{
  assert.match(clientV49,/questionRequestsEnumeration\(turnQuestion\)/);
- assert.match(clientV49,/if\(allowLists\)/);
- assert.match(clientV49,/const heading=line\.match/);
+ assert.match(clientV49,/parseAnswerMarkdown\(answer/);
  assert.match(clientV49,/document\.createElement\('h3'\)/);
- assert.match(clientV49,/function unwrapOverlongInlineItalics/);
- assert.match(clientV49,/\{141,\}/,
-  'a stray emphasis pair cannot italicize a multi-sentence answer section');
- assert.match(clientV49,/paragraph\.push\(bullet\[1\]\)/);
- assert.match(clientV49,/render an actual[\s\S]{0,50}list only when the reader explicitly asks/);
+ assert.match(clientV49,/parseInlineMarkdown\(answer\)/);
+ const raw='**The Relationship Between Love and Knowing God** The phrase establishes a standard: * **Recognition of God:** Those who love know God [S2]. * **Abiding in God:** Those who abide in love abide in God [S2]. * **The Moral Imperative:** Love of God is shown through love of others [S2]. *';
+ const blocks=parseAnswerMarkdown(raw);
+ assert.equal(blocks[0].type,'heading');
+ assert.equal(blocks[1].type,'paragraph');
+ assert.doesNotMatch(blocks[1].text,/\s\*\s+\*\*/,
+  'inline list markers after a colon are folded into readable prose');
+ const inline=parseInlineMarkdown(blocks[1].text);
+ assert.equal(inline.filter(token=>token.type==='em').length,0,
+  'a list marker cannot wrap the section in italics');
+ assert.ok(inline.filter(token=>token.type==='strong').length>=3,
+  'bold labels inside the list remain available to the renderer');
+ const longWithBold='*A long stretch containing **a bold label** '+('and ordinary explanation '.repeat(8))+'*';
+ assert.equal(parseInlineMarkdown(longWithBold).some(token=>token.type==='em'),false,
+  'overlong emphasis is removed even when bold markup is nested inside it');
+ assert.equal(parseInlineMarkdown('*A Short Work Title*')[0].type,'em',
+  'short work titles retain italics');
+ const numbered=parseAnswerMarkdown('1. First reason\n2. Second reason',{allowLists:true});
+ assert.equal(numbered[0].type,'list');
+ assert.equal(numbered[0].ordered,true);
 });
 test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);

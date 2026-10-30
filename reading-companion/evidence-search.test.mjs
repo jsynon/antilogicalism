@@ -1492,7 +1492,8 @@ test('browser sends bounded full candidate pages and leaves semantic selection t
  assert.ok(js.includes('partQuestions,gapQueries,gapQueryPartLinks}'));
  assert.doesNotMatch(js,/retrievalGap:[^}]*reviewFocus/s);
  assert.match(js,/const queries=\[\.\.\.new Set\(data\.queries\.map/);
- assert.match(js,/const markdown=String\(answer\)\.replace/);
+ assert.match(js,/parseAnswerMarkdown\(answer,\{allowLists\}\)/,
+  'the browser renders the shared tested Markdown block parser');
  assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions,allowEmpty:true\}/);
  assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
  assert.match(js,/diagnosticState\.fallbackMode=true/);

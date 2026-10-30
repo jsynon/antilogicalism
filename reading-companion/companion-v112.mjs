@@ -1,4 +1,4 @@
-/* Antilogicalism Reading Companion v1.18.3 — staged verified-library alpha.
+/* Antilogicalism Reading Companion v1.18.4 — staged verified-library alpha.
  * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
  * The Worker independently validates every submitted source page against v49
  * fingerprints before any inference. The verified scope comes from the
@@ -13,6 +13,7 @@ import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
 import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
 import {citationExcerptsForAnswer} from './citation-evidence.mjs';
+import {parseAnswerMarkdown,parseInlineMarkdown} from './answer-markdown.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -345,85 +346,45 @@ function appendCitationTokens(target,answer,citations,evidenceMap=[],numbering=n
   }
   if(at<answer.length)target.append(document.createTextNode(answer.slice(at)));
 }
-function unwrapOverlongInlineItalics(answer){
-  // Italics are useful for work titles, but a stray marker pair should not
-  // turn several sentences into one enormous emphasized passage.
-  return String(answer).replace(/(^|[^*])\*([^*\n]{141,})\*(?!\*)/g,
-    (_match,prefix,text)=>prefix+text);
+function appendInlineTokens(target,tokens,citations,evidenceMap,numbering,
+  citationExcerpts,citationCursor){
+  for(const token of tokens){
+    if(token.type==='text'){
+      appendCitationTokens(target,token.value,citations,evidenceMap,numbering,
+        citationExcerpts,citationCursor);continue;
+    }
+    const formatted=document.createElement(token.type==='strong'?'strong':'em');
+    appendInlineTokens(formatted,token.children,citations,evidenceMap,numbering,
+      citationExcerpts,citationCursor);
+    target.append(formatted);
+  }
 }
 function putCitationTokens(target,answer,citations,evidenceMap=[],numbering=new Map(),
   citationExcerpts=[],citationCursor={index:0}){
-  answer=unwrapOverlongInlineItalics(answer);
-  const pattern=/\*\*([^*\n]+?)\*\*|__([^_\n]+?)__|\*([^*\n]+?)\*|_([^_\n]+?)_/g;
-  let at=0;
-  for(const match of answer.matchAll(pattern)){
-    if(match.index>at)appendCitationTokens(target,answer.slice(at,match.index),
-      citations,evidenceMap,numbering,citationExcerpts,citationCursor);
-    const isBold=match[1]!==undefined||match[2]!==undefined;
-    const formatted=document.createElement(isBold?'strong':'em');
-    appendCitationTokens(formatted,match[1]??match[2]??match[3]??match[4],
-      citations,evidenceMap,numbering,citationExcerpts,citationCursor);
-    target.append(formatted);
-    at=match.index+match[0].length;
-  }
-  if(at<answer.length)appendCitationTokens(target,answer.slice(at),
-    citations,evidenceMap,numbering,citationExcerpts,citationCursor);
+  appendInlineTokens(target,parseInlineMarkdown(answer),citations,evidenceMap,
+    numbering,citationExcerpts,citationCursor);
 }
 function putMarkdownBlocks(target,answer,citations,evidenceMap=[],numbering=new Map(),citationExcerpts=[],allowLists=false){
-  let paragraph=[];
   const citationCursor={index:0};
-  const flushParagraph=()=>{
-    if(!paragraph.length)return;
-    const p=document.createElement('p');
-    putCitationTokens(p,paragraph.join(' ').trim(),citations,evidenceMap,numbering,
-      citationExcerpts,citationCursor);
-    target.append(p);
-    paragraph=[];
-  };
-  // The model occasionally emits a list item after a sentence on the same
-  // line. Split only clear Markdown list markers so they render as semantic
-  // lists instead of exposing the marker in the answer text.
-  const markdown=String(answer).replace(/\r\n?/g,'\n')
-    .replace(/([.!?])\s+(?=(?:[*+-]|\d+[.)])\s{1,})/g,'$1\n');
-  for(const line of markdown.split('\n')){
-    // Treat standalone Markdown headings as real blocks. Without this, a
-    // model's bold heading followed by a soft line break runs into its prose.
-    const heading=line.match(/^\s*(?:#{1,3}\s+(.+?)\s*|\*\*([^*\n]+)\*\*|__([^_\n]+)__)\s*$/);
-    if(heading){
-      flushParagraph();
-      const subheading=document.createElement('h3');
-      putCitationTokens(subheading,heading[1]??heading[2]??heading[3],
-        citations,evidenceMap,numbering,citationExcerpts,citationCursor);
-      target.append(subheading);
-      continue;
+  for(const block of parseAnswerMarkdown(answer,{allowLists})){
+    if(block.type==='heading'){
+      const heading=document.createElement('h3');
+      putCitationTokens(heading,block.text,citations,evidenceMap,numbering,
+        citationExcerpts,citationCursor);target.append(heading);continue;
     }
-    const bullet=line.match(/^\s*(?:[*+-]|\d+[.)])\s+(.+?)\s*$/);
-    if(bullet){
-      if(allowLists){
-        flushParagraph();
-        const listType=/^\s*\d/.test(line)?'ol':'ul';
-        const list=target.lastElementChild?.tagName.toLowerCase()===listType
-          ?target.lastElementChild:document.createElement(listType);
-        if(list!==target.lastElementChild)target.append(list);
-        const item=document.createElement('li');
-        putCitationTokens(item,bullet[1],citations,evidenceMap,numbering,
-          citationExcerpts,citationCursor);
-        list.append(item);
-      }else{
-        // Stray model list markers are not allowed to turn a normal answer
-        // into a list. Fold their text into connected prose; render an actual
-        // list only when the reader explicitly asks for enumeration.
-        paragraph.push(bullet[1]);
-      }
-      continue;
+    if(block.type==='paragraph'){
+      const paragraph=document.createElement('p');
+      putCitationTokens(paragraph,block.text,citations,evidenceMap,numbering,
+        citationExcerpts,citationCursor);target.append(paragraph);continue;
     }
-    if(!line.trim()){
-      flushParagraph();
-      continue;
+    const list=document.createElement(block.ordered?'ol':'ul');
+    for(const value of block.items){
+      const item=document.createElement('li');
+      putCitationTokens(item,value,citations,evidenceMap,numbering,
+        citationExcerpts,citationCursor);list.append(item);
     }
-    paragraph.push(line);
+    target.append(list);
   }
-  flushParagraph();
 }
 function questionRequestsEnumeration(question){
   return /\b(?:list|enumerate|number the)\b/i.test(String(question||''));
