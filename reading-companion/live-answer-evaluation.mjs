@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {validSearchPlan,selectAnswerSources,prepareAnswerCandidates,boundAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,LIVE_RETRIEVAL_CONFIG,RETRIEVAL_PROFILES} from './evidence-search.mjs';
+import {validSearchPlan,selectAnswerSources,prepareAnswerCandidates,boundAnswerSources,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,auditEvidencePacketSelection,LIVE_RETRIEVAL_CONFIG,RETRIEVAL_PROFILES} from './evidence-search.mjs';
 import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -566,6 +566,9 @@ function attachRequestFailure(error,stage,details={}){
   workerFailure:details.workerFailure===true,
   ...(typeof details.failureDetail==='string'&&/^[a-z_]{1,48}$/.test(details.failureDetail)?
    {failureDetail:details.failureDetail}:{}),
+  ...(typeof details.workerFailureStage==='string'&&
+   ['planning','gap-planning'].includes(details.workerFailureStage)?
+   {workerFailureStage:details.workerFailureStage}:{}),
   workerVersionId:typeof details.workerVersionId==='string'&&details.workerVersionId.length<=128?details.workerVersionId:null,
   workerSourceBuild:typeof details.workerSourceBuild==='string'&&details.workerSourceBuild.length<=128?details.workerSourceBuild:null,
   workerSourceRevision:typeof details.workerSourceRevision==='string'&&/^[a-f0-9]{40}$/i.test(details.workerSourceRevision)?details.workerSourceRevision.toLowerCase():null};
@@ -597,7 +600,7 @@ async function callJson(fetcher,url,token,body,beforeCall=async()=>{},stage='wor
    message:`The Worker returned HTTP ${response.status} (${String(data?.failureCode||'request-failed')}).`});
   throw attachRequestFailure(new Error(String(data?.failureCode||data?.error||'Worker request failed').slice(0,240)),stage,{
   httpStatus:response.status,failureCode:String(data?.failureCode||'http-error'),
-  failureDetail:data?.failureDetail,workerFailure:true,
+  failureDetail:data?.failureDetail,workerFailure:true,workerFailureStage:data?.failureStage,
   workerVersionId:data?.workerVersionId,workerSourceBuild:data?.workerSourceBuild,workerSourceRevision:data?.workerSourceRevision});
  }
  await onProgress({stage,status:'completed',elapsedMs:Date.now()-started,
@@ -639,11 +642,12 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   if(!book)throw Error('A selected source is absent from the published manifest.');
  }
  const answerCandidates=prepareAnswerCandidates(populated);
+ const selectionAudit=auditEvidencePacketSelection(answerCandidates,selected,item.question,partQuestions);
  const retrievalCandidates=populated.map(({bookId,title,page,globalPageId,score,facet,facetRanks,
   matchedFacets,candidatePartIds,preview,text})=>({bookId,title,page,globalPageId,score,facet,facetRanks,
   matchedFacets,candidatePartIds,excerpt:String(preview||text||'').slice(0,1200)}));
  return {selected,candidates:answerCandidates,searches:retrieval.searches,retrievalCandidates,
-  selectionCoverage:auditSelectionCoverage(answerCandidates,selected,partQuestions)};
+  selectionCoverage:auditSelectionCoverage(answerCandidates,selected,partQuestions),selectionAudit};
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,preparedPlan=null,answerVariant='with-review',retrievalProfile='baseline',onProgress=async()=>{}}){
  if(!['with-review','compose-only','paired-review-ablation','with-expansion','paired-expansion-ablation','paired-selection-ablation'].includes(answerVariant))
@@ -655,7 +659,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  await progress('case','started',`Starting ${answerVariant} evaluation for this question.`);
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
- let plan,queries,plannerFallback=false,plannerFailure=null,plannerSkipped=false,plannerReused=false,
+ let plan,queries,plannerFallback=false,plannerFailure=null,plannerFailureDiagnostics=null,plannerSkipped=false,plannerReused=false,
   plannerWorkerVersionId=null,plannerWorkerSourceBuild=null,plannerWorkerSourceRevision=null;
  if(preparedPlan&&(validSearchPlan(preparedPlan.queries)||
    (preparedPlan.plannerFallback===true&&Array.isArray(preparedPlan.queries)&&
@@ -677,7 +681,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  }else try{
   plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner',progressEvent);
   if(!validSearchPlan(plan?.queries)){
-   const error=attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{httpStatus:200,failureCode:'invalid-response',workerFailure:false});
+   const error=attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{httpStatus:200,failureCode:'invalid-response',failureDetail:'invalid_output',workerFailure:false});
    throw error;
   }
   queries=plan.queries;
@@ -685,7 +689,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   plannerWorkerSourceBuild=plan.workerSourceBuild||null;
   plannerWorkerSourceRevision=plan.workerSourceRevision||null;
  }catch(error){
-  if(!error.requestFailure)error.requestFailure={stage:'planner',httpStatus:null,failureCode:'planner-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
+  if(!error.requestFailure)error.requestFailure={stage:'planner',httpStatus:null,failureCode:'planner-failed',failureDetail:'unknown',message:String(error.message||error).slice(0,240),workerFailure:false};
   const failure=error.requestFailure;
   plannerWorkerVersionId=failure.workerVersionId||null;
   plannerWorkerSourceBuild=failure.workerSourceBuild||null;
@@ -693,6 +697,11 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   if(!canFallbackToDirectSearch(failure.httpStatus,failure.failureCode))throw error;
   plannerFallback=true;
   plannerFailure={httpStatus:failure.httpStatus,failureCode:failure.failureCode};
+  // Keep the established compact field stable for existing artifact readers;
+  // richer safe stage/class details live beside it in a versionable field.
+  plannerFailureDiagnostics={stage:'planner',workerFailureStage:failure.workerFailureStage||'planning',
+   httpStatus:failure.httpStatus,failureCode:failure.failureCode,
+   failureDetail:failure.failureDetail||'unknown',workerFailure:failure.workerFailure===true};
   queries=[item.question];
   await progress('planner','fallback','Planner was unavailable; continuing with the reader’s exact question.',{failureCode:failure.failureCode});
  }
@@ -710,8 +719,9 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerVersionId=plannerWorkerVersionId;
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
-  if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
- let gapQueries=[],gapQueryPartLinks=[],gapPlannerFailure=null;
+  if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;
+   if(plannerFailureDiagnostics)error.requestFailure.plannerFailureDiagnostics=plannerFailureDiagnostics;throw error;}
+ let gapQueries=[],gapQueryPartLinks=[],gapPlannerFailure=null,gapPlannerFailureDiagnostics=null;
  const initialSearches=loaded.searches;
  const initialRetrievalCandidates=loaded.retrievalCandidates;
  const initialRetrievalCoverage=assessEvidenceCoverage(initialRetrievalCandidates,item.question,partQuestions);
@@ -733,7 +743,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    if(!Array.isArray(gap?.queries)||gap.queries.length>3||gap.queries.some(value=>
      typeof value!=='string'||value.trim().length<8||value.trim().length>160))
     throw attachRequestFailure(new Error('Conditional retrieval planner returned invalid queries.'),
-     'gap-planner',{httpStatus:200,failureCode:'invalid-response',workerFailure:false});
+     'gap-planner',{httpStatus:200,failureCode:'invalid-response',failureDetail:'invalid_output',workerFailure:false});
    gapQueries=[...new Set(gap.queries.map(value=>value.trim()))];
    const weakPartIds=new Set(retrievalCoverage.weakParts.slice(0,6).map(part=>part.partId));
    gapQueryPartLinks=Array.isArray(gap.queryPartLinks)?gap.queryPartLinks.filter(link=>
@@ -757,8 +767,11 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     failure.gapPlannerAttempted=true;error.requestFailure=failure;throw error;
    }
    gapPlannerFailure=failure.failureCode||'gap-planning-failed';
+   gapPlannerFailureDiagnostics={stage:'gap-planner',workerFailureStage:failure.workerFailureStage||'gap-planning',
+    httpStatus:failure.httpStatus,failureCode:gapPlannerFailure,
+    failureDetail:failure.failureDetail||'unknown',workerFailure:failure.workerFailure===true};
    await progress('gap-planner','recovered','Conditional search planning failed; continuing with the original verified retrieval packet.',
-    {failureCode:gapPlannerFailure});
+    {failureCode:gapPlannerFailure,failureDetail:gapPlannerFailureDiagnostics.failureDetail});
   }
  }
  if(!loaded.selected.length){
@@ -796,7 +809,9 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
      score:candidate.score,facet:candidate.facet,facetRanks:candidate.facetRanks,candidatePartIds:candidate.candidatePartIds||[],
      excerpt:String(candidate.preview||candidate.text||'').slice(0,520)})),
     deterministicSelectionCoverage:loaded.selectionCoverage,
+    deterministicSelectionAudit:loaded.selectionAudit,
     modelSelectionCoverage:auditSelectionCoverage(loaded.candidates,modelSources,parts),
+    modelSelectionAudit:auditEvidencePacketSelection(loaded.candidates,modelSources,item.question,parts),
     deterministicSelected:loaded.selected.map(candidate=>({candidateId:idByCandidate.get(candidate)||null,bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
     deterministicExcludedCandidateIds:pool.filter(candidate=>!loaded.selected.includes(candidate)).map(candidate=>idByCandidate.get(candidate)),
     modelSelected:modelSources.map(candidate=>({candidateId:idByCandidate.get(candidate)||null,bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
@@ -833,6 +848,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    variantResults.push({answerVariant:answerVariant==='paired-selection-ablation'?'with-review':variant,
     ...(answerVariant==='paired-selection-ablation'?{selectionVariant:variant==='model-selection'&&selectionComparison?.status!=='completed'?'model-selection-fallback':variant}:{}),
     selectionCoverage:auditSelectionCoverage(loaded.candidates,answerSources,partQuestions),
+    selectionAudit:auditEvidencePacketSelection(loaded.candidates,answerSources,item.question,partQuestions),
     submittedSources:answerSources.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,excerpt:String(preview||'').slice(0,1200)})),
     pipeline:data.pipeline||null,...audit,usage:data.usage||null,
     ...(data.trace?{evidenceTrace:data.trace}:{})});
@@ -860,14 +876,15 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerReused,
   plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,plannerWorkerSourceRevision,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
-  ...(plannerFailure?{plannerFailure}:{}),plannerPlan:plan?.plan||null,
+  ...(plannerFailure?{plannerFailure}:{}),...(plannerFailureDiagnostics?{plannerFailureDiagnostics}:{}),plannerPlan:plan?.plan||null,
   searchesBeforeGap:initialSearches,retrievalCandidatesBeforeGap:initialRetrievalCandidates,
   searches,retrievalCandidates,
   retrievalCoverage:{triggered:gapSearchTriggered,
    weakParts:initialRetrievalCoverage.weakParts},
   ...(gapRetrievalRerun?{retrievalCoverageAfterGap:{weakParts:retrievalCoverage.weakParts}}:{}),
   gapPlannerAttempted:gapSearchTriggered,gapQueries,gapQueryPartLinks,
-  selectionCoverage:loaded.selectionCoverage,...(gapPlannerFailure?{gapPlannerFailure}:{}),
+  selectionCoverage:loaded.selectionCoverage,selectionAudit:loaded.selectionAudit,
+  ...(gapPlannerFailure?{gapPlannerFailure,gapPlannerFailureDiagnostics}:{}),
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
   ...primary,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
