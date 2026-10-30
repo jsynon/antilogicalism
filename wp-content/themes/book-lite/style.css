@@ -1445,14 +1445,6 @@ body {
 	z-index: 100000;
 }
 
-.site-theme-toggle::before {
-	color: rgba(255, 255, 255, .72);
-	content: "◆";
-	font-size: .5em;
-	line-height: 1;
-	margin-right: 8px;
-}
-
 .site-theme-toggle svg {
 	fill: none;
 	height: 16px;
@@ -1500,10 +1492,6 @@ body {
 		z-index: 100001;
 	}
 
-	.site-theme-toggle::before {
-		display: none;
-	}
-
 	.site-theme-toggle:hover {
 		background: rgba(255, 255, 255, .08);
 	}
@@ -1546,6 +1534,12 @@ body {
 
 	.site-navigation .menu-primary-container > ul.menu > li {
 		left: auto;
+	}
+
+	/* Use the menu's own separator before the theme control. */
+	.site-navigation .menu-primary-container > ul.menu > li:last-child::after {
+		content: "♦";
+		margin: 0 0 0 17px;
 	}
 
 	.site-navigation .site-theme-toggle {
