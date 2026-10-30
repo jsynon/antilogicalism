@@ -102,8 +102,8 @@ test('the production facet merger preserves both facets and ranks stronger passa
   {sources:[page('7',14,64),page('12',117,55)]},
   {sources:[page('529',495,84),page('547',215,45)]},
  ],8);
- assert.deepEqual(result.map(x=>x.bookId),['529','7','12','547']);
- assert.deepEqual(result.slice(0,2).map(x=>x.facet),[1,0]);
+ assert.deepEqual(result.map(x=>x.bookId),['7','529','12','547']);
+ assert.deepEqual(result.slice(0,2).map(x=>x.facet),[0,1]);
 });
 
 test('public retrieval evaluation searches both planner facets and exact question',async()=>{

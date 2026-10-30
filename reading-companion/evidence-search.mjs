@@ -2,8 +2,11 @@ import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms,
  PRODUCTION_MAX_BOOKS,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
 import {catalogIdentity} from './reader-contract.mjs';
 
-// Keep live browser and workflow retrieval breadth on one shared contract.
-export const LIVE_RETRIEVAL_CONFIG=Object.freeze({maxCandidates:24,
+// Keep live browser and workflow retrieval breadth on one shared contract. The
+// 32-page candidate handoff gives the semantic selector room for facet-only
+// works while remaining below its existing 48-candidate contract and transport
+// byte budget; the final answer packet stays separately capped at six pages.
+export const LIVE_RETRIEVAL_CONFIG=Object.freeze({maxCandidates:32,
  maxBooks:PRODUCTION_MAX_BOOKS,pagesPerBook:PRODUCTION_PAGES_PER_BOOK});
 // The wider profile is for controlled evaluations. Public traffic keeps the
 // proven baseline until saved-trace review shows a recall gain without weaker
@@ -249,6 +252,29 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
        reserved.push(candidate);reservedKeys.add(key);
      }
    }
+ }
+ // Before spending the remaining cap on globally corroborated pages, give
+ // each facet a fair chance to contribute its best as-yet-unrepresented work.
+ // Reciprocal-rank aggregation is useful for corroboration, but by itself it
+ // can let repeated hits from a few works crowd out a distinct work that only
+ // one query angle found. These are still candidates only; the Worker judges
+ // passage relevance after fingerprint verification.
+ const representedBooks=new Set(reserved.map(item=>String(item.bookId)));
+ for(let round=0;round<limit&&reserved.length<limit;round++){
+   let added=false;
+   for(let facet=0;facet<groups.length&&reserved.length<limit;facet++){
+     const entry=groups[facet].find(value=>valid(value)&&
+       !representedBooks.has(String(value.bookId))&&
+       !reservedKeys.has(String(value.bookId)+':'+value.page));
+     if(!entry)continue;
+     const key=String(entry.bookId)+':'+entry.page;
+     const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
+     if(!candidate)continue;
+     reserved.push(candidate);reservedKeys.add(key);
+     representedBooks.add(String(candidate.bookId));
+     added=true;
+   }
+   if(!added)break;
  }
  for(const candidate of ranked){
    const key=String(candidate.bookId)+':'+candidate.page;
@@ -1160,8 +1186,13 @@ export function auditSelectionCoverage(candidates,selected,partQuestions=[]){
 }
 export function prepareAnswerCandidates(candidates){
  if(!Array.isArray(candidates))return [];
+ // A catalogued general/subject index can contain topical terms plus useful
+ // looking page references even when the bounded text excerpt misses the
+ // index layout. Keep those pages in search traces, but never send them as
+ // answer evidence.
  return dedupeEditionCopies(candidates.filter(candidate=>
-  !isIndexLikeText(candidate?.text||candidate?.preview||candidate?.excerpt||'')));
+  !isIndexLikeText(candidate?.text||candidate?.preview||candidate?.excerpt||'')&&
+  !/\b(?:general|subject|topical)\s+index\b|\bindex\s+to\b/iu.test(String(candidate?.title||''))));
 }
 
 /* Offline evaluation view of the evidence packet. The local term-coherence

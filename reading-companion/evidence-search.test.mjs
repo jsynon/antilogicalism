@@ -460,7 +460,7 @@ test('generic author wording does not scope all-books retrieval to collective by
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,prepareAnswerCandidates} from './evidence-search.mjs';
 import {catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
 import {sourceAttributionLabel} from './citation-numbering.mjs';
 
@@ -489,6 +489,12 @@ test('index-style entries cannot combine unrelated terms into answer coverage',(
  const prose=assessEvidenceCoverage([{excerpt:'The simulation of Christian living at Jerusalem shapes the argument.'}],question);
  assert.equal(prose.shouldSearch,false);
 });
+test('catalogued index volumes stay out of the answer packet when previews are incomplete',()=>{
+ const candidate={...page(243,'517'),
+  title:'Sacred Books of the East, Volume 50: A General Index to the Sacred Books of the East — M. Winternitz',
+  preview:'A short OCR fragment with no repeated page-reference pattern.'};
+ assert.deepEqual(prepareAnswerCandidates([candidate]),[]);
+});
 test('answer selection collapses near-identical edition copies but retains distinct passages',()=>{
  const excerpt=Array.from({length:45},(_,i)=>'the same verified source text word'+i).join(' ');
  const longerExcerpt='An introduction with other contextual words. '+excerpt+
@@ -510,6 +516,21 @@ test('first two selections cover different semantic question facets',()=>{
  assert.deepEqual(out.slice(0,2).map(x=>x.page),[475,718]);
  assert.deepEqual(out.slice(0,2).map(x=>x.facet),[0,1]);
  assert.deepEqual(out.slice(2).map(x=>x.page),[465,814,476,719]);
+});
+test('candidate merge preserves a distinct work found by one facet before repeating works',()=>{
+ const repeated=[
+  {...page(1,'7'),score:100},
+  {...page(2,'7'),score:99},
+  {...page(3,'7'),score:98},
+  {...page(4,'35'),score:97}
+ ];
+ const out=mergeFacetSearches([
+  {sources:repeated},
+  {sources:[{...page(1,'7'),score:100},{...page(2,'7'),score:99},
+   {...page(5,'40'),score:95}]},
+  {sources:[{...page(1,'7'),score:100},{...page(6,'44'),score:94}]}
+ ],4);
+ assert.deepEqual(out.slice(0,4).map(source=>source.bookId),['7','40','44','35']);
 });
 test('deduplicates common matches and selects a distinct second facet page',()=>{
  const out=mergeFacetSearches([

@@ -260,10 +260,11 @@ test('acceptance mode preserves its baseline and adds four calibration cases',()
  assert.match(focused[0].review_focus[1],/optional/);
  const simulation=selectLiveCases({cases:[]},'acceptance','acceptance-simulation-hypothesis');
  assert.equal(simulation.length,1);
- assert.deepEqual(simulation[0].required_source_groups.map(group=>group.book_ids),[
-  ['25'],['19','20','35']]);
- assert.match(simulation[0].review_focus[0],/do not establish whether we live in a computer simulation/);
- assert.match(simulation[0].review_focus[2],/as evidence for a computational simulation/);
+ assert.deepEqual(simulation[0].planner_queries,[]);
+ assert.deepEqual(simulation[0].required_source_groups,[]);
+ assert.match(simulation[0].review_focus[0],/distinguish a general skeptical possibility/);
+ assert.match(simulation[0].review_focus[1],/no particular author, school, or source is required/);
+ assert.doesNotMatch(simulation[0].review_focus.join(' '),/Descartes|Berkeley|Hume/);
  const buddha=selectLiveCases({cases:[]},'acceptance','acceptance-buddha-on-death');
  assert.equal(buddha.length,1);
  assert.deepEqual(buddha[0].required_source_groups.map(group=>group.book_ids),[
