@@ -2453,11 +2453,11 @@ html body .site-navigation .site-theme-toggle:focus-visible {
 
 
 
-/* Keep only the footer RSS article titles white in dark mode. */
-html[data-theme="dark"] #supplementary .widget_rss > ul > li > a.rsswidget,
-html[data-theme="dark"] #supplementary .widget_rss > ul > li > a.rsswidget:visited,
-html[data-theme="dark"] #supplementary .widget_rss > ul > li > a.rsswidget:hover,
-html[data-theme="dark"] #supplementary .widget_rss > ul > li > a.rsswidget:focus-visible,
-html[data-theme="dark"] #supplementary .widget_rss > ul > li > a.rsswidget:active {
+/* Keep the two footer RSS feed headings white in dark mode. */
+html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title,
+html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title:visited,
+html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title:hover,
+html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title:focus-visible,
+html[data-theme="dark"] #supplementary .widget_rss > h1.widget-title > a.rss-widget-title:active {
 	color: #fff;
 }
