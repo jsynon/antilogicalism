@@ -1538,7 +1538,7 @@ body {
 
 	/* Use the menu's own separator before the theme control. */
 	.site-navigation .menu-primary-container > ul.menu > li:last-child::after {
-		content: "\\2666";
+		content: "♦";
 		margin: 0 0 0 17px;
 	}
 
