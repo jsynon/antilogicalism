@@ -133,7 +133,7 @@ export function auditPassageGoldReview(report,gold){
   bestCandidatePacketMisses:claimChecks.filter(item=>item.bestCandidateInPool&&!item.bestCandidateSubmitted).length,
   bestCandidateSearchMisses:claimsWithBest.filter(item=>item.bestCandidateSearchHit===false).length,
   bestCandidateSearchUnknown:claimsWithBest.filter(item=>item.bestCandidateSearchHit===null).length,
-  bestCandidateFusionMisses:claimsWithBest.filter(item=>item.bestCandidateSearchHit===true&&!item.bestCandidateInPool).length,
+  bestCandidateAssemblyMisses:claimsWithBest.filter(item=>item.bestCandidateSearchHit===true&&!item.bestCandidateInPool).length,
   bestCandidateUseMisses:claimsWithBest.filter(item=>item.bestCandidateSubmitted&&!item.bestCandidateClaimLinkedLocated).length,
   nonBestHighlights:claimChecks.reduce((sum,item)=>sum+item.nonBestHighlights.length,0),
   statusMismatches:statusChecks.filter(item=>!item.consistent).length,

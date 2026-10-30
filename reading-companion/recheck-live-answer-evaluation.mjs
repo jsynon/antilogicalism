@@ -44,7 +44,7 @@ async function main(){
  console.log('Passage gold review: '+passageReview.checkedCases+' cases; '+
   passageReview.bestCandidateSearchMisses+' best passages absent from complete search traces, '+
   passageReview.bestCandidateSearchUnknown+' search outcomes unknown in older/partial traces, '+
-  passageReview.bestCandidateFusionMisses+' search hits lost before the candidate pool, '+
+  passageReview.bestCandidateAssemblyMisses+' search hits not retained in the candidate pool, '+
   passageReview.bestCandidatePacketMisses+' candidate hits omitted from the answer packet, '+
   passageReview.bestCandidateUseMisses+' submitted passages without a claim-linked located highlight, '+
   passageReview.nonBestHighlights+' non-best highlights, '+
