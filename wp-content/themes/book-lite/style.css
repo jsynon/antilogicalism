@@ -1563,8 +1563,8 @@ html[data-theme="dark"] {
 	--site-surface-raised: #0d1117;
 	--site-text: #e6edf3;
 	--site-muted: #8b949e;
-	--site-link: #58a6ff;
-	--site-link-hover: #79c0ff;
+	--site-link: #fff;
+	--site-link-hover: #58a6ff;
 	--site-border: #30363d;
 	--site-control-border: #484f58;
 	--site-button-bg: #21262d;
@@ -2450,15 +2450,18 @@ html body .site-navigation .site-theme-toggle:focus-visible {
 /* Keep only the Arts & Letters Daily and Quanta footer headings white in dark mode. */
 html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title,
 html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title:visited,
+html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title,
+html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:visited {
+	color: #fff;
+}
+
 html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title:hover,
 html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title:focus-visible,
 html[data-theme="dark"] #second #rss-3 > h1.widget-title > a.rss-widget-title:active,
-html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title,
-html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:visited,
 html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:hover,
 html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:focus-visible,
 html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:active {
-	color: #fff;
+	color: var(--site-link-hover);
 }
 
 
@@ -2467,4 +2470,13 @@ html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:ac
 	font-size: 1.9rem;
 	font-weight: bold;
 	text-transform: uppercase;
+}
+
+
+/* Keep dark-mode links white until hover, including the navigation and RSS headings. */
+html[data-theme="dark"] .site-navigation a:hover,
+html[data-theme="dark"] .site-navigation a:focus-visible,
+html[data-theme="dark"] .site-navigation .site-theme-toggle:hover,
+html[data-theme="dark"] .site-navigation .site-theme-toggle:focus-visible {
+	color: var(--site-link-hover);
 }
