@@ -1528,6 +1528,35 @@ body {
 	}
 }
 
+/* Keep the centered desktop menu centered when the theme control follows it. */
+@media (min-width: 1201px) {
+	.site-navigation .menu-primary-container {
+		display: inline-block;
+		vertical-align: middle;
+	}
+
+	.site-navigation .menu-primary-container > ul.menu {
+		display: inline-block;
+		float: none;
+		position: static;
+		right: auto;
+		vertical-align: middle;
+	}
+
+	.site-navigation .menu-primary-container > ul.menu > li {
+		left: auto;
+	}
+
+	.site-navigation .site-theme-toggle {
+		margin-left: 8px;
+		position: relative;
+		right: auto;
+		top: auto;
+		transform: none;
+		vertical-align: middle;
+	}
+}
+
 /*
  * Shared dark palette for the site-wide theme.
  * Page-specific tools may refine these surface and control colors below.
