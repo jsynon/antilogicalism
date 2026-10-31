@@ -26,7 +26,7 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.18.7'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.18.8'));
 });
 test('v49 answer renderer keeps default prose out of accidental ordered lists',()=>{
  assert.match(clientV49,/questionRequestsEnumeration\(turnQuestion\)/);
@@ -227,18 +227,22 @@ test('answer citations open in the local page reader while Sources keeps the PDF
  assert.ok(clientV49.includes('sourceReader.open({...source,excerpts},read)'));
  assert.ok(clientV49.includes("const citationLabel=node('p','Citation ['+\n        citationDisplayLabel(source.id,numbering)+']','companion-source-number')"),
   'the source citation number is a non-clickable label');
- assert.ok(clientV49.includes('card.append(citationLabel)'));
+ assert.ok(clientV49.includes('card.append(citationLabel,link)'));
+ assert.ok(clientV49.includes("if(attribution)card.append(node('p',attribution,'companion-source-attribution'))"));
  assert.doesNotMatch(clientV49,/citationButton|sourceReader\.open\(\{\.\.\.source,excerpts\},citationLabel\)/,
   'the source card has no second control for opening the same excerpts');
  assert.ok(clientV49.includes("link.textContent=source.title+' · p. '+source.page;"),
   'only the book title and page label open the scanned book');
- assert.ok(clientV49.includes('card.append(link)'));
+ assert.ok(clientV49.includes('// Keep the source identity and its voice together before the excerpts,'));
+ assert.ok(clientV49.includes('// The title opens the scan; Read passages remains the excerpt control.'));
  assert.doesNotMatch(clientV49,/link\.textContent='\['\+citationDisplayLabel\(source\.id,numbering\)/,
   'the citation number is not part of the scanned-book link');
  assert.ok(clientV49.includes('link.href=source.url'));
  assert.ok(clientV49.includes("panel.append(node('h3','Key passages from the source books'))"));
  assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
  assert.ok(html.includes('.companion-source-number{'));
+ assert.ok(html.includes('.companion-key-passage>.companion-source-attribution{order:2;'));
+ assert.ok(html.includes('.companion-key-quote{order:3}'));
 });
 
 test('Book Lite opening drop cap and small-caps apply only to the introductory paragraph',()=>{
