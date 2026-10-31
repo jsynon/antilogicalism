@@ -184,7 +184,7 @@ test('v1.10 never claims unsupported books are ready if fingerprint index missin
 
 test('public companion copy explains cited sources and keeps source reading controls',()=>{
  assert.match(html,/Numbered citations in the answer open their passages in the page reader/);
- assert.match(html,/In Key passages, the citation number labels the source/);
+ assert.doesNotMatch(html,/In Key passages, the citation number labels the source/);
  assert.match(html,/“Read passages” opens its excerpts here, and the book title opens the original scanned book/);
  assert.doesNotMatch(html,/Open PDF/);
  assert.match(client,/Read highlighted passage/);
@@ -227,13 +227,19 @@ test('answer citations open in the local page reader while Sources keeps the PDF
  assert.ok(clientV49.includes('sourceReader.open({...source,excerpts},read)'));
  assert.ok(clientV49.includes("const citationLabel=node('p','Citation ['+\n        citationDisplayLabel(source.id,numbering)+']','companion-source-number')"),
   'the source citation number is a non-clickable label');
- assert.ok(clientV49.includes('card.append(citationLabel,link)'));
+ const quoteOrder=clientV49.indexOf('card.append(quote);');
+ const citationOrder=clientV49.indexOf('card.append(citationLabel);',quoteOrder);
+ const buttonAndTitleOrder=clientV49.indexOf('card.append(read,link);',citationOrder);
+ const attributionOrder=clientV49.indexOf("card.append(node('p',attribution,'companion-source-attribution'));",buttonAndTitleOrder);
+ assert.ok([quoteOrder,citationOrder,buttonAndTitleOrder,attributionOrder]
+  .every((position,index,all)=>position>=0&&(index===0||position>all[index-1])),
+  'the DOM order is passage, citation, button, book title, then attribution');
  assert.ok(clientV49.includes("if(attribution)card.append(node('p',attribution,'companion-source-attribution'))"));
  assert.doesNotMatch(clientV49,/citationButton|sourceReader\.open\(\{\.\.\.source,excerpts\},citationLabel\)/,
   'the source card has no second control for opening the same excerpts');
  assert.ok(clientV49.includes("link.textContent=source.title+' · p. '+source.page;"),
   'only the book title and page label open the scanned book');
- assert.ok(clientV49.includes('// Keep the source identity and its voice together before the excerpts,'));
+ assert.ok(clientV49.includes('// The citation label stays separate from the linked book title.'));
  assert.ok(clientV49.includes('// The title opens the scan; Read passages remains the excerpt control.'));
  assert.doesNotMatch(clientV49,/link\.textContent='\['\+citationDisplayLabel\(source\.id,numbering\)/,
   'the citation number is not part of the scanned-book link');
@@ -241,8 +247,9 @@ test('answer citations open in the local page reader while Sources keeps the PDF
  assert.ok(clientV49.includes("panel.append(node('h3','Key passages from the source books'))"));
  assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
  assert.ok(html.includes('.companion-source-number{'));
- assert.ok(html.includes('.companion-key-passage>.companion-source-attribution{order:2;'));
- assert.ok(html.includes('.companion-key-quote{order:3}'));
+ assert.ok(html.includes('.companion-key-passage>.companion-source-attribution{order:4;'));
+ assert.ok(html.includes('.companion-key-quote{order:0}'));
+ assert.ok(html.includes('.companion-key-passage>button.companion-inline-read{order:2}'));
 });
 
 test('Book Lite opening drop cap and small-caps apply only to the introductory paragraph',()=>{

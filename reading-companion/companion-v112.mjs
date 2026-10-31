@@ -415,18 +415,7 @@ function renderResponse(data,turnQuestion=''){
         .filter(value=>typeof value==='string'&&value.trim()).slice(0,3);
       if(!excerpts.length&&typeof highlight?.quote==='string'&&highlight.quote.trim())excerpts.push(highlight.quote);
       const card=node('article',undefined,'companion-key-passage');
-      // This number labels the answer citation; the nearby Read passages
-      // button is the single source-card control for opening its excerpts.
-      const citationLabel=node('p','Citation ['+
-        citationDisplayLabel(source.id,numbering)+']','companion-source-number');
-      const link=document.createElement('a');link.href=source.url;
-      link.target='_blank';link.rel='noopener noreferrer';
-      link.textContent=source.title+' · p. '+source.page;
-      // Keep the source identity and its voice together before the excerpts,
-      // so a pseudonym cannot look like it belongs to the preceding book.
-      card.append(citationLabel,link);
-      const attribution=sourceAttributionLabel(source.provenance);
-      if(attribution)card.append(node('p',attribution,'companion-source-attribution'));
+      // Keep the source-card DOM order aligned with its displayed reading order.
       if(excerpts.length){
         excerpts.forEach(excerpt=>{
           // Use semantic blockquote markup so each verified passage reads as
@@ -435,25 +424,27 @@ function renderResponse(data,turnQuestion=''){
           quote.append(node('p',excerpt));
           card.append(quote);
         });
-        const read=node('button','Read passages','companion-inline-read');
-        read.type='button';
-        read.addEventListener('click',async()=>{
-          try{await sourceReader.open({...source,excerpts},read);}
-          catch(error){setStatus('Source reader: '+error.message);}
-        });
-        card.append(read);
       }else{
         card.append(node('p','No verified passage highlight is available for this citation.',
           'companion-key-note'));
-        const read=node('button','Read passages','companion-inline-read');
-        read.type='button';
-        read.addEventListener('click',async()=>{
-          try{await sourceReader.open({...source,excerpts:[]},read);}
-          catch(error){setStatus('Source reader: '+error.message);}
-        });
-        card.append(read);
       }
+      // The citation label stays separate from the linked book title.
+      const citationLabel=node('p','Citation ['+
+        citationDisplayLabel(source.id,numbering)+']','companion-source-number');
+      card.append(citationLabel);
+      const read=node('button','Read passages','companion-inline-read');
+      read.type='button';
+      read.addEventListener('click',async()=>{
+        try{await sourceReader.open({...source,excerpts},read);}
+        catch(error){setStatus('Source reader: '+error.message);}
+      });
+      const link=document.createElement('a');link.href=source.url;
+      link.target='_blank';link.rel='noopener noreferrer';
+      link.textContent=source.title+' · p. '+source.page;
       // The title opens the scan; Read passages remains the excerpt control.
+      card.append(read,link);
+      const attribution=sourceAttributionLabel(source.provenance);
+      if(attribution)card.append(node('p',attribution,'companion-source-attribution'));
       panel.append(card);
     }
     turn.append(panel);
