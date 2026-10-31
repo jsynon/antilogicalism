@@ -116,7 +116,7 @@ node .\reading-companion\recheck-live-answer-evaluation.mjs `
   --output .\downloaded-artifact\reading-companion-live-answer-evaluation.offline-rechecked.json
 ```
 
-The new `offlineRecheck` fields preserve the original report and show the corrected structural score alongside it. This can correct evaluator false negatives, but it does not change the generated answer or verify factual truth. Run its regression tests with `node --test .\reading-companion\live-answer-evaluation.test.mjs`.
+The new `offlineRecheck` fields preserve the original report and show the corrected structural score alongside it. Reviewer labels are also refreshed from saved traces when an older artifact lacks support-issue dispositions. `supportIssueDispositions` separates final-answer issues from claims rejected before the final answer, rejected alternate sources, and unresolved cases; the aggregate issue count remains available. This can correct evaluator false negatives and clarify review outcomes, but it does not change the generated answer or verify factual truth. Run its regression tests with `node --test .\reading-companion\live-answer-evaluation.test.mjs`.
 
 ## One-time setup
 
@@ -411,3 +411,10 @@ The response renderer already separates blank-line paragraphs and common inline 
 The run #36 Descartes trace showed page 5 in the browser candidate pool with links to both P1 and P2, but the Worker evidence plan linked it only to P1. The current live client removed `candidatePartIds` while building the Worker request, so the Worker could not use the retrieval-stage association when linking verified pages to the planner's parts. The browser now sends those bounded part IDs with each candidate, and the acceptance evaluator sends the same metadata so offline runs match production. These IDs guide page-to-part eligibility; the Worker still verifies page identity, and claim citations still require reviewed exact spans. A part link by itself is not evidence support.
 
 The trace was from Worker source revision `49d5932b627ad5993e6136faf155c3526f51c71d`, before the contextual-review and missing-decision changes in PR #329 were present in the run. The saved artifact can confirm that both part links reached the candidate pool, but replaying it cannot generate a new model review or establish that the Worker will use P2's source correctly. After the Worker and site revisions are deployed, rerun the Descartes case once and inspect, in order, the browser candidate part IDs, Worker `plan.parts[].candidateSourceIds`, cited claim, and reviewed spans. Score the answer's explanation and exact source support separately from structural coverage.
+
+
+## October 31, 2026: replay support-issue and formatting distinctions offline
+
+The offline evaluator now rebuilds older reviewer summaries from their preserved review contracts when they lack `supportIssueDispositions`. The report retains the total issue count and separates issues that remain in the final answer from rejected draft claims, rejected alternate source decisions, and unresolved cases. This avoids treating a correctly rejected draft claim as though it reached the reader. The classification uses the saved final answer and matching claim/source review decisions; ambiguous cases remain unresolved rather than being guessed.
+
+The answer Markdown parser now splits a run of inline bullets when the model emits a period followed by a bullet marker with multiple spaces. This matches the captured Epictetus and Buddha formatting while leaving ordinary inline italics intact. Regression tests use those observed shapes; this parser check measures rendered block structure, not answer correctness.

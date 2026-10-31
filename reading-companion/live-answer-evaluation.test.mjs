@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeAnswerVariants,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeAnswerVariants,summarizeReviewerLabels,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -498,6 +498,30 @@ test('human rubric summary keeps semantic review separate from structural passes
  assert.equal(scored.reviewed,1);
  assert.deepEqual(scored.averageScores,{accuracy:2,questionCoverage:1,explanationQuality:1,citationSupport:2,citationCompleteness:0});
  assert.equal(scored.qualityPass,null,'human scores are reported, not collapsed into an unsupported pass threshold');
+});
+
+test('reviewer summary separates final-answer support failures from rejected draft claims',()=>{
+ const cases=[
+  {id:'direct-answer-gap',answerText:'The answer gives a related idea but not the requested explanation.',
+   evidenceTrace:{reviewContract:{valid:true,
+    supportIssues:[{partId:'P1',reason:'direct-answer-claim-missing'}],
+    partDecisions:[{partId:'P1',finalStatus:'partial'}],reviewDecisions:[]}}},
+  {id:'rejected-draft-claim',answerText:'The gifts of Fortune cannot secure happiness because they are unstable.',
+   reviewerLabels:{available:true,supportIssueCount:1},
+   evidenceTrace:{reviewContract:{valid:true,
+    supportIssues:[{partId:'P1',claimId:'P1-C2',sourceId:'S5',reason:'claim-source-not-supported'}],
+    partDecisions:[{partId:'P1',finalStatus:'answered'}],reviewDecisions:[{
+     partId:'P1',claimId:'P1-C2',sourceId:'S5',accepted:false,claimStatus:'partial',
+     claimText:'The instability of Fortune\'s gifts reveals that they are handmaids to Fortune rather than permanent attributes of the human soul.'
+    }]}}}
+ ];
+ const summary=summarizeReviewerLabels(cases);
+ assert.equal(summary.supportIssueCount,2);
+ assert.deepEqual(summary.supportIssueDispositions,{
+  finalAnswer:1,rejectedBeforeFinal:1,rejectedAlternateSource:0,unresolved:0
+ });
+ assert.equal(summary.entries[1].labels.supportIssueDispositions.rejectedBeforeFinal,1,
+  'old stored aggregates are rebuilt from the retained trace');
 });
 
 test('paired variant summary reports structural results and human scores separately',()=>{

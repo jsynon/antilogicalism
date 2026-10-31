@@ -310,6 +310,39 @@ function answerDeniesSupportedComparison(part,answer){
  const givesContrast=/\b(?:whereas|by contrast|in contrast|unlike|differs? from|different from|the difference is|differ in|contrasts? with)\b/i.test(text);
  return explicitGap&&!givesContrast;
 }
+function normalizeClaimForMatch(value){
+ return String(value||'').normalize('NFKC').toLocaleLowerCase()
+  .replace(/\[\s*s\d+(?:\s*,\s*s\d+)*\s*\]/giu,' ')
+  .replace(/[*_`#]/gu,' ').replace(/\s+/gu,' ').trim();
+}
+function supportIssueDispositions(item,supportIssues,reviewDecisions,partDecisions){
+ const answer=normalizeClaimForMatch(item?.answerText||item?.answer||
+  item?.evidenceTrace?.final?.answer||item?.trace?.final?.answer||'');
+ const counts={finalAnswer:0,rejectedBeforeFinal:0,rejectedAlternateSource:0,unresolved:0};
+ for(const issue of supportIssues){
+  const claimId=String(issue?.claimId||'');
+  const sourceId=String(issue?.sourceId||'');
+  if(!claimId){
+   const part=partDecisions.find(decision=>decision?.partId===issue?.partId);
+   if(issue?.partId&&part&&part.finalStatus!=='answered')counts.finalAnswer++;
+   else counts.unresolved++;
+   continue;
+  }
+  const claimRows=reviewDecisions.filter(decision=>decision?.claimId===claimId&&
+   (!sourceId||!decision?.sourceId||decision.sourceId===sourceId));
+  const claimText=claimRows.find(decision=>typeof decision?.claimText==='string')?.claimText||'';
+  const normalizedClaim=normalizeClaimForMatch(claimText);
+  const appearsInFinal=normalizedClaim.length>=24&&answer.includes(normalizedClaim);
+  const rejected=claimRows.some(decision=>decision?.accepted===false);
+  const acceptedAlternative=reviewDecisions.some(decision=>decision?.claimId===claimId&&
+   decision?.accepted===true&&decision?.sourceId&&decision.sourceId!==sourceId);
+  if(appearsInFinal&&!acceptedAlternative)counts.finalAnswer++;
+  else if(rejected&&acceptedAlternative)counts.rejectedAlternateSource++;
+  else if(rejected&&!appearsInFinal)counts.rejectedBeforeFinal++;
+  else counts.unresolved++;
+ }
+ return counts;
+}
 function summarizeCaseReviewerLabels(item){
  // The live Worker response exposes its trace as `trace`; saved benchmark
  // rows normalize that same object to `evidenceTrace`. Read either shape so
@@ -321,6 +354,7 @@ function summarizeCaseReviewerLabels(item){
  const incompleteReasons=new Set(['missing-claim-source-decision','missing-claim-source-span']);
  const partDecisions=Array.isArray(contract.partDecisions)?contract.partDecisions:[];
  const reviewDecisions=Array.isArray(contract.reviewDecisions)?contract.reviewDecisions:[];
+ const issueDispositions=supportIssueDispositions(item,supportIssues,reviewDecisions,partDecisions);
  const contractIncomplete=contract.valid!==true||!Array.isArray(contract.partDecisions)||
   !Array.isArray(contract.reviewDecisions)||supportIssues.some(issue=>
    incompleteReasons.has(String(issue?.reason||'')));
@@ -344,6 +378,7 @@ function summarizeCaseReviewerLabels(item){
   validatedPartStatusCounts:statusCounts(partDecisions.map(item=>String(item?.finalStatus||''))),
   claimStatusCounts:statusCounts([...claimStatuses.values()]),
   supportIssueCount:supportIssues.length,
+  supportIssueDispositions:issueDispositions,
   incompleteSupportIssueCount:supportIssues.filter(issue=>
    incompleteReasons.has(String(issue?.reason||''))).length};
 }
@@ -352,8 +387,13 @@ export function summarizeReviewerLabels(cases){
   // Older rows can contain an explicit `{available:false}` placeholder even
   // though their preserved trace has the review contract needed for a fresh
   // summary. Prefer stored labels only when they actually contain a summary.
-  const storedLabels=item?.reviewerLabels?.available===true?item.reviewerLabels:
-   item?.offlineRecheck?.reviewerLabels?.available===true?item.offlineRecheck.reviewerLabels:null;
+  // Older artifacts stored only the aggregate support-issue count. Rebuild
+  // those summaries from their trace so a rejected draft claim is separated
+  // from a support problem that survived into the answer.
+  const hasCurrentDisposition=labels=>labels?.available===true&&
+   labels.supportIssueDispositions&&typeof labels.supportIssueDispositions==='object';
+  const storedLabels=hasCurrentDisposition(item?.reviewerLabels)?item.reviewerLabels:
+   hasCurrentDisposition(item?.offlineRecheck?.reviewerLabels)?item.offlineRecheck.reviewerLabels:null;
   return {id:String(item?.id||''),
    attemptNumber:Number.isInteger(item?.attemptNumber)?item.attemptNumber:null,
    reviewStatus:String(item?.reviewStatus||''),
@@ -373,6 +413,9 @@ export function summarizeReviewerLabels(cases){
   validatedPartStatusCounts:aggregate('validatedPartStatusCounts'),
   claimStatusCounts:aggregate('claimStatusCounts'),
   supportIssueCount:available.reduce((sum,item)=>sum+Number(item.labels.supportIssueCount||0),0),
+  supportIssueDispositions:Object.fromEntries(['finalAnswer','rejectedBeforeFinal',
+   'rejectedAlternateSource','unresolved'].map(key=>[key,available.reduce((sum,item)=>
+    sum+Number(item.labels.supportIssueDispositions?.[key]||0),0)])),
   incompleteSupportIssueCount:available.reduce((sum,item)=>sum+
    Number(item.labels.incompleteSupportIssueCount||0),0),
   entries};
