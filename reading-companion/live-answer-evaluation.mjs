@@ -218,7 +218,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return selected.map(copyEvaluationCase);
  }
  if(caseId&&caseId!=='all'){
-  if(!['quality','focused','paired','holdout','acceptance','fresh'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout, acceptance or fresh mode.');
+  if(!['quality','focused','paired','holdout','acceptance','fresh'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh cases can also be selected in fresh mode.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
