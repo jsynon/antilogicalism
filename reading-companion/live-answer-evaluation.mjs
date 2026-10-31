@@ -310,6 +310,62 @@ function answerDeniesSupportedComparison(part,answer){
  const givesContrast=/\b(?:whereas|by contrast|in contrast|unlike|differs? from|different from|the difference is|differ in|contrasts? with)\b/i.test(text);
  return explicitGap&&!givesContrast;
 }
+function summarizeCaseReviewerLabels(item){
+ const contract=item?.evidenceTrace?.reviewContract;
+ if(!contract||typeof contract!=='object')return {available:false};
+ const supportIssues=Array.isArray(contract.supportIssues)?contract.supportIssues:[];
+ const incompleteReasons=new Set(['missing-claim-source-decision','missing-claim-source-span']);
+ const partDecisions=Array.isArray(contract.partDecisions)?contract.partDecisions:[];
+ const reviewDecisions=Array.isArray(contract.reviewDecisions)?contract.reviewDecisions:[];
+ const contractIncomplete=contract.valid!==true||!Array.isArray(contract.partDecisions)||
+  !Array.isArray(contract.reviewDecisions)||supportIssues.some(issue=>
+   incompleteReasons.has(String(issue?.reason||'')));
+ const statusCounts=values=>values.reduce((counts,status)=>{
+  if(Object.hasOwn(counts,status))counts[status]++;
+  return counts;
+ },{answered:0,partial:0,unanswered:0});
+ const claimStatuses=new Map();
+ for(const decision of reviewDecisions){
+  const claimId=String(decision?.claimId||'');
+  const status=String(decision?.claimStatus||'');
+  if(!claimId||!['answered','partial','unanswered'].includes(status))continue;
+  const previous=claimStatuses.get(claimId);
+  // Source-linked claims can have one trace row per cited source. Count each
+  // claim once and retain the weakest status if those rows disagree.
+  const order={answered:0,partial:1,unanswered:2};
+  if(!previous||order[status]>order[previous])claimStatuses.set(claimId,status);
+ }
+ return {available:true,contractStatus:contractIncomplete?'incomplete':'complete',
+  reviewerPartStatusCounts:statusCounts(partDecisions.map(item=>String(item?.reviewerStatus||''))),
+  validatedPartStatusCounts:statusCounts(partDecisions.map(item=>String(item?.finalStatus||''))),
+  claimStatusCounts:statusCounts([...claimStatuses.values()]),
+  supportIssueCount:supportIssues.length,
+  incompleteSupportIssueCount:supportIssues.filter(issue=>
+   incompleteReasons.has(String(issue?.reason||''))).length};
+}
+export function summarizeReviewerLabels(cases){
+ const entries=(cases||[]).map(item=>({id:String(item?.id||''),
+  attemptNumber:Number.isInteger(item?.attemptNumber)?item.attemptNumber:null,
+  reviewStatus:String(item?.reviewStatus||''),
+  labels:item?.reviewerLabels||item?.offlineRecheck?.reviewerLabels||summarizeCaseReviewerLabels(item)}));
+ const available=entries.filter(item=>item.labels?.available);
+ const aggregate=key=>available.reduce((counts,item)=>{
+  for(const status of Object.keys(counts))
+   counts[status]+=Number(item.labels?.[key]?.[status])||0;
+  return counts;
+ },{answered:0,partial:0,unanswered:0});
+ return {caseCount:entries.length,
+  reviewContractCases:{complete:available.filter(item=>item.labels.contractStatus==='complete').length,
+   incomplete:available.filter(item=>item.labels.contractStatus==='incomplete').length,
+   unavailable:entries.length-available.length},
+  reviewerPartStatusCounts:aggregate('reviewerPartStatusCounts'),
+  validatedPartStatusCounts:aggregate('validatedPartStatusCounts'),
+  claimStatusCounts:aggregate('claimStatusCounts'),
+  supportIssueCount:available.reduce((sum,item)=>sum+Number(item.labels.supportIssueCount||0),0),
+  incompleteSupportIssueCount:available.reduce((sum,item)=>sum+
+   Number(item.labels.incompleteSupportIssueCount||0),0),
+  entries};
+}
 export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSources=[],options={}){
  const citations=Array.isArray(data?.citations)?data.citations:[];
  const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
@@ -465,6 +521,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   partStatusesConsistent&&!proseContradictions.length;
  const partEvidenceComplete=questionParts.length===0?null:
   partEvidenceAudit.every(part=>part.structurallyComplete!==false);
+ const reviewerLabels=summarizeCaseReviewerLabels(data);
  const evidenceAuditScope='Evidence IDs are checked for consistent linkage across question parts, the reviewed evidence map, cited sources, and submitted pages. This is a structural check, not a semantic judge of whether a passage truly supports a claim; review the answer and source text.';
  const failureCode=typeof data?.failureCode==='string'?data.failureCode:'';
  const failureStage=typeof data?.failureStage==='string'?data.failureStage:'';
@@ -472,9 +529,12 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
  const structuralPassed=coverage==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
   missingInline.length===0&&(citations.length>0||generalContextOnly)&&answerCoverageConsistent!==false&&partEvidenceComplete!==false&&
-  sourcePartAlignment.every(item=>item.aligned)&&!failureCode&&reviewStatus!=='pipeline-failed'&&
+  sourcePartAlignment.every(item=>item.aligned)&&reviewerLabels.contractStatus!=='incomplete'&&
+  !failureCode&&reviewStatus!=='pipeline-failed'&&
+  reviewStatus!=='review-contract-incomplete'&&
   reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed';
- return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,reviewStatus,failureCode,failureStage,
+ return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,reviewStatus,
+  reviewerLabels,failureCode,failureStage,
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
@@ -541,7 +601,8 @@ export function recheckQualityReport(report){
    answer:item.answerText,coverage:item.coverage,citations:item.citationSources,
    questionParts:item.questionParts,evidenceMap:item.evidenceMap,
    evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
-   workerSourceBuild:item.answerWorkerSourceBuild,workerSourceRevision:item.answerWorkerSourceRevision
+   workerSourceBuild:item.answerWorkerSourceBuild,workerSourceRevision:item.answerWorkerSourceRevision,
+   evidenceTrace:item.evidenceTrace
   },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups,
    definition.required_part_source_groups||[],{scope:item.scope||
     (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books'),
@@ -574,10 +635,11 @@ export function recheckQualityReport(report){
    highlightRelevance:audit.highlightRelevance}};
  });
  const checked=cases.filter(item=>item.offlineRecheck);
- return {...report,cases,humanReview:summarizeManualReviews(cases),answerVariants:summarizeAnswerVariants(cases),
+ return {...report,cases,humanReview:summarizeManualReviews(cases),
+  reviewerLabels:summarizeReviewerLabels(cases),answerVariants:summarizeAnswerVariants(cases),
   selectionVariants:summarizeSelectionVariants(cases),offlineRecheck:{checkedAt:new Date().toISOString(),
   evaluator:'local-structural-recheck-v1',networkCalls:0,aiCalls:0,
-  checkedCases:checked.length,
+  checkedCases:checked.length,reviewerLabels:summarizeReviewerLabels(checked),
   passedCases:checked.filter(item=>item.offlineRecheck.passed).length,
   failedCases:checked.filter(item=>!item.offlineRecheck.passed).length,
   questionPartStatusCounts:checked.reduce((totals,item)=>{
@@ -1224,6 +1286,7 @@ async function main(){
    answerQualityStatus:args.mode==='planner'?'not-assessed':'pending-human-review',
    requestFailureCases:report.requestFailureCases,
    plannerFallbackCases:report.plannerFallbackCases,
+   reviewerLabels:summarizeReviewerLabels(report.cases),
    humanReview:summarizeManualReviews(report.cases),
    answerVariants:summarizeAnswerVariants(report.cases),
    selectionVariants:summarizeSelectionVariants(report.cases),
@@ -1238,6 +1301,13 @@ async function main(){
   console.log(args.mode==='planner'?
    'Done: '+report.summary.passedCases+'/'+report.caseCount+' planner plans retrieved at least one expected book; no answers were generated.':
    (args.mode==='paired'?'Done: '+report.summary.passedCases+'/'+report.caseCount+' scope results met structural gates; paired scope totals are in scopeSummary. ':'Done: '+report.summary.passedCases+'/'+report.caseCount+' reviewed answers met structural gates; ')+report.summary.failedCases+' failed and '+report.summary.unscoredCases+' are unscored. Semantic answer quality requires the separate human rubric.');
+  if(args.mode!=='planner'){
+   const labels=report.summary.reviewerLabels;
+   console.log('Reviewer labels: '+labels.reviewerPartStatusCounts.answered+' answered, '+
+    labels.reviewerPartStatusCounts.partial+' partial, '+labels.reviewerPartStatusCounts.unanswered+
+    ' unanswered parts; '+labels.reviewContractCases.complete+' complete and '+
+    labels.reviewContractCases.incomplete+' incomplete review contracts. Human quality scores remain separate.');
+  }
   return report.requestFailureCases||(args.mode==='planner'&&report.summary.failedCases)||
    (usesEvaluationMode&&report.summary.failedCases>0&&!args.reportOnly)?1:0;
  }catch(error){

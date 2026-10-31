@@ -1,0 +1,446 @@
+{
+  "schema": "antilogicalism-reading-companion-reviewed-quality-baseline-v1",
+  "source": {
+    "workflowRunId": 41164688565,
+    "url": "https://github.com/jsynon/antilogicalism/actions/runs/41164688565",
+    "artifact": "reading-companion-quality-benchmark.json",
+    "artifactSha256": "3eb0463140d6053a425d8a65d001ebb9b95a888d2a00391d34e5e5ef153de6f2",
+    "reviewedOn": "2026-10-31",
+    "reviewMode": "offline review of saved answers and evidence traces"
+  },
+  "rubric": {
+    "scale": {
+      "min": 0,
+      "max": 2
+    },
+    "dimensions": [
+      "accuracy",
+      "questionCoverage",
+      "explanationQuality",
+      "citationSupport",
+      "citationCompleteness"
+    ],
+    "maximumTotal": 10,
+    "note": "Scores are an independent assistant judgment from the saved answer, citations, and trace. Reviewer and structural labels are recorded separately; they do not determine these scores."
+  },
+  "summary": {
+    "cases": 12,
+    "totalPoints": 88,
+    "maximumPoints": 120,
+    "meanTotal": 7.33,
+    "meanScores": {
+      "accuracy": 1.5,
+      "questionCoverage": 1.83,
+      "explanationQuality": 1.25,
+      "citationSupport": 1.17,
+      "citationCompleteness": 1.58
+    },
+    "byQuestion": {
+      "acceptance-buddha-on-death": {
+        "attempts": 3,
+        "meanTotal": 7.33,
+        "meanScores": {
+          "accuracy": 1.0,
+          "questionCoverage": 2.0,
+          "explanationQuality": 1.33,
+          "citationSupport": 1.0,
+          "citationCompleteness": 2.0
+        }
+      },
+      "acceptance-god-is-love": {
+        "attempts": 3,
+        "meanTotal": 8.67,
+        "meanScores": {
+          "accuracy": 2.0,
+          "questionCoverage": 2.0,
+          "explanationQuality": 1.33,
+          "citationSupport": 1.67,
+          "citationCompleteness": 1.67
+        }
+      },
+      "acceptance-life-meaning-authors": {
+        "attempts": 3,
+        "meanTotal": 8.33,
+        "meanScores": {
+          "accuracy": 1.67,
+          "questionCoverage": 2.0,
+          "explanationQuality": 1.33,
+          "citationSupport": 1.33,
+          "citationCompleteness": 2.0
+        }
+      },
+      "acceptance-simulation-hypothesis": {
+        "attempts": 3,
+        "meanTotal": 5.0,
+        "meanScores": {
+          "accuracy": 1.33,
+          "questionCoverage": 1.33,
+          "explanationQuality": 1.0,
+          "citationSupport": 0.67,
+          "citationCompleteness": 0.67
+        }
+      }
+    }
+  },
+  "cases": [
+    {
+      "caseId": "acceptance-god-is-love",
+      "attemptNumber": 1,
+      "scores": {
+        "accuracy": 2,
+        "questionCoverage": 2,
+        "explanationQuality": 1,
+        "citationSupport": 2,
+        "citationCompleteness": 1
+      },
+      "total": 8,
+      "notes": "The biblical explanation is clear and supported. Weil and Feuerbach add perspective, though the structure and some secondary material feel uneven.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "unanswered": 1,
+          "answered": 13
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-simulation-hypothesis",
+      "attemptNumber": 1,
+      "scores": {
+        "accuracy": 1,
+        "questionCoverage": 1,
+        "explanationQuality": 1,
+        "citationSupport": 1,
+        "citationCompleteness": 1
+      },
+      "total": 5,
+      "notes": "Discusses related library material but does not adequately answer whether we may live in a literal computer simulation.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "answered": 11
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-buddha-on-death",
+      "attemptNumber": 1,
+      "scores": {
+        "accuracy": 1,
+        "questionCoverage": 2,
+        "explanationQuality": 1,
+        "citationSupport": 1,
+        "citationCompleteness": 2
+      },
+      "total": 7,
+      "notes": "Coherent coverage of mortality and liberation, but one book dominates and secondary-source ideas need clearer attribution.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "partial": 1,
+          "answered": 10
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-life-meaning-authors",
+      "attemptNumber": 1,
+      "scores": {
+        "accuracy": 1,
+        "questionCoverage": 2,
+        "explanationQuality": 1,
+        "citationSupport": 1,
+        "citationCompleteness": 2
+      },
+      "total": 7,
+      "notes": "Good range, though formatting is rough. The Sartre/Roquentin attribution appears questionable despite reviewer acceptance.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "partial": 1,
+          "answered": 13
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-god-is-love",
+      "attemptNumber": 2,
+      "scores": {
+        "accuracy": 2,
+        "questionCoverage": 2,
+        "explanationQuality": 1,
+        "citationSupport": 2,
+        "citationCompleteness": 2
+      },
+      "total": 9,
+      "notes": "Focused and well supported, with the biblical answer central. The presentation is somewhat flat.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "unanswered": 1,
+          "answered": 10
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-simulation-hypothesis",
+      "attemptNumber": 2,
+      "scores": {
+        "accuracy": 1,
+        "questionCoverage": 2,
+        "explanationQuality": 2,
+        "citationSupport": 1,
+        "citationCompleteness": 1
+      },
+      "total": 7,
+      "notes": "The clearest direct explanation, including the simulation argument and objections. Some broader factual claims need qualification.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "general-context-answer",
+        "reviewStatus": "general-context-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "answered": 1
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-buddha-on-death",
+      "attemptNumber": 2,
+      "scores": {
+        "accuracy": 1,
+        "questionCoverage": 2,
+        "explanationQuality": 1,
+        "citationSupport": 1,
+        "citationCompleteness": 2
+      },
+      "total": 7,
+      "notes": "Broader coverage, but later traditions and secondary accounts blur with what sounds like the Buddha’s own teaching.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "unanswered": 1,
+          "answered": 10
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-life-meaning-authors",
+      "attemptNumber": 2,
+      "scores": {
+        "accuracy": 2,
+        "questionCoverage": 2,
+        "explanationQuality": 2,
+        "citationSupport": 2,
+        "citationCompleteness": 2
+      },
+      "total": 10,
+      "notes": "The strongest answer: direct, coherent, and supported by complementary sources.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "unanswered": 1,
+          "answered": 9
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-god-is-love",
+      "attemptNumber": 3,
+      "scores": {
+        "accuracy": 2,
+        "questionCoverage": 2,
+        "explanationQuality": 2,
+        "citationSupport": 1,
+        "citationCompleteness": 2
+      },
+      "total": 9,
+      "notes": "Strong Bible-centered answer with relevant context. The trace lacks a source decision for one cited claim.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "answered": 12
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {
+          "missing-claim-source-decision": 1
+        }
+      }
+    },
+    {
+      "caseId": "acceptance-simulation-hypothesis",
+      "attemptNumber": 3,
+      "scores": {
+        "accuracy": 2,
+        "questionCoverage": 1,
+        "explanationQuality": 0,
+        "citationSupport": 0,
+        "citationCompleteness": 0
+      },
+      "total": 3,
+      "notes": "Accurate but only one sentence, with no citations or developed explanation. The planner failed; four claims were rejected while the part was marked answered.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "general-context-answer",
+        "reviewStatus": "general-context-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "answered": 1,
+          "unanswered": 4
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-buddha-on-death",
+      "attemptNumber": 3,
+      "scores": {
+        "accuracy": 1,
+        "questionCoverage": 2,
+        "explanationQuality": 2,
+        "citationSupport": 1,
+        "citationCompleteness": 2
+      },
+      "total": 8,
+      "notes": "Fuller and more coherent, but still leans on a secondary source; the reviewer marked one claim partial.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "answered": 12,
+          "partial": 1
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    },
+    {
+      "caseId": "acceptance-life-meaning-authors",
+      "attemptNumber": 3,
+      "scores": {
+        "accuracy": 2,
+        "questionCoverage": 2,
+        "explanationQuality": 1,
+        "citationSupport": 1,
+        "citationCompleteness": 2
+      },
+      "total": 8,
+      "notes": "Substantial and wide-ranging, but some discussion relies on secondary interpretation and the presentation is less coherent.",
+      "automatedLabels": {
+        "structuralPassed": true,
+        "outcome": "verified-source-draft",
+        "reviewStatus": "claim-review",
+        "reviewerPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewerClaimStatusCounts": {
+          "partial": 1,
+          "answered": 13
+        },
+        "workerValidatedPartStatusCounts": {
+          "answered": 1
+        },
+        "reviewContractValid": true,
+        "supportIssues": {}
+      }
+    }
+  ]
+}

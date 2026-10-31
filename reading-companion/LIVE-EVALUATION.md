@@ -54,6 +54,10 @@ The question-steering audit removed topic-triggered search additions from shared
 
 For each answer, score these dimensions independently from 0 (fail) to 2 (strong): accuracy, question coverage, explanation quality, citation support, and citation completeness. Record a short note for any score below 2 that names the claim or passage driving it. Keep those human scores separate from the automated supported/partial/unsupported labels; compare the two signals across cases to spot where the partial labels miss an incomplete answer or flag an answer that a reviewer considers complete.
 
+The reviewed baseline for workflow run [#41164688565](https://github.com/jsynon/antilogicalism/actions/runs/41164688565) is saved at `benchmarks/human-reviews/quality-run-41164688565.json`. It records the 12 assistant-scored answers, notes, structural result, reviewer part/claim labels, and review support issues without changing the original Actions artifact. The score was 88/120 (7.33/10); all 12 passed structural checks and all 12 reviewer part decisions were `answered`, even though the answer scores and claim decisions show important differences. This is a calibration reference, not a release threshold or independent double score.
+
+New benchmark artifacts now summarize reviewer part labels, validated part labels, claim labels, review-contract completeness, and support-issue counts separately from `structuralPassed` and `humanReview`. A source decision missing for a cited claim makes its review contract incomplete. Do not interpret a reviewer `answered` label or a structurally complete report as a human quality score.
+
 ## Focused source-selection checks
 
 The `focused` mode is separate from the stable seven-question `quality` baseline and is available in both manually dispatched live-answer workflows. To run the whole five-question set in one job and one artifact, choose **mode `focused`** and **case ID `all`**. Choose one focused `case_id` only when diagnosing a single question. The cases are Kant on transcendental idealism, Kierkegaard on faith, Nietzsche on Christianity, sunyata, and the question about Nietzsche's possible response to Kierkegaard.
