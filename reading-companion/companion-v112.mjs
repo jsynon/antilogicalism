@@ -1,4 +1,4 @@
-/* Antilogicalism Reading Companion v1.18.4 — staged verified-library alpha.
+/* Antilogicalism Reading Companion v1.18.5 — staged verified-library alpha.
  * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
  * The Worker independently validates every submitted source page against v49
  * fingerprints before any inference. The verified scope comes from the
@@ -7,7 +7,7 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.17.0';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.18.0';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';

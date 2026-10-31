@@ -444,6 +444,19 @@ test('author-only mentions search across the named author’s catalog works',()=
  assert.deepEqual(matchExplicitBookIds(
   'In Leviathan, how does Hobbes describe the state of nature?',books),['163']);
 });
+test('incidental words in corporate bylines do not narrow all-books retrieval',()=>{
+ const books=[
+  {id:'400',title:'Paris Agreement — United Nations Framework Convention on Climate Change'},
+  {id:'40',title:'Critique of Pure Reason — Immanuel Kant'}
+ ];
+ const question='How have writers described the effects of technological change on how people live?';
+ assert.deepEqual(matchExplicitBookIds(question,books),[]);
+ assert.deepEqual(targetBooksForFacet(question,books),[null]);
+ assert.deepEqual(targetBooksForFacet(
+  'technological change and its effects on ordinary life',books),[null]);
+ assert.deepEqual(matchExplicitBookIds(
+  'What does United Nations Framework Convention on Climate Change say about cooperation?',books),['400']);
+});
 test('generic author wording does not scope all-books retrieval to collective bylines',()=>{
  const books=[...Array.from({length:8},(_,index)=>({
   id:String(283+index),title:`The Ante-Nicene Fathers, Volume ${index+1} — Various authors`

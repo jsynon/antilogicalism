@@ -750,11 +750,55 @@ function catalogAuthorNames(title){
   !COLLECTIVE_BYLINE.test(normalizeCatalogText(name)));
 }
 function namedSpeakerPhrase(question){
- const match=String(question||'').match(/\b(?:what|how)\s+(?:did|does|do|would)\s+([\p{L}][\p{L}\p{M}.'’\-]*(?:\s+[\p{L}][\p{L}\p{M}.'’\-]*){0,3})\s+(?:say|says|said|teach|teaches|taught|think|thinks|thought|argue|argues|argued|believe|believes|believed|write|writes|wrote|hold|holds|held)\b/iu);
+ // A last name is a scope hint only when the question places it in the
+ // speaker role. The verb set covers ordinary ways readers ask about a view;
+ // incidental topic words elsewhere in the question are not author mentions.
+ const match=String(question||'').match(/\b(?:what|how)\s+(?:did|does|do|would)\s+([\p{L}][\p{L}\p{M}.'’\-]*(?:\s+[\p{L}][\p{L}\p{M}.'’\-]*){0,3}?)\s+(?:(?:have|has|had)\s+to\s+)?(?:say|says|said|teach|teaches|taught|think|thinks|thought|argue|argues|argued|believe|believes|believed|write|writes|wrote|hold|holds|held|handle|handles|handled|address|addresses|addressed|describe|describes|described|explain|explains|explained|discuss|discusses|discussed|approach|approaches|approached|examine|examines|examined|present|presents|presented|portray|portrays|portrayed|interpret|interprets|interpreted|define|defines|defined)\b/iu);
  if(!match)return '';
  const name=match[1].trim();
- return new Set(['it','they','he','she','the author','the book','the text','people','someone','anyone'])
+ return new Set(['it','they','he','she','the author','the book','the text','people','someone','anyone',
+  'different authors','the authors','writers','the writers'])
   .has(normalizeCatalogText(name))?'':name;
+}
+function explicitlyComparedAuthors(question,names){
+ const text=normalizeCatalogText(question);
+ if(!/\b(?:difference|differ|compare|comparison|contrast|between|versus|vs)\b/i.test(text))
+  return new Set();
+ const candidates=[...new Map(names.map(name=>{
+  const key=normalizeCatalogText(name);
+  const surname=key.split(' ').filter(Boolean).at(-1)||'';
+  return [key,{key,surname}];
+ }).filter(([,item])=>item.surname.length>=4&&questionContainsPhrase(question,item.surname))).values()];
+ const mentioned=new Set();
+ for(let left=0;left<candidates.length;left++){
+  for(let right=left+1;right<candidates.length;right++){
+   const a=candidates[left],b=candidates[right];
+   if(a.surname===b.surname)continue;
+   const aIndex=text.indexOf(a.surname),bIndex=text.indexOf(b.surname);
+   if(aIndex<0||bIndex<0)continue;
+   const start=Math.min(aIndex,bIndex),end=Math.max(aIndex,bIndex);
+   if(/\b(?:and|versus|vs)\b/i.test(text.slice(start+a.surname.length,end))){
+    mentioned.add(a.key);mentioned.add(b.key);
+   }
+  }
+ }
+ return mentioned;
+}
+function explicitlyMentionsAuthor(question,name,comparedAuthors=new Set()){
+ const normalized=normalizeCatalogText(name);
+ if(!normalized)return false;
+ if(comparedAuthors.has(normalized)||questionContainsPhrase(question,name))return true;
+ const surname=normalized.split(' ').filter(Boolean).at(-1)||'';
+ if(surname.length<4)return false;
+ const speaker=normalizeCatalogText(namedSpeakerPhrase(question));
+ if(speaker&&(speaker===normalized||speaker===surname))return true;
+ // Preserve concise named-author questions ("Nietzsche on morality") while
+ // requiring a proper-name signal when a surname appears outside a speaker
+ // construction. Common lowercase topic words in a byline cannot scope search.
+ const escaped=surname.replace(/[.*+?^$()|[\]\\]/g,'\\$&');
+ const capitalized=new RegExp('(?<![\\p{L}])'+escaped[0].toLocaleUpperCase()+
+  escaped.slice(1)+'(?![\\p{L}])','u');
+ return capitalized.test(String(question||''));
 }
 function explicitlyNamedAuthorGroups(question,candidates){
  const groups=new Map();
@@ -768,17 +812,10 @@ function explicitlyNamedAuthorGroups(question,candidates){
    groups.get(key).bookIds.add(bookId);
   }
  }
- const surnameCounts=new Map();
- for(const group of groups.values()){
-  const surname=group.key.split(' ').at(-1)||'';
-  surnameCounts.set(surname,(surnameCounts.get(surname)||0)+1);
- }
- return [...groups.values()].filter(group=>{
-  const surname=group.key.split(' ').at(-1)||'';
-  return questionContainsPhrase(question,group.name)||
-   (surname.length>=4&&surnameCounts.get(surname)===1&&
-    questionContainsPhrase(question,surname));
- });
+ const comparedAuthors=explicitlyComparedAuthors(question,
+  [...groups.values()].map(group=>group.name));
+ return [...groups.values()].filter(group=>
+  explicitlyMentionsAuthor(question,group.name,comparedAuthors));
 }
 function comparisonAuthorOrder(question,candidates,facetBalanced,directFacet){
  const groups=explicitlyNamedAuthorGroups(question,candidates);
@@ -822,10 +859,12 @@ export function matchExplicitBookIds(question,books){
  const titleMatches=valid.filter(book=>
   catalogWorkTitles(book.title).some(title=>questionContainsPhrase(question,title)));
  const authorGroups=new Map();
+ const comparedAuthors=explicitlyComparedAuthors(question,
+  valid.flatMap(book=>catalogAuthorNames(book.title)));
  for(const book of valid){
   for(const name of catalogAuthorNames(book.title)){
-   const surname=normalizeCatalogText(name).split(' ').filter(Boolean).at(-1)||'';
-   if(surname.length>=4&&questionContainsPhrase(question,surname)){
+   if(explicitlyMentionsAuthor(question,name,comparedAuthors)){
+    const surname=normalizeCatalogText(name).split(' ').filter(Boolean).at(-1)||'';
     if(!authorGroups.has(surname))authorGroups.set(surname,[]);
     authorGroups.get(surname).push(book);
    }
