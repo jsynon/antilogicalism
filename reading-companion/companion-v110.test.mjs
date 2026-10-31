@@ -78,7 +78,8 @@ test('v49 Reading Companion page retains Book Lite and loads the v49 client',()=
  assert.doesNotMatch(html,/companion-v110\.mjs/);
 });
 test('companion introduction explains how to use it and links to Library Search',()=>{
- assert.match(html,/Ask questions about books in the Antilogicalism library/);
+ assert.match(html,/Explore questions and ideas with help from the Antilogicalism Library/);
+ assert.match(html,/The Reading Companion draws on relevant passages and may add general context/);
  assert.match(html,/Select a book or leave “All books” selected, enter your question/);
  assert(html.includes('href="/antilogicalism/digital-library/">Library Search</a>'));
  assert(html.includes('Search the full-text collection with <a href="/antilogicalism/digital-library/">Library Search</a> or browse books by title with the <a href="/antilogicalism/primary-sources/">Bookshelf</a>.'));
