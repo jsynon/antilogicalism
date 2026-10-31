@@ -681,7 +681,10 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
   }
   const terms=facetTerms(coverageQuestion);
   const overlap=terms.length?best.overlap:2;
-  const required=Math.min(2,terms.length);
+  // A couple of matching words are not enough when a question has several
+  // distinct content terms. Keep a small absolute floor for short questions,
+  // then require a modest share of the terms for longer facets.
+  const required=Math.min(terms.length,Math.max(2,Math.ceil(terms.length*0.35)));
   const weak=terms.length>0&&overlap<required;
   const indexLikeIsStrongest=bestIndex.overlap>best.overlap;
   const coverageReason=weak
@@ -694,10 +697,14 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
    ?(weak&&indexLikeIsStrongest&&bestIndex.matchedTerms.length
      ?bestIndex.matchedTerms:best.matchedTerms):[];
   return {...part,overlap,matchedTerms,
-   distinctiveTermCount:terms.length,coverageSignal:weak?'weak-coherent-text':'coherent-text-found',
+   distinctiveTermCount:terms.length,
+   coverageRatio:terms.length?Number((overlap/terms.length).toFixed(3)):1,
+   requiredTermCount:required,
+   coverageSignal:weak?'weak-coherent-text':'coherent-text-found',
    coverageReason,coverageSource:diagnosticMatch.source||indexLikeSource};
- }).filter(part=>part.coverageSignal==='weak-coherent-text');
- return {weakParts,shouldSearch:weakParts.length>0};
+ });
+ const weakParts=assessments.filter(part=>part.coverageSignal==='weak-coherent-text');
+ return {parts:assessments,weakParts,shouldSearch:weakParts.length>0};
 }
 export function validSearchPlan(value){
  return Array.isArray(value)&&value.length>=2&&value.length<=4&&

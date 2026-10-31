@@ -136,6 +136,16 @@ const FRESH3_CASES=[
  {id:'fresh3-selected-odyssey-homecoming',discipline:'literature',evaluation_scope:'selected-books',question:'How does Odysseus’s desire to return home shape his choices and the poem’s picture of heroism?',selected_book_ids:['186'],planner_queries:['How does Odysseus’s desire to return home shape his choices and the poem’s picture of heroism?'],required_source_groups:[{label:'Homer, The Odyssey',book_ids:['186']}],review_focus:[]},
  {id:'fresh3-selected-douglass-literacy',discipline:'history',evaluation_scope:'selected-books',question:'How does Douglass describe the role of literacy in his experience of enslavement and pursuit of freedom?',selected_book_ids:['459'],planner_queries:['How does Douglass describe the role of literacy in his experience of enslavement and pursuit of freedom?'],required_source_groups:[{label:'Frederick Douglass, Narrative of the Life of Frederick Douglass, an American Slave',book_ids:['459']}],review_focus:[]},
 ];
+// One-run handoff validation: two observed regressions plus three fresh,
+// open-ended controls. These cases test retrieval and question coverage, not
+// predetermined answer text or a required source for all-books questions.
+const HANDOFF_CASES=[
+ {id:'handoff-all-technology-change',discipline:'society',evaluation_scope:'all-books',question:'How have writers described the effects of technological change on the ways people live?',selected_book_ids:[],planner_queries:['How have writers described the effects of technological change on the ways people live?'],required_source_groups:[],review_focus:[]},
+ {id:'handoff-all-conscience-authority',discipline:'philosophy',evaluation_scope:'all-books',question:'How do writers explain the tension between conscience and obedience to authority, and when do they consider resistance justified?',selected_book_ids:[],planner_queries:['How do writers explain the tension between conscience and obedience to authority, and when do they consider resistance justified?'],required_source_groups:[],review_focus:[]},
+ {id:'handoff-all-memory-identity',discipline:'philosophy',evaluation_scope:'all-books',question:'How does memory contribute to personal identity, and what limits do writers place on what memory can tell us about who we are?',selected_book_ids:[],planner_queries:['How does memory contribute to personal identity, and what limits do writers place on what memory can tell us about who we are?'],required_source_groups:[],review_focus:[]},
+ {id:'handoff-selected-odyssey-homecoming',discipline:'literature',evaluation_scope:'selected-books',question:'How does Odysseus’s desire to return home shape his choices and the poem’s picture of heroism?',selected_book_ids:['186'],planner_queries:['How does Odysseus’s desire to return home shape his choices and the poem’s picture of heroism?'],required_source_groups:[{label:'Homer, The Odyssey',book_ids:['186']}],review_focus:[]},
+ {id:'handoff-selected-mill-liberty',discipline:'philosophy',evaluation_scope:'selected-books',question:'How does Mill defend freedom of thought, and what limits does he place on individual liberty?',selected_book_ids:['51'],planner_queries:['John Stuart Mill On Liberty defense of freedom of thought discussion and publication','Mill On Liberty limits of individual liberty harm to others'],required_source_groups:[{label:'Mill, On Liberty',book_ids:['51']}],review_focus:[]},
+];
 // This second fresh set changes topic and genre after the first five-case baseline.
 // All-books prompts have no expected author groups; selected-book cases check only
 // that evidence comes from the chosen work, leaving the answer itself open-ended.
@@ -215,7 +225,7 @@ function sourceRevision(){
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
- const evaluationCases=mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
+ const evaluationCases=mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
  if(mode==='acceptance'&&caseId==='repeatable-calibration'){
@@ -231,7 +241,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return selected.map(copyEvaluationCase);
  }
  if(caseId&&caseId!=='all'){
-  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh and fresh3 cases can be selected in their respective modes.');
+  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff'].includes(mode))throw Error('A specific case can be selected only in a supported evaluation suite.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
@@ -243,6 +253,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  if(mode==='acceptance')return ACCEPTANCE_CASES.map(copyEvaluationCase);
  if(mode==='fresh')return FRESH_CASES.map(copyEvaluationCase);
  if(mode==='fresh3')return FRESH3_CASES.map(copyEvaluationCase);
+ if(mode==='handoff')return HANDOFF_CASES.map(copyEvaluationCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
   const item=QUALITY_CASES.find(value=>value.id===id);
   if(!item)throw Error('The planner-only cases are missing from the quality suite.');
@@ -254,7 +265,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3 or full.');
+ throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(scope==='case-default')return cases.map(item=>({...item,selected_book_ids:item.evaluation_scope==='all-books'?[]:[...item.selected_book_ids]}));
@@ -264,7 +275,7 @@ export function applyQualityScope(cases,scope='selected-books'){
  return cases.map(item=>({...item,selected_book_ids:[]}));
 }
 export function evaluationUsesLivePlanner(mode,scope){
- if(mode==='fresh'||mode==='fresh3')return true;
+ if(mode==='fresh'||mode==='fresh3'||mode==='handoff')return true;
  return ['quality','focused','paired','holdout','acceptance'].includes(mode)&&
   (mode==='paired'||scope==='all-books');
 }
@@ -1108,8 +1119,9 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   searchesBeforeGap:initialSearches,retrievalCandidatesBeforeGap:initialRetrievalCandidates,
   searches,retrievalCandidates,
   retrievalCoverage:{triggered:gapSearchTriggered,
-   weakParts:initialRetrievalCoverage.weakParts},
-  ...(gapRetrievalRerun?{retrievalCoverageAfterGap:{weakParts:retrievalCoverage.weakParts}}:{}),
+   parts:initialRetrievalCoverage.parts,weakParts:initialRetrievalCoverage.weakParts},
+  ...(gapRetrievalRerun?{retrievalCoverageAfterGap:{parts:retrievalCoverage.parts,
+   weakParts:retrievalCoverage.weakParts}}:{}),
   gapPlannerAttempted:gapSearchTriggered,gapQueries,gapQueryPartLinks,
   retrievalBaselineSelectionCoverage:loaded.selectionCoverage,
   retrievalBaselineSelectionAudit:loaded.selectionAudit,
@@ -1274,15 +1286,15 @@ function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',sco
   if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='retrieval-profile')out.retrievalProfile=value;else if(key==='repeat')out.repeatCount=Number(value);else if(key==='report-only')out.reportOnly=value==='true';else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|handoff|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
  if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
- const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3'].includes(args.mode);
+ const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
- if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, paired, holdout, acceptance or fresh mode.');
- if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
- if((args.mode==='fresh'||args.mode==='fresh3')&&args.scope!=='case-default')throw Error('Fresh question suites must use case-default scope.');
+ if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in a supported evaluation suite.');
+ if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff')&&args.scope!=='case-default')throw Error('Fresh and handoff question suites must use case-default scope.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
   throw Error('Repeat count must be an integer from 1 to 3.');

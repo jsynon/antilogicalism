@@ -162,13 +162,28 @@ export function createDiagnosticReport(input={}){
     gapSearch:input.retrievalCoverage&&typeof input.retrievalCoverage==='object'?{
       triggered:input.retrievalCoverage.triggered===true,
       plannerAttempted:input.gapPlannerAttempted===true,
+      parts:Array.isArray(input.retrievalCoverage.parts)?input.retrievalCoverage.parts.slice(0,6).map(part=>({
+        part:string(part?.question,240),
+        matchedTerms:Array.isArray(part?.matchedTerms)?part.matchedTerms.slice(0,12).map(value=>string(value,40)):[],
+        overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0,
+        distinctiveTermCount:Number.isSafeInteger(part?.distinctiveTermCount)?part.distinctiveTermCount:0,
+        coverageRatio:Number.isFinite(part?.coverageRatio)?part.coverageRatio:0,
+        requiredTermCount:Number.isSafeInteger(part?.requiredTermCount)?part.requiredTermCount:0,
+        reason:safeDiagnosticToken(part?.coverageReason)
+      })):[],
       weakParts:Array.isArray(input.retrievalCoverage.weakParts)?input.retrievalCoverage.weakParts.slice(0,6).map(part=>({
         part:string(part?.question,240),overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0
       })):[],
       queries:Array.isArray(input.gapQueries)?input.gapQueries.slice(0,3).map(value=>string(value,160)):[],
       failureCode:isSafeFailureCode(input.gapPlannerFailure)?input.gapPlannerFailure:null,
-      afterGap:Array.isArray(input.retrievalCoverageAfterGap?.weakParts)?input.retrievalCoverageAfterGap.weakParts.slice(0,6).map(part=>({
-        part:string(part?.question,240),overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0
+      afterGap:Array.isArray(input.retrievalCoverageAfterGap?.parts)?input.retrievalCoverageAfterGap.parts.slice(0,6).map(part=>({
+        part:string(part?.question,240),
+        matchedTerms:Array.isArray(part?.matchedTerms)?part.matchedTerms.slice(0,12).map(value=>string(value,40)):[],
+        overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0,
+        distinctiveTermCount:Number.isSafeInteger(part?.distinctiveTermCount)?part.distinctiveTermCount:0,
+        coverageRatio:Number.isFinite(part?.coverageRatio)?part.coverageRatio:0,
+        requiredTermCount:Number.isSafeInteger(part?.requiredTermCount)?part.requiredTermCount:0,
+        reason:safeDiagnosticToken(part?.coverageReason)
       })):[]
     }:null,
     plannerPlan:input.plannerPlan&&typeof input.plannerPlan==='object'?{

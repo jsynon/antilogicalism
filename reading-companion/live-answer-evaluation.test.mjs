@@ -30,6 +30,23 @@ test('live evaluation preflight rejects selected or expected books missing from 
  ],allowed,manifest),/cross-work: no expected source book is fingerprint-covered/);
 });
 
+test('handoff suite covers five cases with three all-books and two selected-book controls',()=>{
+ const cases=selectLiveCases(suite,'handoff','all');
+ assert.equal(cases.length,5);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='all-books').length,3);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='selected-books').length,2);
+ assert.equal(cases.filter(item=>item.id.includes('technology')||item.id.includes('odyssey')).length,2);
+ assert.ok(evaluationUsesLivePlanner('handoff','case-default'));
+ assert.deepEqual(applyQualityScope(cases,'case-default').map(item=>item.selected_book_ids),
+  [[],[],[],['186'],['51']]);
+});
+test('handoff suite permits one selected diagnostic case and keeps questions open-ended',()=>{
+ const selected=selectLiveCases(suite,'handoff','handoff-selected-odyssey-homecoming');
+ assert.equal(selected.length,1);
+ assert.deepEqual(selected[0].selected_book_ids,['186']);
+ assert.match(selected[0].question,/choices and the poem’s picture of heroism/);
+ assert.deepEqual(selected[0].review_focus,[]);
+});
 test('malformed optional planner facets are dropped or fall back without blocking base retrieval',()=>{
  const result=partFacetsFromPlan([
   {id:'P1',question:'What did the priests say about Helen?',searchQueries:['']},

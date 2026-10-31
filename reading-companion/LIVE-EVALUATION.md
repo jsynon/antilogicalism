@@ -189,3 +189,10 @@ The default `selected-books` run keeps the four one-book cases restricted to the
 ## Current saved-run notes
 
 Run-by-run implementation history was removed from this operational guide to keep workflow instructions readable. The current project status, last acceptance findings, active corrective changes, and next validation step live in the [Worker’s project brief](https://github.com/jsynon/book-chatbot/blob/main/docs/reader-evidence-milestone-release.md). Older run notes remain recoverable from Git history and saved workflow artifacts. Use the workflow artifact and its offline trace as the source of truth for each new run; do not treat historical scores or old library versions as current results.
+
+
+## Handoff validation workflow
+
+Use **Reading Companion handoff validation** after merging the website and Worker changes and publishing both. It is one manual dispatch, one attempt for each of five cases, and one artifact. The suite includes two observed regressions (technology-change retrieval and the Odyssey's bundled homecoming/heroism request), plus three open-ended controls. Three questions run in All Books mode; two are confined to the selected *Odyssey* or *On Liberty*. The All Books cases do not require named authors or predetermined sources. The workflow checks whether the planner preserves independent requested parts and whether thin lexical matches trigger the existing conditional gap-planning call. It adds no runtime answer route and does not add a model call to ordinary well-covered questions. The manual report remains the quality review; structural checks and coverage ratios do not establish semantic accuracy.
+
+The saved trace includes per-part matched terms, overlap, distinct-term count, coverage ratio, threshold, and reason, both before and after the conditional retrieval retry. This makes it possible to distinguish a correctly skipped retry from a false-positive coverage signal. The one-run suite is diagnostic and intentionally does not support repeated attempts.

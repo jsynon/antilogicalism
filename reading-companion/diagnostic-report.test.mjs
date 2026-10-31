@@ -193,6 +193,19 @@ test('diagnostics record bounded conditional retrieval decisions without excerpt
  assert.equal(JSON.stringify(report).includes('must never be copied'),false);
 });
 
+test('diagnostics preserve per-part coverage ratios and reasons safely',()=>{
+ const report=createDiagnosticReport({retrievalCoverage:{triggered:true,parts:[
+  {question:'How does climate change affect people?',matchedTerms:['climate','change'],
+   overlap:2,distinctiveTermCount:7,coverageRatio:0.286,requiredTermCount:3,
+   coverageReason:'no-coherent-term-cluster'},
+  {question:'What is memory?',matchedTerms:['memory'],overlap:1,
+   distinctiveTermCount:1,coverageRatio:1,requiredTermCount:1,
+   coverageReason:'unexpected free form value!'}],weakParts:[]}});
+ assert.equal(report.gapSearch.parts[0].coverageRatio,0.286);
+ assert.equal(report.gapSearch.parts[0].reason,'no-coherent-term-cluster');
+ assert.equal(report.gapSearch.parts[1].reason,null);
+ assert.equal(JSON.stringify(report).includes('unexpected free form'),false);
+});
 test('diagnostics preserve bounded per-part search and selected-page mappings',()=>{
  const searches=Array.from({length:7},(_,index)=>({
   query:'question facet '+index,resultCount:10,partIds:['P'+(index+1)],

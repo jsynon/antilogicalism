@@ -7,7 +7,7 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.16.0';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.17.0';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -619,8 +619,8 @@ async function askQuestion(questionText){
         plan:planned?.plan||null,partQuestions,allowEmpty:true});
       if(!found)return;
       const coverage=assessEvidenceCoverage(candidates,q,partQuestions);
-      if(diagnosticState){diagnosticState.retrievalCoverage={weakParts:coverage.weakParts,
-        triggered:coverage.shouldSearch};refreshDiagnostic();}
+      if(diagnosticState){diagnosticState.retrievalCoverage={parts:coverage.parts,
+        weakParts:coverage.weakParts,triggered:coverage.shouldSearch};refreshDiagnostic();}
       if(coverage.shouldSearch){
         setStatus('I’ve found some useful pages. I’m looking for a couple more that might round out the answer…');
         turnstileToken='';
@@ -642,7 +642,7 @@ async function askQuestion(questionText){
           if(!expanded)return;
           const secondCoverage=assessEvidenceCoverage(candidates,q,partQuestions);
           if(diagnosticState)diagnosticState.retrievalCoverageAfterGap={
-            weakParts:secondCoverage.weakParts,triggered:true};
+            parts:secondCoverage.parts,weakParts:secondCoverage.weakParts,triggered:true};
         }
       }
       if(!candidates.length){setStatus('No promising passages turned up yet. Try another wording or choose a different book.');return;}

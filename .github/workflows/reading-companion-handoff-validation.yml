@@ -1,0 +1,59 @@
+name: Reading Companion handoff validation
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_ai:
+        description: Confirm one live answer attempt for each of five questions
+        type: boolean
+        default: false
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reading-companion-live-answer-evaluation
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: ${{ inputs.confirm_live_ai }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      CONFIRM_LIVE_AI: ${{ inputs.confirm_live_ai }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Confirm live evaluation credentials
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          test "$CONFIRM_LIVE_AI" = "true"
+          test -n "$PILOT_EVALUATION_TOKEN"
+      - name: Run the five-case handoff validation once
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+          LIVE_EVAL_OUTPUT: ${{ github.workspace }}/reading-companion-handoff-validation.json
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode handoff \
+            --scope case-default \
+            --case all \
+            --repeat 1 \
+            --retrieval-profile baseline \
+            --answer-variant with-review \
+            --report-only true \
+            --confirm-live-ai true \
+            --output "$LIVE_EVAL_OUTPUT"
+      - name: Save the handoff validation artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-companion-handoff-validation
+          path: ${{ github.workspace }}/reading-companion-handoff-validation.json
+          if-no-files-found: warn
+          retention-days: 30
