@@ -278,29 +278,43 @@ function locateHighlightInSubmittedPage(item,citations,submitted){
  return normalizeDiagnosticExcerpt(original.text).includes(normalizedQuote);
 }
 function highlightRelevanceAudit(answer,citations,evidenceHighlights){
- // Keep this diagnostic inspection-only: shared source IDs connect a quote to
- // candidate answer sentences, but neither that link nor quote location proves
- // that the excerpt supports the sentence's meaning.
+ // Match the reviewer claim note to answer wording within the same cited
+ // source. Citation identity alone is too broad when one page supports several
+ // claims; unmatched cases remain visible for human inspection.
  const answerSentences=String(answer||'')
   .split(/(?<=[.!?])\s+(?=[\p{Lu}"“‘(])/u)
   .map(text=>text.trim()).filter(Boolean)
   .map((text,index)=>({index:index+1,text,
-   sourceIds:auditCitationIds(text,citations).inlineIds}));
+   normalized:normalizeClaimForMatch(text),sourceIds:auditCitationIds(text,citations).inlineIds}));
+ const stopWords=new Set(['and','are','but','for','from','has','have','into','its','not','that','the','their','this','was','with']);
+ const terms=value=>new Set((normalizeClaimForMatch(value).match(/[\p{L}\p{N}]{3,}/gu)||[])
+  .map(term=>term.replace(/(?:ing|ed|es|s)$/u,'')).filter(term=>!stopWords.has(term)));
  const excerpts=(Array.isArray(evidenceHighlights)?evidenceHighlights:[]).flatMap(item=>{
   const sourceId=String(item?.sourceId||'');
   const quotes=Array.isArray(item?.quotes)&&item.quotes.length?item.quotes:[item];
-  return quotes.map(quote=>({sourceId,page:Number.isSafeInteger(item?.page)?item.page:null,
+  return quotes.map(quote=>{
+   const sourceId=String(item?.sourceId||'');
+   const point=String(quote?.point||item?.point||'');
+   const pointTerms=terms(point);
+   const matched=pointTerms.size>=3?answerSentences.filter(sentence=>{
+    if(!sentence.sourceIds.includes(sourceId))return false;
+    const sentenceTerms=terms(sentence.text);let shared=0;
+    for(const term of pointTerms)if(sentenceTerms.has(term))shared++;
+    return shared/Math.min(pointTerms.size,sentenceTerms.size||1)>=0.67;
+   }):[];
+   return {sourceId,page:Number.isSafeInteger(item?.page)?item.page:null,
    claimId:String(quote?.claimId||item?.claimId||''),
-   partId:String(quote?.partId||''),point:String(quote?.point||item?.point||''),
+   partId:String(quote?.partId||''),point,
    quote:String(quote?.quote||item?.quote||''),
    quoteLocated:typeof quote?.quoteLocated==='boolean'?quote.quoteLocated:
     typeof item?.quoteLocated==='boolean'?item.quoteLocated:null,
-   answerSentenceIndexes:answerSentences.filter(sentence=>sentence.sourceIds.includes(sourceId))
-    .map(sentence=>sentence.index)}));
+   answerSentenceIndexes:matched.map(sentence=>sentence.index),
+   linkStatus:matched.length?'matched-claim-wording':'unresolved-claim-link'};
+  });
  }).filter(item=>item.sourceId&&item.quote);
- return {method:'inspection-only',linkage:'shared-citation-source-id',
+ return {method:'inspection-only',linkage:'same-source-and-claim-point-wording',
   semanticRelevanceScored:false,
-  limitation:'A located quote and a shared citation identify a candidate link; inspect the answer sentence and passage to judge relevance.',
+  limitation:'Point wording is matched conservatively to answer sentences; unmatched links require inspection. Neither a match nor exact quote location proves semantic support.',
   answerSentences,excerpts};
 }
 function answerDeniesSupportedComparison(part,answer){
@@ -581,6 +595,11 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const failureStage=typeof data?.failureStage==='string'?data.failureStage:'';
  const manualReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
   accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
+ // Keep evidence-excerpt quality independent from answer prose quality. The
+ // same five 0–2 dimensions allow comparable human scoring, but reviewers
+ // score the excerpts and their claim links rather than the generated answer.
+ const highlightHumanReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
+  accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
  const structuralPassed=coverage==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
   missingInline.length===0&&(citations.length>0||generalContextOnly)&&answerCoverageConsistent!==false&&partEvidenceComplete!==false&&
   sourcePartAlignment.every(item=>item.aligned)&&reviewerLabels.contractStatus!=='incomplete'&&
@@ -598,7 +617,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
   evidenceHighlightCount:highlights.length,evidenceHighlights,citationHighlightAudit,
   highlightRelevance,
-  manualReview,structuralPassed,
+  manualReview,highlightHumanReview,structuralPassed,
   answerQualityStatus:'pending-human-review',answerQualityPass:null,
   passed:reviewStatus==='answer-draft-unverified'?null:structuralPassed};
 }
@@ -619,6 +638,25 @@ export function summarizeManualReviews(cases){
     Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2)?'complete':'pending'})),
   averageScores,qualityPass:null,
   note:'Human scores are independent of automated structural pass/fail. No semantic score is inferred from model review.'};
+}
+export function summarizeHighlightReviews(cases){
+ const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
+  (item.answerVariantComparison||item.reviewAblation).variants.map(variant=>({id:item.id,
+   attemptNumber:item.attemptNumber,answerVariant:variant.answerVariant,selectionVariant:variant.selectionVariant,
+   review:variant.highlightHumanReview})):
+  [{id:item.id,attemptNumber:item.attemptNumber,answerVariant:item.answerVariant||'with-review',
+   selectionVariant:item.selectionVariant,review:item.highlightHumanReview}]);
+ const complete=entry=>MANUAL_REVIEW_DIMENSIONS.every(key=>
+  Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2);
+ const reviewed=entries.filter(complete);
+ const averageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,reviewed.length?
+  Number((reviewed.reduce((sum,entry)=>sum+entry.review.scores[key],0)/reviewed.length).toFixed(2)):null]));
+ return {scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,reviewed:reviewed.length,
+  pending:entries.length-reviewed.length,entries:entries.map(entry=>({id:entry.id,
+   ...(Number.isInteger(entry.attemptNumber)?{attemptNumber:entry.attemptNumber}:{}),
+   answerVariant:entry.answerVariant,...(entry.selectionVariant?{selectionVariant:entry.selectionVariant}:{}),
+   status:complete(entry)?'complete':'pending'})),averageScores,qualityPass:null,
+  note:'Score the displayed excerpts and their claim links separately from answer prose. Exact location is not a semantic relevance score.'};
 }
 export function summarizeAnswerVariants(cases){
  const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
@@ -676,7 +714,8 @@ export function recheckQualityReport(report){
       (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books'),
       plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null,
       candidateSources:Array.isArray(item.retrievalCandidates)?item.retrievalCandidates:null});
-    return {...variant,...variantAudit,manualReview:variant.manualReview};
+    return {...variant,...variantAudit,manualReview:variant.manualReview,
+     highlightHumanReview:variant.highlightHumanReview};
    })}:previousComparison;
   return {...item,...(answerVariantComparison?{answerVariantComparison}:{}),
    ...(item.reviewAblation&&answerVariantComparison?{reviewAblation:answerVariantComparison}:{}),
@@ -688,10 +727,12 @@ export function recheckQualityReport(report){
    coverageContradictions:audit.coverageContradictions,
    inlineIdsWithoutSource:audit.inlineIdsWithoutSource,
    citationHighlightAudit:audit.citationHighlightAudit,
-   highlightRelevance:audit.highlightRelevance}};
+   highlightRelevance:audit.highlightRelevance,
+   highlightHumanReview:audit.highlightHumanReview}};
  });
  const checked=cases.filter(item=>item.offlineRecheck);
  return {...report,cases,humanReview:summarizeManualReviews(cases),
+  highlightReview:summarizeHighlightReviews(cases),
   reviewerLabels:summarizeReviewerLabels(cases),answerVariants:summarizeAnswerVariants(cases),
   selectionVariants:summarizeSelectionVariants(cases),offlineRecheck:{checkedAt:new Date().toISOString(),
   evaluator:'local-structural-recheck-v1',networkCalls:0,aiCalls:0,
@@ -1297,6 +1338,7 @@ async function main(){
    report.plannerSkippedCases=results.filter(item=>item.plannerSkipped).length;
    report.plannerReusedCases=results.filter(item=>item.plannerReused).length;
    report.humanReview=summarizeManualReviews(results);
+   report.highlightReview=summarizeHighlightReviews(results);
    report.answerVariants=summarizeAnswerVariants(results);
    report.selectionVariants=summarizeSelectionVariants(results);
    if(args.repeatCount>1){
@@ -1350,6 +1392,7 @@ async function main(){
    plannerFallbackCases:report.plannerFallbackCases,
    reviewerLabels:summarizeReviewerLabels(report.cases),
    humanReview:summarizeManualReviews(report.cases),
+   highlightReview:summarizeHighlightReviews(report.cases),
    answerVariants:summarizeAnswerVariants(report.cases),
    selectionVariants:summarizeSelectionVariants(report.cases),
    questionPartStatusCounts:report.cases.reduce((totals,item)=>{
