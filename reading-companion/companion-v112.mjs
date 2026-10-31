@@ -415,19 +415,14 @@ function renderResponse(data,turnQuestion=''){
         .filter(value=>typeof value==='string'&&value.trim()).slice(0,3);
       if(!excerpts.length&&typeof highlight?.quote==='string'&&highlight.quote.trim())excerpts.push(highlight.quote);
       const card=node('article',undefined,'companion-key-passage');
-      const citationLabel='['+citationDisplayLabel(source.id,numbering)+']';
-      const citationButton=node('button',citationLabel,
-        'companion-inline-citation companion-source-number');
-      citationButton.type='button';
-      citationButton.setAttribute('aria-label',
-        'Read citation '+citationDisplayLabel(source.id,numbering)+' in the page reader');
-      citationButton.addEventListener('click',async()=>{
-        try{await sourceReader.open({...source,excerpts},citationButton);}
-        catch(error){setStatus('Source reader: '+error.message);}
-      });
+      // This number labels the answer citation; the nearby Read passages
+      // button is the single source-card control for opening its excerpts.
+      const citationLabel=node('p','Citation ['+
+        citationDisplayLabel(source.id,numbering)+']','companion-source-number');
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
       link.textContent=source.title+' · p. '+source.page;
+      card.append(citationLabel);
       const attribution=sourceAttributionLabel(source.provenance);
       if(attribution)card.append(node('p',attribution,'companion-source-attribution'));
       if(excerpts.length){
@@ -456,9 +451,9 @@ function renderResponse(data,turnQuestion=''){
         });
         card.append(read);
       }
-      // Keep the page-reader citation and scanned-book link separate so the
-      // number's action is clear and matches numbered citations in the answer.
-      card.append(citationButton,document.createTextNode(' '),link);
+      // Only the book title opens the scanned source; the citation number is
+      // metadata and Read passages handles the in-page excerpt action.
+      card.append(link);
       panel.append(card);
     }
     turn.append(panel);
