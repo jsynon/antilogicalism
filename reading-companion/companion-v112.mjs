@@ -422,7 +422,9 @@ function renderResponse(data,turnQuestion=''){
       const link=document.createElement('a');link.href=source.url;
       link.target='_blank';link.rel='noopener noreferrer';
       link.textContent=source.title+' · p. '+source.page;
-      card.append(citationLabel);
+      // Keep the source identity and its voice together before the excerpts,
+      // so a pseudonym cannot look like it belongs to the preceding book.
+      card.append(citationLabel,link);
       const attribution=sourceAttributionLabel(source.provenance);
       if(attribution)card.append(node('p',attribution,'companion-source-attribution'));
       if(excerpts.length){
@@ -451,9 +453,7 @@ function renderResponse(data,turnQuestion=''){
         });
         card.append(read);
       }
-      // Only the book title opens the scanned source; the citation number is
-      // metadata and Read passages handles the in-page excerpt action.
-      card.append(link);
+      // The title opens the scan; Read passages remains the excerpt control.
       panel.append(card);
     }
     turn.append(panel);
