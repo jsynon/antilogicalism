@@ -4,16 +4,18 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Run calibration, one selected acceptance question, or the full frozen acceptance set
+        description: Run calibration, one selected acceptance question, or the full frozen acceptance set; or run the fresh five-question set
         type: choice
         options:
           - calibration
           - single-case
           - acceptance
-        default: calibration
+          - fresh-five
+          - fresh-single-case
+        default: fresh-five
         required: true
       case_id:
-        description: Acceptance question to run when suite is single-case; ignored by other suites
+        description: Frozen acceptance question for suite single-case; ignored otherwise
         type: choice
         options:
           - acceptance-descartes-cogito
@@ -29,8 +31,19 @@ on:
           - acceptance-life-meaning-authors
         default: acceptance-buddha-on-death
         required: true
+      fresh_case_id:
+        description: Fresh question to run when suite is fresh-single-case; ignored by other suites
+        type: choice
+        options:
+          - fresh-all-reason-experience
+          - fresh-all-authority-resistance
+          - fresh-all-education-and-character
+          - fresh-selected-herodotus-accounts
+          - fresh-selected-maxwell-potential
+        default: fresh-all-reason-experience
+        required: true
       repeat_count:
-        description: Attempts per calibration question or selected case; full acceptance always runs once
+        description: Attempts per calibration or fresh question; frozen acceptance always runs once
         type: choice
         options:
           - '1'
@@ -75,6 +88,7 @@ jobs:
     env:
       BENCHMARK_SUITE: ${{ inputs.suite }}
       BENCHMARK_CASE_ID: ${{ inputs.case_id }}
+      BENCHMARK_FRESH_CASE_ID: ${{ inputs.fresh_case_id }}
       BENCHMARK_REPEAT_COUNT: ${{ inputs.repeat_count }}
       BENCHMARK_RETRIEVAL_PROFILE: ${{ inputs.retrieval_profile }}
       BENCHMARK_ANSWER_EXPERIMENT: ${{ inputs.answer_experiment }}
@@ -99,13 +113,19 @@ jobs:
           LIVE_EVAL_OUTPUT: ${{ github.workspace }}/reading-companion-quality-benchmark.json
         run: |
           if [ "$BENCHMARK_SUITE" = "calibration" ]; then
-            case_id=quality-calibration
+            mode=acceptance; scope=all-books; case_id=quality-calibration
             repeat_count="$BENCHMARK_REPEAT_COUNT"
           elif [ "$BENCHMARK_SUITE" = "single-case" ]; then
-            case_id="$BENCHMARK_CASE_ID"
+            mode=acceptance; scope=all-books; case_id="$BENCHMARK_CASE_ID"
+            repeat_count="$BENCHMARK_REPEAT_COUNT"
+          elif [ "$BENCHMARK_SUITE" = "fresh-five" ]; then
+            mode=fresh; scope=case-default; case_id=all
+            repeat_count="$BENCHMARK_REPEAT_COUNT"
+          elif [ "$BENCHMARK_SUITE" = "fresh-single-case" ]; then
+            mode=fresh; scope=case-default; case_id="$BENCHMARK_FRESH_CASE_ID"
             repeat_count="$BENCHMARK_REPEAT_COUNT"
           else
-            case_id=all
+            mode=acceptance; scope=all-books; case_id=all
             repeat_count=1
           fi
           if [ "$BENCHMARK_ANSWER_EXPERIMENT" = "compare-expansion" ]; then
@@ -116,8 +136,8 @@ jobs:
             answer_variant=with-review
           fi
           node reading-companion/live-answer-evaluation.mjs \
-            --mode acceptance \
-            --scope all-books \
+            --mode "$mode" \
+            --scope "$scope" \
             --case "$case_id" \
             --repeat "$repeat_count" \
             --retrieval-profile "$BENCHMARK_RETRIEVAL_PROFILE" \
@@ -129,7 +149,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reading-companion-quality-benchmark-${{ inputs.suite }}-${{ inputs.suite == 'single-case' && inputs.case_id || 'all-cases' }}-${{ inputs.retrieval_profile }}-${{ inputs.answer_experiment }}
+          name: reading-companion-quality-benchmark-${{ inputs.suite }}-${{ inputs.suite == 'single-case' && inputs.case_id || (inputs.suite == 'fresh-single-case' && inputs.fresh_case_id) || 'all-cases' }}-${{ inputs.retrieval_profile }}-${{ inputs.answer_experiment }}
           path: ${{ github.workspace }}/reading-companion-quality-benchmark.json
           if-no-files-found: warn
           retention-days: 30

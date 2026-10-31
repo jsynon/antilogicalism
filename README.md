@@ -28,6 +28,8 @@ The Reading Companion is a live chatbot on the Antilogicalism website, hosted wi
 
 Answer quality continues to be evaluated and improved. The cited passages let readers inspect the original wording and draw their own conclusions, keeping the tool focused on supporting direct engagement with primary sources.
 
+The manual [answer-quality workflow](https://github.com/jsynon/antilogicalism/actions/workflows/reading-companion-quality-benchmark.yml) includes a fresh five-question suite alongside the frozen acceptance cases. The fresh set uses three all-books prompts and two selected-book prompts; it can run once or three times, as a set or one question at a time. This keeps broad quality checks separate from repeated debugging of individual questions.
+
 ## Search, Discovery, and Organization
 
 Antilogicalism approaches discovery through several complementary systems. The Bookshelf, presented as *A History of Ideas*, organizes works by collection, subject, and author for exploratory browsing. The digital library provides page-level full-text search, while the original article archive uses a separate precomputed search index with ranked results and pagination.
