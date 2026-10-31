@@ -676,7 +676,11 @@ async function askQuestion(questionText){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
         history,bookId:bookFilter.value||'',plan:currentPlan||undefined,
-        sources:candidatePacket.map(({bookId,page,text})=>({bookId,page,text,libraryVersion:49}))})
+        // Carry retrieval's part associations alongside each candidate. They
+        // are routing hints only: the Worker still verifies page identity and
+        // reviews whether cited spans actually support each answer claim.
+        sources:candidatePacket.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
+          ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))})
     });
     let data;
     try{data=await response.json();}catch{

@@ -925,7 +925,10 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
     answerVariant:variant==='compose-only'?'compose-only':variant==='with-expansion'?'with-expansion':'with-review',
     // The evaluator loads v49 text; the Worker defaults omitted versions to v48.
-    sources:answerSources.map(({bookId,page,text})=>({bookId,page,text,libraryVersion:49}))},beforeCall,'answer',progressEvent);
+    // Match the live client handoff so offline acceptance runs exercise the
+    // same part-linked evidence packet that the Worker receives in production.
+    sources:answerSources.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
+     ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))},beforeCall,'answer',progressEvent);
    const candidateByLocator=new Map(loaded.candidates.map(source=>[String(source.bookId)+':'+source.page,source]));
    const workerSelected=(Array.isArray(data.sourceSelection?.pages)?data.sourceSelection.pages:[])
     .map(source=>{
