@@ -714,7 +714,8 @@ export function recheckQualityReport(report){
       (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books'),
       plannerPlan:item.plannerPlan||item.evidenceTrace?.plan||null,
       candidateSources:Array.isArray(item.retrievalCandidates)?item.retrievalCandidates:null});
-    return {...variant,...variantAudit,manualReview:variant.manualReview};
+    return {...variant,...variantAudit,manualReview:variant.manualReview,
+     highlightHumanReview:variant.highlightHumanReview};
    })}:previousComparison;
   return {...item,...(answerVariantComparison?{answerVariantComparison}:{}),
    ...(item.reviewAblation&&answerVariantComparison?{reviewAblation:answerVariantComparison}:{}),

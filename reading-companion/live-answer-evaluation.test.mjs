@@ -673,11 +673,13 @@ test('offline paired all-books recheck uses the saved plan and reports eligible 
 
 test('offline report recheck refreshes both paired variant audits and preserves manual scores',()=>{
  const manualReview={scores:{accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:2,citationCompleteness:2},notes:'Checked'};
+ const highlightHumanReview={status:'complete',scores:{accuracy:1,questionCoverage:2,
+  explanationQuality:1,citationSupport:2,citationCompleteness:1},notes:'Quotes are accurate; one is clipped.'};
  const variant={answerVariant:'compose-only',answerText:'A sourced claim [S1].',coverage:'full',reviewStatus:'answer-draft-unverified',
   citations:[{id:'S1',bookId:'25'}],citationSources:[{id:'S1',bookId:'25'}],
   questionParts:[{part:'What does the text say?',status:'supported',evidenceIds:['S1']}],
   evidenceMap:[{id:'S1',claimId:'C1',quote:'A passage long enough to demonstrate the claim.'}],
-  evidenceHighlights:[],manualReview};
+  evidenceHighlights:[],manualReview,highlightHumanReview};
  const report={cases:[{id:'acceptance-descartes-cogito',answerText:variant.answerText,coverage:'full',
   citations:variant.citations,citationSources:variant.citationSources,questionParts:variant.questionParts,
   evidenceMap:variant.evidenceMap,evidenceHighlights:[],submittedSources:[{bookId:'25',page:1}],
@@ -685,6 +687,7 @@ test('offline report recheck refreshes both paired variant audits and preserves 
  const checked=recheckQualityReport(report);
  assert.equal(checked.cases[0].reviewAblation.variants[0].structuralPassed,true);
  assert.deepEqual(checked.cases[0].reviewAblation.variants[0].manualReview,manualReview);
+ assert.deepEqual(checked.cases[0].reviewAblation.variants[0].highlightHumanReview,highlightHumanReview);
  assert.equal(checked.answerVariants['compose-only'].humanScores.reviewed,1);
 });
 
