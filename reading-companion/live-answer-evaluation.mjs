@@ -1390,7 +1390,12 @@ async function main(){
    report.workerVersionIds=[...new Set(results.flatMap(item=>[item.plannerWorkerVersionId,item.answerWorkerVersionId]).filter(value=>typeof value==='string'&&value))];
    report.workerSourceRevisions=[...new Set(results.flatMap(item=>[item.plannerWorkerSourceRevision,item.answerWorkerSourceRevision]).filter(value=>typeof value==='string'&&/^[a-f0-9]{40}$/.test(value)))];
    report.scopeSummary=Object.fromEntries(['all-books','selected-books'].map(scope=>{
-    const scoped=results.filter(item=>item.scope===scope);
+    const scoped=results.filter(item=>{
+    // Current answer records use evaluationScope; scope remains for older/paired rows.
+    const recordedScope=item.evaluationScope||item.scope||
+     (Array.isArray(item.selectedBookIds)&&item.selectedBookIds.length?'selected-books':'all-books');
+    return recordedScope===scope;
+   });
     return [scope,{cases:scoped.length,passed:scoped.filter(item=>item.passed===true).length,
      failed:scoped.filter(item=>item.passed===false).length,requestFailures:scoped.filter(item=>item.requestFailure).length,
      questionPartCoverage:scoped.reduce((totals,item)=>{const count=item.questionPartCoverage||{};
