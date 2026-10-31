@@ -2468,3 +2468,8 @@ html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:ac
 	font-weight: bold;
 	text-transform: uppercase;
 }
+
+/* Keep the book title as the single link in related-book cards. */
+.antilogicalism-related-books a[href*="drive.google.com"] {
+	display: none !important;
+}
