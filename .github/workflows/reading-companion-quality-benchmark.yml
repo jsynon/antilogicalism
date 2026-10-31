@@ -15,7 +15,7 @@ on:
         default: fresh-five
         required: true
       case_id:
-        description: Choose a frozen or fresh question when running one case
+        description: Frozen acceptance question for suite single-case; ignored otherwise
         type: choice
         options:
           - acceptance-descartes-cogito
