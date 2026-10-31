@@ -63,10 +63,11 @@ function splitInlineListMarkers(line){
 }
 
 function splitInlineSectionHeadings(line){
- // A bold section label written after a complete sentence is a block boundary,
- // not emphasis inside that paragraph. Restrict this to colon-ended labels so
- // ordinary bold phrases and prose remain untouched.
- return line.replace(/([.!?])\s+(?=(?:\*\*[^*\n]{3,90}:\*\*|__[^_\n]{3,90}:__))(?=\s*\S)/gu,'$1\n');
+ // Models sometimes place a bold section title after prose without a newline
+ // or trailing colon. Split only at a sentence boundary, and only when the
+ // title is a substantial label followed by a new sentence, so ordinary bold
+ // emphasis inside a paragraph stays inline.
+ return line.replace(/([.!?])\s+(?=(?:\*\*[^*\n]{3,90}:?\*\*|__[^_\n]{3,90}:?__)(?:\s+)(?=[\p{Lu}])/gu,'$1\n');
 }
 
 function inlineHeading(line){
