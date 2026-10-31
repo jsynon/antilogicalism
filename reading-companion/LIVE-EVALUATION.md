@@ -6,7 +6,7 @@ The active live-answer and retrieval-only workflows now target the same release 
 
 ## Consolidated answer-quality benchmark
 
-Use **Reading Companion answer quality benchmark** for one dispatch and one artifact. Choose `calibration` for the four targeted diagnostic cases, `single-case` to run one acceptance question, or `acceptance` for the full frozen set. For a Buddha-only run, choose `single-case`, keep the default `acceptance-buddha-on-death`, and choose `1` or `3` attempts. A single-case run costs only that case's answer calls per attempt; selecting three attempts does not run the other acceptance questions. Calibration can also run once or three interleaved attempts per question, while the full acceptance suite always runs once. `baseline` retrieves up to 32 pages across four books; `expanded` retrieves up to 48 pages across six books. Both pass the retrieved candidate pool to the Worker for semantic evidence selection after fingerprint verification. The final composer still receives at most six pages and 35 KB.
+Use **Reading Companion answer quality benchmark** for one dispatch and one artifact. Choose `calibration` for the four targeted diagnostic cases, `single-case` to run one acceptance question, or `acceptance` for the full frozen set. Choose `fresh-five` for the second five-question holdout set or `fresh-three` for the third. Use `fresh-single-case` or `fresh-three-single-case` with a case ID to run one question from the corresponding set. Fresh sets can run once or three interleaved attempts per question; a single-case run costs only that case's answer calls per attempt. For a Buddha-only acceptance run, choose `single-case`, keep the default `acceptance-buddha-on-death`, and choose `1` or `3` attempts. Calibration can also run once or three times per question, while the full acceptance suite always runs once. `baseline` retrieves up to 32 pages across four books; `expanded` retrieves up to 48 pages across six books. Both pass the retrieved candidate pool to the Worker for semantic evidence selection after fingerprint verification. The final composer still receives at most six pages and 35 KB.
 
 The live answer path now separates retrieval recall from answer-packet selection. A normal reviewed all-books question uses one planning call, one evidence-selection call, one composition call, and one review call. Selected-books requests may skip planning. Conditional gap planning may add one retrieval-only call if local text coverage is weak. Selection failures are marked and use a bounded retrieval-order fallback; review and deterministic citation checks still apply.
 
@@ -32,7 +32,7 @@ The `quality` mode defaults to the cases’ selected-book scope and uses two fix
 
 Quality reports distinguish the candidate pool from the answer packet. In each `sourceGroups` entry, `candidateBookIds` and `candidateFound` say whether an expected work appeared in the hydrated `retrievalCandidates`; `selectedBookIds` and `selectedForComposition` say whether it was sent in `submittedSources`; `citedBookIds` and `cited` say whether the answer cited it. The older `retrievedBookIds`/`retrieved` fields remain as compatibility aliases for selection into the answer packet. For each requested part, `partEvidenceAudit` shows whether its evidence IDs resolve to the review map, cited source, and submitted page. `answerCoverageConsistent` checks that reported library coverage matches the part evidence statuses and flags explicit prose that denies a comparison marked supported. `structuralPassed` requires complete answer status plus citation, evidence-link, source-group, and contract integrity; it no longer fails solely because `coverage` is partial. These are structural checks only. They cannot determine whether the cited passage semantically supports the claim or whether the interpretation is correct; inspect `answerText`, `evidenceMap`, highlights, and cited page text manually. The automated `passed` count is a review signal, not an AI truth grade.
 
-## Current fresh five-question set
+## Second fresh five-question set (`fresh-five`)
 
 The fresh-five suite now uses a second, distinct set after the first five-question baseline was completed. Run all five at once or use fresh-single-case with a chosen case ID to run one question; each can run once or three times. The three All Books prompts have no required author or title groups, so retrieval and synthesis remain open-ended. The two selected-book prompts restrict evidence to the selected book but do not prescribe an interpretation.
 
@@ -43,6 +43,20 @@ The fresh-five suite now uses a second, distinct set after the first five-questi
 | All books | Why do people sometimes act against the principles they profess, and how have writers explained that gap between belief and conduct? | Finding relevant perspectives on a broad psychological and ethical question |
 | Selected: Walden (book 257) | How does Thoreau distinguish necessities from luxuries, and how does that distinction shape his criticism of work and everyday life? | Multi-passage retrieval and synthesis within an argumentative work |
 | Selected: Pride and Prejudice (book 341) | How does Elizabeth’s view of Darcy change over the course of the novel, and what role do her first impressions play in that change? | Tracking character development and supporting literary interpretation across a novel |
+
+## Third fresh five-question set (`fresh-three`)
+
+This set adds a different mix of open all-books questions and selected-book interpretation after the first two fresh sets. The all-books prompts have no expected author or title groups, extra search terms, or answer-specific review hints. The selected-book cases restrict scope to the named work but leave interpretation open. Run all five once or three times, or use `fresh-three-single-case` to run one selected case.
+
+| Scope | Question | Capability being sampled |
+|---|---|---|
+| All books | What role does imagination play in how people understand the world? | Broad retrieval and explanation across disciplines |
+| All books | How do writers distinguish justice from mercy, and when might these values come into conflict? | Synthesis of differing ethical views |
+| All books | How have writers described the effects of technological change on the ways people live? | Retrieval across social and historical perspectives |
+| Selected: *The Odyssey* (book 186) | How does Odysseus’s desire to return home shape his choices and the poem’s picture of heroism? | Multi-passage literary interpretation |
+| Selected: *Narrative of the Life of Frederick Douglass, an American Slave* (book 459) | How does Douglass describe the role of literacy in his experience of enslavement and pursuit of freedom? | Connecting a recurring idea to the author’s lived narrative |
+
+Compare all three fresh sets with the same human rubric. Look for repeated answer-quality patterns across different topics; do not infer a pipeline-wide weakness from one question or treat structural labels as semantic scores.
 
 ## Workbench-breadth experiment
 
