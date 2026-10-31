@@ -57,9 +57,13 @@ export function parseInlineMarkdown(value){
 }
 
 function splitInlineListMarkers(line){
- // Split a list marker only when it is followed by a bold/underlined label or
- // a numbered item. This avoids mistaking ordinary italic text for a bullet.
- return line.replace(/([.!?:])\s+(?=(?:[*+-]\s+(?:\*\*|__)|\d+[.)]\s+))/g,'$1\n');
+ // Split obvious model-emitted list markers when they follow prose on the same
+ // line. Two or more spaces after a bullet marker distinguish this common
+ // format from ordinary italic phrases such as “*an example*”. Bold/underlined
+ // labels and numbered items retain their existing, narrower split rule.
+ return line
+  .replace(/([.!?:])\s+(?=(?:[*+-]\s{2,})\S)/g,'$1\n')
+  .replace(/([.!?:])\s+(?=(?:[*+-]\s+(?:\*\*|__)|\d+[.)]\s+))/g,'$1\n');
 }
 
 function splitInlineSectionHeadings(line){

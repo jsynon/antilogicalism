@@ -46,6 +46,13 @@ test('v49 answer renderer keeps default prose out of accidental ordered lists',(
   'overlong emphasis is removed even when bold markup is nested inside it');
  assert.equal(parseInlineMarkdown('*A Short Work Title*')[0].type,'em',
   'short work titles retain italics');
+ const inlineBullets=parseAnswerMarkdown('The answer introduces the distinction: *   First point about choice [S1]. *   Second point about externals [S1].');
+ assert.deepEqual(inlineBullets.map(block=>block.type),['paragraph','paragraph','paragraph'],
+  'unambiguous inline bullet runs become separate readable prose blocks');
+ assert.equal(inlineBullets[1].text,'First point about choice [S1].');
+ assert.equal(inlineBullets[2].text,'Second point about externals [S1].');
+ assert.equal(parseAnswerMarkdown('This is * an italic phrase. It continues* in prose.').length,1,
+  'ordinary italics are not split into list items');
  const numbered=parseAnswerMarkdown('1. First reason\n2. Second reason',{allowLists:true});
  assert.equal(numbered[0].type,'list');
  assert.equal(numbered[0].ordered,true);
