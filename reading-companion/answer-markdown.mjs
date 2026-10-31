@@ -67,7 +67,7 @@ function splitInlineSectionHeadings(line){
  // or trailing colon. Split only at a sentence boundary, and only when the
  // title is a substantial label followed by a new sentence, so ordinary bold
  // emphasis inside a paragraph stays inline.
- return line.replace(/([.!?])\s+(?=(?:\*\*[^*\n]{3,90}:?\*\*|__[^_\n]{3,90}:?__)(?:\s+)(?=[\p{Lu}])/gu,'$1\n');
+ return line.replace(/([.!?])\s+(?=(?:\*\*[^*\n]{3,90}:?\*\*|__[^_\n]{3,90}:?__)(?:\s+)(?=[\p{Lu}]))/gu,'$1\n');
 }
 
 function inlineHeading(line){
