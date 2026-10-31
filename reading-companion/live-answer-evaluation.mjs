@@ -240,7 +240,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, or full.');
+ throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(scope==='case-default')return cases.map(item=>({...item,selected_book_ids:item.evaluation_scope==='all-books'?[]:[...item.selected_book_ids]}));
@@ -1174,7 +1174,7 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
 function failedCaseResult(item,error){
  const failure=error?.requestFailure||{stage:'evaluation',httpStatus:null,failureCode:'evaluation-failed',
   message:String(error?.message||error||'Evaluation failed').slice(0,240),workerFailure:false};
- return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
+ return {id:item.id,question:item.question,discipline:item.discipline||'',evaluationScope:item.evaluation_scope||(item.selected_book_ids?.length?'selected-books':'all-books'),selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],requestFailure:failure,plannerQueries:[],plannerSkipped:failure.plannerSkipped===true,
   plannerWorkerVersionId:failure.plannerWorkerVersionId|| (failure.stage==='planner'?failure.workerVersionId:null),
   plannerWorkerSourceBuild:failure.plannerWorkerSourceBuild|| (failure.stage==='planner'?failure.workerSourceBuild:null),
@@ -1266,7 +1266,7 @@ async function main(){
  if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
  const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
- if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, paired, holdout or acceptance mode.');
+ if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, paired, holdout, acceptance or fresh mode.');
  if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
  if(args.mode==='fresh'&&args.scope!=='case-default')throw Error('The fresh question suite must use case-default scope.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
@@ -1277,7 +1277,7 @@ async function main(){
   ['repeatable-calibration','quality-calibration'].includes(args.caseId)||
   ACCEPTANCE_CASES.some(item=>item.id===args.caseId));
  if(args.repeatCount!==1&&!repeatableAcceptanceSelection&&!repeatableFreshSelection)
-  throw Error('Repeated runs require a calibration suite or one selected acceptance case.');
+  throw Error('Repeated runs require a calibration suite, fresh question set, or one selected case.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
