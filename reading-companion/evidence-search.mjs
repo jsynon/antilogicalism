@@ -753,17 +753,41 @@ function namedSpeakerPhrase(question){
  // A last name is a scope hint only when the question places it in the
  // speaker role. The verb set covers ordinary ways readers ask about a view;
  // incidental topic words elsewhere in the question are not author mentions.
- const match=String(question||'').match(/\b(?:what|how)\s+(?:did|does|do|would)\s+([\p{L}][\p{L}\p{M}.'’\-]*(?:\s+[\p{L}][\p{L}\p{M}.'’\-]*){0,3})\s+(?:(?:have|has|had)\s+to\s+)?(?:say|says|said|teach|teaches|taught|think|thinks|thought|argue|argues|argued|believe|believes|believed|write|writes|wrote|hold|holds|held|handle|handles|handled|address|addresses|addressed|describe|describes|described|explain|explains|explained|discuss|discusses|discussed|approach|approaches|approached|examine|examines|examined|present|presents|presented|portray|portrays|portrayed|interpret|interprets|interpreted|define|defines|defined)\b/iu);
+ const match=String(question||'').match(/\b(?:what|how)\s+(?:did|does|do|would)\s+([\p{L}][\p{L}\p{M}.'’\-]*(?:\s+[\p{L}][\p{L}\p{M}.'’\-]*){0,3}?)\s+(?:(?:have|has|had)\s+to\s+)?(?:say|says|said|teach|teaches|taught|think|thinks|thought|argue|argues|argued|believe|believes|believed|write|writes|wrote|hold|holds|held|handle|handles|handled|address|addresses|addressed|describe|describes|described|explain|explains|explained|discuss|discusses|discussed|approach|approaches|approached|examine|examines|examined|present|presents|presented|portray|portrays|portrayed|interpret|interprets|interpreted|define|defines|defined)\b/iu);
  if(!match)return '';
  const name=match[1].trim();
  return new Set(['it','they','he','she','the author','the book','the text','people','someone','anyone',
   'different authors','the authors','writers','the writers'])
   .has(normalizeCatalogText(name))?'':name;
 }
-function explicitlyMentionsAuthor(question,name){
+function explicitlyComparedAuthors(question,names){
+ const text=normalizeCatalogText(question);
+ if(!/\b(?:difference|differ|compare|comparison|contrast|between|versus|vs)\b/i.test(text))
+  return new Set();
+ const candidates=[...new Map(names.map(name=>{
+  const key=normalizeCatalogText(name);
+  const surname=key.split(' ').filter(Boolean).at(-1)||'';
+  return [key,{key,surname}];
+ }).filter(([,item])=>item.surname.length>=4&&questionContainsPhrase(question,item.surname))).values()];
+ const mentioned=new Set();
+ for(let left=0;left<candidates.length;left++){
+  for(let right=left+1;right<candidates.length;right++){
+   const a=candidates[left],b=candidates[right];
+   if(a.surname===b.surname)continue;
+   const aIndex=text.indexOf(a.surname),bIndex=text.indexOf(b.surname);
+   if(aIndex<0||bIndex<0)continue;
+   const start=Math.min(aIndex,bIndex),end=Math.max(aIndex,bIndex);
+   if(/\b(?:and|versus|vs)\b/i.test(text.slice(start+a.surname.length,end))){
+    mentioned.add(a.key);mentioned.add(b.key);
+   }
+  }
+ }
+ return mentioned;
+}
+function explicitlyMentionsAuthor(question,name,comparedAuthors=new Set()){
  const normalized=normalizeCatalogText(name);
  if(!normalized)return false;
- if(questionContainsPhrase(question,name))return true;
+ if(comparedAuthors.has(normalized)||questionContainsPhrase(question,name))return true;
  const surname=normalized.split(' ').filter(Boolean).at(-1)||'';
  if(surname.length<4)return false;
  const speaker=normalizeCatalogText(namedSpeakerPhrase(question));
@@ -788,8 +812,10 @@ function explicitlyNamedAuthorGroups(question,candidates){
    groups.get(key).bookIds.add(bookId);
   }
  }
+ const comparedAuthors=explicitlyComparedAuthors(question,
+  [...groups.values()].map(group=>group.name));
  return [...groups.values()].filter(group=>
-  explicitlyMentionsAuthor(question,group.name));
+  explicitlyMentionsAuthor(question,group.name,comparedAuthors));
 }
 function comparisonAuthorOrder(question,candidates,facetBalanced,directFacet){
  const groups=explicitlyNamedAuthorGroups(question,candidates);
@@ -833,9 +859,11 @@ export function matchExplicitBookIds(question,books){
  const titleMatches=valid.filter(book=>
   catalogWorkTitles(book.title).some(title=>questionContainsPhrase(question,title)));
  const authorGroups=new Map();
+ const comparedAuthors=explicitlyComparedAuthors(question,
+  valid.flatMap(book=>catalogAuthorNames(book.title)));
  for(const book of valid){
   for(const name of catalogAuthorNames(book.title)){
-   if(explicitlyMentionsAuthor(question,name)){
+   if(explicitlyMentionsAuthor(question,name,comparedAuthors)){
     const surname=normalizeCatalogText(name).split(' ').filter(Boolean).at(-1)||'';
     if(!authorGroups.has(surname))authorGroups.set(surname,[]);
     authorGroups.get(surname).push(book);
