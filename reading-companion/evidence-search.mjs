@@ -660,7 +660,7 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
   ?partQuestions.filter(item=>typeof item?.question==='string').map(item=>({
     partId:item.partId||'',question:item.question}))
   :[{partId:'P1',question:String(question||'')}];
- const weakParts=parts.map(part=>{
+ const assessments=parts.map(part=>{
   let best={overlap:0,matchedTerms:[],windowStart:-1,source:null};
   let bestIndex={overlap:0,matchedTerms:[],windowStart:-1,source:null};
   let indexLikeSource=null;
@@ -682,9 +682,9 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
   const terms=facetTerms(coverageQuestion);
   const overlap=terms.length?best.overlap:2;
   // A couple of matching words are not enough when a question has several
-  // distinct content terms. Keep a small absolute floor for short questions,
-  // then require a modest share of the terms for longer facets.
-  const required=Math.min(terms.length,Math.max(2,Math.ceil(terms.length*0.35)));
+  // distinct content terms. Keep a two-term floor for short questions; for
+  // longer facets, require more than one quarter of their terms in one span.
+  const required=Math.min(terms.length,Math.max(2,Math.floor(terms.length*0.25)+1));
   const weak=terms.length>0&&overlap<required;
   const indexLikeIsStrongest=bestIndex.overlap>best.overlap;
   const coverageReason=weak
