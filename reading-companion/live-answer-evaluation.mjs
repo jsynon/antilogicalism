@@ -311,7 +311,11 @@ function answerDeniesSupportedComparison(part,answer){
  return explicitGap&&!givesContrast;
 }
 function summarizeCaseReviewerLabels(item){
- const contract=item?.evidenceTrace?.reviewContract;
+ // The live Worker response exposes its trace as `trace`; saved benchmark
+ // rows normalize that same object to `evidenceTrace`. Read either shape so
+ // labels are captured before and after the response is written to the case.
+ const trace=item?.evidenceTrace||item?.trace;
+ const contract=trace?.reviewContract||item?.reviewContract;
  if(!contract||typeof contract!=='object')return {available:false};
  const supportIssues=Array.isArray(contract.supportIssues)?contract.supportIssues:[];
  const incompleteReasons=new Set(['missing-claim-source-decision','missing-claim-source-span']);
@@ -344,10 +348,17 @@ function summarizeCaseReviewerLabels(item){
    incompleteReasons.has(String(issue?.reason||''))).length};
 }
 export function summarizeReviewerLabels(cases){
- const entries=(cases||[]).map(item=>({id:String(item?.id||''),
-  attemptNumber:Number.isInteger(item?.attemptNumber)?item.attemptNumber:null,
-  reviewStatus:String(item?.reviewStatus||''),
-  labels:item?.reviewerLabels||item?.offlineRecheck?.reviewerLabels||summarizeCaseReviewerLabels(item)}));
+ const entries=(cases||[]).map(item=>{
+  // Older rows can contain an explicit `{available:false}` placeholder even
+  // though their preserved trace has the review contract needed for a fresh
+  // summary. Prefer stored labels only when they actually contain a summary.
+  const storedLabels=item?.reviewerLabels?.available===true?item.reviewerLabels:
+   item?.offlineRecheck?.reviewerLabels?.available===true?item.offlineRecheck.reviewerLabels:null;
+  return {id:String(item?.id||''),
+   attemptNumber:Number.isInteger(item?.attemptNumber)?item.attemptNumber:null,
+   reviewStatus:String(item?.reviewStatus||''),
+   labels:storedLabels||summarizeCaseReviewerLabels(item)};
+ });
  const available=entries.filter(item=>item.labels?.available);
  const aggregate=key=>available.reduce((counts,item)=>{
   for(const status of Object.keys(counts))
