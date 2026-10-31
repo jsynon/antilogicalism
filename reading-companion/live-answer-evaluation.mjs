@@ -1149,8 +1149,11 @@ async function main(){
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
   throw Error('Repeat count must be an integer from 1 to 3.');
- if(args.repeatCount!==1&&!(args.mode==='acceptance'&&['repeatable-calibration','quality-calibration'].includes(args.caseId)))
-  throw Error('Repeated runs are limited to the repeatable calibration case set.');
+ const repeatableAcceptanceSelection=args.mode==='acceptance'&&(
+  ['repeatable-calibration','quality-calibration'].includes(args.caseId)||
+  ACCEPTANCE_CASES.some(item=>item.id===args.caseId));
+ if(args.repeatCount!==1&&!repeatableAcceptanceSelection)
+  throw Error('Repeated runs require a calibration suite or one selected acceptance case.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
  const suite=JSON.parse(await readFile(SUITE_PATH,'utf8'));
@@ -1195,7 +1198,7 @@ async function main(){
  };
  await saveReport();
  console.log('Initializing '+args.mode+' evaluation for '+(args.repeatCount>1?
-  args.repeatCount+' attempts each for '+baseCases.length+' calibration questions ('+cases.length+' answers)':
+  args.repeatCount+' attempts each for '+baseCases.length+' selected questions ('+cases.length+' answers)':
   args.mode==='paired'?cases.length+' paired questions ('+reportCaseCount+' scope results)':
   cases.length+' question'+(cases.length===1?'':'s'))+
   '; loading the published fingerprint coverage and corpus manifest before retrieval.');
