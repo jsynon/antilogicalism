@@ -473,11 +473,12 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   const citedEvidenceIds=evidenceIds.filter(id=>citationIds.has(id));
   const submittedEvidenceIds=evidenceIds.filter(id=>submittedIds.has(id));
   const structurallyComplete=part?.status==='unsupported'?null:
-   generalContextOnly&&evidenceIds.length===0?null:
+   evidenceIds.length===0?null:
    evidenceIds.length>0&&mappedEvidenceIdsForPart.length===evidenceIds.length&&
    citedEvidenceIds.length===evidenceIds.length&&submittedEvidenceIds.length===evidenceIds.length;
-  return {part:String(part?.part||''),status:String(part?.status||''),evidenceIds,
-   evidenceApplicability:generalContextOnly&&evidenceIds.length===0?'not-applicable':'required',
+  return {part:String(part?.part||''),status:String(part?.status||''),
+   answerStatus:String(part?.answerStatus||''),evidenceIds,
+   evidenceApplicability:evidenceIds.length===0?'not-applicable':'required',
    mappedEvidenceIds:mappedEvidenceIdsForPart,citedEvidenceIds,submittedEvidenceIds,structurallyComplete};
  });
  const completeSupportedEvidenceIds=new Set(partEvidenceAudit
@@ -524,6 +525,15 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   supported:questionParts.filter(item=>item?.status==='supported').length,
   partial:questionParts.filter(item=>item?.status==='partial').length,
   unsupported:questionParts.filter(item=>item?.status==='unsupported').length};
+ const coverage=String(data?.coverage||'');
+ const answerCompleteness=typeof data?.answerCompleteness==='string'?
+  data.answerCompleteness:
+  (coverage==='full'?'full':coverage==='none'?'none':'partial');
+ const questionPartAnswerCompleteness={total:questionParts.length,
+  answered:questionParts.filter(item=>item?.answerStatus==='answered').length,
+  partial:questionParts.filter(item=>item?.answerStatus==='partial').length,
+  unanswered:questionParts.filter(item=>item?.answerStatus==='unanswered').length,
+  unknown:questionParts.filter(item=>!['answered','partial','unanswered'].includes(item?.answerStatus)).length};
  const evaluationScope=options.scope==='all-books'?'all-books':
   options.scope==='selected-books'?'selected-books':'';
  const plannerParts=Array.isArray(options.plannerPlan?.parts)?options.plannerPlan.parts:[];
@@ -579,7 +589,6 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   highlightedSourceCount:citedSourceIds.filter(id=>highlightedSourceIds.has(id)).length,
   citedSourcesWithoutLocatedHighlight:citedSourceIds.filter(id=>!highlightedSourceIds.has(id))};
  const highlightRelevance=highlightRelevanceAudit(answer,citations,evidenceHighlights);
- const coverage=String(data?.coverage||'');
  const partStatusesConsistent=questionParts.length===0?null:
   (coverage==='full'?questionParts.every(part=>part?.status==='supported'):
    coverage==='partial'?questionParts.some(part=>part?.status!=='supported'):false);
@@ -600,18 +609,18 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  // score the excerpts and their claim links rather than the generated answer.
  const highlightHumanReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
   accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
- const structuralPassed=coverage==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
+ const structuralPassed=answerCompleteness==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
   missingInline.length===0&&(citations.length>0||generalContextOnly)&&answerCoverageConsistent!==false&&partEvidenceComplete!==false&&
   sourcePartAlignment.every(item=>item.aligned)&&reviewerLabels.contractStatus!=='incomplete'&&
   !failureCode&&reviewStatus!=='pipeline-failed'&&
   reviewStatus!=='review-contract-incomplete'&&
   reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed';
- return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,reviewStatus,
+ return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,answerCompleteness,reviewStatus,
   reviewerLabels,failureCode,failureStage,
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
-  sourceGroups,questionParts,questionPartCoverage,partEvidenceAudit,partEvidenceComplete,
+  sourceGroups,questionParts,questionPartCoverage,questionPartAnswerCompleteness,partEvidenceAudit,partEvidenceComplete,
   evidenceApplicability:generalContextOnly?'not-applicable':'required',
   sourcePartAlignment,
   answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
@@ -690,7 +699,8 @@ export function recheckQualityReport(report){
   const definition=definitions.get(String(item?.pairedCaseId||item?.id||'').replace(/::(?:all-books|selected-books)$/,''));
   if(!definition)return {...item,offlineRecheck:null};
   const audit=auditLiveAnswer({
-   answer:item.answerText,coverage:item.coverage,outcome:item.outcome,reviewStatus:item.reviewStatus,
+   answer:item.answerText,coverage:item.coverage,answerCompleteness:item.answerCompleteness,
+   outcome:item.outcome,reviewStatus:item.reviewStatus,
    citations:item.citationSources,
    questionParts:item.questionParts,evidenceMap:item.evidenceMap,
    evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
@@ -705,6 +715,7 @@ export function recheckQualityReport(report){
   const answerVariantComparison=Array.isArray(previousComparison?.variants)?{...previousComparison,
    variants:previousComparison.variants.map(variant=>{
     const variantAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
+     answerCompleteness:variant.answerCompleteness,
      outcome:variant.outcome,reviewStatus:variant.reviewStatus,
      citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
      evidenceHighlights:variant.evidenceHighlights,workerVersionId:variant.workerVersionId,
@@ -719,9 +730,11 @@ export function recheckQualityReport(report){
    })}:previousComparison;
   return {...item,...(answerVariantComparison?{answerVariantComparison}:{}),
    ...(item.reviewAblation&&answerVariantComparison?{reviewAblation:answerVariantComparison}:{}),
-   offlineRecheck:{passed:audit.passed,sourceGroups:audit.sourceGroups,
+   offlineRecheck:{passed:audit.passed,answerCompleteness:audit.answerCompleteness,
+   questionPartAnswerCompleteness:audit.questionPartAnswerCompleteness,sourceGroups:audit.sourceGroups,
    sourcePartAlignment:audit.sourcePartAlignment,
-   questionPartCoverage:audit.questionPartCoverage,partEvidenceAudit:audit.partEvidenceAudit,
+   questionPartCoverage:audit.questionPartCoverage,
+   partEvidenceAudit:audit.partEvidenceAudit,
    partEvidenceComplete:audit.partEvidenceComplete,
    answerCoverageConsistent:audit.answerCoverageConsistent,
    coverageContradictions:audit.coverageContradictions,
@@ -743,7 +756,14 @@ export function recheckQualityReport(report){
    const counts=item.offlineRecheck.questionPartCoverage||{};
    for(const status of ['supported','partial','unsupported'])totals[status]+=Number(counts[status])||0;
    totals.total+=Number(counts.total)||0;return totals;
-  },{total:0,supported:0,partial:0,unsupported:0})}};
+  },{total:0,supported:0,partial:0,unsupported:0}),
+  answerCompletenessCounts:checked.reduce((totals,item)=>{
+   const status=item.offlineRecheck.answerCompleteness;
+   if(status==='full')totals.full++;
+   else if(status==='partial')totals.partial++;
+   else totals.none++;
+   return totals;
+  },{full:0,partial:0,none:0})}};
 }
 function safeHeaders(token){return {authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json',origin:'https://jsynon.github.io'};}
 function attachRequestFailure(error,stage,details={}){
@@ -1401,12 +1421,23 @@ async function main(){
      totals[status]+=Number(counts[status])||0;
     totals.total+=Number(counts.total)||0;
     return totals;
-   },{total:0,supported:0,partial:0,unsupported:0})};
+   },{total:0,supported:0,partial:0,unsupported:0}),
+   ...(args.mode==='planner'?{}:{answerCompletenessCounts:report.cases.reduce((totals,item)=>{
+    const status=item.answerCompleteness;
+    if(status==='full')totals.full++;
+    else if(status==='partial')totals.partial++;
+    else if(status==='none')totals.none++;
+    else totals.unknown++;
+    return totals;
+   },{full:0,partial:0,none:0,unknown:0})})};
   await saveReport();
   console.log(args.mode==='planner'?
    'Done: '+report.summary.passedCases+'/'+report.caseCount+' planner plans retrieved at least one expected book; no answers were generated.':
    (args.mode==='paired'?'Done: '+report.summary.passedCases+'/'+report.caseCount+' scope results met structural gates; paired scope totals are in scopeSummary. ':'Done: '+report.summary.passedCases+'/'+report.caseCount+' reviewed answers met structural gates; ')+report.summary.failedCases+' failed and '+report.summary.unscoredCases+' are unscored. Semantic answer quality requires the separate human rubric.');
   if(args.mode!=='planner'){
+   const completeness=report.summary.answerCompletenessCounts;
+   console.log('Answer completeness: '+completeness.full+' full, '+completeness.partial+
+    ' partial, '+completeness.none+' none, '+completeness.unknown+' unknown; library-evidence coverage remains reported separately.');
    const labels=report.summary.reviewerLabels;
    console.log('Reviewer labels: '+labels.reviewerPartStatusCounts.answered+' answered, '+
     labels.reviewerPartStatusCounts.partial+' partial, '+labels.reviewerPartStatusCounts.unanswered+
