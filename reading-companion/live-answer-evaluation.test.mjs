@@ -289,7 +289,9 @@ test('acceptance workflow lists all four calibration cases in sequence',async()=
  const workflow=readFileSync(new URL('../.github/workflows/reading-companion-holdout-answer-evaluation.yml',import.meta.url),'utf8');
  assert.match(workflow, /^\s+- acceptance-god-is-love\s*\n\s+- acceptance-simulation-hypothesis\s*\n\s+- acceptance-buddha-on-death\s*\n\s+- acceptance-life-meaning-authors\s*$/m);
  const benchmark=readFileSync(new URL('../.github/workflows/reading-companion-quality-benchmark.yml',import.meta.url),'utf8');
- assert.match(benchmark,/Run the four repeated calibration questions/);
+ assert.match(benchmark,/Run calibration, one selected acceptance question, or the full frozen acceptance set/);
+ assert.match(benchmark,/default: acceptance-buddha-on-death/);
+ assert.match(benchmark,/case_id="\$BENCHMARK_CASE_ID"/);
 });
 
 test('holdout all-books scope and single-case selection behave independently of the baseline',()=>{
