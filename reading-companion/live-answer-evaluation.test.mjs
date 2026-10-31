@@ -628,6 +628,23 @@ test('offline report recheck keeps an actual partial answer as a miss',()=>{
  assert.equal(checked.cases[0].offlineRecheck.questionPartCoverage.partial,1);
 });
 
+test('offline report recheck preserves separate answer-completeness and evidence-coverage labels',()=>{
+ const checked=recheckQualityReport({cases:[{
+  id:'acceptance-simulation-hypothesis',coverage:'partial',answerCompleteness:'full',
+  answerText:'We do not know whether reality is computationally simulated. Baudrillard describes a cultural idea of simulation [S1].',
+  outcome:'verified-source-draft',reviewStatus:'claim-review',
+  citationSources:[{id:'S1',bookId:'202'}],submittedSources:[{bookId:'202'}],
+  evidenceMap:[{id:'S1',partId:'P1',point:'A related account of simulation.'}],
+  questionParts:[{part:'Are we living in a simulation?',status:'partial',answerStatus:'answered',evidenceIds:['S1']}]
+ }]});
+ assert.equal(checked.offlineRecheck.aiCalls,0);
+ assert.equal(checked.offlineRecheck.networkCalls,0);
+ assert.equal(checked.cases[0].offlineRecheck.answerCompleteness,'full');
+ assert.equal(checked.cases[0].offlineRecheck.questionPartCoverage.partial,1);
+ assert.equal(checked.cases[0].offlineRecheck.questionPartAnswerCompleteness.answered,1);
+ assert.equal(checked.offlineRecheck.answerCompletenessCounts.full,1);
+});
+
 test('offline report recheck recognizes paired scope rows by their shared question ID',()=>{
  const checked=recheckQualityReport({cases:[{
   id:'paired-hume-kant-causal-inference::selected-books',pairedCaseId:'paired-hume-kant-causal-inference',
@@ -809,6 +826,19 @@ test('partial Worker coverage is an evaluation miss even when citations and expe
  const result=auditLiveAnswer({coverage:'partial',answer:'Supported claim [S1].',citations:[{id:'S1',bookId:'638'}]},[{}],[{label:'Bible',book_ids:['638']}]);
  assert.equal(result.sourceGroups[0].found,true);
  assert.equal(result.passed,false);
+});
+
+test('answer completeness can pass independently while evidence coverage remains partial',()=>{
+ const result=auditLiveAnswer({outcome:'verified-source-draft',reviewStatus:'claim-review',
+  coverage:'partial',answerCompleteness:'full',answer:'A contextual answer with one reviewed source [S1].',
+  citations:[{id:'S1',bookId:'638'}],evidenceMap:[{id:'S1',partId:'P1'}],
+  questionParts:[{part:'The requested explanation',status:'partial',answerStatus:'answered',evidenceIds:['S1']}]
+ },[{bookId:'638'}],[]);
+ assert.equal(result.coverage,'partial','the evidence coverage label remains visible');
+ assert.equal(result.answerCompleteness,'full');
+ assert.equal(result.questionPartAnswerCompleteness.answered,1);
+ assert.equal(result.partEvidenceComplete,true);
+ assert.equal(result.structuralPassed,true);
 });
 
 test('case evaluation sends one selected-book plan and one answer request in order without logging the token',async()=>{

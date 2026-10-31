@@ -39,6 +39,8 @@ async function main(){
  console.log('Offline structural recheck: '+summary.passedCases+'/'+summary.checkedCases+' passed.');
  console.log('Question parts: '+summary.questionPartStatusCounts.supported+' supported, '+
   summary.questionPartStatusCounts.partial+' partial, '+summary.questionPartStatusCounts.unsupported+' unsupported.');
+ console.log('Answer completeness: '+summary.answerCompletenessCounts.full+' full, '+
+  summary.answerCompletenessCounts.partial+' partial, '+summary.answerCompletenessCounts.none+' none.');
  console.log('AI calls: 0. Network calls: 0.');
  const passageReview=result.offlinePassageReview;
  console.log('Passage gold review: '+passageReview.checkedCases+' cases; '+
