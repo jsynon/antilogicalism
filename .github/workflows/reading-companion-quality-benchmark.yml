@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Run calibration, one frozen case, the frozen set, or the fresh five-question set
+        description: Run calibration, one selected acceptance question, or the full frozen acceptance set; or run the fresh five-question set
         type: choice
         options:
           - calibration
