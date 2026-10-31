@@ -773,8 +773,8 @@ test('case evaluation sends one selected-book plan and one answer request in ord
  assert.deepEqual(searched,['first distinct search concept','second distinct search concept',item.question]);
  assert.equal(result.searches[2].query,item.question+' [named books: 638]');
  assert.equal(calls[1].body.bookId,'638');
- assert.equal(Object.hasOwn(calls[1].body.sources[0],'candidatePartIds'),false,
-  'browser retrieval links are eligibility hints, so the Worker selector assigns final part links');
+ assert.deepEqual(calls[1].body.sources[0].candidatePartIds,['P1'],
+  'the Worker receives retrieval part links as hints for matching pages to plan parts');
  assert.deepEqual(result.submittedSources[0].candidatePartIds,['P1']);
  assert.deepEqual(result.retrievalCandidates.map(source=>source.bookId+':'+source.page),['638:10']);
  assert.ok(!JSON.stringify(result).includes('x'.repeat(40)));
