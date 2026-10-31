@@ -116,6 +116,16 @@ const QUALITY_CASES=[
  {id:'quality-all-books-cross-discipline-order',discipline:'philosophy',question:'How does Aristotle describe the aim of political science in the Nicomachean Ethics, and what role does Hobbes give common power in Leviathan? How do these accounts differ?',selected_book_ids:[],planner_queries:['Aristotle Nicomachean Ethics political science human good citizens good obedient laws','Hobbes Leviathan state of nature common power keep them in awe war every man against every man'],required_source_groups:[{label:'Aristotle, Nicomachean Ethics',book_ids:['7']},{label:'Hobbes, Leviathan',book_ids:['163']}],required_part_source_groups:[{partIncludes:'Aristotle',book_ids:['7']},{partIncludes:'Hobbes',book_ids:['163']}],review_focus:['Represent each author’s account in its own terms and identify a meaningful difference.','Ground the comparison in both works instead of importing unsupported modern claims.']},
  {id:'quality-all-books-religion-scripture',discipline:'religion',question:'According to 1 John 4:7–12, what does “God is love” mean, and how does the passage connect God’s love with loving one another?',selected_book_ids:[],planner_queries:['1 John 4:7-12 God is love sent Son love one another passage','1 John 4:7-12 love of God revealed in Christ command love one another'],required_source_groups:[{label:'1 John 4:7–12',book_ids:['335']}],review_focus:['Explain the passage’s connection between God’s prior love and the command to love one another.','Stay close to the passage and distinguish its claims from later theological interpretation.']},
 ];
+// A small holdout set for broad quality checks. The open all-books prompts
+// carry no expected-author labels; selected-book cases use the book chosen in
+// the test setup. Keep this separate from the frozen acceptance set.
+const FRESH_CASES=[
+ {id:'fresh-all-knowledge-and-belief',discipline:'philosophy',evaluation_scope:'all-books',question:'How do different writers in the library distinguish knowledge from opinion, and what do they treat as good grounds for belief?',selected_book_ids:[],planner_queries:['How do different writers in the library distinguish knowledge from opinion, and what do they treat as good grounds for belief?'],required_source_groups:[],review_focus:[]},
+ {id:'fresh-all-political-authority',discipline:'politics',evaluation_scope:'all-books',question:'What do different writers in the library say gives political authority its legitimacy, and what limits should it have?',selected_book_ids:[],planner_queries:['What do different writers in the library say gives political authority its legitimacy, and what limits should it have?'],required_source_groups:[],review_focus:[]},
+ {id:'fresh-all-education-and-character',discipline:'society',evaluation_scope:'all-books',question:'How do writers in the library connect education with the development of judgment or character?',selected_book_ids:[],planner_queries:['How do writers in the library connect education with the development of judgment or character?'],required_source_groups:[],review_focus:[]},
+ {id:'fresh-selected-herodotus-accounts',discipline:'history',evaluation_scope:'selected-books',question:'When Herodotus recounts competing explanations for an event, how does he signal which account he finds credible?',selected_book_ids:['149'],planner_queries:['When Herodotus recounts competing explanations for an event, how does he signal which account he finds credible?'],required_source_groups:[{label:'Herodotus, The Histories',book_ids:['149']}],review_focus:[]},
+ {id:'fresh-selected-maxwell-potential',discipline:'science',evaluation_scope:'selected-books',question:'How does Maxwell explain the connection between electric potential and the force acting on a charge?',selected_book_ids:['645'],planner_queries:['How does Maxwell explain the connection between electric potential and the force acting on a charge?'],required_source_groups:[{label:'Maxwell, A Treatise on Electricity and Magnetism',book_ids:['645']}],review_focus:[]},
+];
 // Focused diagnostics stay selectable without changing the stable seven-case
 // quality baseline. This case targets the live user's question and asks the
 // reviewer to judge source sufficiency and highlight relevance qualitatively.
@@ -192,7 +202,7 @@ function sourceRevision(){
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
- const evaluationCases=mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
+ const evaluationCases=mode==='fresh'?FRESH_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
  if(mode==='acceptance'&&caseId==='repeatable-calibration'){
@@ -208,7 +218,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return selected.map(copyEvaluationCase);
  }
  if(caseId&&caseId!=='all'){
-  if(!['quality','focused','paired','holdout','acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode.');
+  if(!['quality','focused','paired','holdout','acceptance','fresh'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout, acceptance or fresh mode.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
@@ -218,6 +228,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  if(mode==='paired')return PAIRED_CASES.map(copyEvaluationCase);
  if(mode==='holdout')return HOLDOUT_CASES.map(copyEvaluationCase);
  if(mode==='acceptance')return ACCEPTANCE_CASES.map(copyEvaluationCase);
+ if(mode==='fresh')return FRESH_CASES.map(copyEvaluationCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
   const item=QUALITY_CASES.find(value=>value.id===id);
   if(!item)throw Error('The planner-only cases are missing from the quality suite.');
@@ -232,12 +243,14 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
+ if(scope==='case-default')return cases.map(item=>({...item,selected_book_ids:item.evaluation_scope==='all-books'?[]:[...item.selected_book_ids]}));
  if(!['selected-books','all-books'].includes(scope))
-  throw Error('Evaluation scope must be selected-books or all-books.');
+  throw Error('Evaluation scope must be selected-books, all-books or case-default.');
  if(scope==='selected-books')return cases;
  return cases.map(item=>({...item,selected_book_ids:[]}));
 }
 export function evaluationUsesLivePlanner(mode,scope){
+ if(mode==='fresh')return true;
  return ['quality','focused','paired','holdout','acceptance'].includes(mode)&&
   (mode==='paired'||scope==='all-books');
 }
@@ -1073,7 +1086,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    'Same resolved question, planner result and submitted source pages; only the final model-review call is omitted in compose-only',
   variants:variantResults
  }:null;
- return {id:item.id,question:item.question,discipline:item.discipline||'',selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
+ return {id:item.id,question:item.question,discipline:item.discipline||'',evaluationScope:item.evaluation_scope||(item.selected_book_ids?.length?'selected-books':'all-books'),selectedBookIds:Array.isArray(item.selected_book_ids)?item.selected_book_ids:[],
   reviewFocus:Array.isArray(item.review_focus)?item.review_focus:[],plannerSkipped,plannerReused,
   plannerQueries:plannerFallback?[]:queries,plannerFallback,
   plannerWorkerVersionId,plannerWorkerSourceBuild,plannerWorkerSourceRevision,answerWorkerVersionId:primary.workerVersionId,answerWorkerSourceBuild:primary.workerSourceBuild,answerWorkerSourceRevision:primary.workerSourceRevision,
@@ -1247,21 +1260,23 @@ function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',sco
   if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='retrieval-profile')out.retrievalProfile=value;else if(key==='repeat')out.repeatCount=Number(value);else if(key==='report-only')out.reportOnly=value==='true';else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|full] [--scope selected-books|all-books|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
  if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
- const usesEvaluationMode=['quality','focused','paired','holdout','acceptance'].includes(args.mode);
+ const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in quality, focused, paired, holdout or acceptance mode.');
- if(usesEvaluationMode&&args.mode!=='paired'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ if(args.mode==='fresh'&&args.scope!=='case-default')throw Error('The fresh question suite must use case-default scope.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
   throw Error('Repeat count must be an integer from 1 to 3.');
+ const repeatableFreshSelection=args.mode==='fresh'&&(args.caseId==='all'||FRESH_CASES.some(item=>item.id===args.caseId));
  const repeatableAcceptanceSelection=args.mode==='acceptance'&&(
   ['repeatable-calibration','quality-calibration'].includes(args.caseId)||
   ACCEPTANCE_CASES.some(item=>item.id===args.caseId));
- if(args.repeatCount!==1&&!repeatableAcceptanceSelection)
+ if(args.repeatCount!==1&&!repeatableAcceptanceSelection&&!repeatableFreshSelection)
   throw Error('Repeated runs require a calibration suite or one selected acceptance case.');
  const token=process.env.PILOT_EVALUATION_TOKEN;if(typeof token!=='string'||token.length<32)throw Error('PILOT_EVALUATION_TOKEN must be set to the configured evaluation secret.');
  if(args.mode==='full'&&process.env.CONFIRM_FULL_30!=='true')throw Error('The full 30-question live run also requires CONFIRM_FULL_30=true.');
