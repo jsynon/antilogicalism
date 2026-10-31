@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Run calibration, one selected acceptance question, or the full frozen acceptance set; or run the fresh five-question set
+        description: Run calibration, one selected acceptance question, or the full frozen acceptance set; or run the current fresh five-question set
         type: choice
         options:
           - calibration
@@ -35,12 +35,12 @@ on:
         description: Fresh question to run when suite is fresh-single-case; ignored by other suites
         type: choice
         options:
-          - fresh-all-reason-experience
-          - fresh-all-authority-resistance
-          - fresh-all-education-and-character
-          - fresh-selected-herodotus-accounts
-          - fresh-selected-maxwell-potential
-        default: fresh-all-reason-experience
+          - fresh2-all-freedom-circumstances
+          - fresh2-all-nature-responsibility
+          - fresh2-all-belief-conduct
+          - fresh2-selected-walden-necessities
+          - fresh2-selected-austen-first-impressions
+        default: fresh2-all-freedom-circumstances
         required: true
       repeat_count:
         description: Attempts per calibration or fresh question; frozen acceptance always runs once
