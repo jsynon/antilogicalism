@@ -172,7 +172,7 @@ test('book selector search matches title or author without changing source entri
 });
 
 test('current browser client validates the v3 fingerprint coverage manifest',()=>{
- assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.16\.0'/,
+ assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.17\.0'/,
   'the active client cache-busts the changed shared retriever');
  assert(clientV49.includes("reader-fingerprints-v3/coverage-v3.json"));
  assert.match(clientV49,/antilogicalism-reader-coverage-v3/);

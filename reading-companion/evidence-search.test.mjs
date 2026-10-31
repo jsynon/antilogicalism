@@ -471,9 +471,34 @@ test('conditional coverage is a weak-overlap signal, not a source verdict',()=>{
   'How do we know that reality exists?',[{partId:'P1',question:'How do we know that reality exists?'}]);
  assert.equal(weak.shouldSearch,true);
  assert.equal(weak.weakParts[0].partId,'P1');
+ assert.equal(weak.parts[0].coverageSignal,'weak-coherent-text');
  const covered=assessEvidenceCoverage([{excerpt:'We know reality through experience and perception.'}],
   'How do we know that reality exists?');
  assert.equal(covered.shouldSearch,false);
+ assert.equal(covered.parts[0].coverageSignal,'coherent-text-found');
+ assert.ok(covered.parts[0].coverageRatio>=0.35);
+});
+test('thin keyword overlap in a multi-term question triggers conditional retrieval',()=>{
+ const page={bookId:'12',page:41,
+  excerpt:'The adverse effects of climate change have altered many regions.'};
+ const coverage=assessEvidenceCoverage([page],
+  'How have writers described the effects of technological change on the ways people live?');
+ assert.equal(coverage.shouldSearch,true);
+ assert.equal(coverage.weakParts[0].coverageReason,'no-coherent-term-cluster');
+ assert.equal(coverage.weakParts[0].overlap,2);
+ assert.equal(coverage.weakParts[0].distinctiveTermCount,8);
+ assert.ok(coverage.weakParts[0].coverageRatio<coverage.weakParts[0].requiredTermCount/
+  coverage.weakParts[0].distinctiveTermCount);
+});
+test('coverage diagnostics retain strong and weak entries for every planned part',()=>{
+ const coverage=assessEvidenceCoverage([
+  {bookId:'21',page:10,excerpt:'Memory shapes identity because it connects past experience to the present.'}
+ ],'How does memory shape identity and what limits does memory have?',
+ [{partId:'P1',question:'How does memory shape identity?'},
+  {partId:'P2',question:'What limits does memory have?'}]);
+ assert.equal(coverage.parts.length,2);
+ assert.ok(coverage.parts.every(part=>Number.isFinite(part.coverageRatio)));
+ assert.deepEqual(coverage.weakParts.map(part=>part.partId),['P2']);
 });
 test('index-style entries cannot combine unrelated terms into answer coverage',()=>{
  const indexPage={bookId:'114',page:1264,globalPageId:'114:1264',
