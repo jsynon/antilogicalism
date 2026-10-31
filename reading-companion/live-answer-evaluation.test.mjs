@@ -584,6 +584,25 @@ test('offline report recheck repairs positional evidence links without changing 
  assert.equal(checked.cases[0].offlineRecheck.partEvidenceAudit[0].structurallyComplete,true);
 });
 
+test('offline report recheck preserves an explicit source-free general-context answer',()=>{
+ const report={mode:'quality',cases:[{
+  id:'acceptance-simulation-hypothesis',passed:true,coverage:'full',
+  outcome:'general-context-answer',reviewStatus:'general-context-review',
+  answerText:'There is no established evidence that we live in a computer simulation.',
+  citationSources:[],submittedSources:[],evidenceMap:[],
+  questionParts:[{part:'Whether we are living in a simulation',status:'supported',evidenceIds:[]}],
+  evidenceHighlights:[]
+ }]};
+ const checked=recheckQualityReport(report);
+ assert.equal(checked.offlineRecheck.aiCalls,0);
+ assert.equal(checked.offlineRecheck.networkCalls,0);
+ assert.equal(checked.offlineRecheck.passedCases,1);
+ assert.equal(checked.cases[0].passed,true);
+ assert.equal(checked.cases[0].offlineRecheck.passed,true);
+ assert.equal(checked.cases[0].offlineRecheck.partEvidenceAudit[0].evidenceApplicability,'not-applicable');
+ assert.equal(checked.cases[0].offlineRecheck.partEvidenceAudit[0].structurallyComplete,null);
+});
+
 test('offline report recheck keeps an actual partial answer as a miss',()=>{
  const checked=recheckQualityReport({cases:[{
   id:'quality-science-darwin-selection',coverage:'partial',answerText:'Claim [S1].',

@@ -418,3 +418,9 @@ The trace was from Worker source revision `49d5932b627ad5993e6136faf155c3526f51c
 The offline evaluator now rebuilds older reviewer summaries from their preserved review contracts when they lack `supportIssueDispositions`. The report retains the total issue count and separates issues that remain in the final answer from rejected draft claims, rejected alternate source decisions, and unresolved cases. This avoids treating a correctly rejected draft claim as though it reached the reader. The classification uses the saved final answer and matching claim/source review decisions; ambiguous cases remain unresolved rather than being guessed.
 
 The answer Markdown parser now splits a run of inline bullets when the model emits a period followed by a bullet marker with multiple spaces. This matches the captured Epictetus and Buddha formatting while leaving ordinary inline italics intact. Regression tests use those observed shapes; this parser check measures rendered block structure, not answer correctness.
+
+## October 31, 2026: replay source-free general context and single-space bullet runs
+
+Offline recheck now preserves a saved `general-context-answer` / `general-context-review` outcome. When a case has no required library sources and the answer has no citations, its empty evidence list is marked not applicable rather than reported as missing evidence. The saved report remains immutable and replay makes no model or network calls; this is a structural distinction, not a quality or truth score.
+
+The renderer also splits a repeated inline bullet run that uses one space after each marker. It requires at least two such markers on a line so a lone italic phrase is not treated as a list. This improves block readability without changing citation parsing or imposing an answer outline. Regression coverage uses the saved life-meaning answer shape and the existing ordinary-italics example.

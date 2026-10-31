@@ -652,7 +652,8 @@ export function recheckQualityReport(report){
   const definition=definitions.get(String(item?.pairedCaseId||item?.id||'').replace(/::(?:all-books|selected-books)$/,''));
   if(!definition)return {...item,offlineRecheck:null};
   const audit=auditLiveAnswer({
-   answer:item.answerText,coverage:item.coverage,citations:item.citationSources,
+   answer:item.answerText,coverage:item.coverage,outcome:item.outcome,reviewStatus:item.reviewStatus,
+   citations:item.citationSources,
    questionParts:item.questionParts,evidenceMap:item.evidenceMap,
    evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
    workerSourceBuild:item.answerWorkerSourceBuild,workerSourceRevision:item.answerWorkerSourceRevision,
@@ -666,6 +667,7 @@ export function recheckQualityReport(report){
   const answerVariantComparison=Array.isArray(previousComparison?.variants)?{...previousComparison,
    variants:previousComparison.variants.map(variant=>{
     const variantAudit=auditLiveAnswer({answer:variant.answerText,coverage:variant.coverage,
+     outcome:variant.outcome,reviewStatus:variant.reviewStatus,
      citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
      evidenceHighlights:variant.evidenceHighlights,workerVersionId:variant.workerVersionId,
      workerSourceBuild:variant.workerSourceBuild,workerSourceRevision:variant.workerSourceRevision},

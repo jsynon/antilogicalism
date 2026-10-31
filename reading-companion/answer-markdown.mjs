@@ -58,10 +58,16 @@ export function parseInlineMarkdown(value){
 
 function splitInlineListMarkers(line){
  // Split obvious model-emitted list markers when they follow prose on the same
- // line. Two or more spaces after a bullet marker distinguish this common
- // format from ordinary italic phrases such as “*an example*”. Bold/underlined
- // labels and numbered items retain their existing, narrower split rule.
- return line
+ // line. Two or more spaces after a bullet marker are unambiguous; for the
+ // captured single-space form, require a repeated run so an isolated italic
+ // phrase is not mistaken for a list item. Bold/underlined labels and numbered
+ // items retain their existing, narrower split rule.
+ const singleSpaceBullet=/([.!?:])\s+([*+-])\s+(?=\S)/gu;
+ const singleSpaceMatches=[...line.matchAll(singleSpaceBullet)];
+ const normalized=singleSpaceMatches.length>=2
+  ?line.replace(singleSpaceBullet,'$1\n$2 ')
+  :line;
+ return normalized
   .replace(/([.!?:])\s+(?=(?:[*+-]\s{2,})\S)/g,'$1\n')
   .replace(/([.!?:])\s+(?=(?:[*+-]\s+(?:\*\*|__)|\d+[.)]\s+))/g,'$1\n');
 }

@@ -51,6 +51,15 @@ test('v49 answer renderer keeps default prose out of accidental ordered lists',(
   'unambiguous inline bullet runs become separate readable prose blocks');
  assert.equal(inlineBullets[1].text,'First point about choice [S1].');
  assert.equal(inlineBullets[2].text,'Second point about externals [S1].');
+ const singleSpaceBullets=parseAnswerMarkdown('Unamuno suggests that: * Human consciousness may be viewed as an end [S2]. * Good can be defined as persistence [S2]. * Meaning is tied to religious values [S2].');
+ assert.deepEqual(singleSpaceBullets.map(block=>block.type),['paragraph','paragraph','paragraph','paragraph'],
+  'a repeated single-space inline bullet run becomes separate prose blocks');
+ assert.equal(singleSpaceBullets[0].text,'Unamuno suggests that:');
+ assert.deepEqual(singleSpaceBullets.slice(1).map(block=>block.text),[
+  'Human consciousness may be viewed as an end [S2].',
+  'Good can be defined as persistence [S2].',
+  'Meaning is tied to religious values [S2].'
+ ]);
  assert.equal(parseAnswerMarkdown('This is * an italic phrase. It continues* in prose.').length,1,
   'ordinary italics are not split into list items');
  const numbered=parseAnswerMarkdown('1. First reason\n2. Second reason',{allowLists:true});
