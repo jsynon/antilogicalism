@@ -184,7 +184,10 @@ export function createDiagnosticReport(input={}){
         coverageRatio:Number.isFinite(part?.coverageRatio)?part.coverageRatio:0,
         requiredTermCount:Number.isSafeInteger(part?.requiredTermCount)?part.requiredTermCount:0,
         reason:safeDiagnosticToken(part?.coverageReason)
-      })):[]
+      })):Array.isArray(input.retrievalCoverageAfterGap?.weakParts)
+        ?input.retrievalCoverageAfterGap.weakParts.slice(0,6).map(part=>({
+          part:string(part?.question,240),overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0
+        })):[]
     }:null,
     plannerPlan:input.plannerPlan&&typeof input.plannerPlan==='object'?{
       version:string(input.plannerPlan.version,40),
