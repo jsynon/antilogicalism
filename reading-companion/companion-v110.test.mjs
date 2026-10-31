@@ -276,6 +276,6 @@ test('Book Lite opening drop cap and small-caps apply only to the introductory p
  assert.match(html,/font-size:7\.03rem;/);
  assert.match(html,/line-height:43px;/);
  assert.match(html,/margin:9px 5px 0 0;/);
- assert.match(html,/<section id="companion-pilot"[^>]*>\s*<p>Ask questions/);
+ assert.match(html,/<section id="companion-pilot"[^>]*>\s*<p>Explore questions and ideas/);
  assert(!html.includes('#companion-pilot .companion-answer-text::first-letter'));
 });
