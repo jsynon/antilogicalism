@@ -4,15 +4,33 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Run the four repeated calibration questions or the full frozen acceptance set
+        description: Run calibration, one selected acceptance question, or the full frozen acceptance set
         type: choice
         options:
           - calibration
+          - single-case
           - acceptance
         default: calibration
         required: true
+      case_id:
+        description: Acceptance question to run when suite is single-case; ignored by other suites
+        type: choice
+        options:
+          - acceptance-descartes-cogito
+          - acceptance-mill-harm-principle
+          - acceptance-epictetus-freedom
+          - acceptance-augustine-memory
+          - acceptance-aristotle-tragedy-plot
+          - acceptance-boethius-fortune
+          - acceptance-locke-political-authority
+          - acceptance-god-is-love
+          - acceptance-simulation-hypothesis
+          - acceptance-buddha-on-death
+          - acceptance-life-meaning-authors
+        default: acceptance-buddha-on-death
+        required: true
       repeat_count:
-        description: Attempts per calibration question; acceptance always runs once
+        description: Attempts per calibration question or selected case; full acceptance always runs once
         type: choice
         options:
           - '1'
@@ -56,6 +74,7 @@ jobs:
     timeout-minutes: 120
     env:
       BENCHMARK_SUITE: ${{ inputs.suite }}
+      BENCHMARK_CASE_ID: ${{ inputs.case_id }}
       BENCHMARK_REPEAT_COUNT: ${{ inputs.repeat_count }}
       BENCHMARK_RETRIEVAL_PROFILE: ${{ inputs.retrieval_profile }}
       BENCHMARK_ANSWER_EXPERIMENT: ${{ inputs.answer_experiment }}
@@ -82,6 +101,9 @@ jobs:
           if [ "$BENCHMARK_SUITE" = "calibration" ]; then
             case_id=quality-calibration
             repeat_count="$BENCHMARK_REPEAT_COUNT"
+          elif [ "$BENCHMARK_SUITE" = "single-case" ]; then
+            case_id="$BENCHMARK_CASE_ID"
+            repeat_count="$BENCHMARK_REPEAT_COUNT"
           else
             case_id=all
             repeat_count=1
@@ -107,7 +129,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reading-companion-quality-benchmark-${{ inputs.suite }}-${{ inputs.retrieval_profile }}-${{ inputs.answer_experiment }}
+          name: reading-companion-quality-benchmark-${{ inputs.suite }}-${{ inputs.suite == 'single-case' && inputs.case_id || 'all-cases' }}-${{ inputs.retrieval_profile }}-${{ inputs.answer_experiment }}
           path: ${{ github.workspace }}/reading-companion-quality-benchmark.json
           if-no-files-found: warn
           retention-days: 30
