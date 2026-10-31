@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       suite:
-        description: Run calibration, one selected acceptance question, or the full frozen acceptance set; or run the current fresh five-question set
+        description: Run calibration, acceptance, or either of the two fresh five-question sets
         type: choice
         options:
           - calibration
@@ -12,7 +12,9 @@ on:
           - acceptance
           - fresh-five
           - fresh-single-case
-        default: fresh-five
+          - fresh-three
+          - fresh-three-single-case
+        default: fresh-three
         required: true
       case_id:
         description: Frozen acceptance question for suite single-case; ignored otherwise
@@ -32,7 +34,7 @@ on:
         default: acceptance-buddha-on-death
         required: true
       fresh_case_id:
-        description: Fresh question to run when suite is fresh-single-case; ignored by other suites
+        description: Second fresh-set question to run when suite is fresh-single-case; ignored by other suites
         type: choice
         options:
           - fresh2-all-freedom-circumstances
@@ -41,6 +43,17 @@ on:
           - fresh2-selected-walden-necessities
           - fresh2-selected-austen-first-impressions
         default: fresh2-all-freedom-circumstances
+        required: true
+      fresh3_case_id:
+        description: Third fresh-set question to run when suite is fresh-three-single-case; ignored by other suites
+        type: choice
+        options:
+          - fresh3-all-imagination-understanding
+          - fresh3-all-justice-mercy
+          - fresh3-all-technology-living
+          - fresh3-selected-odyssey-homecoming
+          - fresh3-selected-douglass-literacy
+        default: fresh3-all-imagination-understanding
         required: true
       repeat_count:
         description: Attempts per calibration or fresh question; frozen acceptance always runs once
@@ -89,6 +102,7 @@ jobs:
       BENCHMARK_SUITE: ${{ inputs.suite }}
       BENCHMARK_CASE_ID: ${{ inputs.case_id }}
       BENCHMARK_FRESH_CASE_ID: ${{ inputs.fresh_case_id }}
+      BENCHMARK_FRESH3_CASE_ID: ${{ inputs.fresh3_case_id }}
       BENCHMARK_REPEAT_COUNT: ${{ inputs.repeat_count }}
       BENCHMARK_RETRIEVAL_PROFILE: ${{ inputs.retrieval_profile }}
       BENCHMARK_ANSWER_EXPERIMENT: ${{ inputs.answer_experiment }}
@@ -124,6 +138,12 @@ jobs:
           elif [ "$BENCHMARK_SUITE" = "fresh-single-case" ]; then
             mode=fresh; scope=case-default; case_id="$BENCHMARK_FRESH_CASE_ID"
             repeat_count="$BENCHMARK_REPEAT_COUNT"
+          elif [ "$BENCHMARK_SUITE" = "fresh-three" ]; then
+            mode=fresh3; scope=case-default; case_id=all
+            repeat_count="$BENCHMARK_REPEAT_COUNT"
+          elif [ "$BENCHMARK_SUITE" = "fresh-three-single-case" ]; then
+            mode=fresh3; scope=case-default; case_id="$BENCHMARK_FRESH3_CASE_ID"
+            repeat_count="$BENCHMARK_REPEAT_COUNT"
           else
             mode=acceptance; scope=all-books; case_id=all
             repeat_count=1
@@ -149,7 +169,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: reading-companion-quality-benchmark-${{ inputs.suite }}-${{ inputs.suite == 'single-case' && inputs.case_id || (inputs.suite == 'fresh-single-case' && inputs.fresh_case_id) || 'all-cases' }}-${{ inputs.retrieval_profile }}-${{ inputs.answer_experiment }}
+          name: reading-companion-quality-benchmark-${{ inputs.suite }}-${{ inputs.suite == 'single-case' && inputs.case_id || (inputs.suite == 'fresh-single-case' && inputs.fresh_case_id) || (inputs.suite == 'fresh-three-single-case' && inputs.fresh3_case_id) || 'all-cases' }}-${{ inputs.retrieval_profile }}-${{ inputs.answer_experiment }}
           path: ${{ github.workspace }}/reading-companion-quality-benchmark.json
           if-no-files-found: warn
           retention-days: 30
