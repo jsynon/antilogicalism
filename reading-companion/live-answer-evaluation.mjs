@@ -48,9 +48,8 @@ export function validateEvaluationBookScopes(cases,allowed,manifest){
  * for the reader's complete question. Keep the same bounded contract as the
  * shared retriever: at most 12 links and 6 distinct part queries. */
 export function partFacetsFromPlan(parts){
- const partQueries=[],partQuestions=[],warnings=[];
+ const partQueries=[],partQuestions=[],warnings=[],candidateGroups=[];
  if(!Array.isArray(parts))return {partQueries,partQuestions,warnings};
- const seenQueries=new Set();
  for(const part of parts){
   const partId=typeof part?.id==='string'?part.id.trim():'';
   const question=part?.question;
@@ -68,19 +67,24 @@ export function partFacetsFromPlan(parts){
    candidates=[question.trim()];
    warnings.push('invalid-part-query-fallback');
   }
-  for(const query of candidates){
+  candidateGroups.push({partId,queries:candidates});
+ }
+ // Give each planned part its first retrieval hint before spending the
+ // remaining distinct-query budget on extra angles from earlier parts.
+ // Round-robin keeps the existing six-unique-query and twelve-link limits.
+ const seenQueries=new Set();
+ const rounds=Math.max(0,...candidateGroups.map(group=>group.queries.length));
+ for(let queryIndex=0;queryIndex<rounds;queryIndex++){
+  for(const group of candidateGroups){
+   const query=group.queries[queryIndex];
+   if(!query)continue;
    const key=query.toLocaleLowerCase();
-   if(seenQueries.has(key)){
-    if(partQueries.length<12)partQueries.push({partId,query});
-    else warnings.push('part-query-budget-exceeded');
-    continue;
-   }
-   if(seenQueries.size>=6||partQueries.length>=12){
-    warnings.push('part-query-budget-exceeded');
-    continue;
+   if(partQueries.length>=12){warnings.push('part-query-budget-exceeded');continue;}
+   if(!seenQueries.has(key)&&seenQueries.size>=6){
+    warnings.push('part-query-budget-exceeded');continue;
    }
    seenQueries.add(key);
-   partQueries.push({partId,query});
+   partQueries.push({partId:group.partId,query});
   }
  }
  return {partQueries,partQuestions,warnings:[...new Set(warnings)]};
