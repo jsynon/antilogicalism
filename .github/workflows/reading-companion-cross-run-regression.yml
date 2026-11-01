@@ -43,6 +43,7 @@ jobs:
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-cross-run-regression/philosophy3.json"
       - name: Run the five-question fresh suite
+        if: ${{ !cancelled() }}
         env:
           PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
         run: |
@@ -52,6 +53,7 @@ jobs:
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-cross-run-regression/fresh.json"
       - name: Run the five-question fresh-three suite
+        if: ${{ !cancelled() }}
         env:
           PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
         run: |
