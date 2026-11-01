@@ -292,7 +292,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  * the only environment difference (browser shard cache versus evaluator
  * RemoteLibrary access).
  */
-export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],gapQueryPartLinks=[],library,books,allowedBookIds,
+export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],gapQueryPartLinks=[],sourceGroups=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
  maxCandidates=LIVE_RETRIEVAL_CONFIG.maxCandidates,maxBooks=LIVE_RETRIEVAL_CONFIG.maxBooks,
  pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000}={}){
@@ -333,6 +333,11 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
      !Array.isArray(link.partIds)||link.partIds.length<1||link.partIds.length>6||
      link.partIds.some(id=>!knownPartIds.has(id))))
   throw Error('Conditional retrieval query links are invalid');
+ if(!Array.isArray(sourceGroups)||sourceGroups.length>8||sourceGroups.some(group=>
+   !group||!['primary','subject','commentary','unspecified'].includes(group.role)||
+   !Array.isArray(group.bookIds)||group.bookIds.length>20||
+   group.bookIds.some(id=>typeof id!=='string'||!allowedBookIds.has(id))))
+  throw Error('Catalog source groups are invalid');
  // Direct fallback uses only the unchanged question. Topic or source-language
  // expansions belong in the planner output, where they remain visible in traces.
  const fallbackQueries=useDirect?[direct]:queries;
@@ -456,6 +461,39 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
     // other author's independently retrieved evidence.
    }
   }
+ }
+ // A global or mixed-source facet can return plenty of pages while omitting
+ // one explicitly named author or work. Retry each missing catalog group once
+ // inside its already-validated book IDs. This is local retrieval work: it
+ // adds no model call and cannot widen the answer's six-page evidence cap.
+ const candidatesSoFar=()=>searchSets.flatMap(set=>set.sources||[]);
+ for(const group of sourceGroups.filter(item=>['primary','subject'].includes(item.role)).slice(0,4)){
+  const ids=[...new Set(group.bookIds.map(String).filter(id=>allowedBookIds.has(id)))];
+  if(!ids.length||candidatesSoFar().some(source=>ids.includes(String(source.bookId))))continue;
+  const linkedParts=partQuestions.filter(part=>Array.isArray(part?.sourceBookIds)&&
+    part.sourceBookIds.some(id=>ids.includes(String(id))));
+  const preferred=linkedParts.flatMap(part=>partQueries.filter(item=>item.partId===part.partId)
+    .map(item=>item.query));
+  const query=[...new Set([...preferred,...gapQueryPartLinks.filter(link=>
+    linkedParts.some(part=>link.partIds.includes(part.partId))).map(link=>link.query)])]
+    .find(value=>typeof value==='string'&&value.trim().length>=5)||
+    (ids.length===1?direct:'');
+  if(!query)continue;
+  const facet=searchQueries.length;
+  searchQueries.push(query);
+  for(const part of linkedParts)partFacetIndices.push({partId:part.partId,facet,kind:'source-group-recovery'});
+  let recovered=[];
+  try{
+   const result=await library.search(query,{allowedBookIds:new Set(ids),maxBooks,pagesPerBook});
+   recovered=(Array.isArray(result?.sources)?result.sources:[])
+    .filter(source=>ids.includes(String(source.bookId)))
+    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+  }catch{
+   // A missing partition or transient index failure leaves this source group
+   // visibly uncovered; it does not interrupt retrieval for the other groups.
+  }
+  searchSets.push({sources:recovered,executedQuery:query,targetBookIds:ids,
+   groupScopeRecovery:true,sourceGroupLabel:String(group.label||'').slice(0,120)});
  }
  const linkedFacets=[...new Set(partFacetIndices.map(item=>item.facet).filter(index=>index>=0))];
  // A planner part may omit sourceBookIds even when its focused query resolves
@@ -634,6 +672,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   ...(searchSets[index].scopeReference?{originalQuery:searchQueries[index],scopeInherited:true}:{}),
   ...(searchSets[index].inheritedPartScope?{partScopeInherited:searchSets[index].inheritedPartScope}:{}),
   ...(searchSets[index].quoteFallback?{quoteFallback:true}:{}),
+  ...(searchSets[index].groupScopeRecovery?{groupScopeRecovery:true,
+   sourceGroupLabel:searchSets[index].sourceGroupLabel}:{}),
   ...(searchSets[index].fallbackFrom?{fallbackFrom:searchSets[index].fallbackFrom,
    fallbackReason:'empty-source-side-facet'}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
