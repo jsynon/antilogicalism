@@ -725,7 +725,11 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
     partId:item.partId||'',question:item.question,
     ...(Array.isArray(item.sourceBookIds)?{sourceBookIds:item.sourceBookIds}:{})}))
   :[{partId:'P1',question:String(question||'')}];
- const assessments=parts.map(part=>{
+ const partTerms=parts.map(part=>facetTerms(part.question.replace(
+  /\b(?:explain|source|question|detail|specific|named|book|passage|answer|enough|sufficiently|testing|fake)\b/giu,' ')));
+ const assessments=parts.map((part,partIndex)=>{
+  const siblingTerms=new Set(partTerms.filter((_,index)=>index!==partIndex).flat());
+  const distinctiveTerms=partTerms[partIndex].filter(term=>!siblingTerms.has(term));
   let best={overlap:0,matchedTerms:[],windowStart:-1,source:null};
   let bestIndex={overlap:0,matchedTerms:[],windowStart:-1,source:null};
   let indexLikeSource=null;
@@ -747,19 +751,31 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
      bestIndex={...indexMatch,source:coverageSourceRef(source)};
     continue;
    }
-   const match=localFacetTextMatch(coverageQuestion,text);
-   if(match.overlap>best.overlap)best={...match,source:coverageSourceRef(source)};
+   const match=localFacetTextMatch(coverageQuestion,text,22,distinctiveTerms);
+   const distinctiveOverlap=match.matchedTerms.filter(term=>distinctiveTerms.includes(term)).length;
+   const bestDistinctiveOverlap=best.matchedTerms.filter(term=>distinctiveTerms.includes(term)).length;
+   if(match.overlap>best.overlap||
+      (match.overlap===best.overlap&&distinctiveOverlap>bestDistinctiveOverlap))
+    best={...match,source:coverageSourceRef(source)};
   }
   const terms=facetTerms(coverageQuestion);
   const overlap=terms.length?best.overlap:2;
+  const matchedDistinctiveTerms=best.matchedTerms.filter(term=>distinctiveTerms.includes(term));
+  const sharedMatchedTerms=best.matchedTerms.filter(term=>!distinctiveTerms.includes(term));
   // A couple of matching words are not enough when a question has several
   // distinct content terms. Keep a two-term floor for short questions; for
   // longer facets, require more than one quarter of their terms in one span.
   const required=Math.min(terms.length,Math.max(2,Math.floor(terms.length*0.25)+1));
-  const weak=missingRequestedSource||(terms.length>0&&overlap<required);
+  // Shared names and topic words can describe every clause in a compound
+  // question. They cannot, by themselves, establish that this particular
+  // part has a relevant retrieval lead. This remains a retrieval trigger;
+  // semantic selection and answer review still decide what the text supports.
+  const onlySharedPartTerms=parts.length>1&&distinctiveTerms.length>0&&
+   matchedDistinctiveTerms.length===0;
+  const weak=missingRequestedSource||(terms.length>0&&overlap<required)||onlySharedPartTerms;
   const indexLikeIsStrongest=bestIndex.overlap>best.overlap;
   const coverageReason=missingRequestedSource?'named-source-candidate-missing':weak
-   ?indexLikeIsStrongest?'index-like-candidates-not-counted':'no-coherent-term-cluster'
+   ?onlySharedPartTerms?'only-shared-part-terms':indexLikeIsStrongest?'index-like-candidates-not-counted':'no-coherent-term-cluster'
    :'coherent-prose-cluster-found';
   // Only blame an index candidate when it is the strongest lexical match;
   // unrelated index pages must not misdescribe the best prose candidate.
@@ -767,7 +783,9 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
   const matchedTerms=terms.length
    ?(weak&&indexLikeIsStrongest&&bestIndex.matchedTerms.length
      ?bestIndex.matchedTerms:best.matchedTerms):[];
-  return {...part,overlap,matchedTerms,
+  return {...part,overlap,matchedTerms,distinctiveTerms:distinctiveTerms.slice(0,12),
+   matchedDistinctiveTerms:matchedDistinctiveTerms.slice(0,12),
+   sharedMatchedTerms:sharedMatchedTerms.slice(0,12),
    distinctiveTermCount:terms.length,
    coverageRatio:missingRequestedSource?0:terms.length?Number((overlap/terms.length).toFixed(3)):1,
    requiredTermCount:required,
@@ -1101,9 +1119,10 @@ function isIndexLikeText(text){
  return pageReferenceEntries.length>=4&&pageReferenceEntries.length/entries.length>=0.55&&
   shortEntries.length/entries.length>=0.6;
 }
-function textFacetMatch(question,text,windowSize=22){
+function textFacetMatch(question,text,windowSize=22,preferredTerms=[]){
  const terms=facetTerms(question);
  if(!terms.length)return {overlap:0,matchedTerms:[],windowStart:-1};
+ const preferred=new Set(preferredTerms);
  let best={overlap:0,matchedTerms:[],windowStart:-1};
  let offset=0;
  // Sentence, clause, and list boundaries keep nearby but unrelated entries
@@ -1113,7 +1132,10 @@ function textFacetMatch(question,text,windowSize=22){
   for(let start=0;start<words.length;start++){
    const window=new Set(words.slice(start,start+windowSize));
    const matchedTerms=terms.filter(term=>window.has(term));
-   if(matchedTerms.length>best.overlap)
+   const distinctiveOverlap=matchedTerms.filter(term=>preferred.has(term)).length;
+   const bestDistinctiveOverlap=best.matchedTerms.filter(term=>preferred.has(term)).length;
+   if(matchedTerms.length>best.overlap||
+      (matchedTerms.length===best.overlap&&distinctiveOverlap>bestDistinctiveOverlap))
     best={overlap:matchedTerms.length,matchedTerms,windowStart:offset+start};
    if(best.overlap===terms.length)return best;
   }
@@ -1121,8 +1143,8 @@ function textFacetMatch(question,text,windowSize=22){
  }
  return best;
 }
-function localFacetTextMatch(question,text,windowSize=22){
- const match=textFacetMatch(question,text,windowSize);
+function localFacetTextMatch(question,text,windowSize=22,preferredTerms=[]){
+ const match=textFacetMatch(question,text,windowSize,preferredTerms);
  return isIndexLikeText(text)?{...match,overlap:0,matchedTerms:[],indexLike:true}:match;
 }
 

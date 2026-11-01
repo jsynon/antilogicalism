@@ -165,6 +165,9 @@ export function createDiagnosticReport(input={}){
       parts:Array.isArray(input.retrievalCoverage.parts)?input.retrievalCoverage.parts.slice(0,6).map(part=>({
         part:string(part?.question,240),
         matchedTerms:Array.isArray(part?.matchedTerms)?part.matchedTerms.slice(0,12).map(value=>string(value,40)):[],
+        distinctiveTerms:Array.isArray(part?.distinctiveTerms)?part.distinctiveTerms.slice(0,12).map(value=>string(value,40)):[],
+        matchedDistinctiveTerms:Array.isArray(part?.matchedDistinctiveTerms)?part.matchedDistinctiveTerms.slice(0,12).map(value=>string(value,40)):[],
+        sharedMatchedTerms:Array.isArray(part?.sharedMatchedTerms)?part.sharedMatchedTerms.slice(0,12).map(value=>string(value,40)):[],
         overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0,
         distinctiveTermCount:Number.isSafeInteger(part?.distinctiveTermCount)?part.distinctiveTermCount:0,
         coverageRatio:Number.isFinite(part?.coverageRatio)?part.coverageRatio:0,
@@ -175,6 +178,10 @@ export function createDiagnosticReport(input={}){
       })):[],
       weakParts:Array.isArray(input.retrievalCoverage.weakParts)?input.retrievalCoverage.weakParts.slice(0,6).map(part=>({
         part:string(part?.question,240),overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0,
+        distinctiveTerms:Array.isArray(part?.distinctiveTerms)?part.distinctiveTerms.slice(0,12).map(value=>string(value,40)):[],
+        matchedDistinctiveTerms:Array.isArray(part?.matchedDistinctiveTerms)?part.matchedDistinctiveTerms.slice(0,12).map(value=>string(value,40)):[],
+        sharedMatchedTerms:Array.isArray(part?.sharedMatchedTerms)?part.sharedMatchedTerms.slice(0,12).map(value=>string(value,40)):[],
+        reason:safeDiagnosticToken(part?.coverageReason),
         requestedBookIds:Array.isArray(part?.requestedBookIds)?part.requestedBookIds.slice(0,16).map(value=>string(value,12)):[],
         candidateBookIds:Array.isArray(part?.candidateBookIds)?part.candidateBookIds.slice(0,16).map(value=>string(value,12)):[]
       })):[],
@@ -183,6 +190,8 @@ export function createDiagnosticReport(input={}){
       afterGap:Array.isArray(input.retrievalCoverageAfterGap?.parts)?input.retrievalCoverageAfterGap.parts.slice(0,6).map(part=>({
         part:string(part?.question,240),
         matchedTerms:Array.isArray(part?.matchedTerms)?part.matchedTerms.slice(0,12).map(value=>string(value,40)):[],
+        distinctiveTerms:Array.isArray(part?.distinctiveTerms)?part.distinctiveTerms.slice(0,12).map(value=>string(value,40)):[],
+        matchedDistinctiveTerms:Array.isArray(part?.matchedDistinctiveTerms)?part.matchedDistinctiveTerms.slice(0,12).map(value=>string(value,40)):[],
         overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0,
         distinctiveTermCount:Number.isSafeInteger(part?.distinctiveTermCount)?part.distinctiveTermCount:0,
         coverageRatio:Number.isFinite(part?.coverageRatio)?part.coverageRatio:0,

@@ -581,6 +581,35 @@ test('coverage diagnostics retain strong and weak entries for every planned part
  assert.ok(coverage.parts.every(part=>Number.isFinite(part.coverageRatio)));
  assert.deepEqual(coverage.weakParts.map(part=>part.partId),['P2']);
 });
+test('shared subject words do not hide a missing facet in a multi-part question',()=>{
+ const question='How does Odysseus’s return home shape his choices and the poem’s picture of heroism?';
+ const parts=[
+  {partId:'P1',question:'How does Odysseus’s return home shape his choices?'},
+  {partId:'P2',question:'How does Odysseus’s return home shape his choices and the poem’s picture of heroism?'}
+ ];
+ const sharedOnly={bookId:'186',page:219,
+  excerpt:'Odysseus’s return home shapes his choices and directs his journey.'};
+ const coverage=assessEvidenceCoverage([sharedOnly],question,parts);
+ assert.equal(coverage.parts[1].overlap>=coverage.parts[1].requiredTermCount,true,
+  'raw overlap reproduces the false positive seen in the live trace');
+ assert.deepEqual(coverage.parts[1].matchedDistinctiveTerms,[]);
+ assert.ok(coverage.parts[1].distinctiveTerms.includes('heroism'));
+ assert.equal(coverage.parts[1].coverageReason,'only-shared-part-terms');
+ assert.deepEqual(coverage.weakParts.map(part=>part.partId),['P2']);
+ assert.equal(coverage.shouldSearch,true);
+});
+test('a multi-part facet with its own distinctive term does not trigger recovery',()=>{
+ const question='How does Odysseus’s return home shape his choices and the poem’s picture of heroism?';
+ const parts=[
+  {partId:'P1',question:'How does Odysseus’s return home shape his choices?'},
+  {partId:'P2',question:'How does Odysseus’s return home shape his choices and the poem’s picture of heroism?'}
+ ];
+ const source={bookId:'186',page:220,
+  excerpt:'The poem presents Odysseus’s choices as an image of heroism and courage.'};
+ const coverage=assessEvidenceCoverage([source],question,parts);
+ assert.ok(coverage.parts[1].matchedDistinctiveTerms.includes('heroism'));
+ assert.ok(!coverage.weakParts.some(part=>part.partId==='P2'));
+});
 test('index-style entries cannot combine unrelated terms into answer coverage',()=>{
  const indexPage={bookId:'114',page:1264,globalPageId:'114:1264',
   preview:'Asceticism, 461; Simulation, St. Peter, 461; Christian living, 512; Jerusalem, common life at, 512; Widows, 450.'};
