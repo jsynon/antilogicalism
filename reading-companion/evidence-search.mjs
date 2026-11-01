@@ -467,11 +467,22 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  // inside its already-validated book IDs. This is local retrieval work: it
  // adds no model call and cannot widen the answer's six-page evidence cap.
  const candidatesSoFar=()=>searchSets.flatMap(set=>set.sources||[]);
+ const groupHasLinkedCandidate=(ids,linkedParts)=>{
+  if(!linkedParts.length)return candidatesSoFar().some(source=>ids.includes(String(source.bookId)));
+  const partIds=new Set(linkedParts.map(part=>part.partId));
+  const linkedFacets=new Set(partFacetIndices.filter(item=>partIds.has(item.partId))
+   .map(item=>item.facet));
+  // An incidental hit from the broad question facet must not suppress
+  // recovery when the query linked to the missing source part returned no
+  // page from that catalog group.
+  return [...linkedFacets].some(facet=>(searchSets[facet]?.sources||[])
+   .some(source=>ids.includes(String(source.bookId))));
+ };
  for(const group of sourceGroups.filter(item=>['primary','subject'].includes(item.role)).slice(0,4)){
   const ids=[...new Set(group.bookIds.map(String).filter(id=>allowedBookIds.has(id)))];
-  if(!ids.length||candidatesSoFar().some(source=>ids.includes(String(source.bookId))))continue;
   const linkedParts=partQuestions.filter(part=>Array.isArray(part?.sourceBookIds)&&
     part.sourceBookIds.some(id=>ids.includes(String(id))));
+  if(!ids.length||groupHasLinkedCandidate(ids,linkedParts))continue;
   const preferred=linkedParts.flatMap(part=>partQueries.filter(item=>item.partId===part.partId)
     .map(item=>item.query));
   const query=[...new Set([...preferred,...gapQueryPartLinks.filter(link=>

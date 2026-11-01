@@ -1,0 +1,70 @@
+name: Reading Companion cross-run regression evaluation
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_ai:
+        description: I understand this runs the philosophy, fresh, and fresh-three live Worker evaluations and incurs AI usage
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reading-companion-cross-run-regression
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: ${{ inputs.confirm_live_ai }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify explicit live AI confirmation and evaluation token
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          test "${{ inputs.confirm_live_ai }}" = "true"
+          test -n "$PILOT_EVALUATION_TOKEN"
+          mkdir -p "$GITHUB_WORKSPACE/reading-companion-cross-run-regression"
+      - name: Run the three-question philosophy trace suite
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode philosophy3 --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-cross-run-regression/philosophy3.json"
+      - name: Run the five-question fresh suite
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode fresh --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-cross-run-regression/fresh.json"
+      - name: Run the five-question fresh-three suite
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode fresh3 --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-cross-run-regression/fresh3.json"
+      - name: Preserve all evaluation reports and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-companion-cross-run-regression
+          path: ${{ github.workspace }}/reading-companion-cross-run-regression/*.json
+          if-no-files-found: warn
+          retention-days: 30
