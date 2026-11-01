@@ -1,6 +1,6 @@
 // Site-side reader-contract helpers. Production retrieval currently imports
 // catalogIdentity; the other normalizers are exercised by contract tests.
- // The Worker copy is in book-chatbot/hosting-poc/reader-contract.mjs. These
+// The Worker copy is in book-chatbot/hosting-poc/reader-contract.mjs. These
 // implementations are not byte-identical: planner normalization currently
 // differs, so compare both copies before changing shared plan or citation rules.
 export const CONTRACT_VERSION='reader-evidence-v2';
