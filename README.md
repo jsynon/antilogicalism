@@ -2,6 +2,8 @@
 
 **An independent digital archive of philosophy, literature, history, religion, and the humanities.**
 
+![Antilogicalism website features and repository connections](docs/website-architecture.png)
+
 ## About
 
 Founded in 2016, Antilogicalism began as a personal exploration of philosophy, literature, religion, and the history of ideas. Over the years, it developed into an extensive collection of articles, primary sources, historical texts, and educational resources. Today, the project is being restored and expanded as an independent digital humanities archive, combining its original content with new tools for searching, organizing, and discovering intellectual works.
