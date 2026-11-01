@@ -1,8 +1,10 @@
-/* Antilogicalism Reading Companion v1.18.5 — staged verified-library alpha.
- * Real indexed v49 passages; no secrets, model keys or paid APIs in this file.
- * The Worker independently validates every submitted source page against v49
- * fingerprints before any inference. The verified scope comes from the
- * owner-published cohort manifest; expanding it does not change v49 OCR.
+/* Active browser client loaded by reading-companion/index.html.
+ *
+ * This module coordinates the reader-facing flow: plan a search, retrieve
+ * candidate passages, send the bounded packet to the Worker, and render the
+ * answer, citations, and passage highlights. Browser retrieval helps discovery;
+ * the Worker independently verifies submitted page text before inference.
+ * This client is separate from the local Python/Ollama workbench.
  */
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
