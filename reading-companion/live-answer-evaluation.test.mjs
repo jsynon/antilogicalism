@@ -76,7 +76,6 @@ test('planner facet links obey the shared unique-query and total-link budgets',(
  assert.ok(result.warnings.includes('part-query-budget-exceeded'));
 });
 
-
 test('planner query budget gives each part a first query before extra per-part angles',()=>{
  const parts=Array.from({length:4},(_,index)=>({id:`P${index+1}`,
   question:`Question part ${index+1} with enough text`,
@@ -870,7 +869,6 @@ test('answer completeness can pass independently while evidence coverage remains
  assert.equal(result.partEvidenceComplete,true);
  assert.equal(result.structuralPassed,true);
 });
-
 
 test('complete general-context answer can pass with partial library coverage',()=>{
  const result=auditLiveAnswer({outcome:'general-context-answer',reviewStatus:'general-context-review',
