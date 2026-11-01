@@ -150,6 +150,42 @@ node .\reading-companion\recheck-live-answer-evaluation.mjs `
 
 The new `offlineRecheck` fields preserve the original report and show the corrected structural score alongside it. Reviewer labels are also refreshed from saved traces when an older artifact lacks support-issue dispositions. `supportIssueDispositions` separates final-answer issues from claims rejected before the final answer, rejected alternate sources, and unresolved cases; the aggregate issue count remains available. This can correct evaluator false negatives and clarify review outcomes, but it does not change the generated answer or verify factual truth. Run its regression tests with `node --test .\reading-companion\live-answer-evaluation.test.mjs`.
 
+To persist manual scores alongside that report, pass `--scorecard scores.json`. The scorecard is local JSON with one row per case or answer variant. Each `answer` and `highlights` object contains all five rubric dimensions as integer scores from 0 to 2, plus optional notes:
+
+```json
+{
+  "scores": [
+    {
+      "caseId": "acceptance-descartes-cogito",
+      "answerVariant": "with-review",
+      "selectionVariant": "full-retrieval-pool",
+      "answer": {
+        "scores": {
+          "accuracy": 2,
+          "questionCoverage": 2,
+          "explanationQuality": 1,
+          "citationSupport": 2,
+          "citationCompleteness": 2
+        },
+        "notes": "One requested distinction could be clearer."
+      },
+      "highlights": {
+        "scores": {
+          "accuracy": 2,
+          "questionCoverage": 1,
+          "explanationQuality": 2,
+          "citationSupport": 2,
+          "citationCompleteness": 1
+        },
+        "notes": "A second requested facet has no matching excerpt."
+      }
+    }
+  ]
+}
+```
+
+Use the exact report `caseId`; variant reports also require the exact `answerVariant` and, when present, `selectionVariant`. Unknown or ambiguous rows and incomplete/out-of-range scores are rejected. The saved report keeps answer and highlight score summaries separate; score entry makes no Worker, AI, or network calls. Example: `node reading-companion/recheck-live-answer-evaluation.mjs --input report.json --scorecard scores.json --output reviewed.json`.
+
 ## One-time setup
 
 After Worker PR #62 (manual evaluation authorization) is merged and deployed:
