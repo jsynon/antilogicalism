@@ -718,6 +718,66 @@ export function summarizeHighlightReviews(cases){
    status:complete(entry)?'complete':'pending'})),averageScores,qualityPass:null,
   note:'Score the displayed excerpts and their claim links separately from answer prose. Exact location is not a semantic relevance score.'};
 }
+function normalizeHumanScore(review,label){
+ if(!review||typeof review!=='object'||Array.isArray(review)||
+   !review.scores||typeof review.scores!=='object'||Array.isArray(review.scores))
+  throw Error(label+' must contain a scores object.');
+ const keys=Object.keys(review.scores);
+ if(keys.length!==MANUAL_REVIEW_DIMENSIONS.length||
+   keys.some(key=>!MANUAL_REVIEW_DIMENSIONS.includes(key))||
+   MANUAL_REVIEW_DIMENSIONS.some(key=>!Number.isInteger(review.scores[key])||
+    review.scores[key]<0||review.scores[key]>2))
+  throw Error(label+' scores must include each dimension exactly once with an integer from 0 to 2.');
+ if(review.notes!==undefined&&(typeof review.notes!=='string'||review.notes.length>2000))
+  throw Error(label+' notes must be text of at most 2000 characters.');
+ return {status:'complete',scale:{min:0,max:2},
+  scores:Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,review.scores[key]])),
+  notes:review.notes||''};
+}
+/** Apply explicit human scores to a saved report. This is pure offline work. */
+export function applyHumanScorecard(report,scorecard){
+ if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
+ if(!scorecard||typeof scorecard!=='object'||Array.isArray(scorecard)||
+   !Array.isArray(scorecard.scores))throw Error('Scorecard must contain a scores array.');
+ const cases=report.cases.map(item=>({...item}));
+ const applied=new Set();
+ for(const [index,row] of scorecard.scores.entries()){
+  if(!row||typeof row!=='object'||Array.isArray(row)||typeof row.caseId!=='string'||!row.caseId.trim())
+   throw Error('Scorecard row '+(index+1)+' needs a caseId.');
+  if(!row.answer&&!row.highlights)throw Error('Scorecard row '+(index+1)+' needs answer and/or highlights scores.');
+  const matches=cases.filter(item=>String(item.id)===row.caseId);
+  if(matches.length!==1)throw Error('Scorecard caseId is unknown or ambiguous: '+row.caseId);
+  const target=matches[0];
+  const variantsContainer=target.answerVariantComparison||target.reviewAblation;
+  let scoredTarget=target;
+  if(Array.isArray(variantsContainer?.variants)){
+   const variants=variantsContainer.variants;
+   const matched=variants.filter(variant=>variant.answerVariant===row.answerVariant&&
+    (!row.selectionVariant||variant.selectionVariant===row.selectionVariant));
+   if(!row.answerVariant||matched.length!==1)
+    throw Error('Scorecard row '+(index+1)+' must identify one answerVariant'+
+     (variants.some(variant=>variant.selectionVariant)?' and selectionVariant':'')+'.');
+   scoredTarget={...matched[0]};
+   const variantIndex=variants.indexOf(matched[0]);
+   const updated={...variantsContainer,variants:variants.map((variant,i)=>i===variantIndex?scoredTarget:variant)};
+   if(target.answerVariantComparison)target.answerVariantComparison=updated;
+   if(target.reviewAblation)target.reviewAblation=updated;
+  }else if(row.answerVariant||row.selectionVariant){
+   throw Error('Scorecard row '+(index+1)+' selects a variant, but the case has none.');
+  }
+  for(const kind of ['answer','highlights']){
+   if(row[kind]===undefined)continue;
+   const key=JSON.stringify([row.caseId,row.answerVariant||'',row.selectionVariant||'',kind]);
+   if(applied.has(key))throw Error('Duplicate scorecard scores for '+row.caseId+' '+kind+'.');
+   applied.add(key);
+   scoredTarget[kind==='answer'?'manualReview':'highlightHumanReview']=
+    normalizeHumanScore(row[kind],kind==='answer'?'answer':'highlights');
+  }
+ }
+ return {...report,cases,humanReview:summarizeManualReviews(cases),
+  highlightReview:summarizeHighlightReviews(cases),
+  answerVariants:summarizeAnswerVariants(cases),selectionVariants:summarizeSelectionVariants(cases)};
+}
 export function summarizeAnswerVariants(cases){
  const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
   (item.answerVariantComparison||item.reviewAblation).variants.map(variant=>({id:item.id,...variant})):
