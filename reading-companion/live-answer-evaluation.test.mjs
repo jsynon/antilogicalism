@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,recheckQualityReport,applyHumanScorecard,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -742,6 +742,37 @@ test('offline report recheck refreshes both paired variant audits and preserves 
  assert.deepEqual(checked.cases[0].reviewAblation.variants[0].manualReview,manualReview);
  assert.deepEqual(checked.cases[0].reviewAblation.variants[0].highlightHumanReview,highlightHumanReview);
  assert.equal(checked.answerVariants['compose-only'].humanScores.reviewed,1);
+});
+
+test('offline scorecard applies separate answer and highlight scores to a named variant',()=>{
+ const report={cases:[{id:'acceptance-descartes-cogito',answerText:'A sourced claim [S1].',
+  coverage:'full',citations:[],citationSources:[],questionParts:[],evidenceMap:[],
+  submittedSources:[],reviewAblation:{variants:[{answerVariant:'with-review',selectionVariant:'full-retrieval-pool',
+   answerText:'A sourced claim [S1].',coverage:'full',citations:[],citationSources:[],questionParts:[],evidenceMap:[],
+   evidenceHighlights:[],submittedSources:[]} ]}}]};
+ const scores={accuracy:2,questionCoverage:1,explanationQuality:2,citationSupport:1,citationCompleteness:2};
+ const checked=applyHumanScorecard(report,{scores:[{caseId:'acceptance-descartes-cogito',
+  answerVariant:'with-review',selectionVariant:'full-retrieval-pool',
+  answer:{scores,notes:'Covers the claim; citation explanation could be clearer.'},
+  highlights:{scores:{...scores,accuracy:1},notes:'The excerpt is located but loosely tied to the claim.'}}]});
+ const saved=checked.cases[0].reviewAblation.variants[0];
+ assert.equal(saved.manualReview.status,'complete');
+ assert.equal(saved.manualReview.scores.accuracy,2);
+ assert.equal(saved.highlightHumanReview.scores.accuracy,1);
+ assert.equal(checked.humanReview.reviewed,1);
+ assert.equal(checked.highlightReview.reviewed,1);
+ assert.equal(checked.humanReview.averageScores.accuracy,2);
+ assert.equal(checked.highlightReview.averageScores.accuracy,1);
+ assert.equal(checked.offlineRecheck,undefined,'scorecard ingestion does not fabricate a structural recheck');
+});
+
+test('offline scorecard rejects unknown cases, ambiguous variants, and incomplete score dimensions',()=>{
+ const variantReport={cases:[{id:'case-a',reviewAblation:{variants:[
+  {answerVariant:'with-review',selectionVariant:'full-retrieval-pool'}]}}]};
+ const scores={accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:2,citationCompleteness:2};
+ assert.throws(()=>applyHumanScorecard(variantReport,{scores:[{caseId:'missing',answer:{scores}}]}),/unknown or ambiguous/);
+ assert.throws(()=>applyHumanScorecard(variantReport,{scores:[{caseId:'case-a',answer:{scores}}]}),/must identify one answerVariant/);
+ assert.throws(()=>applyHumanScorecard({cases:[{id:'case-a'}]},{scores:[{caseId:'case-a',answer:{scores:{accuracy:2}}}]}),/each dimension exactly once/);
 });
 
 test('quality case uses fixed queries, skips planning, and restricts retrieval to its selected book',async()=>{
