@@ -330,6 +330,40 @@ test('hypothetical thinker source-side facets search only the named author’s w
  assert.ok(calls.some(call=>call.query===queries[1]&&call.bookId==='140'));
  assert.ok(!calls.some(call=>call.query===queries[1]&&call.bookId==='239'));
 });
+test('missing named groups receive one bounded retry inside their catalog book IDs',async()=>{
+ const books=[
+  {id:'4',title:'Metaphysics — Aristotle'},
+  {id:'35',title:'An Enquiry Concerning Human Understanding — David Hume'},
+  {id:'40',title:'Critique of Pure Reason — Immanuel Kant'}
+ ];
+ const allowedBookIds=new Set(books.map(book=>book.id)),calls=[];
+ const library={search:async(query,options={})=>{
+  const scope=options.bookId?String(options.bookId):
+   options.allowedBookIds?.size===1?[...options.allowedBookIds][0]:null;
+  calls.push({query,ids:scope?[scope]:null,groupRecovery:!options.bookId&&options.allowedBookIds?.size===1});
+  if(options.bookId==='40')return {sources:[]};
+  const id=scope||'4';
+  if(id==='40'&&!options.bookId){
+   const book=books.find(value=>value.id===id);
+   return {sources:[{bookId:id,title:book.title,page:7,globalPageId:id+':7',score:30,preview:'Causality and explanation in the source.'}]};
+  }
+  const book=books.find(value=>value.id===id);
+  if(!book)return {sources:[]};
+  return {sources:[{bookId:id,title:book.title,page:7,globalPageId:id+':7',score:30,preview:'Causality and explanation in the source.'}]};
+ }};
+ const groups=books.map(book=>({label:book.title.split(' — ')[1],role:'primary',bookIds:[book.id]}));
+ const parts=groups.map((group,index)=>({partId:'P'+(index+1),question:'How does '+group.label+' understand causality?',sourceBookIds:group.bookIds}));
+ const result=await retrieveEvidence({question:'How do Aristotle, Hume, and Kant differ on causality?',
+  queries:['Aristotle causality explanation','Hume causality custom conjunction','Kant causality a priori'],
+  partQueries:parts.map(part=>({partId:part.partId,query:part.question})),partQuestions:parts,
+  sourceGroups:groups,library,books,allowedBookIds,maxCandidates:12,maxBooks:3,pagesPerBook:2,
+  pageLoader:async source=>({text:'Causality and explanation in the source.'})});
+ const retries=calls.filter(call=>call.groupRecovery);
+ assert.equal(retries.length,1,'only the missing source group receives one scoped retry');
+ assert.ok(retries.some(call=>call.ids[0]==='40'));
+ assert.ok(result.searches.some(item=>item.groupScopeRecovery&&item.targetBookIds?.includes('40')));
+ assert.ok(result.candidates.some(source=>source.bookId==='40'&&source.candidatePartIds.includes('P3')));
+});
 test('an empty comparison-side facet retries with the other side’s topic inside the missing source scope',async()=>{
  const question='What would Nietzsche think about the thought of Kierkegaard?';
  const books=[{id:'239',title:'The Antichrist — Friedrich Nietzsche'},
@@ -1104,6 +1138,25 @@ test('synthetic comparison coverage reuses source searches instead of spending a
  assert.match(comparison.question,/compare in response to this question/i);
  assert.deepEqual(comparison.searchQueries,[humeQuery,kantQuery]);
  assert.ok(!comparison.searchQueries.includes(comparison.question));
+});
+
+test('plan identities are checked against the catalog and redundant comparison wrappers are removed',()=>{
+ const question='How do Aristotle and Darwin differ in explaining change?';
+ const catalog={
+  '4':'Metaphysics — Aristotle','529':'On the Origin of Species — Charles Darwin',
+  '9':'Physics — Aristotle','530':'The Descent of Man — Charles Darwin',
+  '35':'An Enquiry Concerning Human Understanding — David Hume'
+ };
+ const plan=normalizePlan({intent:'compare',sources:[
+  {label:'Aristotle',role:'primary',bookIds:['4','9','35']},
+  {label:'Darwin',role:'primary',bookIds:['529','530']}
+ ],parts:["How does Aristotle explain change?","How does Darwin explain change?",
+  "What are the differences between Aristotle's and Darwin's accounts of change?",
+  'How do the named sources compare in response to this question: '+question],
+ queries:['Aristotle change','Darwin change']},question,catalog);
+ assert.deepEqual(plan.sources.map(source=>source.bookIds),[['4','9'],['529','530']]);
+ assert.deepEqual(plan.parts.map(part=>part.id),['P1','P2','P3']);
+ assert.deepEqual(plan.parts.map(part=>part.sourceBookIds),[['4','9'],['529','530'],['4','9','529','530']]);
 });
 
 test('author-wide plans do not narrow to a work because the author name appears in its title',()=>{
