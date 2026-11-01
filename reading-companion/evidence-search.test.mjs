@@ -341,6 +341,10 @@ test('missing named groups receive one bounded retry inside their catalog book I
   const scope=options.bookId?String(options.bookId):
    options.allowedBookIds?.size===1?[...options.allowedBookIds][0]:null;
   calls.push({query,ids:scope?[scope]:null,groupRecovery:!options.bookId&&options.allowedBookIds?.size===1});
+  if(query==='How do Aristotle, Hume, and Kant differ on causality?'&&
+    !options.bookId&&options.allowedBookIds?.size>1)
+   return {sources:[{bookId:'40',title:books[2].title,page:3,globalPageId:'40:3',score:99,
+    preview:'A broad incidental mention of causality in the Kant book.'}]};
   if(options.bookId==='40')return {sources:[]};
   const id=scope||'4';
   if(id==='40'&&!options.bookId){
@@ -1157,6 +1161,21 @@ test('plan identities are checked against the catalog and redundant comparison w
  assert.deepEqual(plan.sources.map(source=>source.bookIds),[['4','9'],['529','530']]);
  assert.deepEqual(plan.parts.map(part=>part.id),['P1','P2','P3']);
  assert.deepEqual(plan.parts.map(part=>part.sourceBookIds),[['4','9'],['529','530'],['4','9','529','530']]);
+});
+
+test('ambiguous author tokens cannot authorize planner-proposed catalog books',()=>{
+ const catalog={
+  '901':'Computing Machinery and Intelligence — Alan Turing',
+  '902':'The Principles of Mathematical Logic — Raymond Turing',
+  '40':'Critique of Pure Reason — Immanuel Kant'
+ };
+ const plan=normalizePlan({intent:'compare',sources:[
+  {label:'Turing',role:'primary',bookIds:['901','902']},
+  {label:'Kant',role:'primary',bookIds:['40']}
+ ],parts:['How do Turing and Kant differ?'],queries:[]},
+ 'How do Turing and Kant differ?',catalog);
+ assert.deepEqual(plan.sources.map(source=>source.bookIds),[['40']],
+  'a surname shared by multiple catalog authors cannot validate either proposed author identity');
 });
 
 test('author-wide plans do not narrow to a work because the author name appears in its title',()=>{
