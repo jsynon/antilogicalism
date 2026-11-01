@@ -262,7 +262,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
     }else{
       const retrieval=await retrieveEvidence({question:q,
         queries:plannerFallback||!plannedQueries?[q]:plannedQueries,
-        gapQueries,gapQueryPartLinks,
+        gapQueries,gapQueryPartLinks,sourceGroups:plan?.sources||[],
         partQuestions,
         partQueries:!plannerFallback&&Array.isArray(plan?.parts)?plan.parts.flatMap(part=>
           (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
