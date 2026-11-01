@@ -4,15 +4,15 @@
  */
 import {readFile,writeFile} from 'node:fs/promises';
 import {resolve} from 'node:path';
-import {recheckQualityReport} from './live-answer-evaluation.mjs';
+import {recheckQualityReport,applyHumanScorecard} from './live-answer-evaluation.mjs';
 import {auditPassageGoldReview} from './passage-review.mjs';
 
 function parseArgs(argv){
- const result={input:'',output:''};
+ const result={input:'',output:'',scorecard:''};
  for(let index=0;index<argv.length;index++){
   const [flag,inline]=argv[index].split('=',2);
   if(flag==='--help'||flag==='-h'){result.help=true;continue;}
-  if(!['--input','--output'].includes(flag))throw Error('Unknown option '+flag);
+  if(!['--input','--output','--scorecard'].includes(flag))throw Error('Unknown option '+flag);
   const value=inline??argv[++index];
   if(!value)throw Error('Missing value for '+flag);
   result[flag.slice(2)]=value;
@@ -24,13 +24,17 @@ function parseArgs(argv){
 async function main(){
  const args=parseArgs(process.argv.slice(2));
  if(args.help){
-  console.log('Usage: node reading-companion/recheck-live-answer-evaluation.mjs --input report.json [--output rechecked.json]');
-  console.log('Input must be the JSON report extracted from the GitHub Actions artifact ZIP. No network or AI calls are made.');
+  console.log('Usage: node reading-companion/recheck-live-answer-evaluation.mjs --input report.json [--scorecard scores.json] [--output rechecked.json]');
+  console.log('Input must be the JSON report extracted from the GitHub Actions artifact ZIP. Optional human scores are applied offline; no network or AI calls are made.');
   return;
  }
  const input=resolve(args.input);
  const report=JSON.parse(await readFile(input,'utf8'));
- const result=recheckQualityReport(report);
+ let result=recheckQualityReport(report);
+ if(args.scorecard){
+  const scorecard=JSON.parse(await readFile(resolve(args.scorecard),'utf8'));
+  result=applyHumanScorecard(result,scorecard);
+ }
  const passageGold=JSON.parse(await readFile(new URL('./passage-review-gold.json',import.meta.url),'utf8'));
  result.offlinePassageReview=auditPassageGoldReview(report,passageGold);
  const output=args.output?resolve(args.output):input.replace(/\.json$/i,'')+'.offline-rechecked.json';
@@ -42,6 +46,7 @@ async function main(){
  console.log('Answer completeness: '+summary.answerCompletenessCounts.full+' full, '+
   summary.answerCompletenessCounts.partial+' partial, '+summary.answerCompletenessCounts.none+' none.');
  console.log('AI calls: 0. Network calls: 0.');
+ if(args.scorecard)console.log('Human scorecard applied: '+args.scorecard);
  const passageReview=result.offlinePassageReview;
  console.log('Passage gold review: '+passageReview.checkedCases+' cases; '+
   passageReview.bestCandidateSearchMisses+' best passages absent from complete search traces, '+
