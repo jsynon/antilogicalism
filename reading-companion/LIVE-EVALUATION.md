@@ -138,6 +138,8 @@ In the paired-scope handoff, candidate merging reserves a returned candidate for
 
 The report also records final citation sources, question-part/evidence links, and each highlight's exact-text location result. Citation records preserve bounded provenance fields when the Worker supplies them: credited author/editor/translator, planner role, page-section hint, and title-guarded work/page voice metadata. `quoteLocated` verifies textual location only. Use each case's `reviewFocus` rubric and cited page text to judge semantic support, accuracy, source sufficiency, and highlight relevance. Do not score source quality by citation count alone, and do not treat an exact quote match as semantic validation. These are focused diagnostics, not a replacement or expansion of the baseline suite.
 
+Authenticated evidence-selection traces are also checked across the selector-to-composer handoff. `selectionHandoffAudit` compares each selected candidate's per-part support decision with the part links on the pages actually sent to composition. A missing link, evidence decision outside the submitted packet, or a part marked supported without selected direct evidence is reported as a structural failure. This check verifies trace consistency, not whether the passage truly supports the claim.
+
 ## Recheck a saved quality report without AI or network calls
 
 The standalone `recheck-live-answer-evaluation.mjs` script reapplies the current structural audit to a saved quality JSON report. It does not contact the Worker, retrieve books, or call a model. First extract `reading-companion-live-answer-evaluation.json` from the GitHub Actions artifact ZIP, then run:
