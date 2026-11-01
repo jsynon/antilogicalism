@@ -1,6 +1,9 @@
-/* v1.8.1: Read-only browser proof of concept for the published v49 corpus.
- * This does not call an LLM or replace Python's evidence pipeline.
- * Original shard IDs, physical PDF pages and manifest PDF URLs are preserved.
+/* Browser-side reader and search client for the published v49 corpus.
+ *
+ * It loads the catalog, index, and original page shards for the public
+ * Reading Companion. Its matches are candidate-discovery signals, not proof
+ * that a passage supports an answer; the Worker verifies submitted page text.
+ * This module makes no model calls and is separate from Python retrieval.
  */
 export const DEFAULT_INDEX_ROOT = 'https://jsynon.github.io/antilogicalism-library-data/data-v49/';
 // Keep the per-query corpus search bound aligned with the shared live/evaluator
