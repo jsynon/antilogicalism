@@ -9,7 +9,7 @@
 import {RemoteLibrary} from './remote-library.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.18.0';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.19.0';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -522,6 +522,7 @@ async function requestSourcePlan(q,verificationToken,history){
 async function requestRetrievalGap(q,verificationToken,history,originalQueries,partQuestions,coverage,candidates){
   if(diagnosticState){diagnosticState.stage='gap-planning';diagnosticState.gapPlannerAttempted=true;}
   const weakParts=coverage.weakParts.slice(0,6).map(item=>({partId:item.partId,part:item.question,
+    ...(Array.isArray(item.sourceBookIds)?{sourceBookIds:item.sourceBookIds.slice(0,16)}:{}),
     overlap:item.overlap,matchedTerms:item.matchedTerms,
     coverageReason:item.coverageReason,coverageSource:item.coverageSource}));
   const evidence=candidates.slice(0,6).map(source=>({title:source.title,

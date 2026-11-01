@@ -66,6 +66,13 @@ test('malformed optional planner facets are dropped or fall back without blockin
  assert.ok(result.warnings.includes('invalid-part-query-dropped'));
  assert.ok(result.warnings.includes('invalid-part'));
 });
+test('planner author scopes survive into retrieval part metadata for coverage diagnosis',()=>{
+ const result=partFacetsFromPlan([{id:'P1',
+  question:'How does Augustine explain moral responsibility?',sourceBookIds:['16','17'],
+  searchQueries:['Augustine responsibility free will']}]);
+ assert.deepEqual(result.partQuestions,[{partId:'P1',
+  question:'How does Augustine explain moral responsibility?',sourceBookIds:['16','17']}]);
+});
 
 test('planner facet links obey the shared unique-query and total-link budgets',()=>{
  const parts=Array.from({length:8},(_,index)=>({id:`P${index+1}`,
