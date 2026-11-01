@@ -483,6 +483,43 @@ export function summarizeReviewerLabels(cases){
    Number(item.labels.incompleteSupportIssueCount||0),0),
   entries};
 }
+export function auditSelectionHandoff(trace){
+ const stage=Array.isArray(trace?.stages)?trace.stages.find(item=>item?.stage==='evidence-selection'):null;
+ if(!stage)return {status:'unavailable',checkedRelations:0,issues:[]};
+ if(stage.status!=='selected'||!stage.decision||!Array.isArray(stage.decision.parts))
+  return {status:'not-applicable',selectionStatus:String(stage.status||'unknown'),
+   checkedRelations:0,issues:[]};
+ const selected=new Map((Array.isArray(stage.selected)?stage.selected:[])
+  .filter(item=>typeof item?.candidateId==='string')
+  .map(item=>[item.candidateId,item]));
+ const issues=[];let checkedRelations=0;
+ for(const part of stage.decision.parts){
+  const partId=String(part?.partId||'');
+  const evidence=Array.isArray(part?.evidence)?part.evidence:[];
+  const partCandidateIds=Array.isArray(part?.candidateIds)?part.candidateIds:[];
+  for(const item of evidence){
+   const candidateId=String(item?.candidateId||'');
+   const source=selected.get(candidateId);
+   if(!source){
+    issues.push({code:'decision-evidence-not-in-packet',partId,candidateId,
+     support:String(item?.support||'')});
+    continue;
+   }
+   checkedRelations++;
+   if(!Array.isArray(source.candidatePartIds)||!source.candidatePartIds.includes(partId))
+    issues.push({code:'selected-evidence-part-link-missing',partId,candidateId,
+     support:String(item?.support||'')});
+  }
+  for(const candidateId of partCandidateIds){
+   if(!selected.has(String(candidateId)))
+    issues.push({code:'part-link-source-not-selected',partId,candidateId:String(candidateId)});
+  }
+  if(part?.coverage==='supported'&&!evidence.some(item=>item?.support==='direct'&&
+    selected.has(String(item?.candidateId||''))))
+   issues.push({code:'supported-part-has-no-selected-direct-evidence',partId});
+ }
+ return {status:issues.length?'mismatch':'consistent',checkedRelations,issues};
+}
 export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSources=[],options={}){
  const citations=Array.isArray(data?.citations)?data.citations:[];
  const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
@@ -499,6 +536,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const missingInline=citationAudit.inlineIdsWithoutSource;
  const outcome=String(data?.outcome||'');
  const reviewStatus=String(data?.reviewStatus||'');
+ const selectionHandoffAudit=auditSelectionHandoff(data?.trace||data?.evidenceTrace);
  // A reviewed source-free answer is structurally valid only when the Worker
  // explicitly classifies it as general context and the case asks for no
  // library source groups. This keeps evidence-free answers distinct from
@@ -665,13 +703,15 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   sourcePartAlignment.every(item=>item.aligned)&&reviewerLabels.contractStatus!=='incomplete'&&
   !failureCode&&reviewStatus!=='pipeline-failed'&&
   reviewStatus!=='review-contract-incomplete'&&
-  reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed';
+  reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed'&&
+  selectionHandoffAudit.status!=='mismatch';
  return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,answerCompleteness,reviewStatus,
   reviewerLabels,failureCode,failureStage,
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
   sourceGroups,questionParts,questionPartCoverage,questionPartAnswerCompleteness,partEvidenceAudit,partEvidenceComplete,
+  selectionHandoffAudit,
   evidenceApplicability:generalContextOnly?'not-applicable':'required',
   sourcePartAlignment,
   answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
@@ -814,7 +854,8 @@ export function recheckQualityReport(report){
    outcome:item.outcome,reviewStatus:item.reviewStatus,
    citations:item.citationSources,
    questionParts:item.questionParts,evidenceMap:item.evidenceMap,
-   evidenceHighlights:item.evidenceHighlights,workerVersionId:item.answerWorkerVersionId,
+   evidenceHighlights:item.evidenceHighlights,evidenceTrace:item.evidenceTrace,
+   workerVersionId:item.answerWorkerVersionId,
    workerSourceBuild:item.answerWorkerSourceBuild,workerSourceRevision:item.answerWorkerSourceRevision,
    evidenceTrace:item.evidenceTrace
   },Array.isArray(item.submittedSources)?item.submittedSources:[],definition.required_source_groups,
@@ -829,7 +870,8 @@ export function recheckQualityReport(report){
      answerCompleteness:variant.answerCompleteness,
      outcome:variant.outcome,reviewStatus:variant.reviewStatus,
      citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
-     evidenceHighlights:variant.evidenceHighlights,workerVersionId:variant.workerVersionId,
+     evidenceHighlights:variant.evidenceHighlights,evidenceTrace:variant.evidenceTrace,
+     workerVersionId:variant.workerVersionId,
      workerSourceBuild:variant.workerSourceBuild,workerSourceRevision:variant.workerSourceRevision},
      Array.isArray(variant.submittedSources)?variant.submittedSources:Array.isArray(item.submittedSources)?item.submittedSources:[],
      definition.required_source_groups,definition.required_part_source_groups||[],{scope:item.scope||
@@ -847,6 +889,7 @@ export function recheckQualityReport(report){
    questionPartCoverage:audit.questionPartCoverage,
    partEvidenceAudit:audit.partEvidenceAudit,
    partEvidenceComplete:audit.partEvidenceComplete,
+   selectionHandoffAudit:audit.selectionHandoffAudit,
    answerCoverageConsistent:audit.answerCoverageConsistent,
    coverageContradictions:audit.coverageContradictions,
    inlineIdsWithoutSource:audit.inlineIdsWithoutSource,

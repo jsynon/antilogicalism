@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,recheckQualityReport,applyHumanScorecard,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditSelectionHandoff,recheckQualityReport,applyHumanScorecard,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -906,6 +906,43 @@ test('answer completeness can pass independently while evidence coverage remains
  assert.equal(result.questionPartAnswerCompleteness.answered,1);
  assert.equal(result.partEvidenceComplete,true);
  assert.equal(result.structuralPassed,true);
+});
+
+test('selection handoff audit catches a selected direct passage dropped from its question part',()=>{
+ const trace={stages:[{stage:'evidence-selection',status:'selected',
+  decision:{selectedCandidateIds:['C10','C11','C14','C22','C17','C30'],parts:[
+   {partId:'P1',candidateIds:['C10','C14','C22'],coverage:'partial',evidence:[
+    {candidateId:'C10',support:'context'},{candidateId:'C14',support:'context'},
+    {candidateId:'C22',support:'context'}]},
+   {partId:'P2',candidateIds:['C11','C17','C30'],coverage:'supported',evidence:[
+    {candidateId:'C11',support:'context'},{candidateId:'C14',support:'direct'},
+    {candidateId:'C17',support:'context'},{candidateId:'C30',support:'context'}]}
+  ]},selected:[
+   {id:'S1',candidateId:'C10',candidatePartIds:['P1']},
+   {id:'S2',candidateId:'C11',candidatePartIds:['P2']},
+   {id:'S3',candidateId:'C14',candidatePartIds:['P1']},
+   {id:'S4',candidateId:'C22',candidatePartIds:['P1']},
+   {id:'S5',candidateId:'C17',candidatePartIds:['P2']},
+   {id:'S6',candidateId:'C30',candidatePartIds:['P2']}
+  ]}]};
+ const handoff=auditSelectionHandoff(trace);
+ assert.equal(handoff.status,'mismatch');
+ assert.ok(handoff.issues.some(issue=>issue.code==='selected-evidence-part-link-missing'&&
+  issue.partId==='P2'&&issue.candidateId==='C14'&&issue.support==='direct'));
+ const answer=auditLiveAnswer({evidenceTrace:trace,outcome:'verified-source-draft',reviewStatus:'claim-review',
+  coverage:'full',answerCompleteness:'full',answer:'A complete answer [S1].',
+  citations:[{id:'S1',bookId:'7'}],evidenceMap:[{id:'S1',point:'A supported point.'}],
+  questionParts:[{part:'The requested point',status:'supported',answerStatus:'answered',evidenceIds:['S1']}]},
+  [{id:'S1',bookId:'7'}],[]);
+ assert.equal(answer.selectionHandoffAudit.status,'mismatch');
+ assert.equal(answer.structuralPassed,false,
+  'a selection-stage support link lost before composition must not count as a structural pass');
+});
+
+test('selection handoff audit ignores explicit abstention and unavailable legacy traces',()=>{
+ assert.equal(auditSelectionHandoff({stages:[{stage:'evidence-selection',status:'no-relevant-evidence'}]}).status,
+  'not-applicable');
+ assert.equal(auditSelectionHandoff({}).status,'unavailable');
 });
 
 test('complete general-context answer can pass with partial library coverage',()=>{
