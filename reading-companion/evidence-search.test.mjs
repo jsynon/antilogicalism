@@ -987,6 +987,44 @@ test('part queries keep matching page IDs linked to each question part through s
  assert.deepEqual(new Set(selected.flatMap(source=>source.candidatePartIds)),new Set(['P1','P2']));
 });
 
+test('three-author comparison facets search their own validated source groups',async()=>{
+ const books=[{id:'10',title:'Physics — Aristotle'},
+  {id:'35',title:'An Enquiry Concerning Human Understanding — David Hume'},
+  {id:'40',title:'Critique of Pure Reason — Immanuel Kant'}];
+ const allowedBookIds=new Set(books.map(book=>book.id));
+ const parts=[
+  {partId:'P1',question:'How does Aristotle explain causes?',sourceBookIds:['10']},
+  {partId:'P2',question:'How does Hume explain causal necessity?',sourceBookIds:['35']},
+  {partId:'P3',question:'How does Kant explain causality?',sourceBookIds:['40']}
+ ];
+ const partQueries=[
+  {partId:'P1',query:'Aristotle four causes material formal efficient final'},
+  {partId:'P2',query:'David Hume causal necessity constant conjunction custom'},
+  {partId:'P3',query:'Immanuel Kant causality category of understanding a priori'}
+ ];
+ const calls=[];
+ const library={search:async(query,options={})=>{
+  const bookId=String(options.bookId||'');
+  calls.push({query,bookId});
+  const book=books.find(item=>item.id===bookId);
+  return book?{sources:[{bookId,title:book.title,page:1,globalPageId:bookId+':1',score:50,
+   preview:`A relevant passage about ${book.title.split(' — ')[1]} and causality.`}]}:{sources:[]};
+ }};
+ const question='How did Aristotle, Hume, and Kant explain causality?';
+ const result=await retrieveEvidence({question,
+  queries:partQueries.map(item=>item.query),partQueries,partQuestions:parts,
+  sourceGroups:books.map(book=>({label:book.title.split(' — ')[1],role:'subject',bookIds:[book.id]})),
+  library,books,allowedBookIds,maxCandidates:9,maxBooks:3,pagesPerBook:2,
+  pageLoader:async source=>({text:source.preview})});
+ for(const item of partQueries){
+  const expected=parts.find(part=>part.partId===item.partId).sourceBookIds[0];
+  assert.ok(calls.some(call=>call.query===item.query&&call.bookId===expected),
+   `${item.partId} must search its own source group (${expected})`);
+ }
+ assert.ok(result.candidates.some(source=>source.bookId==='40'&&source.candidatePartIds.includes('P3')),
+  'a relevant Kant page must reach candidate selection');
+});
+
 test('candidate merging gives every requested part evidence before broad multi-work facets',async()=>{
  const humeBooks=[
   {id:'34',title:'Essays Moral Political and Literary — David Hume'},

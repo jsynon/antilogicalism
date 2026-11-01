@@ -411,10 +411,23 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  const namedBookIds=selected.length?selected:matchExplicitBookIds(direct,books);
  const targetBookIds=namedBookIds.length?namedBookIds:[null];
  const retrievalAllowed=selected.length?selectedAllowed:allowedBookIds;
+ const sourceIdsForFacet=facet=>{
+  const linkedPartIds=new Set(partFacetIndices.filter(item=>item.facet===facet)
+   .map(item=>item.partId));
+  const ids=[...new Set(partQuestions.filter(part=>linkedPartIds.has(part?.partId)&&
+   Array.isArray(part?.sourceBookIds)).flatMap(part=>part.sourceBookIds.map(String)))];
+  return ids.filter(id=>retrievalAllowed.has(id));
+ };
  const searchSets=await Promise.all(searchQueries.map(async (query,index)=>{
   const scopeReference=scriptureScopeByFacet.get(index)||'';
   const executedQuery=scopeReference?`${scopeReference} ${query}`:query;
-  const facetBookIds=targetBooksForFacet(executedQuery,books,targetBookIds[0]===null?null:targetBookIds);
+  // A part-specific query must use that part's validated catalog scope. A
+  // whole-question author match can be incomplete for multi-author prompts;
+  // reusing it here may accidentally constrain a Kant facet to Aristotle IDs.
+  const partScopeIds=sourceIdsForFacet(index);
+  const queryScopeIds=partScopeIds.length?partScopeIds:targetBookIds;
+  const facetBookIds=targetBooksForFacet(executedQuery,books,
+   queryScopeIds[0]===null?null:queryScopeIds);
   const targeted=await Promise.all(facetBookIds.map(bookId=>library.search(executedQuery,{
    ...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook
   })));
