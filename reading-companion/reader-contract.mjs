@@ -1,4 +1,8 @@
-// Browser/Worker/evaluator contract. Keep frontend and Worker copies byte-identical.
+// Site-side reader-contract helpers. Production retrieval currently imports
+// catalogIdentity; the other normalizers are exercised by contract tests.
+// The Worker copy is in book-chatbot/hosting-poc/reader-contract.mjs. These
+// implementations are not byte-identical: planner normalization currently
+// differs, so compare both copies before changing shared plan or citation rules.
 export const CONTRACT_VERSION='reader-evidence-v2';
 export const RETRIEVAL_LIMIT=12;
 export function citationIds(text){
