@@ -368,6 +368,34 @@ test('missing named groups receive one bounded retry inside their catalog book I
  assert.ok(result.searches.some(item=>item.groupScopeRecovery&&item.targetBookIds?.includes('40')));
  assert.ok(result.candidates.some(source=>source.bookId==='40'&&source.candidatePartIds.includes('P3')));
 });
+test('a weak incidental named-source hit gets one bounded retry using the part wording',async()=>{
+ const books=[{id:'454',title:'The Souls of Black Folk — W. E. B. Du Bois'}];
+ const question='How does W. E. B. Du Bois connect literacy and freedom, and what political barriers does he describe?';
+ const partQuestion='How does W. E. B. Du Bois connect literacy and freedom?';
+ const planned='W. E. B. Du Bois reading literacy education and freedom';
+ const calls=[];
+ const library={search:async(query,options={})=>{
+  calls.push({query,bookId:String(options.bookId||''),allowed:[...(options.allowedBookIds||[])]});
+  if(query===planned)return {sources:[{bookId:'454',title:books[0].title,page:8,
+    globalPageId:100008,score:90,preview:'A brief note about the author.'}]};
+  if(query===partQuestion)return {sources:[{bookId:'454',title:books[0].title,page:131,
+    globalPageId:100131,score:58,preview:'Literacy gave formerly enslaved people access to written law and political debate.'}]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question,queries:[
+  'Frederick Douglass literacy education','Douglass freedom and written language'],
+  partQueries:[{partId:'P1',query:planned}],
+  partQuestions:[{partId:'P1',question:partQuestion,sourceBookIds:['454']}],
+  sourceGroups:[{label:'W. E. B. Du Bois',role:'primary',bookIds:['454']}],
+  library,books,allowedBookIds:new Set(['454']),pageLoader:async source=>({text:
+   source.page===131?'Literacy gave formerly enslaved people access to written law and political debate.':
+    'A brief note about the author.'})});
+ assert.equal(calls.filter(call=>call.query===partQuestion&&call.allowed.includes('454')).length,1,
+  'the full part wording is tried once inside the validated source group');
+ assert.ok(result.candidates.some(source=>source.page===131&&source.candidatePartIds.includes('P1')));
+ assert.ok(result.searches.some(search=>search.groupScopeRecoveryReason==='weak-linked-source-match'));
+ assert.ok(result.candidates.length<=32,'bounded source recovery stays inside the existing candidate cap');
+});
 test('an empty comparison-side facet retries with the other side’s topic inside the missing source scope',async()=>{
  const question='What would Nietzsche think about the thought of Kierkegaard?';
  const books=[{id:'239',title:'The Antichrist — Friedrich Nietzsche'},
