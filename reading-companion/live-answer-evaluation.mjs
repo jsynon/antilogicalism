@@ -129,6 +129,12 @@ const FRESH_CASES=[
 // The third fresh set adds different question forms after the first two sets.
 // All-books questions have no expected author groups or review hints; selected-book
 // cases constrain only the work searched, leaving the interpretation open.
+// Three open-ended, all-books questions for trace inspection. No preselected sources or answer steering.
+const PHILOSOPHY3_CASES=[
+ {id:"philosophy3-dostoevsky-nietzsche-nihilism",discipline:'philosophy',evaluation_scope:'all-books',question:"How does Dostoevsky's treatment of nihilism compare with Nietzsche's?",selected_book_ids:[],planner_queries:["How does Dostoevsky's treatment of nihilism compare with Nietzsche's?"],required_source_groups:[],review_focus:[]},
+ {id:"philosophy3-augustine-aquinas-kant-responsibility",discipline:'philosophy',evaluation_scope:'all-books',question:"How do Augustine, Aquinas, and Kant differ in their understanding of moral responsibility?",selected_book_ids:[],planner_queries:["How do Augustine, Aquinas, and Kant differ in their understanding of moral responsibility?"],required_source_groups:[],review_focus:[]},
+ {id:"philosophy3-aristotle-hume-kant-causality",discipline:'philosophy',evaluation_scope:'all-books',question:"How did philosophical understandings of causality change between Aristotle, Hume, and Kant?",selected_book_ids:[],planner_queries:["How did philosophical understandings of causality change between Aristotle, Hume, and Kant?"],required_source_groups:[],review_focus:[]},
+];
 const FRESH3_CASES=[
  {id:'fresh3-all-imagination-understanding',discipline:'philosophy',evaluation_scope:'all-books',question:'What role does imagination play in how people understand the world?',selected_book_ids:[],planner_queries:['What role does imagination play in how people understand the world?'],required_source_groups:[],review_focus:[]},
  {id:'fresh3-all-justice-mercy',discipline:'philosophy',evaluation_scope:'all-books',question:'How do writers distinguish justice from mercy, and when might these values come into conflict?',selected_book_ids:[],planner_queries:['How do writers distinguish justice from mercy, and when might these values come into conflict?'],required_source_groups:[],review_focus:[]},
@@ -225,7 +231,7 @@ function sourceRevision(){
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
- const evaluationCases=mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
+ const evaluationCases=mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
  if(mode==='acceptance'&&caseId==='repeatable-calibration'){
@@ -241,7 +247,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return selected.map(copyEvaluationCase);
  }
  if(caseId&&caseId!=='all'){
-  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3 and handoff cases can be selected in their respective suites.');
+  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3, handoff and philosophy3 cases can be selected in their respective suites.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
@@ -254,6 +260,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  if(mode==='fresh')return FRESH_CASES.map(copyEvaluationCase);
  if(mode==='fresh3')return FRESH3_CASES.map(copyEvaluationCase);
  if(mode==='handoff')return HANDOFF_CASES.map(copyEvaluationCase);
+ if(mode==='philosophy3')return PHILOSOPHY3_CASES.map(copyEvaluationCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
   const item=QUALITY_CASES.find(value=>value.id===id);
   if(!item)throw Error('The planner-only cases are missing from the quality suite.');
@@ -265,7 +272,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff or full.');
+ throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff, philosophy3 or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(scope==='case-default')return cases.map(item=>({...item,selected_book_ids:item.evaluation_scope==='all-books'?[]:[...item.selected_book_ids]}));
@@ -1286,15 +1293,15 @@ function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',sco
   if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='retrieval-profile')out.retrievalProfile=value;else if(key==='repeat')out.repeatCount=Number(value);else if(key==='report-only')out.reportOnly=value==='true';else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|handoff|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|handoff|philosophy3|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
  if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
- const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff'].includes(args.mode);
+ const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in a supported evaluation suite.');
- if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
- if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff')&&args.scope!=='case-default')throw Error('Fresh and handoff question suites must use case-default scope.');
+ if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff'||args.mode==='philosophy3')&&args.scope!=='case-default')throw Error('Fresh and handoff question suites must use case-default scope.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
   throw Error('Repeat count must be an integer from 1 to 3.');
