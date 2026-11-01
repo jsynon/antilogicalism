@@ -169,10 +169,14 @@ export function createDiagnosticReport(input={}){
         distinctiveTermCount:Number.isSafeInteger(part?.distinctiveTermCount)?part.distinctiveTermCount:0,
         coverageRatio:Number.isFinite(part?.coverageRatio)?part.coverageRatio:0,
         requiredTermCount:Number.isSafeInteger(part?.requiredTermCount)?part.requiredTermCount:0,
-        reason:safeDiagnosticToken(part?.coverageReason)
+        reason:safeDiagnosticToken(part?.coverageReason),
+        requestedBookIds:Array.isArray(part?.requestedBookIds)?part.requestedBookIds.slice(0,16).map(value=>string(value,12)):[],
+        candidateBookIds:Array.isArray(part?.candidateBookIds)?part.candidateBookIds.slice(0,16).map(value=>string(value,12)):[]
       })):[],
       weakParts:Array.isArray(input.retrievalCoverage.weakParts)?input.retrievalCoverage.weakParts.slice(0,6).map(part=>({
-        part:string(part?.question,240),overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0
+        part:string(part?.question,240),overlap:Number.isSafeInteger(part?.overlap)?part.overlap:0,
+        requestedBookIds:Array.isArray(part?.requestedBookIds)?part.requestedBookIds.slice(0,16).map(value=>string(value,12)):[],
+        candidateBookIds:Array.isArray(part?.candidateBookIds)?part.candidateBookIds.slice(0,16).map(value=>string(value,12)):[]
       })):[],
       queries:Array.isArray(input.gapQueries)?input.gapQueries.slice(0,3).map(value=>string(value,160)):[],
       failureCode:isSafeFailureCode(input.gapPlannerFailure)?input.gapPlannerFailure:null,

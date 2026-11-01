@@ -722,16 +722,23 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
 export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
  const parts=Array.isArray(partQuestions)&&partQuestions.length
   ?partQuestions.filter(item=>typeof item?.question==='string').map(item=>({
-    partId:item.partId||'',question:item.question}))
+    partId:item.partId||'',question:item.question,
+    ...(Array.isArray(item.sourceBookIds)?{sourceBookIds:item.sourceBookIds}:{})}))
   :[{partId:'P1',question:String(question||'')}];
  const assessments=parts.map(part=>{
   let best={overlap:0,matchedTerms:[],windowStart:-1,source:null};
   let bestIndex={overlap:0,matchedTerms:[],windowStart:-1,source:null};
   let indexLikeSource=null;
+  const requestedBookIds=Array.isArray(part.sourceBookIds)?
+   [...new Set(part.sourceBookIds.map(String).filter(id=>/^[1-9]\d{0,3}$/.test(id)))]:[];
+  const scopedCandidates=requestedBookIds.length?
+   (Array.isArray(candidates)?candidates:[]).filter(source=>requestedBookIds.includes(String(source?.bookId))):
+   (Array.isArray(candidates)?candidates:[]);
+  const missingRequestedSource=Boolean(requestedBookIds.length&&!scopedCandidates.length);
   // Strip generic prompt scaffolding so evaluation templates such as
   // "Explain the source question" do not create artificial search calls.
   const coverageQuestion=part.question.replace(/\b(?:explain|source|question|detail|specific|named|book|passage|answer|enough|sufficiently|testing|fake)\b/giu,' ');
-  for(const source of Array.isArray(candidates)?candidates:[]){
+  for(const source of scopedCandidates){
    const text=source?.text||source?.preview||source?.excerpt||'';
    if(isIndexLikeText(text)){
     if(!indexLikeSource)indexLikeSource=coverageSourceRef(source);
@@ -749,9 +756,9 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
   // distinct content terms. Keep a two-term floor for short questions; for
   // longer facets, require more than one quarter of their terms in one span.
   const required=Math.min(terms.length,Math.max(2,Math.floor(terms.length*0.25)+1));
-  const weak=terms.length>0&&overlap<required;
+  const weak=missingRequestedSource||(terms.length>0&&overlap<required);
   const indexLikeIsStrongest=bestIndex.overlap>best.overlap;
-  const coverageReason=weak
+  const coverageReason=missingRequestedSource?'named-source-candidate-missing':weak
    ?indexLikeIsStrongest?'index-like-candidates-not-counted':'no-coherent-term-cluster'
    :'coherent-prose-cluster-found';
   // Only blame an index candidate when it is the strongest lexical match;
@@ -762,8 +769,9 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
      ?bestIndex.matchedTerms:best.matchedTerms):[];
   return {...part,overlap,matchedTerms,
    distinctiveTermCount:terms.length,
-   coverageRatio:terms.length?Number((overlap/terms.length).toFixed(3)):1,
+   coverageRatio:missingRequestedSource?0:terms.length?Number((overlap/terms.length).toFixed(3)):1,
    requiredTermCount:required,
+   ...(requestedBookIds.length?{requestedBookIds,candidateBookIds:[...new Set(scopedCandidates.map(source=>String(source.bookId)))]}:{}),
    coverageSignal:weak?'weak-coherent-text':'coherent-text-found',
    coverageReason,coverageSource:diagnosticMatch.source||indexLikeSource};
  });

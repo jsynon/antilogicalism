@@ -529,6 +529,36 @@ test('conditional coverage is a weak-overlap signal, not a source verdict',()=>{
  assert.equal(covered.parts[0].coverageSignal,'coherent-text-found');
  assert.ok(covered.parts[0].coverageRatio>=0.35);
 });
+test('named-source parts measure coverage against that author’s retrieved works',()=>{
+ const candidates=[
+  {bookId:'16',page:405,title:'The City of God — Augustine of Hippo',
+   excerpt:'Abraham was promised as father of many nations; Augustine recounts the history of the earthly and heavenly city.'},
+  {bookId:'41',page:33,title:'Fundamental Principles of the Metaphysics of Morals — Immanuel Kant',
+   excerpt:'Moral responsibility and free will depend upon autonomy, duty, and the categorical imperative.'}
+ ];
+ const coverage=assessEvidenceCoverage(candidates,
+  'How do Augustine and Kant differ in their understanding of moral responsibility?',[
+   {partId:'P1',question:'How does Augustine define moral responsibility in relation to original sin and free will?',
+    sourceBookIds:['16','17','525']},
+   {partId:'P2',question:'How does Kant define moral responsibility in relation to autonomy and the categorical imperative?',
+    sourceBookIds:['40','41','42','43','44','45','326']}
+  ]);
+ assert.deepEqual(coverage.weakParts.map(part=>part.partId),['P1'],
+  'strong Kant passages cannot mask weak coverage for Augustine');
+ assert.deepEqual(coverage.weakParts[0].requestedBookIds,['16','17','525']);
+ assert.equal(coverage.weakParts[0].candidateBookIds[0],'16');
+});
+test('named-source coverage triggers a bounded retry when none of its books were retrieved',()=>{
+ const coverage=assessEvidenceCoverage([
+  {bookId:'41',page:33,excerpt:'Autonomy and the categorical imperative establish moral duties.'}
+ ],'How do Augustine and Kant differ in moral responsibility?',[
+  {partId:'P1',question:'How does Augustine understand moral responsibility and free will?',sourceBookIds:['16','17']},
+  {partId:'P2',question:'How does Kant understand moral responsibility and autonomy?',sourceBookIds:['41']}
+ ]);
+ assert.deepEqual(coverage.weakParts.map(part=>part.partId),['P1']);
+ assert.equal(coverage.weakParts[0].coverageReason,'named-source-candidate-missing');
+ assert.equal(coverage.weakParts[0].coverageRatio,0);
+});
 test('thin keyword overlap in a multi-term question triggers conditional retrieval',()=>{
  const page={bookId:'12',page:41,
   excerpt:'The adverse effects of climate change have altered many regions.'};
@@ -1637,6 +1667,8 @@ test('browser sends bounded full candidate pages and leaves semantic selection t
  assert.match(js,/const found=await retrieveSources\(planned\?\.queries\|\|null,\{plannerFallback,/);
  assert.match(js,/assessEvidenceCoverage\(candidates,q,partQuestions\)/);
  assert.match(js,/requestRetrievalGap\(q,gapToken,history/);
+ assert.match(js,/sourceBookIds:item\.sourceBookIds\.slice\(0,16\)/,
+  'weak author-specific parts carry their catalog-resolved book IDs into the existing gap search');
  assert.ok(js.includes('partQuestions,gapQueries,gapQueryPartLinks}'));
  assert.doesNotMatch(js,/retrievalGap:[^}]*reviewFocus/s);
  assert.match(js,/const queries=\[\.\.\.new Set\(data\.queries\.map/);
