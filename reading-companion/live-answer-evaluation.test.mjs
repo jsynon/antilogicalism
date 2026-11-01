@@ -76,6 +76,18 @@ test('planner facet links obey the shared unique-query and total-link budgets',(
  assert.ok(result.warnings.includes('part-query-budget-exceeded'));
 });
 
+test('planner query budget gives each part a first query before extra per-part angles',()=>{
+ const parts=Array.from({length:4},(_,index)=>({id:`P${index+1}`,
+  question:`Question part ${index+1} with enough text`,
+  searchQueries:[`part ${index+1} primary search concept`,`part ${index+1} secondary search concept`]}));
+ const result=partFacetsFromPlan(parts);
+ assert.deepEqual(result.partQueries.slice(0,4).map(item=>item.partId),['P1','P2','P3','P4']);
+ assert.deepEqual(result.partQueries.map(item=>item.partId),['P1','P2','P3','P4','P1','P2']);
+ assert.ok(new Set(result.partQueries.map(item=>item.query.toLowerCase())).size<=6);
+ assert.ok(result.partQueries.length<=12);
+ assert.ok(result.warnings.includes('part-query-budget-exceeded'));
+});
+
 test('live answer audit preserves a valid no-evidence selector result as an empty selected set',()=>{
  const retrievalPacket=[{id:'C1',bookId:'283',page:412}];
  assert.deepEqual(sourcesUsedForWorkerSelection(
@@ -856,6 +868,28 @@ test('answer completeness can pass independently while evidence coverage remains
  assert.equal(result.questionPartAnswerCompleteness.answered,1);
  assert.equal(result.partEvidenceComplete,true);
  assert.equal(result.structuralPassed,true);
+});
+
+test('complete general-context answer can pass with partial library coverage',()=>{
+ const result=auditLiveAnswer({outcome:'general-context-answer',reviewStatus:'general-context-review',
+  coverage:'partial',answerCompleteness:'full',answer:'A direct, qualified answer from general knowledge.',
+  citations:[],questionParts:[{part:'The requested explanation',status:'partial',
+   answerStatus:'answered',evidenceIds:[]}]},[],[]);
+ assert.equal(result.coverage,'partial','library evidence coverage remains visible');
+ assert.equal(result.answerCompleteness,'full');
+ assert.equal(result.evidenceApplicability,'not-applicable');
+ assert.equal(result.answerCoverageConsistent,true);
+ assert.equal(result.structuralPassed,true);
+});
+
+test('partial general-context review does not pass as a complete answer',()=>{
+ const result=auditLiveAnswer({outcome:'general-context-answer',reviewStatus:'general-context-review',
+  coverage:'none',answerCompleteness:'partial',answer:'A related but incomplete explanation.',
+  citations:[],questionParts:[{part:'The requested explanation',status:'unsupported',
+   answerStatus:'partial',evidenceIds:[]}]},[],[]);
+ assert.equal(result.evidenceApplicability,'required');
+ assert.equal(result.answerCompleteness,'partial');
+ assert.equal(result.structuralPassed,false);
 });
 
 test('case evaluation sends one selected-book plan and one answer request in order without logging the token',async()=>{

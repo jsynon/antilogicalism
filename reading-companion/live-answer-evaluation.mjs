@@ -48,9 +48,8 @@ export function validateEvaluationBookScopes(cases,allowed,manifest){
  * for the reader's complete question. Keep the same bounded contract as the
  * shared retriever: at most 12 links and 6 distinct part queries. */
 export function partFacetsFromPlan(parts){
- const partQueries=[],partQuestions=[],warnings=[];
+ const partQueries=[],partQuestions=[],warnings=[],candidateGroups=[];
  if(!Array.isArray(parts))return {partQueries,partQuestions,warnings};
- const seenQueries=new Set();
  for(const part of parts){
   const partId=typeof part?.id==='string'?part.id.trim():'';
   const question=part?.question;
@@ -68,19 +67,24 @@ export function partFacetsFromPlan(parts){
    candidates=[question.trim()];
    warnings.push('invalid-part-query-fallback');
   }
-  for(const query of candidates){
+  candidateGroups.push({partId,queries:candidates});
+ }
+ // Give each planned part its first retrieval hint before spending the
+ // remaining distinct-query budget on extra angles from earlier parts.
+ // Round-robin keeps the existing six-unique-query and twelve-link limits.
+ const seenQueries=new Set();
+ const rounds=Math.max(0,...candidateGroups.map(group=>group.queries.length));
+ for(let queryIndex=0;queryIndex<rounds;queryIndex++){
+  for(const group of candidateGroups){
+   const query=group.queries[queryIndex];
+   if(!query)continue;
    const key=query.toLocaleLowerCase();
-   if(seenQueries.has(key)){
-    if(partQueries.length<12)partQueries.push({partId,query});
-    else warnings.push('part-query-budget-exceeded');
-    continue;
-   }
-   if(seenQueries.size>=6||partQueries.length>=12){
-    warnings.push('part-query-budget-exceeded');
-    continue;
+   if(partQueries.length>=12){warnings.push('part-query-budget-exceeded');continue;}
+   if(!seenQueries.has(key)&&seenQueries.size>=6){
+    warnings.push('part-query-budget-exceeded');continue;
    }
    seenQueries.add(key);
-   partQueries.push({partId,query});
+   partQueries.push({partId:group.partId,query});
   }
  }
  return {partQueries,partQuestions,warnings:[...new Set(warnings)]};
@@ -485,6 +489,10 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const workerSourceBuild=typeof data?.workerSourceBuild==='string'&&data.workerSourceBuild.length<=128?data.workerSourceBuild:null;
  const workerSourceRevision=typeof data?.workerSourceRevision==='string'&&/^[a-f0-9]{40}$/i.test(data.workerSourceRevision)?data.workerSourceRevision.toLowerCase():null;
  const answer=String(data?.answer||'');
+ const coverage=String(data?.coverage||'');
+ const answerCompleteness=typeof data?.answerCompleteness==='string'?
+  data.answerCompleteness:
+  (coverage==='full'?'full':coverage==='none'?'none':'partial');
  const citationIds=new Set(citations.map(source=>String(source?.id||'')));
  const citationAudit=auditCitationIds(answer,citations);
  const inline=citationAudit.inlineIds;
@@ -496,7 +504,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  // library source groups. This keeps evidence-free answers distinct from
  // missing or failed source review.
  const generalContextOnly=outcome==='general-context-answer'&&
-  reviewStatus==='general-context-review'&&String(data?.coverage||'')==='full'&&
+  reviewStatus==='general-context-review'&&answerCompleteness==='full'&&
   citations.length===0&&inline.length===0&&missingInline.length===0&&
   requiredGroups.length===0&&requiredPartSources.length===0;
  const citationBookIds=[...new Set(citations.map(source=>String(source?.bookId||'')))];
@@ -570,10 +578,6 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   supported:questionParts.filter(item=>item?.status==='supported').length,
   partial:questionParts.filter(item=>item?.status==='partial').length,
   unsupported:questionParts.filter(item=>item?.status==='unsupported').length};
- const coverage=String(data?.coverage||'');
- const answerCompleteness=typeof data?.answerCompleteness==='string'?
-  data.answerCompleteness:
-  (coverage==='full'?'full':coverage==='none'?'none':'partial');
  const questionPartAnswerCompleteness={total:questionParts.length,
   answered:questionParts.filter(item=>item?.answerStatus==='answered').length,
   partial:questionParts.filter(item=>item?.answerStatus==='partial').length,
@@ -635,8 +639,10 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   citedSourcesWithoutLocatedHighlight:citedSourceIds.filter(id=>!highlightedSourceIds.has(id))};
  const highlightRelevance=highlightRelevanceAudit(answer,citations,evidenceHighlights);
  const partStatusesConsistent=questionParts.length===0?null:
-  (coverage==='full'?questionParts.every(part=>part?.status==='supported'):
-   coverage==='partial'?questionParts.some(part=>part?.status!=='supported'):false);
+  generalContextOnly?questionParts.every(part=>part?.answerStatus==='answered'||
+   (!part?.answerStatus&&part?.status==='supported')):
+  coverage==='full'?questionParts.every(part=>part?.status==='supported'):
+   coverage==='partial'?questionParts.some(part=>part?.status!=='supported'):false;
  const proseContradictions=questionParts.filter(part=>answerDeniesSupportedComparison(part,answer))
   .map(part=>String(part?.part||''));
  const answerCoverageConsistent=questionParts.length===0?null:
