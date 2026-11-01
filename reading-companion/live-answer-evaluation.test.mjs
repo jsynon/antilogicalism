@@ -943,6 +943,11 @@ test('selection handoff audit ignores explicit abstention and unavailable legacy
  assert.equal(auditSelectionHandoff({stages:[{stage:'evidence-selection',status:'no-relevant-evidence'}]}).status,
   'not-applicable');
  assert.equal(auditSelectionHandoff({}).status,'unavailable');
+ const oldSelectedTrace=auditSelectionHandoff({stages:[{stage:'evidence-selection',status:'selected',
+  decision:{parts:[{partId:'P1',candidateIds:['C1'],coverage:'supported',
+   evidence:[{candidateId:'C1',support:'direct'}]}]},selected:[{candidateId:'C1'}]}]});
+ assert.equal(oldSelectedTrace.status,'unavailable');
+ assert.equal(oldSelectedTrace.reason,'selection-part-links-not-recorded');
 });
 
 test('complete general-context answer can pass with partial library coverage',()=>{

@@ -489,9 +489,13 @@ export function auditSelectionHandoff(trace){
  if(stage.status!=='selected'||!stage.decision||!Array.isArray(stage.decision.parts))
   return {status:'not-applicable',selectionStatus:String(stage.status||'unknown'),
    checkedRelations:0,issues:[]};
- const selected=new Map((Array.isArray(stage.selected)?stage.selected:[])
-  .filter(item=>typeof item?.candidateId==='string')
-  .map(item=>[item.candidateId,item]));
+ const selectedRows=(Array.isArray(stage.selected)?stage.selected:[])
+  .filter(item=>typeof item?.candidateId==='string');
+ // Older authenticated traces predate candidate-to-part links. Leave those
+ // records recheckable without treating an absent field as a broken handoff.
+ if(!selectedRows.length||selectedRows.some(item=>!Array.isArray(item.candidatePartIds)))
+  return {status:'unavailable',reason:'selection-part-links-not-recorded',checkedRelations:0,issues:[]};
+ const selected=new Map(selectedRows.map(item=>[item.candidateId,item]));
  const issues=[];let checkedRelations=0;
  for(const part of stage.decision.parts){
   const partId=String(part?.partId||'');
