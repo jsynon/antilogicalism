@@ -485,19 +485,33 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   const partIds=new Set(linkedParts.map(part=>part.partId));
   const linkedFacets=new Set(partFacetIndices.filter(item=>partIds.has(item.partId))
    .map(item=>item.facet));
-  // An incidental hit from the broad question facet must not suppress
-  // recovery when the query linked to the missing source part returned no
-  // page from that catalog group.
+  // A source hit is not enough to suppress recovery when its preview contains
+  // only incidental shared words. Use the question part's own lexical facet
+  // as a retrieval signal; semantic selection and review still decide support.
   return [...linkedFacets].some(facet=>(searchSets[facet]?.sources||[])
-   .some(source=>ids.includes(String(source.bookId))));
+   .some(source=>ids.includes(String(source.bookId))&&linkedParts.some(part=>{
+    const text=source.preview||source.excerpt||source.text||'';
+    const terms=facetTerms(part.question);
+    const required=Math.min(1,terms.length);
+    return required===0||localFacetTextMatch(part.question,text).overlap>=required;
+   })));
  };
  for(const group of sourceGroups.filter(item=>['primary','subject'].includes(item.role)).slice(0,4)){
   const ids=[...new Set(group.bookIds.map(String).filter(id=>allowedBookIds.has(id)))];
   const linkedParts=partQuestions.filter(part=>Array.isArray(part?.sourceBookIds)&&
     part.sourceBookIds.some(id=>ids.includes(String(id))));
   if(!ids.length||groupHasLinkedCandidate(ids,linkedParts))continue;
-  const preferred=linkedParts.flatMap(part=>partQueries.filter(item=>item.partId===part.partId)
-    .map(item=>item.query));
+  const weakLinkedParts=linkedParts.filter(part=>{
+   const facets=new Set(partFacetIndices.filter(item=>item.partId===part.partId).map(item=>item.facet));
+   return ![...facets].some(facet=>(searchSets[facet]?.sources||[]).some(source=>
+    ids.includes(String(source.bookId))&&localFacetTextMatch(part.question,
+      source.preview||source.excerpt||source.text||'').overlap>=
+        Math.min(1,facetTerms(part.question).length)));
+  });
+  const preferred=weakLinkedParts.map(part=>part.question).filter(value=>
+    typeof value==='string'&&value.trim().length>=5);
+  preferred.push(...linkedParts.flatMap(part=>partQueries.filter(item=>item.partId===part.partId)
+    .map(item=>item.query)));
   const query=[...new Set([...preferred,...gapQueryPartLinks.filter(link=>
     linkedParts.some(part=>link.partIds.includes(part.partId))).map(link=>link.query)])]
     .find(value=>typeof value==='string'&&value.trim().length>=5)||
@@ -517,7 +531,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    // visibly uncovered; it does not interrupt retrieval for the other groups.
   }
   searchSets.push({sources:recovered,executedQuery:query,targetBookIds:ids,
-   groupScopeRecovery:true,sourceGroupLabel:String(group.label||'').slice(0,120)});
+   groupScopeRecovery:true,sourceGroupLabel:String(group.label||'').slice(0,120),
+   ...(weakLinkedParts.length?{groupScopeRecoveryReason:'weak-linked-source-match'}:{})});
  }
  const linkedFacets=[...new Set(partFacetIndices.map(item=>item.facet).filter(index=>index>=0))];
  // A planner part may omit sourceBookIds even when its focused query resolves
@@ -697,7 +712,9 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   ...(searchSets[index].inheritedPartScope?{partScopeInherited:searchSets[index].inheritedPartScope}:{}),
   ...(searchSets[index].quoteFallback?{quoteFallback:true}:{}),
   ...(searchSets[index].groupScopeRecovery?{groupScopeRecovery:true,
-   sourceGroupLabel:searchSets[index].sourceGroupLabel}:{}),
+   sourceGroupLabel:searchSets[index].sourceGroupLabel,
+   ...(searchSets[index].groupScopeRecoveryReason?
+    {groupScopeRecoveryReason:searchSets[index].groupScopeRecoveryReason}:{})}:{}),
   ...(searchSets[index].fallbackFrom?{fallbackFrom:searchSets[index].fallbackFrom,
    fallbackReason:'empty-source-side-facet'}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
