@@ -1,0 +1,92 @@
+{
+  "schema": "antilogicalism-reading-companion-reviewed-philosophy-runs-v1",
+  "reviewedOn": "2026-11-02",
+  "sources": [
+    { "runNumber": 13, "artifactId": "13116410545", "report": "philosophy3.json" },
+    { "runNumber": 14, "artifactId": "13121031074", "report": "philosophy3.json" },
+    { "runNumber": 15, "artifactId": "13124293557", "report": "philosophy3.json" }
+  ],
+  "rubric": {
+    "scale": { "min": 0, "max": 2 },
+    "dimensions": ["accuracy", "questionCoverage", "explanationQuality", "citationSupport", "citationCompleteness"],
+    "maximumTotal": 10,
+    "note": "Offline assistant review of saved answer text and linked evidence. Automated reviewer labels and structural checks were considered separately and did not determine scores. General knowledge was allowed; independent background was not penalized for lacking a library citation. A missing highlight set receives zero as unavailable output, not as a judgment that a nonexistent quote is inaccurate."
+  },
+  "summary": {
+    "answers": { "count": 9, "totalPoints": 67, "maximumPoints": 90, "meanTotal": 7.44 },
+    "highlights": { "count": 9, "totalPoints": 38, "maximumPoints": 90, "meanTotal": 4.22 },
+    "byRun": {
+      "13": { "answerPoints": 21, "answerMean": 7.0, "highlightPoints": 25, "highlightMean": 8.33 },
+      "14": { "answerPoints": 22, "answerMean": 7.33, "highlightPoints": 6, "highlightMean": 2.0 },
+      "15": { "answerPoints": 24, "answerMean": 8.0, "highlightPoints": 7, "highlightMean": 2.33 }
+    },
+    "byQuestion": {
+      "philosophy3-dostoevsky-nietzsche-nihilism": { "answerMean": 7.33, "highlightMean": 6.33 },
+      "philosophy3-augustine-aquinas-kant-responsibility": { "answerMean": 6.67, "highlightMean": 3.0 },
+      "philosophy3-aristotle-hume-kant-causality": { "answerMean": 8.33, "highlightMean": 3.33 }
+    },
+    "note": "The apparent answer-score rise from run 14 to run 15 is only three repeated questions and is not enough to establish a quality trend. Highlight means are dominated by runs 14 and 15 returning no highlight records for incomplete reviews."
+  },
+  "runs": [
+    {
+      "runNumber": 13,
+      "scores": [
+        {
+          "caseId": "philosophy3-dostoevsky-nietzsche-nihilism",
+          "answer": { "scores": { "accuracy": 1, "questionCoverage": 1, "explanationQuality": 1, "citationSupport": 1, "citationCompleteness": 2 }, "notes": "The Dostoevsky discussion is broad general context rather than an analysis grounded in this page; the cited Brothers Karamazov excerpt is about rumors, not nihilism. Nietzsche is explained in useful detail, but the comparison is uneven." },
+          "highlights": { "scores": { "accuracy": 2, "questionCoverage": 1, "explanationQuality": 1, "citationSupport": 1, "citationCompleteness": 1 }, "notes": "The quoted text is exact, but the Dostoevsky excerpt is unrelated to nihilism and the set mainly represents Nietzsche." }
+        },
+        {
+          "caseId": "philosophy3-augustine-aquinas-kant-responsibility",
+          "answer": { "scores": { "accuracy": 1, "questionCoverage": 2, "explanationQuality": 1, "citationSupport": 1, "citationCompleteness": 2 }, "notes": "All three are addressed, but Augustine's link from purification and divine order to responsibility is inferred, and some Aquinas material on intellect and sacred rule is adjacent to accountability." },
+          "highlights": { "scores": { "accuracy": 2, "questionCoverage": 2, "explanationQuality": 1, "citationSupport": 2, "citationCompleteness": 2 }, "notes": "The excerpts are exact and span all three authors. The Kant causality passage is relevant to responsibility but less direct than the autonomy excerpt." }
+        },
+        {
+          "caseId": "philosophy3-aristotle-hume-kant-causality",
+          "answer": { "scores": { "accuracy": 1, "questionCoverage": 2, "explanationQuality": 2, "citationSupport": 1, "citationCompleteness": 2 }, "notes": "The through-line is clear, but Aristotle's 'substance (essence)' label blurs the formal cause, and several broader transitions are not directly demonstrated by the quoted spans." },
+          "highlights": { "scores": { "accuracy": 2, "questionCoverage": 2, "explanationQuality": 2, "citationSupport": 2, "citationCompleteness": 2 }, "notes": "The five excerpts are exact and give useful coverage of Aristotle, Hume, and Kant, including the change in how causality is understood." }
+        }
+      ]
+    },
+    {
+      "runNumber": 14,
+      "scores": [
+        {
+          "caseId": "philosophy3-dostoevsky-nietzsche-nihilism",
+          "answer": { "scores": { "accuracy": 1, "questionCoverage": 2, "explanationQuality": 1, "citationSupport": 1, "citationCompleteness": 2 }, "notes": "The answer contrasts Dostoevsky's spiritual rebellion with Nietzsche's historical account, but the Dostoevsky evidence is one character's speech and the Nietzsche sources include a topic preview and a secondary bridge claim." },
+          "highlights": { "scores": { "accuracy": 2, "questionCoverage": 1, "explanationQuality": 1, "citationSupport": 1, "citationCompleteness": 1 }, "notes": "Quotes are text-faithful, but the ascetic-ideal excerpt is only a topic signpost and the Nietzsche bridge excerpt is secondary framing; the selected set does not strongly support the comparison." }
+        },
+        {
+          "caseId": "philosophy3-augustine-aquinas-kant-responsibility",
+          "answer": { "scores": { "accuracy": 1, "questionCoverage": 1, "explanationQuality": 1, "citationSupport": 1, "citationCompleteness": 2 }, "notes": "The response acknowledges the Augustine gap, then gives general context. Aquinas's cited practical-science discussion is related to moral conduct but does not establish a clear account of responsibility; the three-way contrast remains thin." },
+          "highlights": { "scores": { "accuracy": 0, "questionCoverage": 0, "explanationQuality": 0, "citationSupport": 0, "citationCompleteness": 0 }, "notes": "No reviewed highlight records were returned, so there is no usable excerpt set to score." }
+        },
+        {
+          "caseId": "philosophy3-aristotle-hume-kant-causality",
+          "answer": { "scores": { "accuracy": 2, "questionCoverage": 2, "explanationQuality": 2, "citationSupport": 1, "citationCompleteness": 2 }, "notes": "The prose directly explains the move from Aristotle's causes to Hume's conjunction and Kant's a priori category, but the saved reviewer rejected all four parts and the available cited support does not substantiate every synthesis claim." },
+          "highlights": { "scores": { "accuracy": 0, "questionCoverage": 0, "explanationQuality": 0, "citationSupport": 0, "citationCompleteness": 0 }, "notes": "No reviewed highlight records were returned, so there is no usable excerpt set to score." }
+        }
+      ]
+    },
+    {
+      "runNumber": 15,
+      "scores": [
+        {
+          "caseId": "philosophy3-dostoevsky-nietzsche-nihilism",
+          "answer": { "scores": { "accuracy": 2, "questionCoverage": 2, "explanationQuality": 2, "citationSupport": 1, "citationCompleteness": 2 }, "notes": "This is the clearest comparison: the Dostoevsky example is attributed to a character and Nietzsche's cultural and ascetic-ideal accounts are distinguished. The ascetic-ideal source citation relies partly on a passage that announces the topic rather than explaining the claim." },
+          "highlights": { "scores": { "accuracy": 2, "questionCoverage": 2, "explanationQuality": 1, "citationSupport": 1, "citationCompleteness": 1 }, "notes": "The quotations are exact and span both authors, but the ascetic-ideal quote is a weak match for the point about its role as a buffer; the set is not enough to support every comparison facet." }
+        },
+        {
+          "caseId": "philosophy3-augustine-aquinas-kant-responsibility",
+          "answer": { "scores": { "accuracy": 1, "questionCoverage": 2, "explanationQuality": 1, "citationSupport": 1, "citationCompleteness": 2 }, "notes": "The three authors are compared, but Augustine's passage concerns rational and bodily order, while Aquinas's passage is about sacred doctrine; those are used to infer responsibility without enough explanation of agency, choice, or accountability." },
+          "highlights": { "scores": { "accuracy": 0, "questionCoverage": 0, "explanationQuality": 0, "citationSupport": 0, "citationCompleteness": 0 }, "notes": "No reviewed highlight records were returned, so there is no usable excerpt set to score." }
+        },
+        {
+          "caseId": "philosophy3-aristotle-hume-kant-causality",
+          "answer": { "scores": { "accuracy": 1, "questionCoverage": 2, "explanationQuality": 2, "citationSupport": 1, "citationCompleteness": 2 }, "notes": "The contrast is clear and complete, but 'substance (essence)' again blurs Aristotle's formal cause and the cited pages do not establish every broad claim in the transition summary." },
+          "highlights": { "scores": { "accuracy": 0, "questionCoverage": 0, "explanationQuality": 0, "citationSupport": 0, "citationCompleteness": 0 }, "notes": "No reviewed highlight records were returned, so there is no usable excerpt set to score." }
+        }
+      ]
+    }
+  ]
+}
