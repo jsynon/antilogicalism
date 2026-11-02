@@ -30,6 +30,16 @@ Highlight quality is now scored separately in `highlightHumanReview` and summari
 
 The human answer and highlight summaries report the mean score out of 10 for produced outputs once every produced output has a complete rubric. They also report a completion-adjusted mean that includes explicit no-answer failures as zero; pending human ratings keep that adjusted mean blank rather than being treated as zero. `pipelineFailures` groups failed cases by stage and failure code so provider-capacity failures, planner failures, and answer-stage deadlines can be compared independently of answer quality. A report with no-answer failures may therefore have a lower completion-adjusted score while retaining the same mean among answers that were actually produced.
 
+Each saved live-evaluation report also has a sibling `*.scorecard.json` template. The template records the GitHub run ID and attempt, workflow commit, site revision, Worker source revision(s), suite, case IDs, repeated-attempt numbers, and the separate answer/highlight score fields. Fill each score field with an integer from 0 to 2. The report and template are identity-checked before scores are applied, so a scorecard from another run or Worker revision is rejected. No-answer cases are listed in the manifest and count as zero in completion-adjusted averages without fabricated answer scores. Apply a completed template offline, without an evaluation token or Worker request, with:
+
+```sh
+node reading-companion/apply-human-scorecard.mjs \
+  --report path/to/fresh.json \
+  --scorecard path/to/fresh.scorecard.json
+```
+
+The script writes `fresh.scored.json` beside the source report by default. Pass `--output` to choose another path. Use the scored report for cross-run comparisons and retain the original trace artifact unchanged.
+
 `Reading Companion live answer evaluation` is a separate, manually dispatched workflow. It requires a live-AI confirmation checkbox. The `planner` mode is a low-cost, two-question check: it asks the live Worker planner for one selected-book plan and one All Books cross-work plan, then runs retrieval to see whether the expected books appear. It makes two planner inference calls and skips answer generation. It does not assess passage relevance or answer quality.
 
 The default smoke run asks three questions: the 1 John 4:7–12 retrieval case, the Hawking black-hole case, and Aristotle on habituation. Choose `full` only when you want the complete 30-question benchmark; the full mode has a second confirmation checkbox. Runs are serialized and API requests are spaced at least 30 seconds apart to stay within the pilot's rate limits.

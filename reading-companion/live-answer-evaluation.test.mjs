@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -817,6 +817,40 @@ test('offline scorecard applies separate answer and highlight scores to a named 
  assert.equal(checked.offlineRecheck,undefined,'scorecard ingestion does not fabricate a structural recheck');
 });
 
+test('generated scorecard templates bind scores to the exact run, revision, case, and attempt',()=>{
+ const report={mode:'fresh',searchScope:'case-default',
+  evaluationRun:{repository:'jsynon/antilogicalism',runId:'41514251049',runAttempt:1,
+   workflow:'Reading Companion cross-run regression evaluation',workflowRef:'refs/heads/main',
+   workflowSha:'a'.repeat(40)},
+  reproducibility:{clientSourceRevision:'a'.repeat(40)},workerSourceRevisions:['b'.repeat(40)],
+  cases:[
+   {id:'repeat-me',attemptNumber:1,answerVariant:'with-review',answerText:'First answer.',evidenceHighlights:[]},
+   {id:'repeat-me',attemptNumber:2,answerVariant:'with-review',answerText:'Second answer.',evidenceHighlights:[]},
+   {id:'no-answer',noAnswerFailure:true,answerText:'',evidenceHighlights:[]}
+  ]};
+ const template=createHumanScorecardTemplate(report);
+ assert.equal(template.schema,'antilogicalism-reading-companion-human-scorecard-v1');
+ assert.equal(template.evaluationIdentity.runId,'41514251049');
+ assert.deepEqual(template.evaluationIdentity.workerSourceRevisions,['b'.repeat(40)]);
+ assert.deepEqual(template.cases.map(item=>[item.caseId,item.attemptNumber,item.noAnswerFailure]),[
+  ['repeat-me',1,false],['repeat-me',2,false],['no-answer',undefined,true]
+ ]);
+ assert.deepEqual(template.scores.map(item=>item.attemptNumber),[1,2]);
+ assert.deepEqual(Object.values(template.scores[0].answer.scores),[null,null,null,null,null]);
+ const dimensions={accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:2,citationCompleteness:2};
+ template.scores[0].answer.scores={...dimensions};
+ template.scores[0].highlights.scores={...dimensions};
+ template.scores[1].answer.scores={accuracy:1,questionCoverage:1,explanationQuality:1,citationSupport:1,citationCompleteness:1};
+ template.scores[1].highlights.scores={...template.scores[1].answer.scores};
+ const checked=applyHumanScorecard(report,template);
+ assert.equal(checked.humanReview.averageTotalScoreOutOf10,7.5);
+ assert.equal(checked.humanReview.completionAdjustedTotalScoreOutOf10,5);
+ assert.equal(checked.highlightReview.averageTotalScoreOutOf10,7.5);
+ assert.equal(checked.highlightReview.completionAdjustedTotalScoreOutOf10,5);
+ const wrongRun={...template,evaluationIdentity:{...template.evaluationIdentity,runId:'41506134949'}};
+ assert.throws(()=>applyHumanScorecard(report,wrongRun),/identity does not match/);
+});
+
 test('offline scorecard rejects unknown cases, ambiguous variants, and incomplete score dimensions',()=>{
  const variantReport={cases:[{id:'case-a',reviewAblation:{variants:[
   {answerVariant:'with-review',selectionVariant:'full-retrieval-pool'}]}}]};
@@ -824,6 +858,20 @@ test('offline scorecard rejects unknown cases, ambiguous variants, and incomplet
  assert.throws(()=>applyHumanScorecard(variantReport,{scores:[{caseId:'missing',answer:{scores}}]}),/unknown or ambiguous/);
  assert.throws(()=>applyHumanScorecard(variantReport,{scores:[{caseId:'case-a',answer:{scores}}]}),/must identify one answerVariant/);
  assert.throws(()=>applyHumanScorecard({cases:[{id:'case-a'}]},{scores:[{caseId:'case-a',answer:{scores:{accuracy:2}}}]}),/each dimension exactly once/);
+});
+
+test('evaluation identity records GitHub run metadata without accepting malformed IDs',()=>{
+ const sha='c'.repeat(40);
+ assert.deepEqual(evaluationRunContext({GITHUB_REPOSITORY:'jsynon/antilogicalism',
+  GITHUB_RUN_ID:'41514251049',GITHUB_RUN_ATTEMPT:'2',
+  GITHUB_WORKFLOW:'Reading Companion cross-run regression evaluation',
+  GITHUB_REF:'refs/heads/main',GITHUB_SHA:sha}),{
+  repository:'jsynon/antilogicalism',runId:'41514251049',runAttempt:2,
+  workflow:'Reading Companion cross-run regression evaluation',workflowRef:'refs/heads/main',workflowSha:sha
+ });
+ assert.deepEqual(evaluationRunContext({GITHUB_RUN_ID:'not-a-run',GITHUB_RUN_ATTEMPT:'0',GITHUB_SHA:'short'}),{
+  repository:null,runId:null,runAttempt:0,workflow:null,workflowRef:null,workflowSha:null
+ });
 });
 
 test('quality case uses fixed queries, skips planning, and restricts retrieval to its selected book',async()=>{
