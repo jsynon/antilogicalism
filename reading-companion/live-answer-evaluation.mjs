@@ -717,6 +717,8 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const evidenceAuditScope='Evidence IDs are checked for consistent linkage across question parts, the reviewed evidence map, cited sources, and submitted pages. This is a structural check, not a semantic judge of whether a passage truly supports a claim; review the answer and source text.';
  const failureCode=typeof data?.failureCode==='string'?data.failureCode:'';
  const failureStage=typeof data?.failureStage==='string'?data.failureStage:'';
+ const noAnswerFailure=!answer.trim()&&Boolean(failureCode||data?.requestFailure||
+  outcome==='request-failed'||reviewStatus==='pipeline-failed');
  const manualReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
   accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
  // Keep evidence-excerpt quality independent from answer prose quality. The
@@ -732,7 +734,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed'&&
   selectionHandoffAudit.status!=='mismatch';
  return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,answerCompleteness,reviewStatus,
-  reviewerLabels,failureCode,failureStage,
+  reviewerLabels,failureCode,failureStage,noAnswerFailure,
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
@@ -751,16 +753,34 @@ const MANUAL_REVIEW_DIMENSIONS=['accuracy','questionCoverage','explanationQualit
 export function summarizeManualReviews(cases){
  const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
   (item.answerVariantComparison||item.reviewAblation).variants.map(variant=>({id:item.id,attemptNumber:item.attemptNumber,
-   answerVariant:variant.answerVariant,selectionVariant:variant.selectionVariant,review:variant.manualReview})):
-  [{id:item.id,attemptNumber:item.attemptNumber,answerVariant:item.answerVariant||'with-review',review:item.manualReview}]);
+   answerVariant:variant.answerVariant,selectionVariant:variant.selectionVariant,review:variant.manualReview,
+   noAnswerFailure:variant.noAnswerFailure===true||(item.noAnswerFailure===true&&
+    !String(variant.answerText||'').trim())})):
+  [{id:item.id,attemptNumber:item.attemptNumber,answerVariant:item.answerVariant||'with-review',
+   review:item.manualReview,noAnswerFailure:item.noAnswerFailure===true}]);
  const completed=entries.filter(entry=>MANUAL_REVIEW_DIMENSIONS.every(key=>
   Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2));
  const averageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,completed.length?
   Number((completed.reduce((sum,entry)=>sum+entry.review.scores[key],0)/completed.length).toFixed(2)):null]));
+ const adjustedReady=entries.every(entry=>entry.noAnswerFailure||completed.includes(entry));
+ const completionAdjustedAverageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,
+  entries.length&&adjustedReady?Number((entries.reduce((sum,entry)=>sum+
+   (entry.noAnswerFailure?0:entry.review.scores[key]),0)/entries.length).toFixed(2)):null]));
+ const scoreable=entries.filter(entry=>!entry.noAnswerFailure);
+ const averageTotalScoreOutOf10=scoreable.length&&scoreable.every(entry=>completed.includes(entry))?
+  Number((completed.reduce((sum,entry)=>sum+MANUAL_REVIEW_DIMENSIONS.reduce((total,key)=>
+   total+entry.review.scores[key],0),0)/scoreable.length).toFixed(2)):null;
+ const completionAdjustedTotalScoreOutOf10=adjustedReady&&entries.length?
+  Number((entries.reduce((sum,entry)=>sum+(entry.noAnswerFailure?0:MANUAL_REVIEW_DIMENSIONS.reduce((total,key)=>
+   total+entry.review.scores[key],0)),0)/entries.length).toFixed(2)):null;
  return {scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,reviewed:completed.length,
-  pending:entries.length-completed.length,entries:entries.map(entry=>({id:entry.id,
+  pending:scoreable.filter(entry=>!completed.includes(entry)).length,noAnswerFailures:entries.filter(entry=>entry.noAnswerFailure).length,
+  averageTotalScoreOutOf10,completionAdjustedAverageScores,completionAdjustedTotalScoreOutOf10,
+  completionAdjustedPending:adjustedReady?0:entries.filter(entry=>!entry.noAnswerFailure&&!completed.includes(entry)).length,
+  entries:entries.map(entry=>({id:entry.id,
    ...(Number.isInteger(entry.attemptNumber)?{attemptNumber:entry.attemptNumber}:{}),
-   answerVariant:entry.answerVariant,...(entry.selectionVariant?{selectionVariant:entry.selectionVariant}:{}),status:MANUAL_REVIEW_DIMENSIONS.every(key=>
+   answerVariant:entry.answerVariant,...(entry.selectionVariant?{selectionVariant:entry.selectionVariant}:{}),
+   ...(entry.noAnswerFailure?{noAnswerFailure:true}:{}),status:entry.noAnswerFailure?'failed-zero':MANUAL_REVIEW_DIMENSIONS.every(key=>
     Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2)?'complete':'pending'})),
   averageScores,qualityPass:null,
   note:'Human scores are independent of automated structural pass/fail. No semantic score is inferred from model review.'};
@@ -769,19 +789,34 @@ export function summarizeHighlightReviews(cases){
  const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
   (item.answerVariantComparison||item.reviewAblation).variants.map(variant=>({id:item.id,
    attemptNumber:item.attemptNumber,answerVariant:variant.answerVariant,selectionVariant:variant.selectionVariant,
-   review:variant.highlightHumanReview})):
+   review:variant.highlightHumanReview,noAnswerFailure:variant.noAnswerFailure===true||
+    (item.noAnswerFailure===true&&!String(variant.answerText||'').trim())})):
   [{id:item.id,attemptNumber:item.attemptNumber,answerVariant:item.answerVariant||'with-review',
-   selectionVariant:item.selectionVariant,review:item.highlightHumanReview}]);
+   selectionVariant:item.selectionVariant,review:item.highlightHumanReview,noAnswerFailure:item.noAnswerFailure===true}]);
  const complete=entry=>MANUAL_REVIEW_DIMENSIONS.every(key=>
   Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2);
  const reviewed=entries.filter(complete);
  const averageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,reviewed.length?
   Number((reviewed.reduce((sum,entry)=>sum+entry.review.scores[key],0)/reviewed.length).toFixed(2)):null]));
+ const adjustedReady=entries.every(entry=>entry.noAnswerFailure||complete(entry));
+ const completionAdjustedAverageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,
+  entries.length&&adjustedReady?Number((entries.reduce((sum,entry)=>sum+
+   (entry.noAnswerFailure?0:entry.review.scores[key]),0)/entries.length).toFixed(2)):null]));
+ const scoreable=entries.filter(entry=>!entry.noAnswerFailure);
+ const averageTotalScoreOutOf10=scoreable.length&&scoreable.every(entry=>reviewed.includes(entry))?
+  Number((reviewed.reduce((sum,entry)=>sum+MANUAL_REVIEW_DIMENSIONS.reduce((total,key)=>
+   total+entry.review.scores[key],0),0)/scoreable.length).toFixed(2)):null;
+ const completionAdjustedTotalScoreOutOf10=adjustedReady&&entries.length?
+  Number((entries.reduce((sum,entry)=>sum+(entry.noAnswerFailure?0:MANUAL_REVIEW_DIMENSIONS.reduce((total,key)=>
+   total+entry.review.scores[key],0)),0)/entries.length).toFixed(2)):null;
  return {scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,reviewed:reviewed.length,
-  pending:entries.length-reviewed.length,entries:entries.map(entry=>({id:entry.id,
+  pending:scoreable.filter(entry=>!complete(entry)).length,noAnswerFailures:entries.filter(entry=>entry.noAnswerFailure).length,
+  averageTotalScoreOutOf10,completionAdjustedAverageScores,completionAdjustedTotalScoreOutOf10,
+  completionAdjustedPending:adjustedReady?0:entries.filter(entry=>!entry.noAnswerFailure&&!complete(entry)).length,
+  entries:entries.map(entry=>({id:entry.id,
    ...(Number.isInteger(entry.attemptNumber)?{attemptNumber:entry.attemptNumber}:{}),
    answerVariant:entry.answerVariant,...(entry.selectionVariant?{selectionVariant:entry.selectionVariant}:{}),
-   status:complete(entry)?'complete':'pending'})),averageScores,qualityPass:null,
+   ...(entry.noAnswerFailure?{noAnswerFailure:true}:{}),status:entry.noAnswerFailure?'failed-zero':complete(entry)?'complete':'pending'})),averageScores,qualityPass:null,
   note:'Score the displayed excerpts and their claim links separately from answer prose. Exact location is not a semantic relevance score.'};
 }
 function normalizeHumanScore(review,label){
@@ -854,7 +889,8 @@ export function summarizeAnswerVariants(cases){
    structuralPassed:selected.filter(item=>item.structuralPassed===true).length,
    structuralFailed:selected.filter(item=>item.structuralPassed===false).length,
    structuralUnknown:selected.filter(item=>typeof item.structuralPassed!=='boolean').length,
-   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,manualReview:item.manualReview}))) }];
+   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,
+    answerText:item.answerText,noAnswerFailure:item.noAnswerFailure,manualReview:item.manualReview}))) }];
  }));
 }
 export function summarizeSelectionVariants(cases){
@@ -866,8 +902,25 @@ export function summarizeSelectionVariants(cases){
    structuralPassed:selected.filter(item=>item.structuralPassed===true).length,
    structuralFailed:selected.filter(item=>item.structuralPassed===false).length,
    structuralUnknown:selected.filter(item=>typeof item.structuralPassed!=='boolean').length,
-   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,manualReview:item.manualReview})))}];
+   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,
+    answerText:item.answerText,noAnswerFailure:item.noAnswerFailure,manualReview:item.manualReview})))}];
  }));
+}
+export function summarizePipelineFailures(cases){
+ const failed=(cases||[]).filter(item=>item?.requestFailure||item?.noAnswerFailure||
+  item?.failureCode||item?.outcome==='request-failed'||item?.outcome==='pipeline-failed');
+ const groups=new Map();
+ for(const item of failed){
+  const stage=String(item?.failureStage||item?.requestFailure?.stage||'unknown').slice(0,80);
+  const code=String(item?.failureCode||item?.requestFailure?.failureCode||'pipeline-failed').slice(0,80);
+  const key=stage+'|'+code;
+  const group=groups.get(key)||{stage,code,count:0,noAnswerCount:0};
+  group.count++;
+  if(item?.noAnswerFailure||!String(item?.answerText||'').trim())group.noAnswerCount++;
+  groups.set(key,group);
+ }
+ return {failedCases:failed.length,noAnswerFailures:failed.filter(item=>item?.noAnswerFailure||
+  !String(item?.answerText||'').trim()).length,byStageAndCode:[...groups.values()]};
 }
 export function recheckQualityReport(report){
  if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
@@ -1356,7 +1409,7 @@ function failedCaseResult(item,error){
   plannerFallback:failure.plannerFallback===true,gapPlannerAttempted:failure.gapPlannerAttempted===true,
   ...(failure.gapPlannerFailure?{gapPlannerFailure:failure.gapPlannerFailure}:{}),
   ...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),searches:[],
-  submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',
+  submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',noAnswerFailure:true,
   answerText:'',citationCount:0,citationBookIds:[],citationSources:[],inlineCitationCount:0,
   inlineIdsWithoutSource:[],submittedSourceCount:0,
   sourceGroups:(item.required_source_groups||[]).map(group=>({label:group.label,
@@ -1600,6 +1653,7 @@ async function main(){
    structuralPassedCases:report.cases.filter(item=>item.structuralPassed===true).length,
    structuralFailedCases:report.cases.filter(item=>item.structuralPassed===false).length,
    answerQualityStatus:args.mode==='planner'?'not-assessed':'pending-human-review',
+   pipelineFailures:summarizePipelineFailures(report.cases),
    requestFailureCases:report.requestFailureCases,
    plannerFallbackCases:report.plannerFallbackCases,
    reviewerLabels:summarizeReviewerLabels(report.cases),
