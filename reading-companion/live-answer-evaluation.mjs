@@ -502,7 +502,10 @@ export function auditSelectionHandoff(trace){
  for(const part of stage.decision.parts){
   const partId=String(part?.partId||'');
   const evidence=Array.isArray(part?.evidence)?part.evidence:[];
-  const selectedEvidence=evidence.filter(item=>selected.has(String(item?.candidateId||'')));
+  const selectedEvidence=evidence.filter(item=>{
+   const source=selected.get(String(item?.candidateId||''));
+   return Array.isArray(source?.candidatePartIds)&&source.candidatePartIds.includes(partId);
+  });
   if(selectedEvidence.some(item=>item?.support==='direct'))partsWithDirectEvidence++;
   else if(selectedEvidence.some(item=>item?.support==='context'))contextOnlyParts++;
   const partCandidateIds=Array.isArray(part?.candidateIds)?part.candidateIds:[];
@@ -515,10 +518,10 @@ export function auditSelectionHandoff(trace){
     continue;
    }
    checkedRelations++;
-   if(item?.support==='direct'||item?.support==='context')supportRelations[item.support]++;
    if(!Array.isArray(source.candidatePartIds)||!source.candidatePartIds.includes(partId))
     issues.push({code:'selected-evidence-part-link-missing',partId,candidateId,
      support:String(item?.support||'')});
+   else if(item?.support==='direct'||item?.support==='context')supportRelations[item.support]++;
   }
   for(const candidateId of partCandidateIds){
    if(!selected.has(String(candidateId)))
