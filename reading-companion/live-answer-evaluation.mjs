@@ -889,7 +889,8 @@ export function summarizeAnswerVariants(cases){
    structuralPassed:selected.filter(item=>item.structuralPassed===true).length,
    structuralFailed:selected.filter(item=>item.structuralPassed===false).length,
    structuralUnknown:selected.filter(item=>typeof item.structuralPassed!=='boolean').length,
-   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,manualReview:item.manualReview}))) }];
+   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,
+    answerText:item.answerText,noAnswerFailure:item.noAnswerFailure,manualReview:item.manualReview}))) }];
  }));
 }
 export function summarizeSelectionVariants(cases){
@@ -901,7 +902,8 @@ export function summarizeSelectionVariants(cases){
    structuralPassed:selected.filter(item=>item.structuralPassed===true).length,
    structuralFailed:selected.filter(item=>item.structuralPassed===false).length,
    structuralUnknown:selected.filter(item=>typeof item.structuralPassed!=='boolean').length,
-   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,manualReview:item.manualReview})))}];
+   humanScores:summarizeManualReviews(selected.map(item=>({id:item.id,answerVariant:item.answerVariant,
+    answerText:item.answerText,noAnswerFailure:item.noAnswerFailure,manualReview:item.manualReview})))}];
  }));
 }
 export function summarizePipelineFailures(cases){

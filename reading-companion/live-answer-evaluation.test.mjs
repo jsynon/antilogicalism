@@ -617,6 +617,24 @@ test('paired variant summary reports structural results and human scores separat
  assert.equal(summary['compose-only'].humanScores.pending,1);
 });
 
+test('paired variant quality summaries carry no-answer failures into completion adjustment',()=>{
+ const strong={accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:2,citationCompleteness:2};
+ const missing={accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null};
+ const variants=[
+  {answerVariant:'with-review',answerText:'A complete answer.',manualReview:{scores:strong},
+   highlightHumanReview:{scores:strong}},
+  {answerVariant:'compose-only',answerText:'',noAnswerFailure:true,manualReview:{scores:missing},
+   highlightHumanReview:{scores:missing}}
+ ];
+ const answers=summarizeAnswerVariants([{id:'pair',reviewAblation:{variants}}]);
+ const highlights=summarizeHighlightReviews([{id:'pair',reviewAblation:{variants}}]);
+ assert.equal(answers['with-review'].humanScores.averageTotalScoreOutOf10,10);
+ assert.equal(answers['compose-only'].humanScores.completionAdjustedTotalScoreOutOf10,0);
+ assert.equal(answers['compose-only'].humanScores.noAnswerFailures,1);
+ assert.equal(highlights.noAnswerFailures,1);
+ assert.equal(highlights.completionAdjustedTotalScoreOutOf10,5);
+});
+
 test('audit rejects prose that denies a comparison marked supported',()=>{
  const result=auditLiveAnswer({coverage:'full',answer:'Aristotle discusses political order through human good [S1]. Hobbes describes common power preserving justice [S2]. The texts do not offer a direct comparison, and the evidence cannot establish a difference between their accounts [S1, S2].',
   citations:[{id:'S1',bookId:'7'},{id:'S2',bookId:'163'}],
