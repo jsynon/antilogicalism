@@ -927,6 +927,10 @@ test('selection handoff audit catches a selected direct passage dropped from its
   ]}]};
  const handoff=auditSelectionHandoff(trace);
  assert.equal(handoff.status,'mismatch');
+ assert.deepEqual(handoff.supportRelations,{direct:0,context:6},
+  'a direct selector label without a selected part link is not counted as handed-off support');
+ assert.equal(handoff.partsWithDirectEvidence,0);
+ assert.equal(handoff.contextOnlyParts,2);
  assert.ok(handoff.issues.some(issue=>issue.code==='selected-evidence-part-link-missing'&&
   issue.partId==='P2'&&issue.candidateId==='C14'&&issue.support==='direct'));
  const answer=auditLiveAnswer({evidenceTrace:trace,outcome:'verified-source-draft',reviewStatus:'claim-review',
