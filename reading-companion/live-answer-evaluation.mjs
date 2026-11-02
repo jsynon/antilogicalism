@@ -546,6 +546,83 @@ export function auditSelectionHandoff(trace){
  return {status:issues.length?'mismatch':'consistent',checkedRelations,supportRelations,
   partsWithDirectEvidence,contextOnlyParts,issues};
 }
+function tracePayload(stage){
+ const text=stage?.messages?.find(message=>message?.role==='user')?.content;
+ if(typeof text!=='string')return null;
+ try{return JSON.parse(text);}catch{return null;}
+}
+export function auditEvidenceContinuity(trace){
+ const planParts=Array.isArray(trace?.plan?.parts)?trace.plan.parts:[];
+ if(!planParts.length)return {status:'unavailable',parts:[],reviewWorkload:null};
+ const stages=Array.isArray(trace?.stages)?trace.stages:[];
+ const selection=stages.find(stage=>stage?.stage==='evidence-selection');
+ const compose=stages.find(stage=>stage?.stage==='compose');
+ const composePayload=tracePayload(compose);
+ const review=stages.find(stage=>stage?.stage==='review');
+ const reviewStage=review||stages.find(stage=>String(stage?.stage||'').startsWith('review'));
+ const selectionParts=new Map((selection?.decision?.parts||[]).map(part=>[String(part?.partId||''),part]));
+ const selectedRows=Array.isArray(selection?.selected)?selection.selected:[];
+ const composerParts=new Map((composePayload?.parts||[]).map(part=>[String(part?.partId||''),part]));
+ const finalParts=Array.isArray(trace?.final?.questionParts)?trace.final.questionParts:[];
+ const reviewDecisions=Array.isArray(trace?.reviewContract?.reviewDecisions)?trace.reviewContract.reviewDecisions:[];
+ const partDecisions=Array.isArray(trace?.reviewContract?.partDecisions)?trace.reviewContract.partDecisions:[];
+ const parts=planParts.map(part=>{
+  const partId=String(part?.id||'');
+  const selectedDecision=selectionParts.get(partId);
+  const selectedCandidateIds=[...new Set((selectedDecision?.candidateIds||[]).map(String))];
+  const selectedSourceIds=[...new Set(selectedRows.filter(row=>
+   row?.candidatePartIds?.includes(partId)).map(row=>String(row?.id||'')).filter(Boolean))];
+  const composerPart=composerParts.get(partId);
+  const composerSourceIds=[...new Set((composerPart?.candidateSourceIds||[]).map(String))];
+  const composerEvidenceIds=[...new Set((composePayload?.evidence||[]).filter(source=>
+   source?.selectionSupport?.some(item=>item?.partId===partId)).map(source=>String(source?.id||'')).filter(Boolean))];
+  const finalPart=finalParts.find(item=>String(item?.part||'')===String(part?.question||''));
+  const finalCitationIds=[...new Set((finalPart?.evidenceIds||[]).map(String))];
+  const decisionRows=reviewDecisions.filter(row=>row?.partId===partId&&!row?.contextOnly);
+  const reviewedClaimIds=[...new Set(decisionRows.map(row=>String(row?.claimId||'')).filter(Boolean))];
+  const acceptedClaimIds=[...new Set(decisionRows.filter(row=>row?.accepted===true&&row?.claimStatus==='answered')
+   .map(row=>String(row?.claimId||'')).filter(Boolean))];
+  const partialClaimIds=[...new Set(decisionRows.filter(row=>row?.claimStatus==='partial')
+   .map(row=>String(row?.claimId||'')).filter(Boolean))];
+  const partDecision=partDecisions.find(row=>row?.partId===partId);
+  const answerStatus=String(finalPart?.answerStatus||partDecision?.outputAnswerStatus||'');
+  let continuity='unavailable';
+  if(composerSourceIds.length||composerEvidenceIds.length){
+   continuity=finalCitationIds.length?'source-evidence-retained':
+    reviewStage?.failureCode==='inference-deadline-exceeded'?'review-timed-out':
+    partialClaimIds.length||partDecision?.outputStatus==='partial'?'review-left-source-evidence-partial':
+    'composer-evidence-not-retained';
+  }else if(answerStatus==='answered')continuity='general-context-answer';
+  else if(!selectedSourceIds.length)continuity='no-selected-evidence';
+  return {partId,question:String(part?.question||''),
+   selectorCandidateIds:selectedCandidateIds,selectedSourceIds,composerSourceIds,composerEvidenceIds,
+   reviewedClaimCount:reviewedClaimIds.length,acceptedClaimCount:acceptedClaimIds.length,
+   partialClaimCount:partialClaimIds.length,finalCitationIds,answerStatus,continuity};
+ });
+ const payloadMetrics=reviewStage?.payloadMetrics;
+ const reviewWorkload=reviewStage?{elapsedMs:Number.isFinite(reviewStage.elapsedMs)?reviewStage.elapsedMs:null,
+  status:String(reviewStage.status||'completed'),failureCode:String(reviewStage.failureCode||''),
+  ...(payloadMetrics?{payloadMetrics:{partCount:Number(payloadMetrics.partCount)||0,
+   claimCount:Number(payloadMetrics.claimCount)||0,sourceCount:Number(payloadMetrics.sourceCount)||0,
+   spanCount:Number(payloadMetrics.spanCount)||0,spanReferenceCount:Number(payloadMetrics.spanReferenceCount)||0,
+   serializedCharacters:Number(payloadMetrics.serializedCharacters)||0}}:{})}:null;
+ return {status:parts.some(part=>part.continuity==='unavailable')?'partial':'available',parts,reviewWorkload};
+}
+export function summarizeEvidenceContinuity(cases){
+ const audits=(cases||[]).map(item=>item?.evidenceContinuityAudit).filter(audit=>audit?.status==='available');
+ const parts=audits.flatMap(audit=>audit.parts||[]);
+ const statusCounts={};
+ for(const part of parts)statusCounts[part.continuity]=(statusCounts[part.continuity]||0)+1;
+ const workloads=audits.map(audit=>audit.reviewWorkload).filter(Boolean);
+ const withMetrics=workloads.filter(item=>item.payloadMetrics);
+ const avg=key=>withMetrics.length?Math.round(withMetrics.reduce((sum,item)=>sum+item.payloadMetrics[key],0)/withMetrics.length):null;
+ return {caseCount:audits.length,partCount:parts.length,continuityStatusCounts:statusCounts,
+  reviewWorkload:{measuredCases:withMetrics.length,
+   timeoutCases:workloads.filter(item=>item.failureCode==='inference-deadline-exceeded').length,
+   averageClaimCount:avg('claimCount'),averageSourceCount:avg('sourceCount'),
+   averageSpanCount:avg('spanCount'),averageSpanReferenceCount:avg('spanReferenceCount'),
+   averageSerializedCharacters:avg('serializedCharacters')}};
+}
 export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSources=[],options={}){
  const citations=Array.isArray(data?.citations)?data.citations:[];
  const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
@@ -563,6 +640,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const outcome=String(data?.outcome||'');
  const reviewStatus=String(data?.reviewStatus||'');
  const selectionHandoffAudit=auditSelectionHandoff(data?.trace||data?.evidenceTrace);
+ const evidenceContinuityAudit=auditEvidenceContinuity(data?.trace||data?.evidenceTrace);
  // A reviewed source-free answer is structurally valid only when the Worker
  // explicitly classifies it as general context and the case asks for no
  // library source groups. This keeps evidence-free answers distinct from
@@ -739,7 +817,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
   sourceGroups,questionParts,questionPartCoverage,questionPartAnswerCompleteness,partEvidenceAudit,partEvidenceComplete,
-  selectionHandoffAudit,
+  selectionHandoffAudit,evidenceContinuityAudit,
   evidenceApplicability:generalContextOnly?'not-applicable':'required',
   sourcePartAlignment,
   answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
@@ -969,6 +1047,8 @@ export function recheckQualityReport(report){
    partEvidenceAudit:audit.partEvidenceAudit,
    partEvidenceComplete:audit.partEvidenceComplete,
    selectionHandoffAudit:audit.selectionHandoffAudit,
+   evidenceContinuityAudit:audit.evidenceContinuityAudit,
+   reviewWorkload:audit.evidenceContinuityAudit.reviewWorkload,
    answerCoverageConsistent:audit.answerCoverageConsistent,
    coverageContradictions:audit.coverageContradictions,
    inlineIdsWithoutSource:audit.inlineIdsWithoutSource,
@@ -990,6 +1070,7 @@ export function recheckQualityReport(report){
    for(const status of ['supported','partial','unsupported'])totals[status]+=Number(counts[status])||0;
    totals.total+=Number(counts.total)||0;return totals;
   },{total:0,supported:0,partial:0,unsupported:0}),
+  evidenceContinuity:summarizeEvidenceContinuity(checked),
   answerCompletenessCounts:checked.reduce((totals,item)=>{
    const status=item.offlineRecheck.answerCompleteness;
    if(status==='full')totals.full++;
@@ -1657,6 +1738,7 @@ async function main(){
    requestFailureCases:report.requestFailureCases,
    plannerFallbackCases:report.plannerFallbackCases,
    reviewerLabels:summarizeReviewerLabels(report.cases),
+   evidenceContinuity:summarizeEvidenceContinuity(report.cases),
    humanReview:summarizeManualReviews(report.cases),
    highlightReview:summarizeHighlightReviews(report.cases),
    answerVariants:summarizeAnswerVariants(report.cases),
