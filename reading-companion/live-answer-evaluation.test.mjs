@@ -962,6 +962,9 @@ test('selection handoff audit validates deterministic part-recovery links separa
  const valid=auditSelectionHandoff(trace);
  assert.equal(valid.status,'consistent');
  assert.equal(valid.checkedRelations,2);
+ assert.deepEqual(valid.supportRelations,{direct:1,context:0});
+ assert.equal(valid.partsWithDirectEvidence,1);
+ assert.equal(valid.contextOnlyParts,0);
  const missing=auditSelectionHandoff({stages:[{...trace.stages[0],selected:[
   {id:'S1',candidateId:'C1',candidatePartIds:['P1']}
  ]}]});
@@ -973,6 +976,23 @@ test('selection handoff audit validates deterministic part-recovery links separa
  ],recoveredPartLinks:[{partId:'P2',candidateId:'C9'}]}]});
  assert.equal(absent.status,'mismatch');
  assert.ok(absent.issues.some(issue=>issue.code==='recovered-part-link-source-not-selected'));
+});
+
+test('selection audit reports context-only evidence separately from direct support',()=>{
+ const result=auditSelectionHandoff({stages:[{stage:'evidence-selection',status:'selected',
+  decision:{parts:[
+   {partId:'P1',candidateIds:['C1'],coverage:'partial',evidence:[{candidateId:'C1',support:'context'}]},
+   {partId:'P2',candidateIds:['C2','C3'],coverage:'supported',evidence:[
+    {candidateId:'C2',support:'context'},{candidateId:'C3',support:'direct'}]}
+  ]},selected:[
+   {candidateId:'C1',candidatePartIds:['P1']},
+   {candidateId:'C2',candidatePartIds:['P2']},
+   {candidateId:'C3',candidatePartIds:['P2']}
+  ]}]});
+ assert.equal(result.status,'consistent');
+ assert.deepEqual(result.supportRelations,{direct:1,context:2});
+ assert.equal(result.partsWithDirectEvidence,1);
+ assert.equal(result.contextOnlyParts,1);
 });
 
 test('complete general-context answer can pass with partial library coverage',()=>{
