@@ -950,6 +950,31 @@ test('selection handoff audit ignores explicit abstention and unavailable legacy
  assert.equal(oldSelectedTrace.reason,'selection-part-links-not-recorded');
 });
 
+test('selection handoff audit validates deterministic part-recovery links separately from selector decisions',()=>{
+ const trace={stages:[{stage:'evidence-selection',status:'selected',
+  decision:{selectedCandidateIds:['C1'],parts:[
+   {partId:'P1',candidateIds:['C1'],coverage:'supported',evidence:[
+    {candidateId:'C1',support:'direct'}]},
+   {partId:'P2',candidateIds:[],coverage:'none',evidence:[]}
+  ]},selected:[{id:'S1',candidateId:'C1',candidatePartIds:['P1','P2']}],
+  recoveredPartLinks:[{partId:'P2',candidateId:'C1',retrievedCandidateId:'C2',
+   reason:'retrieved-part-hint'}]}]};
+ const valid=auditSelectionHandoff(trace);
+ assert.equal(valid.status,'consistent');
+ assert.equal(valid.checkedRelations,2);
+ const missing=auditSelectionHandoff({stages:[{...trace.stages[0],selected:[
+  {id:'S1',candidateId:'C1',candidatePartIds:['P1']}
+ ]}]});
+ assert.equal(missing.status,'mismatch');
+ assert.ok(missing.issues.some(issue=>issue.code==='recovered-part-link-missing'&&
+  issue.partId==='P2'&&issue.candidateId==='C1'));
+ const absent=auditSelectionHandoff({stages:[{...trace.stages[0],selected:[
+  {id:'S1',candidateId:'C1',candidatePartIds:['P1','P2']}
+ ],recoveredPartLinks:[{partId:'P2',candidateId:'C9'}]}]});
+ assert.equal(absent.status,'mismatch');
+ assert.ok(absent.issues.some(issue=>issue.code==='recovered-part-link-source-not-selected'));
+});
+
 test('complete general-context answer can pass with partial library coverage',()=>{
  const result=auditLiveAnswer({outcome:'general-context-answer',reviewStatus:'general-context-review',
   coverage:'partial',answerCompleteness:'full',answer:'A direct, qualified answer from general knowledge.',

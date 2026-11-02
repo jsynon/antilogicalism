@@ -522,6 +522,18 @@ export function auditSelectionHandoff(trace){
     selected.has(String(item?.candidateId||''))))
    issues.push({code:'supported-part-has-no-selected-direct-evidence',partId});
  }
+ const recoveredPartLinks=Array.isArray(stage.recoveredPartLinks)?stage.recoveredPartLinks:[];
+ for(const link of recoveredPartLinks){
+  const partId=String(link?.partId||''),candidateId=String(link?.candidateId||'');
+  const source=selected.get(candidateId);
+  if(!partId||!candidateId||!source){
+   issues.push({code:'recovered-part-link-source-not-selected',partId,candidateId});
+   continue;
+  }
+  checkedRelations++;
+  if(!source.candidatePartIds.includes(partId))
+   issues.push({code:'recovered-part-link-missing',partId,candidateId});
+ }
  return {status:issues.length?'mismatch':'consistent',checkedRelations,issues};
 }
 export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSources=[],options={}){
