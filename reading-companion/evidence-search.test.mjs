@@ -540,7 +540,7 @@ test('generic author wording does not scope all-books retrieval to collective by
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,prepareAnswerCandidates} from './evidence-search.mjs';
-import {catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
+import {catalogFallbackPlan,catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
 import {sourceAttributionLabel} from './citation-numbering.mjs';
 
 const page=(page,bookId='114')=>({page,bookId,title:'Crime and Punishment',
@@ -1288,6 +1288,46 @@ test('plan identities are checked against the catalog and redundant comparison w
  assert.deepEqual(plan.parts.map(part=>part.sourceBookIds),[['4','9'],['529','530'],['4','9','529','530']]);
 });
 
+test('catalog fallback preserves all unambiguous named authors when planning is unavailable',()=>{
+ const question='How do Augustine, Aquinas, and Kant differ on moral responsibility?';
+ const catalog={
+  '1':'Confessions — Augustine of Hippo','2':'City of God — Augustine of Hippo',
+  '3':'Summa Theologica — Thomas Aquinas','4':'Critique of Practical Reason — Immanuel Kant',
+  '5':'Computing Machinery and Intelligence — Alan Turing',
+  '6':'The Principles of Mathematical Logic — Raymond Turing'
+ };
+ const raw=catalogFallbackPlan(question,catalog);
+ const plan=normalizePlan(raw,question,catalog);
+ assert.equal(plan.intent,'compare');
+ assert.deepEqual(plan.sources.map(source=>source.label),[
+  'Augustine of Hippo','Thomas Aquinas','Immanuel Kant']);
+ assert.deepEqual(plan.sources.map(source=>source.bookIds),[['1','2'],['3'],['4']]);
+ assert.deepEqual(plan.parts.map(part=>part.question),[question]);
+ assert.deepEqual(plan.parts[0].sourceBookIds,['1','2','3','4']);
+});
+
+test('catalog fallback ignores ambiguous surnames and unknown titles, but honors selected-book scope',()=>{
+ const catalog={
+  '1':'Computing Machinery and Intelligence — Alan Turing',
+  '2':'The Principles of Mathematical Logic — Raymond Turing',
+  '3':'Hamlet — William Shakespeare'
+ };
+ const ambiguous=catalogFallbackPlan('What did Turing say about intelligence?',catalog);
+ assert.deepEqual(ambiguous.sources,[]);
+ const unknown=catalogFallbackPlan('Compare Kant and an unknown author on justice.',catalog);
+ assert.deepEqual(unknown.sources,[]);
+ const selected=catalogFallbackPlan('What is moral responsibility? ',catalog,'3');
+ assert.deepEqual(selected.sources,[{label:catalog['3'],role:'primary',bookIds:['3']}]);
+});
+
+test('catalog fallback restores named catalog identities when a planner proposes only invalid identities',()=>{
+ const question='How do Augustine and Aquinas differ?';
+ const catalog={'1':'Confessions — Augustine of Hippo','2':'Summa Theologica — Thomas Aquinas'};
+ const plan=normalizePlan({intent:'compare',sources:[
+  {label:'Aristotle',role:'primary',bookIds:['1','2']}],queries:[question]},question,catalog);
+ assert.deepEqual(plan.sources.map(source=>source.bookIds),[['1'],['2']]);
+});
+
 test('ambiguous author tokens cannot authorize planner-proposed catalog books',()=>{
  const catalog={
   '901':'Computing Machinery and Intelligence — Alan Turing',
@@ -1718,6 +1758,8 @@ test('browser sends bounded full candidate pages and leaves semantic selection t
  const {readFileSync}=await import('node:fs');
  const js=readFileSync(new URL('./companion-v112.mjs',import.meta.url),'utf8');
  assert.match(js,/API\+'\/api\/pilot-plan'/);
+ assert.match(js,/const plan=rawPlan\?normalizePlan\(rawPlan,q,catalog,bookFilter\.value\|\|''\)/,
+  'planner-suggested author and book IDs must be catalog-validated before they guide browser retrieval');
  assert.match(js,/data\.searchPlanning===true/);
  assert.match(js,/validSearchPlan\(data\.queries\)/);
  assert.match(js,/retrieveEvidence\(\{question:q/);
@@ -1734,6 +1776,12 @@ test('browser sends bounded full candidate pages and leaves semantic selection t
  assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions,allowEmpty:true\}/);
  assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
  assert.match(js,/diagnosticState\.fallbackMode=true/);
+ assert.match(js,/catalogFallbackPlan\(q,catalog,bookFilter\.value\|\|''\)/,
+  'planner failure and empty-plan responses should build fallback source groups from the loaded catalog');
+ assert.match(js,/if\(!planned\?\.plan\)/,
+  'a structurally valid query list without a usable plan should enter the bounded fallback');
+ assert.match(js,/plan:currentPlan\|\|undefined/,
+  'the catalog-backed fallback plan should reach Worker validation with the question');
  assert.match(js,/My usual book-finding step hit a snag, so I’m searching with your question instead/);
  assert.match(js,/token=await nextTurnstileToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
