@@ -497,9 +497,17 @@ export function auditSelectionHandoff(trace){
   return {status:'unavailable',reason:'selection-part-links-not-recorded',checkedRelations:0,issues:[]};
  const selected=new Map(selectedRows.map(item=>[item.candidateId,item]));
  const issues=[];let checkedRelations=0;
+ const supportRelations={direct:0,context:0};
+ let partsWithDirectEvidence=0,contextOnlyParts=0;
  for(const part of stage.decision.parts){
   const partId=String(part?.partId||'');
   const evidence=Array.isArray(part?.evidence)?part.evidence:[];
+  const selectedEvidence=evidence.filter(item=>{
+   const source=selected.get(String(item?.candidateId||''));
+   return Array.isArray(source?.candidatePartIds)&&source.candidatePartIds.includes(partId);
+  });
+  if(selectedEvidence.some(item=>item?.support==='direct'))partsWithDirectEvidence++;
+  else if(selectedEvidence.some(item=>item?.support==='context'))contextOnlyParts++;
   const partCandidateIds=Array.isArray(part?.candidateIds)?part.candidateIds:[];
   for(const item of evidence){
    const candidateId=String(item?.candidateId||'');
@@ -513,6 +521,7 @@ export function auditSelectionHandoff(trace){
    if(!Array.isArray(source.candidatePartIds)||!source.candidatePartIds.includes(partId))
     issues.push({code:'selected-evidence-part-link-missing',partId,candidateId,
      support:String(item?.support||'')});
+   else if(item?.support==='direct'||item?.support==='context')supportRelations[item.support]++;
   }
   for(const candidateId of partCandidateIds){
    if(!selected.has(String(candidateId)))
@@ -534,7 +543,8 @@ export function auditSelectionHandoff(trace){
   if(!source.candidatePartIds.includes(partId))
    issues.push({code:'recovered-part-link-missing',partId,candidateId});
  }
- return {status:issues.length?'mismatch':'consistent',checkedRelations,issues};
+ return {status:issues.length?'mismatch':'consistent',checkedRelations,supportRelations,
+  partsWithDirectEvidence,contextOnlyParts,issues};
 }
 export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSources=[],options={}){
  const citations=Array.isArray(data?.citations)?data.citations:[];
