@@ -40,6 +40,17 @@ node reading-companion/apply-human-scorecard.mjs \
 
 The script writes `fresh.scored.json` beside the source report by default. Pass `--output` to choose another path. Use the scored report for cross-run comparisons and retain the original trace artifact unchanged.
 
+Compare two fully scored reports for the same fixed case panel offline with:
+
+```sh
+node reading-companion/compare-human-evaluations.mjs \
+  --before path/to/before.scored.json \
+  --after path/to/after.scored.json \
+  --output path/to/quality-comparison.json
+```
+
+The comparison pairs exact case IDs, question text, attempts, and scopes; it reports answer and highlight means separately, both for produced outputs and with explicit no-answer failures scored as zero. It rejects missing or incomplete human ratings. It also records whether evaluation settings and Worker source revisions match. A matched panel with changed revisions is descriptive evidence, not proof that a particular code change caused the score difference. For a code-change evaluation, keep the case panel and settings fixed, retain the exact Worker revision in each report, and repeat the panel when practical to see whether the difference is larger than run-to-run variation.
+
 `Reading Companion live answer evaluation` is a separate, manually dispatched workflow. It requires a live-AI confirmation checkbox. The `planner` mode is a low-cost, two-question check: it asks the live Worker planner for one selected-book plan and one All Books cross-work plan, then runs retrieval to see whether the expected books appear. It makes two planner inference calls and skips answer generation. It does not assess passage relevance or answer quality.
 
 The default smoke run asks three questions: the 1 John 4:7–12 retrieval case, the Hawking black-hole case, and Aristotle on habituation. Choose `full` only when you want the complete 30-question benchmark; the full mode has a second confirmation checkbox. Runs are serialized and API requests are spaced at least 30 seconds apart to stay within the pilot's rate limits.
