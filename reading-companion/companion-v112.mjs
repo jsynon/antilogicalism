@@ -7,6 +7,7 @@
  * This client is separate from the local Python/Ollama workbench.
  */
 import {RemoteLibrary} from './remote-library.mjs';
+import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
 import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.0';
@@ -514,7 +515,9 @@ async function requestSourcePlan(q,verificationToken,history){
     if(diagnosticState)diagnosticState.failureCode='search-planning-failed';
     throw Error('The evidence search plan was incomplete.');
   }
-  const plan=data.plan&&typeof data.plan==='object'&&!Array.isArray(data.plan)?data.plan:null;
+  const rawPlan=data.plan&&typeof data.plan==='object'&&!Array.isArray(data.plan)?data.plan:null;
+  const catalog=Object.fromEntries(bookList.map(book=>[String(book.id),book.title]));
+  const plan=rawPlan?normalizePlan(rawPlan,q,catalog,bookFilter.value||''):null;
   if(diagnosticState){diagnosticState.plannerQueries=data.queries;
     diagnosticState.plannerPlan=plan;refreshDiagnostic();}
   return {queries:data.queries,plan};
@@ -615,6 +618,13 @@ async function askQuestion(questionText){
           diagnosticState.failureHttpStatus=null;
           diagnosticState.failureCode='';
         }
+      }
+      if(!planned?.plan){
+        plannerFallback=true;
+        const catalog=Object.fromEntries(bookList.map(book=>[String(book.id),book.title]));
+        const fallback=catalogFallbackPlan(q,catalog,bookFilter.value||'');
+        planned={queries:[q],plan:normalizePlan(fallback,q,catalog,bookFilter.value||'')};
+        if(diagnosticState)diagnosticState.fallbackMode=true;
       }
       currentPlan=planned?.plan||null;
       partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>
