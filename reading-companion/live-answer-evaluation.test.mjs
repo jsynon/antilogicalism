@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditSelectionHandoff,recheckQualityReport,applyHumanScorecard,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditSelectionHandoff,recheckQualityReport,applyHumanScorecard,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -547,6 +547,39 @@ test('human rubric summary keeps semantic review separate from structural passes
  assert.equal(scored.reviewed,1);
  assert.deepEqual(scored.averageScores,{accuracy:2,questionCoverage:1,explanationQuality:1,citationSupport:2,citationCompleteness:0});
  assert.equal(scored.qualityPass,null,'human scores are reported, not collapsed into an unsupported pass threshold');
+});
+
+test('quality averages show produced-answer scores and completion-adjusted scores with no-answer failures as zero',()=>{
+ const score={accuracy:2,questionCoverage:2,explanationQuality:1,citationSupport:2,citationCompleteness:1};
+ const entries=[
+  {id:'answered',answerText:'A substantive answer.',manualReview:{scores:score},highlightHumanReview:{scores:score}},
+  {id:'provider-failure',noAnswerFailure:true,requestFailure:{stage:'planner',failureCode:'ai-capacity-unavailable'},
+   answerText:'',manualReview:{scores:{}},highlightHumanReview:{scores:{}}}
+ ];
+ const answer=summarizeManualReviews(entries),highlights=summarizeHighlightReviews(entries);
+ assert.equal(answer.averageTotalScoreOutOf10,8);
+ assert.equal(answer.completionAdjustedTotalScoreOutOf10,4);
+ assert.deepEqual(answer.completionAdjustedAverageScores,{accuracy:1,questionCoverage:1,
+  explanationQuality:0.5,citationSupport:1,citationCompleteness:0.5});
+ assert.equal(answer.noAnswerFailures,1);
+ assert.equal(answer.pending,0);
+ assert.equal(highlights.averageTotalScoreOutOf10,8);
+ assert.equal(highlights.completionAdjustedTotalScoreOutOf10,4);
+ assert.equal(highlights.entries[1].status,'failed-zero');
+});
+
+test('pipeline failure summary keeps provider failures separate by stage and code',()=>{
+ const summary=summarizePipelineFailures([
+  {id:'planner',noAnswerFailure:true,requestFailure:{stage:'planner',failureCode:'ai-capacity-unavailable'}},
+  {id:'compose',noAnswerFailure:true,requestFailure:{stage:'compose',failureCode:'inference-deadline-exceeded'}},
+  {id:'ok',answerText:'Answer.'}
+ ]);
+ assert.equal(summary.failedCases,2);
+ assert.equal(summary.noAnswerFailures,2);
+ assert.deepEqual(summary.byStageAndCode,[
+  {stage:'planner',code:'ai-capacity-unavailable',count:1,noAnswerCount:1},
+  {stage:'compose',code:'inference-deadline-exceeded',count:1,noAnswerCount:1}
+ ]);
 });
 
 test('reviewer summary separates final-answer support failures from rejected draft claims',()=>{
