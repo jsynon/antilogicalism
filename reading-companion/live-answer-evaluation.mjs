@@ -913,18 +913,61 @@ function normalizeHumanScore(review,label){
   scores:Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,review.scores[key]])),
   notes:review.notes||''};
 }
+function scorecardEvaluationIdentity(report){
+ const run=report.evaluationRun||{};
+ const revisions=[...(Array.isArray(report.workerSourceRevisions)?report.workerSourceRevisions:[])].sort();
+ const cases=(Array.isArray(report.cases)?report.cases:[]).map(item=>({caseId:String(item.id||''),
+  ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{})}));
+ return {repository:run.repository||null,runId:run.runId||null,runAttempt:run.runAttempt||null,
+  workflow:run.workflow||null,workflowRef:run.workflowRef||null,workflowSha:run.workflowSha||null,
+  mode:report.mode||null,searchScope:report.searchScope||null,
+  clientSourceRevision:report.reproducibility?.clientSourceRevision||null,
+  workerSourceRevisions:revisions,cases};
+}
+function emptyManualScores(){return Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,null]));}
+/** Create a blank answer/highlight scorecard bound to this exact saved evaluation. */
+export function createHumanScorecardTemplate(report){
+ if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
+ const scores=report.cases.filter(item=>!item.noAnswerFailure&&String(item.answerText||'').trim())
+  .map(item=>({caseId:item.id,
+   ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
+   ...(typeof item.answerVariant==='string'?{answerVariant:item.answerVariant}:{}),
+   ...(typeof item.selectionVariant==='string'?{selectionVariant:item.selectionVariant}:{}),
+   answer:{scores:emptyManualScores(),notes:''},
+   highlights:{scores:emptyManualScores(),notes:''}}));
+ return {schema:'antilogicalism-reading-companion-human-scorecard-v1',
+  evaluationIdentity:scorecardEvaluationIdentity(report),
+  scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,
+  instructions:'Fill every answer and highlights dimension with an integer from 0 to 2. Leave the case manifest intact.',
+  cases:report.cases.map(item=>({caseId:item.id,
+   ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
+   noAnswerFailure:item.noAnswerFailure===true,answerPresent:Boolean(String(item.answerText||'').trim()),
+   highlightCount:Array.isArray(item.evidenceHighlights)?item.evidenceHighlights.length:0})),
+  scores};
+}
+export function evaluationRunContext(env=process.env){
+ return {repository:env.GITHUB_REPOSITORY||null,
+  runId:/^\d+$/.test(env.GITHUB_RUN_ID||'')?env.GITHUB_RUN_ID:null,
+  runAttempt:/^\d+$/.test(env.GITHUB_RUN_ATTEMPT||'')?Number(env.GITHUB_RUN_ATTEMPT):null,
+  workflow:env.GITHUB_WORKFLOW||null,workflowRef:env.GITHUB_REF||null,
+  workflowSha:/^[a-f0-9]{40}$/i.test(env.GITHUB_SHA||'')?env.GITHUB_SHA:null};
+}
 /** Apply explicit human scores to a saved report. This is pure offline work. */
 export function applyHumanScorecard(report,scorecard){
  if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
  if(!scorecard||typeof scorecard!=='object'||Array.isArray(scorecard)||
    !Array.isArray(scorecard.scores))throw Error('Scorecard must contain a scores array.');
+ if(scorecard.evaluationIdentity&&JSON.stringify(scorecard.evaluationIdentity)!==
+    JSON.stringify(scorecardEvaluationIdentity(report)))
+  throw Error('Scorecard evaluation identity does not match this report.');
  const cases=report.cases.map(item=>({...item}));
  const applied=new Set();
  for(const [index,row] of scorecard.scores.entries()){
   if(!row||typeof row!=='object'||Array.isArray(row)||typeof row.caseId!=='string'||!row.caseId.trim())
    throw Error('Scorecard row '+(index+1)+' needs a caseId.');
   if(!row.answer&&!row.highlights)throw Error('Scorecard row '+(index+1)+' needs answer and/or highlights scores.');
-  const matches=cases.filter(item=>String(item.id)===row.caseId);
+  const matches=cases.filter(item=>String(item.id)===row.caseId&&
+   (row.attemptNumber===undefined||item.attemptNumber===row.attemptNumber));
   if(matches.length!==1)throw Error('Scorecard caseId is unknown or ambiguous: '+row.caseId);
   const target=matches[0];
   const variantsContainer=target.answerVariantComparison||target.reviewAblation;
@@ -941,12 +984,13 @@ export function applyHumanScorecard(report,scorecard){
    const updated={...variantsContainer,variants:variants.map((variant,i)=>i===variantIndex?scoredTarget:variant)};
    if(target.answerVariantComparison)target.answerVariantComparison=updated;
    if(target.reviewAblation)target.reviewAblation=updated;
-  }else if(row.answerVariant||row.selectionVariant){
-   throw Error('Scorecard row '+(index+1)+' selects a variant, but the case has none.');
+  }else if((row.answerVariant&&row.answerVariant!==target.answerVariant)||
+    (row.selectionVariant&&row.selectionVariant!==target.selectionVariant)){
+   throw Error('Scorecard row '+(index+1)+' does not match the case answer/selection variant.');
   }
   for(const kind of ['answer','highlights']){
    if(row[kind]===undefined)continue;
-   const key=JSON.stringify([row.caseId,row.answerVariant||'',row.selectionVariant||'',kind]);
+   const key=JSON.stringify([row.caseId,row.attemptNumber??'',row.answerVariant||'',row.selectionVariant||'',kind]);
    if(applied.has(key))throw Error('Duplicate scorecard scores for '+row.caseId+' '+kind+'.');
    applied.add(key);
    scoredTarget[kind==='answer'?'manualReview':'highlightHumanReview']=
@@ -1604,6 +1648,7 @@ async function main(){
  const reportCaseCount=args.mode==='paired'?cases.length*2:cases.length;
  const conditionalGapPlannerCallAllowance=args.mode==='planner'?0:reportCaseCount;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
+  evaluationRun:evaluationRunContext(),
   answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,
   retrievalConfig:{...RETRIEVAL_PROFILES[args.retrievalProfile]},caseCount:reportCaseCount,pairedQuestionCount:args.mode==='paired'?cases.length:undefined,
   repeatCount:args.repeatCount>1?args.repeatCount:undefined,
@@ -1624,7 +1669,12 @@ async function main(){
  const saveReport=async()=>{
   if(activeLibrary&&report.reproducibility?.corpus)
    report.reproducibility.corpus.indexFiles=Object.fromEntries(activeLibrary.contentDigests);
-  if(outputPath)await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');
+  if(outputPath){
+   await writeFile(outputPath,JSON.stringify(report,null,2)+'\n');
+   const scorecardPath=/\.json$/i.test(outputPath)?outputPath.replace(/\.json$/i,'.scorecard.json'):
+    outputPath+'.scorecard.json';
+   await writeFile(scorecardPath,JSON.stringify(createHumanScorecardTemplate(report),null,2)+'\n');
+  }
  };
  await saveReport();
  console.log('Initializing '+args.mode+' evaluation for '+(args.repeatCount>1?
