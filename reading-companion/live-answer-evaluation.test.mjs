@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditSelectionHandoff,recheckQualityReport,applyHumanScorecard,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -1003,6 +1003,58 @@ test('selection handoff audit ignores explicit abstention and unavailable legacy
    evidence:[{candidateId:'C1',support:'direct'}]}]},selected:[{candidateId:'C1'}]}]});
  assert.equal(oldSelectedTrace.status,'unavailable');
  assert.equal(oldSelectedTrace.reason,'selection-part-links-not-recorded');
+});
+
+test('evidence continuity audit separates selector, composer, review, and final-answer dropoff by part',()=>{
+ const composePayload={parts:[
+  {partId:'P1',candidateSourceIds:['S1'],answerMode:'source-and-context'},
+  {partId:'P2',candidateSourceIds:[],answerMode:'general-context'}
+ ],evidence:[{id:'S1',selectionSupport:[{partId:'P1',support:'direct'}]}]};
+ const trace={plan:{parts:[
+  {id:'P1',question:'How does the view change?',candidateSourceIds:['S1']},
+  {id:'P2',question:'What role do first impressions play?',candidateSourceIds:[]}
+ ]},stages:[
+  {stage:'evidence-selection',status:'selected',decision:{parts:[
+   {partId:'P1',candidateIds:['C1'],coverage:'supported'},
+   {partId:'P2',candidateIds:[],coverage:'none'}
+  ]},selected:[{id:'S1',candidateId:'C1',candidatePartIds:['P1']}]},
+  {stage:'compose',messages:[{role:'user',content:JSON.stringify(composePayload)}]},
+  {stage:'review',elapsedMs:28000,payloadMetrics:{partCount:2,claimCount:11,sourceCount:1,
+   spanCount:16,spanReferenceCount:16,serializedCharacters:7800}}
+ ],reviewContract:{reviewDecisions:[{partId:'P1',claimId:'P1-C2',claimStatus:'partial',accepted:false}],
+  partDecisions:[{partId:'P1',outputStatus:'partial',outputAnswerStatus:'partial'}]},
+  final:{questionParts:[
+   {part:'How does the view change?',answerStatus:'partial',evidenceIds:[]},
+   {part:'What role do first impressions play?',answerStatus:'answered',evidenceIds:[]}
+  ]}};
+ const audit=auditEvidenceContinuity(trace);
+ assert.equal(audit.status,'available');
+ assert.deepEqual(audit.parts.map(part=>part.continuity),[
+  'review-left-source-evidence-partial','general-context-answer'
+ ]);
+ assert.deepEqual(audit.parts[0].selectedSourceIds,['S1']);
+ assert.deepEqual(audit.parts[0].composerEvidenceIds,['S1']);
+ assert.equal(audit.parts[0].reviewedClaimCount,1);
+ assert.equal(audit.parts[0].partialClaimCount,1);
+ assert.equal(audit.reviewWorkload.elapsedMs,28000);
+ assert.equal(audit.reviewWorkload.payloadMetrics.serializedCharacters,7800);
+ const summary=summarizeEvidenceContinuity([{evidenceContinuityAudit:audit}]);
+ assert.deepEqual(summary.continuityStatusCounts,{
+  'review-left-source-evidence-partial':1,'general-context-answer':1
+ });
+ assert.equal(summary.reviewWorkload.averageClaimCount,11);
+});
+
+test('evidence continuity audit preserves timeout workload metrics when review fails',()=>{
+ const audit=auditEvidenceContinuity({plan:{parts:[{id:'P1',question:'What does the source say?'}]},
+  stages:[{stage:'compose',messages:[{role:'user',content:JSON.stringify({
+    parts:[{partId:'P1',candidateSourceIds:['S1']}],evidence:[{id:'S1'}]})}]},
+   {stage:'review',elapsedMs:60000,status:'failed',failureCode:'inference-deadline-exceeded',
+   payloadMetrics:{partCount:1,claimCount:22,sourceCount:5,spanCount:49,spanReferenceCount:80,
+    serializedCharacters:23811}}]});
+ assert.equal(audit.parts[0].continuity,'review-timed-out');
+ assert.equal(audit.reviewWorkload.failureCode,'inference-deadline-exceeded');
+ assert.equal(summarizeEvidenceContinuity([{evidenceContinuityAudit:audit}]).reviewWorkload.timeoutCases,1);
 });
 
 test('selection handoff audit validates deterministic part-recovery links separately from selector decisions',()=>{
