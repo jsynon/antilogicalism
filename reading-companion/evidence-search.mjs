@@ -485,16 +485,20 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   const partIds=new Set(linkedParts.map(part=>part.partId));
   const linkedFacets=new Set(partFacetIndices.filter(item=>partIds.has(item.partId))
    .map(item=>item.facet));
-  // A source hit is not enough to suppress recovery when its preview contains
-  // only incidental shared words. Use the question part's own lexical facet
-  // as a retrieval signal; semantic selection and review still decide support.
-  return [...linkedFacets].some(facet=>(searchSets[facet]?.sources||[])
-   .some(source=>ids.includes(String(source.bookId))&&linkedParts.some(part=>{
-    const text=source.preview||source.excerpt||source.text||'';
-    const terms=facetTerms(part.question);
-    const required=Math.min(1,terms.length);
-    return required===0||localFacetTextMatch(part.question,text).overlap>=required;
-   })));
+  // Suppress a scoped retry only when the candidate set reaches the same
+  // coherent-term threshold used by the later coverage check. One incidental
+  // shared word is not enough to count a named source group as retrieved.
+  // This remains a lexical retrieval signal, never a support verdict.
+  return [...linkedFacets].some(facet=>{
+   const candidates=(searchSets[facet]?.sources||[])
+    .filter(source=>ids.includes(String(source.bookId)));
+   return linkedParts.some(part=>{
+    const partCandidates=candidates.filter(source=>
+     !Array.isArray(part.sourceBookIds)||part.sourceBookIds.map(String).includes(String(source.bookId)));
+    return partCandidates.length>0&&
+     !assessEvidenceCoverage(partCandidates,part.question,[part]).weakParts.length;
+   });
+  });
  };
  for(const group of sourceGroups.filter(item=>['primary','subject'].includes(item.role)).slice(0,4)){
   const ids=[...new Set(group.bookIds.map(String).filter(id=>allowedBookIds.has(id)))];
@@ -503,10 +507,13 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   if(!ids.length||groupHasLinkedCandidate(ids,linkedParts))continue;
   const weakLinkedParts=linkedParts.filter(part=>{
    const facets=new Set(partFacetIndices.filter(item=>item.partId===part.partId).map(item=>item.facet));
-   return ![...facets].some(facet=>(searchSets[facet]?.sources||[]).some(source=>
-    ids.includes(String(source.bookId))&&localFacetTextMatch(part.question,
-      source.preview||source.excerpt||source.text||'').overlap>=
-        Math.min(1,facetTerms(part.question).length)));
+   return ![...facets].some(facet=>{
+    const candidates=(searchSets[facet]?.sources||[]).filter(source=>
+     ids.includes(String(source.bookId))&&(!Array.isArray(part.sourceBookIds)||
+      part.sourceBookIds.map(String).includes(String(source.bookId))));
+    return candidates.length>0&&
+     !assessEvidenceCoverage(candidates,part.question,[part]).weakParts.length;
+   });
   });
   const preferred=weakLinkedParts.map(part=>part.question).filter(value=>
     typeof value==='string'&&value.trim().length>=5);

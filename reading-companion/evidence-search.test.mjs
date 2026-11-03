@@ -353,7 +353,10 @@ test('missing named groups receive one bounded retry inside their catalog book I
   }
   const book=books.find(value=>value.id===id);
   if(!book)return {sources:[]};
-  return {sources:[{bookId:id,title:book.title,page:7,globalPageId:id+':7',score:30,preview:'Causality and explanation in the source.'}]};
+  const preview=id==='4'?'Aristotle explains causality through material, formal, efficient, and final causes.':
+   id==='35'?'Hume explains causal necessity through constant conjunction and custom.':
+    'Kant explains causality as an a priori category of understanding.';
+  return {sources:[{bookId:id,title:book.title,page:7,globalPageId:id+':7',score:30,preview}]};
  }};
  const groups=books.map(book=>({label:book.title.split(' — ')[1],role:'primary',bookIds:[book.id]}));
  const parts=groups.map((group,index)=>({partId:'P'+(index+1),question:'How does '+group.label+' understand causality?',sourceBookIds:group.bookIds}));
@@ -361,7 +364,10 @@ test('missing named groups receive one bounded retry inside their catalog book I
   queries:['Aristotle causality explanation','Hume causality custom conjunction','Kant causality a priori'],
   partQueries:parts.map(part=>({partId:part.partId,query:part.question})),partQuestions:parts,
   sourceGroups:groups,library,books,allowedBookIds,maxCandidates:12,maxBooks:3,pagesPerBook:2,
-  pageLoader:async source=>({text:'Causality and explanation in the source.'})});
+  pageLoader:async source=>({text:source.bookId==='4'?
+   'Aristotle explains causality through material, formal, efficient, and final causes.':
+   source.bookId==='35'?'Hume explains causal necessity through constant conjunction and custom.':
+   'Kant explains causality as an a priori category of understanding.'})});
  const retries=calls.filter(call=>call.groupRecovery);
  assert.equal(retries.length,1,'only the missing source group receives one scoped retry');
  assert.ok(retries.some(call=>call.ids[0]==='40'));
@@ -395,6 +401,32 @@ test('a weak incidental named-source hit gets one bounded retry using the part w
  assert.ok(result.candidates.some(source=>source.page===131&&source.candidatePartIds.includes('P1')));
  assert.ok(result.searches.some(search=>search.groupScopeRecoveryReason==='weak-linked-source-match'));
  assert.ok(result.candidates.length<=32,'bounded source recovery stays inside the existing candidate cap');
+});
+test('one shared keyword does not satisfy named-source retrieval coverage',async()=>{
+ const books=[{id:'454',title:'The Souls of Black Folk — W. E. B. Du Bois'}];
+ const question='How does Du Bois connect literacy, education, and political freedom?';
+ const planned='Du Bois literacy education political freedom';
+ const calls=[];
+ const library={search:async(query,options={})=>{
+  calls.push({query,bookId:String(options.bookId||''),allowed:[...(options.allowedBookIds||[])]});
+  if(query===planned)return {sources:[{bookId:'454',title:books[0].title,page:8,
+   globalPageId:100008,score:90,preview:'Freedom is an important ideal.'}]};
+  if(query===question)return {sources:[{bookId:'454',title:books[0].title,page:131,
+   globalPageId:100131,score:58,preview:'Literacy and education gave people tools to contest political barriers and pursue freedom.'}]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question,queries:[planned,'Du Bois education and political barriers'],
+  partQueries:[{partId:'P1',query:planned}],
+  partQuestions:[{partId:'P1',question,sourceBookIds:['454']}],
+  sourceGroups:[{label:'W. E. B. Du Bois',role:'primary',bookIds:['454']}],
+  library,books,allowedBookIds:new Set(['454']),pageLoader:async source=>({text:
+   source.page===131?'Literacy and education gave people tools to contest political barriers and pursue freedom.':
+    'Freedom is an important ideal.'})});
+ assert.equal(calls.filter(call=>call.query===question&&call.allowed.includes('454')).length,2,
+  'the original global facet and one source-scoped recovery should both run');
+ assert.ok(result.candidates.some(source=>source.page===131&&source.candidatePartIds.includes('P1')));
+ assert.ok(result.searches.some(search=>search.groupScopeRecoveryReason==='weak-linked-source-match'));
+ assert.ok(result.candidates.length<=32);
 });
 test('an empty comparison-side facet retries with the other side’s topic inside the missing source scope',async()=>{
  const question='What would Nietzsche think about the thought of Kierkegaard?';
