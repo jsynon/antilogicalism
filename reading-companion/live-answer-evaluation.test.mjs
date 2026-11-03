@@ -409,17 +409,58 @@ test('audit requires expected-source coverage and citations with no orphan marke
 
 test('citation highlight coverage is reported separately from structural answer validity',()=>{
  const citation={id:'S1',bookId:'529',title:'On the Origin of Species',page:18};
- const without=auditLiveAnswer({coverage:'full',answer:'A supported claim [S1].',citations:[citation]},
+ const without=auditLiveAnswer({coverage:'full',answerCompleteness:'full',answer:'A supported claim [S1].',citations:[citation]},
   [{bookId:'529',page:18}],[]);
  assert.equal(without.structuralPassed,true);
  assert.deepEqual(without.citationHighlightAudit,{citedSourceCount:1,highlightedSourceCount:0,
   citedSourcesWithoutLocatedHighlight:['S1']});
- const withHighlight=auditLiveAnswer({coverage:'full',answer:'A supported claim [S1].',citations:[citation],
+ const withHighlight=auditLiveAnswer({coverage:'full',answerCompleteness:'full',answer:'A supported claim [S1].',citations:[citation],
   evidenceHighlights:[{source_id:'S1',page:18,quote:'Exact passage text.',quoteLocated:true}]},
   [{bookId:'529',page:18}],[]);
  assert.deepEqual(withHighlight.citationHighlightAudit,{citedSourceCount:1,highlightedSourceCount:1,
   citedSourcesWithoutLocatedHighlight:[]});
  assert.equal(withHighlight.structuralPassed,true);
+});
+
+test('evidence coverage alone does not establish answer completeness',()=>{
+ const result=auditLiveAnswer({coverage:'full',answer:'A source-supported point [S1].',
+  citations:[{id:'S1',bookId:'529'}],
+  questionParts:[{part:'The requested explanation',status:'supported',evidenceIds:['S1']}],
+  evidenceMap:[{id:'S1',partId:'P1',point:'A source-supported point.'}]},
+  [{bookId:'529'}],[]);
+ assert.equal(result.coverage,'full');
+ assert.equal(result.answerCompleteness,'unknown');
+ assert.equal(result.questionPartAnswerCompleteness.unknown,1);
+ assert.equal(result.answerCompletenessConsistent,null);
+ assert.equal(result.evidenceCoverageConsistent,true);
+});
+
+test('full answer completeness requires each requested part to be marked answered',()=>{
+ const result=auditLiveAnswer({coverage:'full',answerCompleteness:'full',
+  answer:'A complete answer with both requested points [S1].',citations:[{id:'S1',bookId:'529'}],
+  questionParts:[
+   {part:'First requested point',status:'supported',answerStatus:'answered',evidenceIds:['S1']},
+   {part:'Second requested point',status:'supported',answerStatus:'partial',evidenceIds:['S1']}
+  ],evidenceMap:[{id:'S1',partId:'P1',point:'First requested point.'}]},
+  [{bookId:'529'}],[]);
+ assert.equal(result.questionPartAnswerCompleteness.answered,1);
+ assert.equal(result.questionPartAnswerCompleteness.partial,1);
+ assert.equal(result.answerCoverageConsistent,true,'evidence coverage remains independent');
+ assert.equal(result.answerCompletenessConsistent,false,'the full label conflicts with a partial requested part');
+ assert.equal(result.structuralPassed,true,'structural success does not certify answer completeness');
+});
+
+test('highlight trace reports located quote coverage across answer parts',()=>{
+ const result=auditLiveAnswer({coverage:'full',answerCompleteness:'full',
+  answer:'The first and second points are supported [S1].',citations:[{id:'S1',bookId:'529'}],
+  questionParts:[
+   {part:'First point',status:'supported',answerStatus:'answered',evidenceIds:['S1']},
+   {part:'Second point',status:'supported',answerStatus:'answered',evidenceIds:['S1']}
+  ],evidenceHighlights:[{source_id:'S1',page:18,quote:'First passage text.',quoteLocated:true,
+   quotes:[{part_id:'P1',point:'First point.',quote:'First passage text.',quoteLocated:true}]}]},
+  [{bookId:'529',page:18}],[]);
+ assert.deepEqual(result.highlightPartCoverage,{total:2,withLocatedHighlight:1,
+  withoutLocatedHighlight:[{part:'Second point',partId:'P2'}]});
 });
 
 test('highlight relevance audit links excerpt to its claim wording within the cited source without scoring support',()=>{
@@ -723,6 +764,11 @@ test('offline report recheck preserves an explicit source-free general-context a
  assert.equal(checked.offlineRecheck.passedCases,1);
  assert.equal(checked.cases[0].passed,true);
  assert.equal(checked.cases[0].offlineRecheck.passed,true);
+ assert.equal(checked.cases[0].offlineRecheck.answerCompleteness,'unknown',
+  'legacy evidence coverage is not promoted to an answer-completeness judgment');
+ assert.equal(checked.offlineRecheck.answerCompletenessCounts.unknown,1);
+ assert.deepEqual(checked.cases[0].offlineRecheck.highlightPartCoverage.withoutLocatedHighlight,
+  [{part:'Whether we are living in a simulation',partId:'P1'}]);
  assert.equal(checked.cases[0].offlineRecheck.partEvidenceAudit[0].evidenceApplicability,'not-applicable');
  assert.equal(checked.cases[0].offlineRecheck.partEvidenceAudit[0].structurallyComplete,null);
 });

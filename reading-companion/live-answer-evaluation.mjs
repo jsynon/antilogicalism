@@ -630,9 +630,8 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const workerSourceRevision=typeof data?.workerSourceRevision==='string'&&/^[a-f0-9]{40}$/i.test(data.workerSourceRevision)?data.workerSourceRevision.toLowerCase():null;
  const answer=String(data?.answer||'');
  const coverage=String(data?.coverage||'');
- const answerCompleteness=typeof data?.answerCompleteness==='string'?
-  data.answerCompleteness:
-  (coverage==='full'?'full':coverage==='none'?'none':'partial');
+ const answerCompleteness=['full','partial','none'].includes(data?.answerCompleteness)?
+  data.answerCompleteness:'unknown';
  const citationIds=new Set(citations.map(source=>String(source?.id||'')));
  const citationAudit=auditCitationIds(answer,citations);
  const inline=citationAudit.inlineIds;
@@ -646,7 +645,8 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  // library source groups. This keeps evidence-free answers distinct from
  // missing or failed source review.
  const generalContextOnly=outcome==='general-context-answer'&&
-  reviewStatus==='general-context-review'&&answerCompleteness==='full'&&
+  reviewStatus==='general-context-review'&&
+  (answerCompleteness==='full'||(answerCompleteness==='unknown'&&coverage==='full'))&&
   citations.length===0&&inline.length===0&&missingInline.length===0&&
   requiredGroups.length===0&&requiredPartSources.length===0;
  const citationBookIds=[...new Set(citations.map(source=>String(source?.bookId||'')))];
@@ -779,16 +779,32 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const citationHighlightAudit={citedSourceCount:citedSourceIds.length,
   highlightedSourceCount:citedSourceIds.filter(id=>highlightedSourceIds.has(id)).length,
   citedSourcesWithoutLocatedHighlight:citedSourceIds.filter(id=>!highlightedSourceIds.has(id))};
+ const locatedHighlightPartIds=new Set(evidenceHighlights.flatMap(item=>item.quotes)
+  .filter(item=>item.quoteLocated===true&&/^P[1-4]$/.test(item.partId))
+  .map(item=>item.partId));
+ const highlightPartCoverage={total:questionParts.length,
+  withLocatedHighlight:questionParts.filter((_part,index)=>locatedHighlightPartIds.has('P'+(index+1))).length,
+  withoutLocatedHighlight:questionParts.map((part,index)=>({part:String(part?.part||''),partId:'P'+(index+1)}))
+   .filter(item=>!locatedHighlightPartIds.has(item.partId))};
  const highlightRelevance=highlightRelevanceAudit(answer,citations,evidenceHighlights);
- const partStatusesConsistent=questionParts.length===0?null:
-  generalContextOnly?questionParts.every(part=>part?.answerStatus==='answered'||
-   (!part?.answerStatus&&part?.status==='supported')):
+ const evidencePartsConsistent=questionParts.length===0?null:
   coverage==='full'?questionParts.every(part=>part?.status==='supported'):
-   coverage==='partial'?questionParts.some(part=>part?.status!=='supported'):false;
+   coverage==='partial'?questionParts.some(part=>part?.status!=='supported'):
+    coverage==='none'?questionParts.every(part=>part?.status==='unsupported'):false;
+ const answerPartsConsistent=questionParts.length===0||answerCompleteness==='unknown'?null:
+  answerCompleteness==='full'?questionParts.every(part=>part?.answerStatus==='answered'):
+   answerCompleteness==='partial'?questionParts.some(part=>
+    ['partial','unanswered'].includes(part?.answerStatus)):
+    answerCompleteness==='none'?questionParts.every(part=>part?.answerStatus==='unanswered'):false;
+ const partStatusesConsistent=questionParts.length===0?null:
+  generalContextOnly?answerPartsConsistent!==false:
+  evidencePartsConsistent;
  const proseContradictions=questionParts.filter(part=>answerDeniesSupportedComparison(part,answer))
   .map(part=>String(part?.part||''));
  const answerCoverageConsistent=questionParts.length===0?null:
-  partStatusesConsistent&&!proseContradictions.length;
+  partStatusesConsistent===null?null:partStatusesConsistent&&!proseContradictions.length;
+ const answerCompletenessConsistent=questionParts.length===0||answerPartsConsistent===null?null:
+  answerPartsConsistent;
  const partEvidenceComplete=questionParts.length===0?null:
   partEvidenceAudit.every(part=>part.structurallyComplete!==false);
  const reviewerLabels=summarizeCaseReviewerLabels(data);
@@ -804,7 +820,9 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  // score the excerpts and their claim links rather than the generated answer.
  const highlightHumanReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
   accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
- const structuralPassed=answerCompleteness==='full'&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
+ const completenessContractSatisfied=answerCompleteness==='full'||
+  (answerCompleteness==='unknown'&&coverage==='full');
+ const structuralPassed=(completenessContractSatisfied||generalContextOnly)&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
   missingInline.length===0&&(citations.length>0||generalContextOnly)&&answerCoverageConsistent!==false&&partEvidenceComplete!==false&&
   sourcePartAlignment.every(item=>item.aligned)&&reviewerLabels.contractStatus!=='incomplete'&&
   !failureCode&&reviewStatus!=='pipeline-failed'&&
@@ -820,8 +838,9 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   selectionHandoffAudit,evidenceContinuityAudit,
   evidenceApplicability:generalContextOnly?'not-applicable':'required',
   sourcePartAlignment,
-  answerCoverageConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
-  evidenceHighlightCount:highlights.length,evidenceHighlights,citationHighlightAudit,
+  answerCoverageConsistent,evidenceCoverageConsistent:answerCoverageConsistent,
+  answerCompletenessConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
+  evidenceHighlightCount:highlights.length,evidenceHighlights,citationHighlightAudit,highlightPartCoverage,
   highlightRelevance,
   manualReview,highlightHumanReview,structuralPassed,
   answerQualityStatus:'pending-human-review',answerQualityPass:null,
@@ -1155,9 +1174,11 @@ export function recheckQualityReport(report){
    evidenceContinuityAudit:audit.evidenceContinuityAudit,
    reviewWorkload:audit.evidenceContinuityAudit.reviewWorkload,
    answerCoverageConsistent:audit.answerCoverageConsistent,
+   answerCompletenessConsistent:audit.answerCompletenessConsistent,
    coverageContradictions:audit.coverageContradictions,
    inlineIdsWithoutSource:audit.inlineIdsWithoutSource,
    citationHighlightAudit:audit.citationHighlightAudit,
+   highlightPartCoverage:audit.highlightPartCoverage,
    highlightRelevance:audit.highlightRelevance,
    highlightHumanReview:audit.highlightHumanReview}};
  });
@@ -1180,9 +1201,10 @@ export function recheckQualityReport(report){
    const status=item.offlineRecheck.answerCompleteness;
    if(status==='full')totals.full++;
    else if(status==='partial')totals.partial++;
-   else totals.none++;
+   else if(status==='none')totals.none++;
+   else totals.unknown++;
    return totals;
-  },{full:0,partial:0,none:0})}};
+  },{full:0,partial:0,none:0,unknown:0})}};
 }
 function safeHeaders(token){return {authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json',origin:'https://jsynon.github.io'};}
 function attachRequestFailure(error,stage,details={}){
