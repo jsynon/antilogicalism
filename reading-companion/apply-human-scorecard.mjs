@@ -30,6 +30,14 @@ async function main(){
   '/10; completion-adjusted: '+String(scored.humanReview?.completionAdjustedTotalScoreOutOf10??'pending')+
   '/10. Highlights: '+String(scored.highlightReview?.averageTotalScoreOutOf10??'pending')+
   '/10; completion-adjusted: '+String(scored.highlightReview?.completionAdjustedTotalScoreOutOf10??'pending')+'/10.');
+ for(const group of scored.qualityByFailureStage||[]){
+  const answer=group.answer||{},highlights=group.highlights||{};
+  console.log('Stage '+group.stage+' ('+group.basis+', n='+group.caseCount+'): answers '+
+   String(answer.producedOnlyAverageOutOf10??'pending')+'/10 produced, '+
+   String(answer.completionAdjustedAverageOutOf10??'pending')+'/10 adjusted; highlights '+
+   String(highlights.producedOnlyAverageOutOf10??'pending')+'/10 produced, '+
+   String(highlights.completionAdjustedAverageOutOf10??'pending')+'/10 adjusted.');
+ }
 }
 
 main().catch(error=>{console.error(error.message);process.exitCode=1;});

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -582,6 +582,30 @@ test('pipeline failure summary keeps provider failures separate by stage and cod
  ]);
 });
 
+test('human quality score summaries group answer and highlight scores by explicit or inferred trace stage',()=>{
+ const score=total=>{let remaining=total;return {status:'complete',scores:Object.fromEntries(
+  ['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness']
+   .map(key=>{const value=Math.min(2,remaining);remaining-=value;return [key,value];}))};};
+ const groups=summarizeQualityByFailureStage([
+  {id:'review-timeout',answerText:'A usable draft.',failureStage:'review',
+   manualReview:score(6),highlightHumanReview:score(5)},
+  {id:'retrieval-failed',answerText:'',noAnswerFailure:true,failureStage:'retrieval'},
+  {id:'weak-evidence',answerText:'A partial answer.',answerCompleteness:'partial',
+   evidenceApplicability:'required',partEvidenceAudit:[{status:'partial',structurallyComplete:false}],
+   manualReview:score(4),highlightHumanReview:score(3)}
+ ]);
+ const byStage=Object.fromEntries(groups.map(group=>[group.stage,group]));
+ assert.equal(byStage.review.basis,'explicit-trace');
+ assert.equal(byStage.review.answer.producedOnlyAverageOutOf10,6);
+ assert.equal(byStage.review.highlights.producedOnlyAverageOutOf10,5);
+ assert.equal(byStage.retrieval.answer.produced,0);
+ assert.equal(byStage.retrieval.answer.completionAdjustedAverageOutOf10,0);
+ assert.equal(byStage.retrieval.highlights.completionAdjustedAverageOutOf10,0);
+ assert.equal(byStage['evidence-alignment'].basis,'part-evidence-audit');
+ assert.equal(byStage['evidence-alignment'].answer.producedOnlyAverageOutOf10,4);
+ assert.equal(byStage['evidence-alignment'].highlights.producedOnlyAverageOutOf10,3);
+});
+
 test('reviewer summary separates final-answer support failures from rejected draft claims',()=>{
  const cases=[
   {id:'direct-answer-gap',answerText:'The answer gives a related idea but not the requested explanation.',
@@ -814,6 +838,8 @@ test('offline scorecard applies separate answer and highlight scores to a named 
  assert.equal(checked.highlightReview.reviewed,1);
  assert.equal(checked.humanReview.averageScores.accuracy,2);
  assert.equal(checked.highlightReview.averageScores.accuracy,1);
+ assert.equal(checked.qualityByFailureStage[0].answer.producedOnlyAverageOutOf10,8);
+ assert.equal(checked.qualityByFailureStage[0].highlights.producedOnlyAverageOutOf10,7);
  assert.equal(checked.offlineRecheck,undefined,'scorecard ingestion does not fabricate a structural recheck');
 });
 

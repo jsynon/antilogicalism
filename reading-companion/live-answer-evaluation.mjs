@@ -925,6 +925,66 @@ function scorecardEvaluationIdentity(report){
   workerSourceRevisions:revisions,cases};
 }
 function emptyManualScores(){return Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,null]));}
+function scoredTotal(review){
+ if(review?.status!=='complete'||!review.scores||
+   !MANUAL_REVIEW_DIMENSIONS.every(key=>Number.isInteger(review.scores[key])&&
+    review.scores[key]>=0&&review.scores[key]<=2))return null;
+ return MANUAL_REVIEW_DIMENSIONS.reduce((sum,key)=>sum+review.scores[key],0);
+}
+function qualityFailureStage(item){
+ const explicitStage=String(item?.failureStage||item?.requestFailure?.stage||'').trim();
+ if(explicitStage)return {stage:explicitStage,basis:'explicit-trace'};
+ if(item?.selectionHandoffAudit?.status==='mismatch')
+  return {stage:'evidence-selection-handoff',basis:'selection-handoff-audit'};
+ if(item?.evidenceApplicability!=='not-applicable'&&Array.isArray(item?.partEvidenceAudit)&&
+   item.partEvidenceAudit.some(part=>part?.status==='partial'||part?.status==='unsupported'||
+    part?.structurallyComplete===false))
+  return {stage:'evidence-alignment',basis:'part-evidence-audit'};
+ if(item?.noAnswerFailure===true||!String(item?.answerText||'').trim())
+  return {stage:'unclassified-no-answer',basis:'no-answer-without-stage'};
+ if(item?.answerCompleteness&&item.answerCompleteness!=='full')
+  return {stage:'unlocalized-answer-gap',basis:'answer-completeness'};
+ return {stage:'no-recorded-failure',basis:'no-stage-failure-in-trace'};
+}
+/** Summarize human scores alongside explicit or inferred trace failure stages.
+ * This is descriptive correlation, not evidence that a stage caused a score. */
+export function summarizeQualityByFailureStage(cases){
+ const groups=new Map();
+ const entries=(cases||[]).flatMap(item=>{
+  const variants=item?.answerVariantComparison||item?.reviewAblation;
+  return Array.isArray(variants?.variants)?variants.variants.map(variant=>({...item,...variant,id:item.id})):[item];
+ });
+ for(const item of entries){
+  const classification=qualityFailureStage(item);
+  const key=classification.stage+'|'+classification.basis;
+  const group=groups.get(key)||{stage:classification.stage,basis:classification.basis,
+   caseCount:0,noAnswerFailures:0,answerProducedScores:[],answerAdjustedScores:[],
+   highlightProducedScores:[],highlightAdjustedScores:[],answerPending:0,highlightPending:0};
+  group.caseCount++;
+  const noAnswer=item?.noAnswerFailure===true||!String(item?.answerText||'').trim();
+  if(noAnswer)group.noAnswerFailures++;
+  const answerScore=noAnswer?0:scoredTotal(item?.manualReview);
+  const highlightScore=noAnswer?0:scoredTotal(item?.highlightHumanReview);
+  if(answerScore===null)group.answerPending++;
+  else{group.answerAdjustedScores.push(answerScore);if(!noAnswer)group.answerProducedScores.push(answerScore);}
+  if(highlightScore===null)group.highlightPending++;
+  else{group.highlightAdjustedScores.push(highlightScore);if(!noAnswer)group.highlightProducedScores.push(highlightScore);}
+  groups.set(key,group);
+ }
+ const summarize=(group,producedScores,adjustedScores,pending)=>{
+  const produced=group.caseCount-group.noAnswerFailures;
+  const mean=values=>values.length?Number((values.reduce((sum,value)=>sum+value,0)/values.length).toFixed(2)):null;
+  return {scored:producedScores.length,produced,
+   producedOnlyAverageOutOf10:produced>0&&pending===0?mean(producedScores):null,
+   completionAdjustedAverageOutOf10:pending===0?mean(adjustedScores):null};
+ };
+ return [...groups.values()].map(group=>{
+  const {answerProducedScores,answerAdjustedScores,highlightProducedScores,highlightAdjustedScores,
+   answerPending,highlightPending,...summary}=group;
+  return {...summary,answer:summarize(group,answerProducedScores,answerAdjustedScores,answerPending),
+   highlights:summarize(group,highlightProducedScores,highlightAdjustedScores,highlightPending)};
+ }).sort((left,right)=>right.caseCount-left.caseCount||left.stage.localeCompare(right.stage));
+}
 /** Create a blank answer/highlight scorecard bound to this exact saved evaluation. */
 export function createHumanScorecardTemplate(report){
  if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
@@ -999,6 +1059,7 @@ export function applyHumanScorecard(report,scorecard){
  }
  return {...report,cases,humanReview:summarizeManualReviews(cases),
   highlightReview:summarizeHighlightReviews(cases),
+  qualityByFailureStage:summarizeQualityByFailureStage(cases),
   answerVariants:summarizeAnswerVariants(cases),selectionVariants:summarizeSelectionVariants(cases)};
 }
 export function summarizeAnswerVariants(cases){
