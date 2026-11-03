@@ -1288,6 +1288,44 @@ test('plan identities are checked against the catalog and redundant comparison w
  assert.deepEqual(plan.parts.map(part=>part.sourceBookIds),[['4','9'],['529','530'],['4','9','529','530']]);
 });
 
+test('an unmentioned but catalog-valid planner source does not become an exclusive search scope',()=>{
+ const question='How have writers described the effects of technological change on daily life?';
+ const catalog={'400':'Paris Agreement — United Nations Framework Convention on Climate Change'};
+ const plan=normalizePlan({intent:'explain',sources:[
+  {label:'United Nations Framework Convention on Climate Change',role:'primary',bookIds:['400']}
+ ],parts:[{question:'What does the United Nations Framework Convention on Climate Change say about technology?'}],
+ queries:['United Nations Framework Convention on Climate Change technology']},question,catalog);
+ assert.deepEqual(plan.sources[0].bookIds,['400']);
+ assert.equal(plan.parts[0].sourceBookIds,null);
+});
+
+test('an explicitly selected book stays scoped and named work in collected volume remains retrievable',()=>{
+ const collection={'212':'The Complete Works of William Shakespeare — William Shakespeare'};
+ const selected=normalizePlan({intent:'explain',sources:[],parts:['What does this book say?']},
+  'What does this book say?',collection,'212');
+ assert.deepEqual(selected.parts[0].sourceBookIds,['212']);
+ const question='In Hamlet’s “To be, or not to be” soliloquy, what does he mean by conscience?';
+ const namedWork=normalizePlan({intent:'interpret',sources:[
+  {label:'William Shakespeare',role:'primary',bookIds:['212']}
+ ],parts:['What does Hamlet mean by conscience in this soliloquy?']},question,collection);
+ assert.deepEqual(namedWork.parts[0].sourceBookIds,['212']);
+});
+test('a comparison synthesis keeps only explicitly named catalog sources',()=>{
+ const question='How do Hume and Kant differ over causal necessity?';
+ const catalog={
+  '35':'An Enquiry Concerning Human Understanding — David Hume',
+  '40':'Critique of Pure Reason — Immanuel Kant',
+  '400':'Paris Agreement — United Nations Framework Convention on Climate Change'
+ };
+ const plan=normalizePlan({intent:'compare',sources:[
+  {label:'David Hume',role:'primary',bookIds:['35']},
+  {label:'Immanuel Kant',role:'primary',bookIds:['40']},
+  {label:'United Nations Framework Convention on Climate Change',role:'primary',bookIds:['400']}
+ ],parts:['How does Hume explain causal necessity?','How does Kant explain causal necessity?',
+  'How do the accounts compare?']},question,catalog);
+ assert.deepEqual(plan.parts.map(part=>part.sourceBookIds),[['35'],['40'],['35','40']]);
+});
+
 test('catalog fallback preserves all unambiguous named authors when planning is unavailable',()=>{
  const question='How do Augustine, Aquinas, and Kant differ on moral responsibility?';
  const catalog={
