@@ -157,6 +157,45 @@ test('diagnostic reports all six source pages sent to the answer service',()=>{
  assert.equal(JSON.stringify(report).includes('PRIVATE TEXT'),false);
 });
 
+test('diagnostics preserve bounded requirement-to-claim links across planner, review, and highlights',()=>{
+ const report=createDiagnosticReport({
+  plannerPlan:{parts:[{id:'P1',question:'Explain necessity and custom.',requirements:[
+   {id:'P1-R1',text:'Explain how repeated conjunction gives rise to necessity.'},
+   {id:'P1-R2',text:'Explain how custom leads to inference.'},
+   {id:'P1-R3',text:'x'.repeat(260)},
+   {id:'bad-R4',text:'ignore malformed id'}]}]},
+  submittedSources:[{id:'S1'}],
+  questionParts:[{part:'Explain necessity and custom.',status:'supported',answerStatus:'answered',
+   requirements:[{id:'P1-R1',text:'Repeated conjunction.'},{id:'P1-R2',text:'Custom and inference.'}],
+   requirementCoverage:[
+    {requirementId:'P1-R1',status:'answered',answerClaimIds:['P1-C1','P2-C1','invalid']},
+    {requirementId:'P1-R2',status:'partial',answerClaimIds:['P1-C2']},
+    {requirementId:'P1-R9',status:'answered',answerClaimIds:['P1-C3']}],
+   requirementsComplete:false,evidenceIds:['S1']}],
+  reviewedEvidence:[{id:'S1',claimId:'P1-C2',partId:'P1',point:'Custom leads to inference.',
+   requirementIds:['P1-R2','invalid-R8'],quoteVerified:true}],
+  evidenceHighlights:[{source_id:'S1',page:42,quote:'Exact reviewed quote.',claim_id:'P1-C2',
+   requirement_ids:['P1-R2','bad-R3'],quotes:[{claim_id:'P1-C2',part_id:'P1',
+    requirement_ids:['P1-R2','bad-R3'],point:'Custom leads to inference.',quote:'Exact reviewed quote.'}]}]
+ });
+ assert.deepEqual(report.plannerPlan.parts[0].requirements,[
+  {id:'P1-R1',text:'Explain how repeated conjunction gives rise to necessity.'},
+  {id:'P1-R2',text:'Explain how custom leads to inference.'},
+  {id:'P1-R3',text:'x'.repeat(200)}
+ ]);
+ assert.deepEqual(report.answer.questionParts[0],{
+  part:'Explain necessity and custom.',status:'supported',evidenceIds:['S1'],answerStatus:'answered',
+  requirements:[{id:'P1-R1',text:'Repeated conjunction.'},{id:'P1-R2',text:'Custom and inference.'}],
+  requirementCoverage:[
+   {requirementId:'P1-R1',status:'answered',answerClaimIds:['P1-C1']},
+   {requirementId:'P1-R2',status:'partial',answerClaimIds:['P1-C2']}],requirementsComplete:false
+ });
+ assert.deepEqual(report.answer.reviewedEvidence[0],{id:'S1',point:'Custom leads to inference.',
+  quoteVerified:true,claimId:'P1-C2',partId:'P1',requirementIds:['P1-R2']});
+ assert.deepEqual(report.evidenceHighlights[0].requirementIds,['P1-R2']);
+ assert.deepEqual(report.evidenceHighlights[0].quotes[0].requirementIds,['P1-R2']);
+});
+
 
 test('diagnostics expose bounded question-part coverage tied to submitted sources',()=>{
  const report=createDiagnosticReport({

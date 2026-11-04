@@ -11,6 +11,11 @@ function safeDiagnosticToken(value){
 function isSafeFailureCode(value){
   return typeof value==='string'&&SAFE_FAILURE_CODE.test(value);
 }
+function safeRequirementIds(value,partId=''){
+  if(!Array.isArray(value))return [];
+  return [...new Set(value.filter(id=>typeof id==='string'&&
+    /^P[1-9]\d*-R[1-9]\d*$/.test(id)&&(!partId||id.startsWith(partId+'-R'))))].slice(0,4);
+}
 
 // Accept both a single marker ([S1]) and grouped markers ([S1, S3]) for
 // rendering. The audit below intentionally remains broader so malformed or
@@ -96,7 +101,11 @@ function reviewedEvidenceSummary(value,submittedSources=[]){
     const qualifier=typeof item?.qualifier==='string'?item.qualifier.trim().slice(0,160):'';
     const quoteVerified=item?.quoteVerified===true||
       (typeof item?.quote==='string'&&Number.isSafeInteger(item?.start)&&Number.isSafeInteger(item?.end)&&item.end>item.start);
+    const claimId=typeof item?.claimId==='string'&&/^P[1-9]\d*-C[1-9]\d*$/.test(item.claimId)?item.claimId:null;
+    const partId=typeof item?.partId==='string'&&/^P[1-9]\d*$/.test(item.partId)?item.partId:null;
+    const requirementIds=safeRequirementIds(item?.requirementIds,partId||claimId?.match(/^P[1-9]\d*/)?.[0]||'');
     seen.add(key);out.push({id,point,quoteVerified,
+      ...(claimId?{claimId}:{}),...(partId?{partId}:{}),...(requirementIds.length?{requirementIds}:{}),
       ...(anchorQuote&&quoteVerified?{anchorQuote}:{}),
       ...(speaker?{speaker}:{}),...(qualifier?{qualifier}:{})});
     if(out.length===6)break;
@@ -117,7 +126,25 @@ function questionPartSummary(value,submittedSources=[]){
     if(part.length<3||!['supported','partial','unsupported'].includes(status))continue;
     const evidenceIds=Array.isArray(item.evidenceIds)?
       [...new Set(item.evidenceIds.filter(id=>typeof id==='string'&&allowed.has(id)))].slice(0,6):[];
-    out.push({part,status,evidenceIds});
+    const requirements=Array.isArray(item.requirements)?item.requirements.slice(0,4).flatMap(requirement=>{
+      const id=typeof requirement?.id==='string'&&/^P[1-9]\d*-R[1-9]\d*$/.test(requirement.id)?requirement.id:null;
+      const text=typeof requirement?.text==='string'?requirement.text.trim().slice(0,200):'';
+      return id&&text?[{id,text}]:[];
+    }):[];
+    const requirementCoverage=Array.isArray(item.requirementCoverage)?item.requirementCoverage.slice(0,4).flatMap(decision=>{
+      const requirementId=typeof decision?.requirementId==='string'&&
+        requirements.some(requirement=>requirement.id===decision.requirementId)?decision.requirementId:null;
+      if(!requirementId||!['answered','partial','unanswered'].includes(decision?.status))return [];
+      const answerClaimIds=Array.isArray(decision.answerClaimIds)?[...new Set(decision.answerClaimIds
+        .filter(id=>typeof id==='string'&&new RegExp('^'+requirementId.split('-R')[0]+'-C[1-9]\\d*$').test(id)))].slice(0,8):[];
+      return [{requirementId,status:decision.status,answerClaimIds}];
+    }):[];
+    const answerStatus=['answered','partial','unanswered'].includes(item.answerStatus)?item.answerStatus:null;
+    out.push({part,status,evidenceIds,
+      ...(answerStatus?{answerStatus}:{}),
+      ...(requirements.length?{requirements,
+        requirementCoverage,
+        requirementsComplete:item.requirementsComplete===true}:{} )});
   }
   return out;
 }
@@ -211,7 +238,12 @@ export function createDiagnosticReport(input={}){
         label:string(source?.label,120),role:['primary','subject','commentary'].includes(source?.role)?source.role:'primary',
         bookIds:Array.isArray(source?.bookIds)?source.bookIds.map(id=>string(id,12)).slice(0,8):[]})):[],
       parts:Array.isArray(input.plannerPlan.parts)?input.plannerPlan.parts.slice(0,6).map(part=>({
-        id:string(part?.id,8),question:string(part?.question,240)})):[],
+        id:string(part?.id,8),question:string(part?.question,240),
+        ...(Array.isArray(part?.requirements)?{requirements:part.requirements.slice(0,4).flatMap(requirement=>{
+          const id=typeof requirement?.id==='string'&&/^P[1-9]\d*-R[1-9]\d*$/.test(requirement.id)?requirement.id:null;
+          const text=typeof requirement?.text==='string'?requirement.text.trim().slice(0,200):'';
+          return id&&id.startsWith(string(part?.id,8)+'-R')&&text?[{id,text}]:[];
+        })}:{})})):[],
     }:null,
     pipeline:string(input.pipeline,48)||null,
     usage:input.usage&&typeof input.usage==='object'?{
@@ -260,10 +292,14 @@ export function createDiagnosticReport(input={}){
         quote:string(item?.quote,320),
         claimId:string(item?.claim_id,48),
         point:string(item?.point,320),
+        ...(Array.isArray(item?.requirement_ids)?{requirementIds:safeRequirementIds(item.requirement_ids,
+          string(item?.part_id,24)||string(item?.claim_id,48).match(/^P[1-9]\d*/)?.[0]||'')}:{ }),
         quoteLocated:item?.quoteLocated===true,
         partialMatch:item?.partialMatch===true,
         quotes:(Array.isArray(item?.quotes)?item.quotes:[]).slice(0,3).map(quote=>({
           claimId:string(quote?.claim_id,48),partId:string(quote?.part_id,24),
+          ...(Array.isArray(quote?.requirement_ids)?{requirementIds:safeRequirementIds(quote.requirement_ids,
+            string(quote?.part_id,24)||string(quote?.claim_id,48).match(/^P[1-9]\d*/)?.[0]||'')}:{ }),
           point:string(quote?.point,320),quote:string(quote?.quote,320),
           quoteLocated:quote?.quoteLocated===true,partialMatch:quote?.partialMatch===true
         }))
