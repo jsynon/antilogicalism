@@ -26,7 +26,7 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.20.0'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.20.1'));
  assert.match(clientV49,/distinctiveTerms:item\.distinctiveTerms/);
  assert.match(clientV49,/matchedDistinctiveTerms:item\.matchedDistinctiveTerms/);
  assert.match(clientV49,/sharedMatchedTerms:item\.sharedMatchedTerms/);
@@ -87,6 +87,22 @@ test('companion introduction explains how to use it and links to Library Search'
  assert(html.includes('href="/antilogicalism/digital-library/">Library Search</a>'));
  assert(html.includes('Search the full-text collection with <a href="/antilogicalism/digital-library/">Library Search</a> or browse books by title with the <a href="/antilogicalism/primary-sources/">Bookshelf</a>.'));
  assert.doesNotMatch(html,/all 642 searchable titles|644-book library/);
+});
+test('waiting screen sets a time expectation and explains the quick check',()=>{
+ assert.match(html,/Give it a little time once you ask: answers usually take about one to two minutes/);
+ assert.match(html,/searches the library and checks every quote before it replies/);
+ assert.match(html,/The quick check below simply confirms you’re a person rather than a bot/);
+ assert.match(html,/the Ask button unlocks as soon as it passes/);
+ assert.match(html,/pass it again before a follow-up question/);
+ const hintAt=html.indexOf('The quick check below simply confirms');
+ const widgetAt=html.indexOf('id="companion-turnstile"');
+ assert.ok(hintAt>=0&&widgetAt>hintAt,
+  'quick-check explanation sits immediately before the Turnstile widget container');
+ assert.match(clientV49,/function armLongWaitNotice\(\)/);
+ assert.match(clientV49,/},45000\);/);
+ assert.match(clientV49,/Still checking the passages carefully — thorough answers take a little longer\./);
+ assert.match(clientV49,/setStatus\('Now I’m bringing the best passages together and checking the sources\. This can take a little while…'\);\n    armLongWaitNotice\(\);/);
+ assert.match(clientV49,/cancelLongWaitNotice\(\);\n    answering=false;/);
 });
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');

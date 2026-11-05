@@ -95,6 +95,17 @@ function refreshStatusState(){
   status.setAttribute('aria-busy',String(busy));
 }
 function setStatus(message){status.textContent=message;refreshStatusState();}
+let longWaitNotice=null;
+function armLongWaitNotice(){
+  cancelLongWaitNotice();
+  longWaitNotice=setTimeout(()=>{
+    longWaitNotice=null;
+    if(answering)setStatus('Still checking the passages carefully — thorough answers take a little longer.');
+  },45000);
+}
+function cancelLongWaitNotice(){
+  if(longWaitNotice!==null){clearTimeout(longWaitNotice);longWaitNotice=null;}
+}
 function refreshDiagnostic(){
   if(!diagnosticState||!diagnosticOutput)return;
   diagnosticOutput.textContent=JSON.stringify(createDiagnosticReport(diagnosticState),null,2);
@@ -687,6 +698,7 @@ async function askQuestion(questionText){
     }
     turnstileToken='';
     setStatus('Now I’m bringing the best passages together and checking the sources. This can take a little while…');
+    armLongWaitNotice();
     const response=await fetch(API+'/api/pilot-answer',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
@@ -770,6 +782,7 @@ async function askQuestion(questionText){
     }
     setStatus(userFailureMessage(diagnosticState?.failureCode));
   }finally{
+    cancelLongWaitNotice();
     answering=false;
     if(window.turnstile&&turnstileId!==null)window.turnstile.reset(turnstileId);
     updateButtons();
