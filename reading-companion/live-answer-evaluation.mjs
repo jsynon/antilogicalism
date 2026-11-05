@@ -146,6 +146,30 @@ const FRESH3_CASES=[
  {id:'fresh3-selected-odyssey-homecoming',discipline:'literature',evaluation_scope:'selected-books',question:'How does Odysseus’s desire to return home shape his choices and the poem’s picture of heroism?',selected_book_ids:['186'],planner_queries:['How does Odysseus’s desire to return home shape his choices and the poem’s picture of heroism?'],required_source_groups:[{label:'Homer, The Odyssey',book_ids:['186']}],review_focus:[]},
  {id:'fresh3-selected-douglass-literacy',discipline:'history',evaluation_scope:'selected-books',question:'How does Douglass describe the role of literacy in his experience of enslavement and pursuit of freedom?',selected_book_ids:['459'],planner_queries:['How does Douglass describe the role of literacy in his experience of enslavement and pursuit of freedom?'],required_source_groups:[{label:'Frederick Douglass, Narrative of the Life of Frederick Douglass, an American Slave',book_ids:['459']}],review_focus:[]},
 ];
+// Phase-2 suites: two dedicated, single-scope sets of brand-new questions.
+// library-all runs open questions against the whole library; library-selected
+// scopes every question to one chosen book. Neither set reuses a question
+// from the earlier suites, and all-books cases carry no expected sources.
+const LIBRARY_ALL_CASES=[
+ {id:'library-all-hobbes-rousseau-nature',discipline:'philosophy',evaluation_scope:'all-books',question:'How do Hobbes and Rousseau differ in their accounts of human beings in the state of nature, and what follows from that difference for their views of political authority?',selected_book_ids:[],planner_queries:['How do Hobbes and Rousseau differ in their accounts of human beings in the state of nature, and what follows from that difference for their views of political authority?'],required_source_groups:[],review_focus:[]},
+ {id:'library-all-suffering-responses',discipline:'philosophy',evaluation_scope:'all-books',question:'How do different authors in the library understand suffering, and what responses to it do they propose?',selected_book_ids:[],planner_queries:['How do different authors in the library understand suffering, and what responses to it do they propose?'],required_source_groups:[],review_focus:[]},
+ {id:'library-all-narrators-judgment',discipline:'literature',evaluation_scope:'all-books',question:'Many works in the library reach the reader through a first-person narrator. How do narrators such as Dostoevsky’s Underground Man and Conrad’s Marlow shape — and limit — what the reader can conclude about the events they describe?',selected_book_ids:[],planner_queries:['Many works in the library reach the reader through a first-person narrator. How do narrators such as Dostoevsky’s Underground Man and Conrad’s Marlow shape — and limit — what the reader can conclude about the events they describe?'],required_source_groups:[],review_focus:[]},
+ {id:'library-all-progress-idea',discipline:'history',evaluation_scope:'all-books',question:'How did the idea of progress change as it passed from ancient and medieval writers through Enlightenment thinkers to its nineteenth-century critics?',selected_book_ids:[],planner_queries:['How did the idea of progress change as it passed from ancient and medieval writers through Enlightenment thinkers to its nineteenth-century critics?'],required_source_groups:[],review_focus:[]},
+ {id:'library-all-science-certainty',discipline:'science',evaluation_scope:'all-books',question:'How do authors in the library differ over how certain scientific knowledge can be, and where do they locate its limits?',selected_book_ids:[],planner_queries:['How do authors in the library differ over how certain scientific knowledge can be, and where do they locate its limits?'],required_source_groups:[],review_focus:[]},
+ {id:'library-all-empires-decline',discipline:'history',evaluation_scope:'all-books',question:'How have writers explained the decline of empires and commonwealths, and do they place more weight on internal decay, external pressure, or failures of leadership?',selected_book_ids:[],planner_queries:['How have writers explained the decline of empires and commonwealths, and do they place more weight on internal decay, external pressure, or failures of leadership?'],required_source_groups:[],review_focus:[]},
+ {id:'library-all-ambition-novels',discipline:'literature',evaluation_scope:'all-books',question:'How do novelists in the library portray ambition, and what does it tend to cost the characters who pursue it?',selected_book_ids:[],planner_queries:['How do novelists in the library portray ambition, and what does it tend to cost the characters who pursue it?'],required_source_groups:[],review_focus:[]},
+ {id:'library-all-wealth-luxury',discipline:'society',evaluation_scope:'all-books',question:'What do authors in the library say about the effects of wealth and luxury on character and on society?',selected_book_ids:[],planner_queries:['What do authors in the library say about the effects of wealth and luxury on character and on society?'],required_source_groups:[],review_focus:[]},
+];
+const LIBRARY_SELECTED_CASES=[
+ {id:'library-selected-conrad-marlow-kurtz',discipline:'literature',evaluation_scope:'selected-books',question:'In Heart of Darkness, how does Marlow’s picture of Kurtz take shape, and which parts of it rest on what Marlow sees himself as opposed to what others tell him or what Kurtz leaves in writing?',selected_book_ids:['315'],planner_queries:['In Heart of Darkness, how does Marlow’s picture of Kurtz take shape, and which parts of it rest on what Marlow sees himself as opposed to what others tell him or what Kurtz leaves in writing?'],required_source_groups:[{label:'Joseph Conrad, Heart of Darkness',book_ids:['315']}],review_focus:[]},
+ {id:'library-selected-machiavelli-prince-limits',discipline:'politics',evaluation_scope:'selected-books',question:'What is the central argument of The Prince about how a ruler acquires and keeps power, and where does Machiavelli acknowledge limits to what a ruler’s skill can control?',selected_book_ids:['241'],planner_queries:['What is the central argument of The Prince about how a ruler acquires and keeps power, and where does Machiavelli acknowledge limits to what a ruler’s skill can control?'],required_source_groups:[{label:'Niccolò Machiavelli, The Prince',book_ids:['241']}],review_focus:[]},
+ {id:'library-selected-plato-republic-images',discipline:'philosophy',evaluation_scope:'selected-books',question:'In the Republic, how do the allegory of the cave and the analogy between the city and the soul each connect knowledge with ruling, and how do the two images differ in what they claim?',selected_book_ids:['74'],planner_queries:['In the Republic, how do the allegory of the cave and the analogy between the city and the soul each connect knowledge with ruling, and how do the two images differ in what they claim?'],required_source_groups:[{label:'Plato, The Republic',book_ids:['74']}],review_focus:[]},
+ {id:'library-selected-dostoevsky-grand-inquisitor',discipline:'literature',evaluation_scope:'selected-books',question:'In The Brothers Karamazov, how does the “Grand Inquisitor” episode, as Ivan tells it to Alyosha, challenge the faith Alyosha represents, and how does the novel complicate Ivan’s challenge?',selected_book_ids:['103'],planner_queries:['In The Brothers Karamazov, how does the “Grand Inquisitor” episode, as Ivan tells it to Alyosha, challenge the faith Alyosha represents, and how does the novel complicate Ivan’s challenge?'],required_source_groups:[{label:'Fyodor Dostoevsky, The Brothers Karamazov',book_ids:['103']}],review_focus:[]},
+ {id:'library-selected-kierkegaard-silentio-speaker',discipline:'philosophy',evaluation_scope:'selected-books',question:'Fear and Trembling is presented by Johannes de Silentio, a speaker who says he cannot himself make the movement of faith. How does that declared limitation shape the book’s portrayal of Abraham, and why does it matter who is speaking?',selected_book_ids:['140'],planner_queries:['Fear and Trembling is presented by Johannes de Silentio, a speaker who says he cannot himself make the movement of faith. How does that declared limitation shape the book’s portrayal of Abraham, and why does it matter who is speaking?'],required_source_groups:[{label:'Søren Kierkegaard, Fear and Trembling',book_ids:['140']}],review_focus:[]},
+ {id:'library-selected-smith-division-of-labor',discipline:'society',evaluation_scope:'selected-books',question:'How does Adam Smith explain the gains in productivity that come from the division of labor, and what concerns does he raise about what the division of labor does to workers themselves?',selected_book_ids:['260'],planner_queries:['How does Adam Smith explain the gains in productivity that come from the division of labor, and what concerns does he raise about what the division of labor does to workers themselves?'],required_source_groups:[{label:'Adam Smith, An Inquiry into the Nature and Causes of the Wealth of Nations',book_ids:['260']}],review_focus:[]},
+ {id:'library-selected-orwell-newspeak',discipline:'literature',evaluation_scope:'selected-books',question:'How does Orwell connect language with political power in 1984, through both Newspeak and the Party’s control of the historical record, and how does Winston’s job illustrate that connection?',selected_book_ids:['89'],planner_queries:['How does Orwell connect language with political power in 1984, through both Newspeak and the Party’s control of the historical record, and how does Winston’s job illustrate that connection?'],required_source_groups:[{label:'George Orwell, 1984',book_ids:['89']}],review_focus:[]},
+ {id:'library-selected-aurelius-meditations-others',discipline:'philosophy',evaluation_scope:'selected-books',question:'In the Meditations, how does Marcus Aurelius instruct himself to respond to other people’s faults and offenses, and what view of himself and of the whole does he rely on in giving that instruction?',selected_book_ids:['18'],planner_queries:['In the Meditations, how does Marcus Aurelius instruct himself to respond to other people’s faults and offenses, and what view of himself and of the whole does he rely on in giving that instruction?'],required_source_groups:[{label:'Marcus Aurelius, Meditations',book_ids:['18']}],review_focus:[]},
+];
 // One-run handoff validation: two observed regressions plus three fresh,
 // open-ended controls. These cases test retrieval and question coverage, not
 // predetermined answer text or a required source for all-books questions.
@@ -235,7 +259,7 @@ function sourceRevision(){
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
- const evaluationCases=mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
+ const evaluationCases=mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
  if(mode==='acceptance'&&caseId==='repeatable-calibration'){
@@ -251,7 +275,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return selected.map(copyEvaluationCase);
  }
  if(caseId&&caseId!=='all'){
-  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3, handoff and philosophy3 cases can be selected in their respective suites.');
+  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3, handoff, philosophy3, library-all and library-selected cases can be selected in their respective suites.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
@@ -265,6 +289,8 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  if(mode==='fresh3')return FRESH3_CASES.map(copyEvaluationCase);
  if(mode==='handoff')return HANDOFF_CASES.map(copyEvaluationCase);
  if(mode==='philosophy3')return PHILOSOPHY3_CASES.map(copyEvaluationCase);
+ if(mode==='library-all')return LIBRARY_ALL_CASES.map(copyEvaluationCase);
+ if(mode==='library-selected')return LIBRARY_SELECTED_CASES.map(copyEvaluationCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
   const item=QUALITY_CASES.find(value=>value.id===id);
   if(!item)throw Error('The planner-only cases are missing from the quality suite.');
@@ -276,7 +302,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff, philosophy3 or full.');
+ throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff, philosophy3, library-all, library-selected or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(scope==='case-default')return cases.map(item=>({...item,selected_book_ids:item.evaluation_scope==='all-books'?[]:[...item.selected_book_ids]}));
@@ -286,7 +312,7 @@ export function applyQualityScope(cases,scope='selected-books'){
  return cases.map(item=>({...item,selected_book_ids:[]}));
 }
 export function evaluationUsesLivePlanner(mode,scope){
- if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3')return true;
+ if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3'||mode==='library-all'||mode==='library-selected')return true;
  return ['quality','focused','paired','holdout','acceptance'].includes(mode)&&
   (mode==='paired'||scope==='all-books');
 }
@@ -1692,15 +1718,15 @@ function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',sco
   if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='retrieval-profile')out.retrievalProfile=value;else if(key==='repeat')out.repeatCount=Number(value);else if(key==='report-only')out.reportOnly=value==='true';else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|handoff|philosophy3|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|handoff|philosophy3|library-all|library-selected|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
  if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
- const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3'].includes(args.mode);
+ const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in a supported evaluation suite.');
- if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
- if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff'||args.mode==='philosophy3')&&args.scope!=='case-default')throw Error('Fresh and handoff question suites must use case-default scope.');
+ if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&args.mode!=='library-all'&&args.mode!=='library-selected'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff'||args.mode==='philosophy3'||args.mode==='library-all'||args.mode==='library-selected')&&args.scope!=='case-default')throw Error('Fresh, handoff and phase-2 library question suites must use case-default scope.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
   throw Error('Repeat count must be an integer from 1 to 3.');
