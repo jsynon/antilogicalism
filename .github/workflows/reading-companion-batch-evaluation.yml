@@ -45,7 +45,7 @@ jobs:
           test "${{ inputs.confirm_live_ai }}" = "true"
           test -n "$PILOT_EVALUATION_TOKEN"
           mkdir -p "$GITHUB_WORKSPACE/reading-companion-batch-evaluation"
-      - name: Pass 1 — philosophy, fresh, and fresh-three suites
+      - name: Pass 1 — philosophy suite
         if: ${{ !cancelled() }}
         env:
           PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
@@ -55,17 +55,27 @@ jobs:
             --answer-variant with-review --retrieval-profile baseline \
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-batch-evaluation/philosophy3-pass1.json"
+      - name: Pass 1 — fresh suite
+        if: ${{ !cancelled() }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
           node reading-companion/live-answer-evaluation.mjs \
             --mode fresh --scope case-default --case all --repeat 1 \
             --answer-variant with-review --retrieval-profile baseline \
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-batch-evaluation/fresh-pass1.json"
+      - name: Pass 1 — fresh-three suite
+        if: ${{ !cancelled() }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
           node reading-companion/live-answer-evaluation.mjs \
             --mode fresh3 --scope case-default --case all --repeat 1 \
             --answer-variant with-review --retrieval-profile baseline \
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-batch-evaluation/fresh3-pass1.json"
-      - name: Pass 2 — philosophy, fresh, and fresh-three suites
+      - name: Pass 2 — philosophy suite
         if: ${{ !cancelled() && inputs.repeats != '1' }}
         env:
           PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
@@ -75,17 +85,27 @@ jobs:
             --answer-variant with-review --retrieval-profile baseline \
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-batch-evaluation/philosophy3-pass2.json"
+      - name: Pass 2 — fresh suite
+        if: ${{ !cancelled() && inputs.repeats != '1' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
           node reading-companion/live-answer-evaluation.mjs \
             --mode fresh --scope case-default --case all --repeat 1 \
             --answer-variant with-review --retrieval-profile baseline \
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-batch-evaluation/fresh-pass2.json"
+      - name: Pass 2 — fresh-three suite
+        if: ${{ !cancelled() && inputs.repeats != '1' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
           node reading-companion/live-answer-evaluation.mjs \
             --mode fresh3 --scope case-default --case all --repeat 1 \
             --answer-variant with-review --retrieval-profile baseline \
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-batch-evaluation/fresh3-pass2.json"
-      - name: Pass 3 — philosophy, fresh, and fresh-three suites
+      - name: Pass 3 — philosophy suite
         if: ${{ !cancelled() && inputs.repeats == '3' }}
         env:
           PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
@@ -95,11 +115,21 @@ jobs:
             --answer-variant with-review --retrieval-profile baseline \
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-batch-evaluation/philosophy3-pass3.json"
+      - name: Pass 3 — fresh suite
+        if: ${{ !cancelled() && inputs.repeats == '3' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
           node reading-companion/live-answer-evaluation.mjs \
             --mode fresh --scope case-default --case all --repeat 1 \
             --answer-variant with-review --retrieval-profile baseline \
             --report-only true --confirm-live-ai true \
             --output "$GITHUB_WORKSPACE/reading-companion-batch-evaluation/fresh-pass3.json"
+      - name: Pass 3 — fresh-three suite
+        if: ${{ !cancelled() && inputs.repeats == '3' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
           node reading-companion/live-answer-evaluation.mjs \
             --mode fresh3 --scope case-default --case all --repeat 1 \
             --answer-variant with-review --retrieval-profile baseline \
