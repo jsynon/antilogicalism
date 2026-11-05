@@ -340,6 +340,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot #companion-status.is-busy::after{content:"";position:absolute;left:1.05rem;top:1.16rem;width:1.1rem;height:1.1rem;border:3px solid #d1dce1;border-top-color:#315d73;border-right-color:#55788b;border-radius:50%;transform-origin:center;animation:companion-status-spin .7s linear infinite;will-change:transform}
 @keyframes companion-status-spin{to{transform:rotate(360deg)}}
 @media(prefers-reduced-motion:reduce){#companion-pilot #companion-status.is-busy::after{animation:companion-status-spin 2s linear infinite}}
+#companion-pilot #companion-check-hint{margin-top:1.1rem}
 #companion-pilot #companion-turnstile{margin:.8rem 0}
 #companion-pilot .companion-source-entry,#companion-pilot .companion-key-passage{padding:.9rem 0;border-bottom:1px solid #dfe2e3}
 /* Suppress Book Lite's article ornament throughout the companion; keep entry borders. */
@@ -468,7 +469,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <button id="companion-new-conversation" type="button" hidden>New conversation</button>
 </div>
 <p id="companion-challenge" role="status" class="companion-hint"></p>
-<p class="companion-hint">The quick check below simply confirms you’re a person rather than a bot — the Ask button unlocks as soon as it passes, and you may be asked to pass it again before a follow-up question.</p>
+<p id="companion-check-hint" class="companion-hint">The quick check below simply confirms you’re a person rather than a bot — the Ask button unlocks as soon as it passes, and you may be asked to pass it again before a follow-up question.</p>
 <div id="companion-turnstile" aria-label="Quick check"></div>
 </form>
 <p id="companion-status" aria-live="polite" aria-atomic="true" aria-busy="false" role="status"></p>
