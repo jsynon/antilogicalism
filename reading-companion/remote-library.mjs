@@ -371,13 +371,43 @@ export class RemoteLibrary {
     this.manifestPromise = null;
     this.suppressionPromise = null;
     this.partitions = new Map();
+    this.bookShards = new Map();
     this.contentDigests = new Map();
   }
   async jsonGzip(filename) {
     if (!/^(?:manifest|url-suppressions|terms-[a-z0-9]{2}|book-[0-9]+)\.json$/.test(filename)) {
       throw new Error('Unexpected corpus filename.');
     }
-    const response = await this.fetcher(this.root + filename + '.gz', {cache:'no-store'});
+    // Book shards are the large downloads (median ~266 KB gz) and a single
+    // question can shortlist the same book from several facet searches, then
+    // ask for it again when hydrating candidate pages. Cache the parsed
+    // shard (and any in-flight load) so each book is fetched at most once
+    // per library session. The cache is bounded and evicts least recently
+    // used shards; failures are never cached.
+    if (filename.startsWith('book-')) {
+      const cached = this.bookShards.get(filename);
+      if (cached) {
+        this.bookShards.delete(filename);
+        this.bookShards.set(filename, cached);
+        return cached;
+      }
+      const loading = this.fetchJsonGzip(filename).catch(error => {
+        this.bookShards.delete(filename);
+        throw error;
+      });
+      this.bookShards.set(filename, loading);
+      if (this.bookShards.size > 16) {
+        this.bookShards.delete(this.bookShards.keys().next().value);
+      }
+      return loading;
+    }
+    return this.fetchJsonGzip(filename);
+  }
+  async fetchJsonGzip(filename) {
+    // Corpus files live under an immutable versioned root (data-v49/), so
+    // let the HTTP cache store and revalidate them instead of refetching
+    // on every load.
+    const response = await this.fetcher(this.root + filename + '.gz', {cache:'default'});
     if (!response.ok) throw new Error('Corpus request returned HTTP ' + response.status + '.');
     const bytes = new Uint8Array(await response.arrayBuffer());
     const digest = new Uint8Array(await globalThis.crypto.subtle.digest('SHA-256', bytes));
@@ -426,8 +456,12 @@ export class RemoteLibrary {
       this.partitions.set(prefix, this.jsonGzip('terms-' + prefix + '.json').catch(error => {
         this.partitions.delete(prefix); throw error;
       }));
-      // Keep only a few decompressed index partitions in browser memory.
-      if (this.partitions.size > 8) this.partitions.delete(this.partitions.keys().next().value);
+      // Keep a working set of decompressed index partitions in browser
+      // memory. Multi-facet questions touch more than eight prefixes, and
+      // evicting at eight made later facets refetch partitions an earlier
+      // facet had already loaded. Partitions are small (the whole set of
+      // files is a few MB compressed), so 32 is a safe working set.
+      if (this.partitions.size > 32) this.partitions.delete(this.partitions.keys().next().value);
     }
     return this.partitions.get(prefix);
   }
