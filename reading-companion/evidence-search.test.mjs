@@ -1838,12 +1838,12 @@ test('browser sends bounded full candidate pages and leaves semantic selection t
  assert.match(js,/requestRetrievalGap\(q,gapToken,history/);
  assert.match(js,/sourceBookIds:item\.sourceBookIds\.slice\(0,16\)/,
   'weak author-specific parts carry their catalog-resolved book IDs into the existing gap search');
- assert.ok(js.includes('partQuestions,gapQueries,gapQueryPartLinks}'));
+ assert.ok(js.includes('partQuestions,gapQueries,gapQueryPartLinks,searchCache}'));
  assert.doesNotMatch(js,/retrievalGap:[^}]*reviewFocus/s);
  assert.match(js,/const queries=\[\.\.\.new Set\(data\.queries\.map/);
  assert.match(js,/parseAnswerMarkdown\(answer,\{allowLists\}\)/,
   'the browser renders the shared tested Markdown block parser');
- assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions,allowEmpty:true\}/);
+ assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions,allowEmpty:true,searchCache\}/);
  assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
  assert.match(js,/diagnosticState\.fallbackMode=true/);
  assert.match(js,/catalogFallbackPlan\(q,catalog,bookFilter\.value\|\|''\)/,

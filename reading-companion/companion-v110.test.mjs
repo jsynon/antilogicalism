@@ -26,7 +26,7 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.20.1'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.20.2'));
  assert.match(clientV49,/distinctiveTerms:item\.distinctiveTerms/);
  assert.match(clientV49,/matchedDistinctiveTerms:item\.matchedDistinctiveTerms/);
  assert.match(clientV49,/sharedMatchedTerms:item\.sharedMatchedTerms/);
@@ -103,6 +103,27 @@ test('waiting screen sets a time expectation and explains the quick check',()=>{
  assert.match(clientV49,/Still checking the passages carefully — thorough answers take a little longer\./);
  assert.match(clientV49,/setStatus\('Now I’m bringing the best passages together and checking the sources\. This can take a little while…'\);\n    armLongWaitNotice\(\);/);
  assert.match(clientV49,/cancelLongWaitNotice\(\);\n    answering=false;/);
+});
+test('selected-book requests skip the planner call with a deterministic plan; all-books keeps it',()=>{
+ assert.match(clientV49,/deterministicSelectedBookPlan\(q,bookList,bookFilter\.value\|\|''\)/);
+ const skipAt=clientV49.indexOf('deterministicSelectedBookPlan(q,bookList');
+ const planCallAt=clientV49.indexOf('planned=await requestSourcePlan(q,token,history)');
+ assert.ok(skipAt>=0&&planCallAt>skipAt,
+  'the deterministic selected-book plan is consulted before the hosted planner call');
+ assert.match(clientV49,/diagnosticState\.plannerSkipped=true/);
+ assert.match(clientV49,/plannerSkipReason='selected-book-deterministic-plan'/,
+  'the skip is flagged in diagnostics');
+ assert.match(clientV49,/planned=await requestSourcePlan\(q,token,history\)/,
+  'the model-planned flow remains for all-books and conflicting questions');
+});
+test('both retrieval rounds of a question share one search cache',()=>{
+ assert.match(clientV49,/const searchCache=createRetrievalSearchCache\(\)/);
+ assert.ok(clientV49.includes('partQuestions,allowEmpty:true,searchCache}'),
+  'round one populates the shared cache');
+ assert.ok(clientV49.includes('partQuestions,gapQueries,gapQueryPartLinks,searchCache}'),
+  'the gap round reuses round-one searches through the shared cache');
+ assert.match(clientV49,/\.\.\.\(searchCache\?\{searchCache\}:\{\}\),/,
+  'retrieveSources threads the cache into shared retrieval only when one is active');
 });
 test('v1.10 presents a clean ask-and-read flow while preserving answer sections',()=>{
  const answer=client.indexOf('Reading Companion answer');
@@ -191,7 +212,7 @@ test('book selector search matches title or author without changing source entri
 });
 
 test('current browser client validates the v3 fingerprint coverage manifest',()=>{
- assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.20\.0'/,
+ assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.20\.1'/,
   'the active client cache-busts the changed shared retriever');
  assert(clientV49.includes("reader-fingerprints-v3/coverage-v3.json"));
  assert.match(clientV49,/antilogicalism-reader-coverage-v3/);

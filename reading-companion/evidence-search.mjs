@@ -1,6 +1,6 @@
 import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms,
  PRODUCTION_MAX_BOOKS,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
-import {catalogIdentity} from './reader-contract.mjs';
+import {catalogFallbackPlan,catalogIdentity,normalizePlan} from './reader-contract.mjs';
 
 // Keep live browser and workflow retrieval breadth on one shared contract. The
 // 32-page candidate handoff gives the semantic selector room for facet-only
@@ -299,14 +299,37 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  * surface as an unhandled rejection; a consumed failure rethrows at the
  * original call site, preserving the caller's existing try/catch behavior.
  */
-export function createSearchPrefetch(library,{concurrency=4}={}){
- const cache=new Map();
- let active=0;
- const waiters=[];
- const keyOf=(query,options)=>[String(query||''),String(options?.bookId||''),
+/* Identity of one library search execution: the query text plus every
+ * option that can change its result set. The published index is immutable
+ * within a session, so two executions with the same key are interchangeable;
+ * the speculative prefetch below and the cross-round retrieval cache both
+ * key on this.
+ */
+function searchExecutionKey(query,options){
+ return [String(query||''),String(options?.bookId||''),
   Number(options?.maxBooks)||'',Number(options?.pagesPerBook)||'',
   options?.allowedBookIds?[...options.allowedBookIds].map(String).sort().join(','):'*']
   .join('\n');
+}
+
+/* A search cache the caller threads through one question's retrieval rounds
+ * (the initial pass and the conditional gap pass). Settled executions are
+ * shared, so the gap round executes only the searches that are genuinely
+ * new instead of re-running every facet, recovery, and scoped search of
+ * round one against the same immutable index. Values are settled wrappers,
+ * mirroring the prefetch below, so a cached failure rethrows at whichever
+ * call site consumes it and an unconsumed failure can never surface as an
+ * unhandled rejection.
+ */
+export function createRetrievalSearchCache(){
+ return new Map();
+}
+
+export function createSearchPrefetch(library,{concurrency=4,cache:sharedCache=null}={}){
+ const cache=sharedCache||new Map();
+ let active=0;
+ const waiters=[];
+ const keyOf=searchExecutionKey;
  // Counting semaphore with slot transfer: a finishing job hands its slot
  // directly to the oldest waiter instead of decrementing first, so a new
  // synchronous prefetch can never overtake a queued job past the cap.
@@ -354,8 +377,28 @@ export function createSearchPrefetch(library,{concurrency=4}={}){
 export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],gapQueryPartLinks=[],sourceGroups=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
  maxCandidates=LIVE_RETRIEVAL_CONFIG.maxCandidates,maxBooks=LIVE_RETRIEVAL_CONFIG.maxBooks,
- pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000,prefetchPartSearches=true}={}){
+ pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000,prefetchPartSearches=true,
+ searchCache=null}={}){
  const direct=String(question||'').trim();
+ // With a caller-supplied cache (see createRetrievalSearchCache), leaf
+ // searches settled in an earlier round of the same question are reused;
+ // every decision above the leaf layer — facet construction, recovery
+ // triggers, scoped searches, merging, hydration — still runs fresh over
+ // this call's inputs, so the merged pool is built exactly as a full
+ // re-run would build it. Without a cache this is the library itself.
+ const runSearch=async(query,options)=>{
+  if(!searchCache)return library.search(query,options);
+  const key=searchExecutionKey(query,options);
+  let entry=searchCache.get(key);
+  if(!entry){
+   entry=(async()=>{try{return {ok:true,value:await library.search(query,options)};}
+    catch(error){return {ok:false,error};}})();
+   searchCache.set(key,entry);
+  }
+  const settled=await entry;
+  if(settled.ok)return settled.value;
+  throw settled.error;
+ };
  if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
  if(!library||typeof library.search!=='function'||!Array.isArray(books)||
    !(allowedBookIds instanceof Set)||typeof pageLoader!=='function')
@@ -487,7 +530,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   const queryScopeIds=partScopeIds.length?partScopeIds:targetBookIds;
   const facetBookIds=targetBooksForFacet(executedQuery,books,
    queryScopeIds[0]===null?null:queryScopeIds);
-  const targeted=await Promise.all(facetBookIds.map(bookId=>library.search(executedQuery,{
+  const targeted=await Promise.all(facetBookIds.map(bookId=>runSearch(executedQuery,{
    ...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook
   })));
   return {sources:targeted.flatMap(set=>Array.isArray(set?.sources)?set.sources:[])
@@ -519,7 +562,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
     [...new Set([...sides[0].bookIds,...sides[1].bookIds])],books);
    if(!retryQuery||retryQuery.toLocaleLowerCase()===searchQueries[facet].toLocaleLowerCase())continue;
    try{
-    const retry=await library.search(retryQuery,{allowedBookIds:new Set(activeIds),maxBooks,pagesPerBook});
+    const retry=await runSearch(retryQuery,{allowedBookIds:new Set(activeIds),maxBooks,pagesPerBook});
     const scopedSources=(Array.isArray(retry?.sources)?retry.sources:[])
      .filter(source=>activeIds.includes(String(source.bookId)))
      .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
@@ -588,7 +631,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   for(const part of linkedParts)partFacetIndices.push({partId:part.partId,facet,kind:'source-group-recovery'});
   let recovered=[];
   try{
-   const result=await library.search(query,{allowedBookIds:new Set(ids),maxBooks,pagesPerBook});
+   const result=await runSearch(query,{allowedBookIds:new Set(ids),maxBooks,pagesPerBook});
    recovered=(Array.isArray(result?.sources)?result.sources:[])
     .filter(source=>ids.includes(String(source.bookId)))
     .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
@@ -640,7 +683,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  // search fans out into index-partition and book-shard downloads, while the
  // per-part job count is small enough that four still overlaps nearly all
  // of the serial wait.
- const partSearch=prefetchPartSearches?createSearchPrefetch(library):null;
+ const partSearch=prefetchPartSearches?createSearchPrefetch(library,{cache:searchCache}):null;
  if(partSearch){
   let predictedFallbacks=0;
   for(const part of scopedPartQuestions){
@@ -761,8 +804,52 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   searchSet.targetBookIds=[...new Set([...alreadySearched,...missingIds])];
   searchSet.inheritedPartScope=part.partId;
  }
+ // A planned part can end retrieval with no candidate at all even when a
+ // whole-question coverage check would pass: its linked facets found other
+ // parts' evidence, or every search scoped to its works came back empty.
+ // Downstream selection cannot recover a part with zero candidates, so give
+ // each starved part one targeted search with its own wording, inside its
+ // already-validated source scope when it has one. This is local index
+ // work only; it adds no model call, and the facet is traced so the rescue
+ // attempt stays visible in search diagnostics.
+ for(const part of scopedPartQuestions){
+  if(typeof part?.partId!=='string'||typeof part?.question!=='string')continue;
+  const partId=part.partId,query=part.question.trim();
+  if(query.length<5)continue;
+  const scopeIds=partSourceBookIds.get(partId)||[];
+  const hasCandidate=partFacetIndices.some(item=>item.partId===partId&&
+   (searchSets[item.facet]?.sources||[]).some(source=>
+    !scopeIds.length||scopeIds.includes(String(source.bookId))));
+  if(hasCandidate)continue;
+  const allowedScopeIds=scopeIds.filter(id=>retrievalAllowed.has(String(id)));
+  if(scopeIds.length&&!allowedScopeIds.length)continue;
+  // Do not repeat an execution this call already ran for the part: a facet
+  // with the part's own wording that already targeted all of its works
+  // would return the same empty result.
+  const alreadyRan=partFacetIndices.some(item=>item.partId===partId&&
+   searchQueries[item.facet]?.trim().toLocaleLowerCase()===query.toLocaleLowerCase()&&
+   (!scopeIds.length||scopeIds.every(id=>
+    (searchSets[item.facet]?.targetBookIds||[]).map(String).includes(id))));
+  if(alreadyRan)continue;
+  const facet=searchQueries.length;
+  searchQueries.push(query);
+  let recovered=[];
+  try{
+   const result=await runSearch(query,{allowedBookIds:scopeIds.length?
+    new Set(allowedScopeIds):retrievalAllowed,maxBooks,pagesPerBook});
+   recovered=(Array.isArray(result?.sources)?result.sources:[])
+    .filter(source=>!scopeIds.length||scopeIds.includes(String(source.bookId)))
+    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+  }catch{
+   // A failed targeted search leaves the part visibly starved in the
+   // traces; it must not interrupt retrieval for the other parts.
+  }
+  searchSets.push({sources:recovered,executedQuery:query,targetBookIds:scopeIds,
+   partGapRecovery:true,starvedPartId:partId});
+  partFacetIndices.push({partId,facet,kind:'part-gap'});
+ }
  const partFacetScopes=partQuestions.length?partFacetIndices.map(item=>({partId:item.partId,facet:item.facet,
-  sourceBookIds:item.kind==='gap'?(partSourceBookIds.get(item.partId)||[]):
+  sourceBookIds:(item.kind==='gap'||item.kind==='part-gap')?(partSourceBookIds.get(item.partId)||[]):
    (partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[])})):[];
  const directQuestionFacetIndex=searchQueries.findIndex(value=>
   value.trim().toLocaleLowerCase()===direct.toLocaleLowerCase());
@@ -838,6 +925,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
     {groupScopeRecoveryReason:searchSets[index].groupScopeRecoveryReason}:{})}:{}),
   ...(searchSets[index].fallbackFrom?{fallbackFrom:searchSets[index].fallbackFrom,
    fallbackReason:'empty-source-side-facet'}:{}),
+  ...(searchSets[index].partGapRecovery?{partGapRecovery:true,
+   starvedPartId:searchSets[index].starvedPartId}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
   ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),
   // The offline gold audit needs to distinguish a search miss from evidence
@@ -1146,6 +1235,31 @@ export function targetBooksForFacet(query,books,allowedBookIds=null){
   if(subjectTitles.length)return [...new Set(subjectTitles)].slice(0,8);
  }
  return scoped?.length?scoped:[null];
+}
+
+/* Selected-book scope is fully determined by the reader's choice, so the
+ * hosted planner call can be skipped for those requests: the deterministic
+ * catalog plan for one book — the question as the only search facet, every
+ * part scoped to that book — is exactly the shape retrieval consumes when
+ * the planner is unavailable, and the same fixed-query shape the evaluation
+ * harness uses for single-book scope. Returns null when the caller should
+ * keep the model-planned flow: no book selected, the book is not in the
+ * published catalog, or the question itself names a different work or
+ * author (the reader may be asking about another source through this one).
+ */
+export function deterministicSelectedBookPlan(question,books,selectedBookId){
+ const bookId=String(selectedBookId||'');
+ const text=String(question||'').trim();
+ if(!bookId||!text||!Array.isArray(books))return null;
+ const catalog=Object.fromEntries(books.map(book=>[String(book?.id||''),book?.title]));
+ if(!Object.hasOwn(catalog,bookId)||typeof catalog[bookId]!=='string')return null;
+ const named=matchExplicitBookIds(text,books);
+ if(named.length&&!named.includes(bookId))return null;
+ const fallback=catalogFallbackPlan(text,catalog,bookId);
+ if(!fallback)return null;
+ const plan=normalizePlan(fallback,text,catalog,bookId);
+ if(!plan||!Array.isArray(plan.parts)||!plan.parts.length)return null;
+ return {queries:[text],plan};
 }
 
 /* Planning improves retrieval, but a temporary planner outage must not block
