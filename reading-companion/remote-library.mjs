@@ -657,7 +657,27 @@ export class RemoteLibrary {
     const pageLimit = Math.max(1, Math.min(pagesPerBook, PRODUCTION_PAGES_PER_BOOK));
     // A small reserve of candidate works allows replacement of an index-
     // only book, without downloading all 644 book shards.
-    for (const book of books.slice(0, Math.max(bookLimit, Math.min(6, books.length)))) {
+    const candidateBooks = books.slice(0, Math.max(bookLimit, Math.min(6, books.length)));
+    // Start every candidate shard download now, concurrently, through the
+    // same cached loader (jsonGzip) the loop used to call one book at a
+    // time: shard downloads dominate cold-session search latency, while
+    // the per-book processing below is local and fast. Each load is still
+    // awaited only when the loop reaches its book, in the original
+    // candidate order, so sources, counting, and scoring are unchanged.
+    // Error semantics are preserved too: a failed load rejects the search
+    // at exactly the point the serial await would have thrown. The no-op
+    // catch merely marks each load as handled, so a rejection in a book
+    // the loop never reaches (early break, or a book skipped for having
+    // no evidence terms) cannot surface as an unhandled rejection; the
+    // loop's own await still observes every rejection it reaches. The
+    // cost is bounded over-fetch: at most this capped slice is downloaded,
+    // which the serial loop already downloads in the worst case.
+    const shardLoads = new Map(candidateBooks.map(book => {
+      const load = this.jsonGzip('book-' + book.id + '.json');
+      load.catch(() => {});
+      return [book.id, load];
+    }));
+    for (const book of candidateBooks) {
       if (new Set(sources.map(source => source.bookId)).size >= bookLimit) break;
       const meta = manifest.books[book.id];
       const pdfId = PDF.exec(meta.drive_url)[1];
@@ -689,7 +709,7 @@ export class RemoteLibrary {
       const minimumEvidenceTerms = bookTerms.length >= 2
         ? (comparison || namedAuthorBookIds.size ? 2 : Math.max(2, Math.min(3, Math.floor(bookTerms.length / 2)))) : 1;
       if (!bookTerms.length) continue;
-      const shard = await this.jsonGzip('book-' + book.id + '.json');
+      const shard = await shardLoads.get(book.id);
       booksScanned++;
       if (!Array.isArray(shard.pages)) throw new Error('Invalid source shard for ' + book.id);
       // Mean word count over this shard's usable prose pages, for BM25-style
