@@ -1519,3 +1519,138 @@ test('live runner stops after two consecutive Worker failures and keeps prior re
  assert.equal(run.results[1].requestFailure.httpStatus,502);
 });
 
+
+test('stage timings record live planner, retrieval and answer durations for a selected-book case',async()=>{
+ const library={search:async()=>({sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]}),
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
+ const item={question:'Explain the source question.',selected_book_ids:['638'],required_source_groups:[{label:'Bible',book_ids:['638']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
+  beforeCall:async()=>{},fetcher:async(url)=>new Response(JSON.stringify(url.endsWith('pilot-plan')?{queries:['first distinct search concept','second distinct search concept'],
+   plan:{parts:[{id:'P1',question:item.question}]}}:
+   {outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}})});
+ assert.equal(result.plannerSkipped,false);
+ assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
+  ['planner:completed','retrieval:completed','answer:completed']);
+ assert.ok(result.stageTimings.every(entry=>Number.isFinite(entry.elapsedMs)&&entry.elapsedMs>=0));
+});
+
+test('stage timings mark fixed-query planning as skipped and record both conditional gap stages',async()=>{
+ const calls=[],searched=[];
+ const pageText='Experience and perception provide evidence about the external world.';
+ const library={search:async query=>{
+  searched.push(query);
+  return query.includes('alternate wording')?{sources:[{id:'S1',bookId:'638',title:'A Source',
+   page:4,globalPageId:44,preview:pageText,score:8}]}:{sources:[]};
+ },jsonGzip:async()=>({pages:[{id:44,page:4,text:pageText}]})};
+ const item={id:'empty-first-pass-timings',question:'What are the properties of the external world?',
+  selected_book_ids:['638'],review_focus:['Evaluator-only note'],
+  planner_queries:['external world reality existence query','properties of perceived reality query'],
+  required_source_groups:[{label:'A Source',book_ids:['638']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'A Source'}}},
+  allowed:new Set(['638']),token:'x'.repeat(40),useFixedQueries:true,
+  fetcher:async(url,options)=>{
+   const body=JSON.parse(options.body);calls.push({url,body});
+   if(body.retrievalGap)return new Response(JSON.stringify({queries:['alternate wording search lead']}),
+    {status:200,headers:{'content-type':'application/json'}});
+   return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',
+    reviewStatus:'review',answer:'The source discusses experience and perception [S1].',
+    citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),
+    {status:200,headers:{'content-type':'application/json'}});
+  }});
+ assert.equal(result.plannerSkipped,true);
+ assert.equal(result.gapPlannerAttempted,true);
+ assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
+  ['planner:skipped','retrieval:completed','gap-planner:completed','gap-retrieval:completed','answer:completed']);
+ assert.equal(result.stageTimings[0].elapsedMs,0);
+});
+
+test('stage timings mark planner and gap-planner fallbacks with the failed request durations',async()=>{
+ const calls=[];
+ const question='What does “God is love” mean?';
+ const library={search:async()=>({sources:[{id:'B1',bookId:'638',title:'The New Oxford Annotated Bible',
+    page:1821,globalPageId:1821,preview:'God is love; let us love one another.',score:99}]}),
+  jsonGzip:async()=>({pages:[{id:1821,page:1821,text:'God is love; let us love one another, because love is from God.'}]})};
+ const item={id:'planner-outage-timings',question,required_source_groups:[{label:'Bible',book_ids:['638']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'The New Oxford Annotated Bible'},427:{title:'Waiting for God'}}},
+  allowed:new Set(['638','427']),token:'x'.repeat(40),
+  beforeCall:async()=>{},fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});
+   if(url.endsWith('pilot-plan'))return new Response(JSON.stringify({failureCode:'search-planning-failed'}),{status:502,headers:{'content-type':'application/json'}});
+   return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',
+    answer:'In 1 John, God’s love is revealed and calls people to love one another [S1].',
+    citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+ assert.equal(result.plannerFallback,true);
+ assert.equal(result.gapPlannerFailure,'search-planning-failed');
+ assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
+  ['planner:fallback','retrieval:completed','gap-planner:fallback','answer:completed']);
+});
+
+test('stage timings mark a prepared paired plan as reused with no planner duration',async()=>{
+ const calls=[];
+ const library={search:async()=>({sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,preview:'A sufficiently long preview passage for testing.',score:4}]}),
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
+ const item={question:'Explain the source question.',selected_book_ids:['638'],required_source_groups:[{label:'Bible',book_ids:['638']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
+  beforeCall:async()=>{},preparedPlan:{queries:['first distinct search concept','second distinct search concept'],
+   plan:{parts:[{id:'P1',question:item.question,sourceBookIds:['638']}]},plannerFallback:false},
+  fetcher:async(url)=>{calls.push(url);return new Response(JSON.stringify(
+   {outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+ assert.equal(result.plannerReused,true);
+ assert.equal(calls.length,1);assert.match(calls[0],/pilot-answer$/);
+ assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
+  ['planner:reused','retrieval:completed','answer:completed']);
+ assert.equal(result.stageTimings[0].elapsedMs,0);
+});
+
+test('stage timings stay attached to fatal planner failures and failed answer requests',async()=>{
+ const rateLimited={id:'planner-rate-limit-timings',question:'Explain the source question with enough detail.',required_source_groups:[]};
+ const noSearch={search:async()=>{throw Error('search should not run');},jsonGzip:async()=>{throw Error('page fetch should not run');}};
+ await assert.rejects(evaluateLiveCase(rateLimited,{library:noSearch,manifest:{books:{}},allowed:new Set(),token:'x'.repeat(40),
+  beforeCall:async()=>{},fetcher:async()=>new Response(JSON.stringify({failureCode:'rate-limited'}),
+   {status:429,headers:{'content-type':'application/json'}})}),error=>{
+    assert.deepEqual(error.requestFailure.stageTimings.map(entry=>entry.stage+':'+entry.status),['planner:failed']);
+    return true;
+   });
+ const library={search:async()=>({sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,preview:'A sufficiently long preview passage for testing.',score:4}]}),
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
+ const item={question:'Explain the source question.',selected_book_ids:['638'],
+  planner_queries:['first distinct query concept','second distinct query concept'],
+  required_source_groups:[{label:'Bible',book_ids:['638']}]};
+ await assert.rejects(evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
+  beforeCall:async()=>{},useFixedQueries:true,
+  fetcher:async()=>new Response(JSON.stringify({failureCode:'answer-failed'}),{status:500,headers:{'content-type':'application/json'}})}),error=>{
+    assert.equal(error.requestFailure.stage,'answer');
+    assert.deepEqual(error.requestFailure.stageTimings.map(entry=>entry.stage+':'+entry.status),
+     ['planner:skipped','retrieval:completed','answer:failed']);
+    return true;
+   });
+});
+
+test('request-failure case records preserve attached stage timings and default to none',async()=>{
+ const stageTimings=[{stage:'planner',elapsedMs:12,status:'completed'},
+  {stage:'retrieval',elapsedMs:34,status:'completed'},{stage:'answer',elapsedMs:56,status:'failed'}];
+ const items=[{id:'timing-failure',question:'Explain the source question with enough detail.',required_source_groups:[]},
+  {id:'untimed-failure',question:'Explain the source question with enough detail.',required_source_groups:[]}];
+ const run=await runLiveCases(items,{evaluateCase:async item=>{
+  const error=new Error('Worker unavailable');
+  error.requestFailure={stage:'answer',httpStatus:502,failureCode:'http-error',message:'unavailable',workerFailure:false,
+   ...(item.id==='timing-failure'?{stageTimings}:{})};
+  throw error;
+ }});
+ assert.equal(run.results[0].outcome,'request-failed');
+ assert.deepEqual(run.results[0].stageTimings,stageTimings);
+ assert.deepEqual(run.results[1].stageTimings,[]);
+});
+
+test('planner-only evaluation records planner and retrieval stage timings',async()=>{
+ const item=selectLiveCases({cases:[]},'planner')[0];
+ const library={search:async()=>({sources:[{id:'S1',bookId:'7',title:'Nicomachean Ethics — Aristotle',page:66,globalPageId:70,
+   preview:'Practical wisdom is a reasoned capacity for acting about matters that can be otherwise.',score:50}]}),
+  jsonGzip:async()=>({pages:[{id:70,page:66,text:'Practical wisdom is a reasoned capacity for acting about matters that can be otherwise.'}]})};
+ const result=await evaluatePlannerCase(item,{library,manifest:{books:{7:{title:'Nicomachean Ethics — Aristotle'}}},
+  allowed:new Set(['7']),token:'x'.repeat(40),beforeCall:async()=>{},
+  fetcher:async()=>new Response(JSON.stringify({queries:['first distinct query concept','second distinct query concept']}),
+   {status:200,headers:{'content-type':'application/json'}})});
+ assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
+  ['planner:completed','retrieval:completed']);
+ assert.ok(result.stageTimings.every(entry=>Number.isFinite(entry.elapsedMs)&&entry.elapsedMs>=0));
+});
