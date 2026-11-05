@@ -47,6 +47,52 @@ test('handoff suite permits one selected diagnostic case and keeps questions ope
  assert.match(selected[0].question,/choices and the poem’s picture of heroism/);
  assert.deepEqual(selected[0].review_focus,[]);
 });
+test('phase-2 library-all suite covers eight open all-books questions with no expected sources',()=>{
+ const cases=selectLiveCases(suite,'library-all','all');
+ assert.equal(cases.length,8);
+ assert.ok(cases.every(item=>item.evaluation_scope==='all-books'));
+ assert.ok(cases.every(item=>item.selected_book_ids.length===0));
+ assert.ok(cases.every(item=>item.required_source_groups.length===0&&item.review_focus.length===0));
+ assert.ok(cases.every(item=>item.planner_queries.length===1&&item.planner_queries[0]===item.question));
+ assert.ok(evaluationUsesLivePlanner('library-all','case-default'));
+ assert.deepEqual(applyQualityScope(cases,'case-default').map(item=>item.selected_book_ids),
+  cases.map(()=>[]));
+ assert.deepEqual(cases.map(item=>item.discipline),
+  ['philosophy','philosophy','literature','history','science','history','literature','society']);
+});
+test('phase-2 library-selected suite scopes eight questions to eight distinct catalog books',()=>{
+ const cases=selectLiveCases(suite,'library-selected','all');
+ assert.equal(cases.length,8);
+ assert.ok(cases.every(item=>item.evaluation_scope==='selected-books'));
+ assert.ok(cases.every(item=>item.selected_book_ids.length===1));
+ assert.equal(new Set(cases.map(item=>item.selected_book_ids[0])).size,8);
+ assert.ok(cases.every(item=>item.required_source_groups.length===1&&
+  item.required_source_groups[0].book_ids.length===1&&
+  item.required_source_groups[0].book_ids[0]===item.selected_book_ids[0]));
+ assert.ok(cases.every(item=>item.planner_queries.length===1&&item.planner_queries[0]===item.question));
+ assert.ok(evaluationUsesLivePlanner('library-selected','case-default'));
+ assert.deepEqual(applyQualityScope(cases,'case-default').map(item=>item.selected_book_ids),
+  [['315'],['241'],['74'],['103'],['140'],['260'],['89'],['18']]);
+});
+test('phase-2 suites permit one selected case and no question duplicates an earlier suite',()=>{
+ const selected=selectLiveCases(suite,'library-selected','library-selected-plato-republic-images');
+ assert.equal(selected.length,1);
+ assert.deepEqual(selected[0].selected_book_ids,['74']);
+ assert.throws(()=>selectLiveCases(suite,'library-selected','not-a-library-case'),/Unknown library-selected case/);
+ assert.throws(()=>selectLiveCases(suite,'library-all','library-selected-plato-republic-images'),/Unknown library-all case/);
+ assert.throws(()=>selectLiveCases(suite,'smoke','library-all-suffering-responses'),
+  /only in quality, focused, paired, holdout or acceptance mode/);
+ const earlierQuestions=new Set(),earlierIds=new Set();
+ for(const mode of ['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3']){
+  for(const item of selectLiveCases({cases:[]},mode,'all')){earlierQuestions.add(item.question);earlierIds.add(item.id);}
+ }
+ const phase2=[...selectLiveCases({cases:[]},'library-all','all'),
+  ...selectLiveCases({cases:[]},'library-selected','all')];
+ assert.equal(new Set(phase2.map(item=>item.question)).size,16,'phase-2 questions are mutually distinct');
+ assert.ok(phase2.every(item=>!earlierQuestions.has(item.question)),
+  'no phase-2 question duplicates an earlier suite question');
+ assert.ok(phase2.every(item=>!earlierIds.has(item.id)),'no phase-2 case id repeats an earlier suite');
+});
 test('malformed optional planner facets are dropped or fall back without blocking base retrieval',()=>{
  const result=partFacetsFromPlan([
   {id:'P1',question:'What did the priests say about Helen?',searchQueries:['']},
