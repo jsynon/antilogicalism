@@ -10,7 +10,7 @@ import {RemoteLibrary} from './remote-library.mjs';
 import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.0';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.1';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -236,7 +236,7 @@ async function bookShard(id){
   }
   return sourceShards.get(id);
 }
-async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=null,partQuestions=[],gapQueries=[],gapQueryPartLinks=[],allowEmpty=false}={}){
+async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=null,partQuestions=[],gapQueries=[],gapQueryPartLinks=[],allowEmpty=false,searchCache=null}={}){
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   candidates=[];
@@ -280,6 +280,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
           (Array.isArray(part.searchQueries)&&part.searchQueries.length?part.searchQueries:[part.question])
             .map(query=>({partId:part.id,query}))):[],
         directFallback:plannerFallback||!plannedQueries,
+        ...(searchCache?{searchCache}:{}),
         library,books:bookList,allowedBookIds:allowed,
         selectedBookIds:bookFilter.value?[bookFilter.value]:[],allowedPage,
         ...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT,
@@ -619,15 +620,32 @@ async function askQuestion(questionText){
       turnstileToken='';
       setStatus('On a little book hunt for passages that might help…');
       let planned=null,plannerFallback=false;
-      try{planned=await requestSourcePlan(q,token,history);}
-      catch(error){
-        if(!canFallbackToDirectSearch(diagnosticState?.failureHttpStatus,
-          diagnosticState?.failureCode))throw error;
-        plannerFallback=true;
+      // A selected book fully determines the search scope, so those
+      // requests build the deterministic catalog plan locally and skip the
+      // hosted planner call entirely. All-books requests, and selected-book
+      // questions that name a different work or author, keep the
+      // model-planned flow below unchanged.
+      const deterministicPlan=deterministicSelectedBookPlan(q,bookList,bookFilter.value||'');
+      if(deterministicPlan){
+        planned=deterministicPlan;
         if(diagnosticState){
-          diagnosticState.fallbackMode=true;
-          diagnosticState.failureHttpStatus=null;
-          diagnosticState.failureCode='';
+          diagnosticState.plannerSkipped=true;
+          diagnosticState.plannerSkipReason='selected-book-deterministic-plan';
+          diagnosticState.plannerQueries=deterministicPlan.queries;
+          diagnosticState.plannerPlan=deterministicPlan.plan;
+          refreshDiagnostic();
+        }
+      }else{
+        try{planned=await requestSourcePlan(q,token,history);}
+        catch(error){
+          if(!canFallbackToDirectSearch(diagnosticState?.failureHttpStatus,
+            diagnosticState?.failureCode))throw error;
+          plannerFallback=true;
+          if(diagnosticState){
+            diagnosticState.fallbackMode=true;
+            diagnosticState.failureHttpStatus=null;
+            diagnosticState.failureCode='';
+          }
         }
       }
       if(!planned?.plan){
@@ -641,8 +659,12 @@ async function askQuestion(questionText){
       partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>
         ({partId:part.id,question:part.question,sourceBookIds:part.sourceBookIds})):[];
       if(planned)setStatus('I found a few promising leads. Let me find the pages themselves…');
+      // One search cache serves both retrieval rounds of this question, so
+      // the conditional gap round below executes only its new searches
+      // instead of re-running every round-one facet against the index.
+      const searchCache=createRetrievalSearchCache();
       const found=await retrieveSources(planned?.queries||null,{plannerFallback,
-        plan:planned?.plan||null,partQuestions,allowEmpty:true});
+        plan:planned?.plan||null,partQuestions,allowEmpty:true,searchCache});
       if(!found)return;
       const coverage=assessEvidenceCoverage(candidates,q,partQuestions);
       if(diagnosticState){diagnosticState.retrievalCoverage={parts:coverage.parts,
@@ -664,7 +686,7 @@ async function askQuestion(questionText){
         }
         if(gapQueries.length){
           const expanded=await retrieveSources(planned?.queries||null,{plannerFallback,
-            plan:planned?.plan||null,partQuestions,gapQueries,gapQueryPartLinks});
+            plan:planned?.plan||null,partQuestions,gapQueries,gapQueryPartLinks,searchCache});
           if(!expanded)return;
           const secondCoverage=assessEvidenceCoverage(candidates,q,partQuestions);
           if(diagnosticState)diagnosticState.retrievalCoverageAfterGap={
