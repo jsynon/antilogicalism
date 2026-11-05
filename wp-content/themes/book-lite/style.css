@@ -2473,3 +2473,23 @@ html[data-theme="dark"] #third #rss-11 > h1.widget-title > a.rss-widget-title:ac
 .antilogicalism-related-books a.book-link {
 	display: none !important;
 }
+
+
+/* Keep the expanded mobile menu readable in light mode. */
+@media (max-width: 1200px) {
+	html:not([data-theme="dark"]) body .site-navigation .main-small-navigation .menu,
+	html:not([data-theme="dark"]) body .site-navigation #main-menu {
+		background-color: #fff !important;
+		color: #222 !important;
+	}
+
+	html:not([data-theme="dark"]) body .site-navigation .main-small-navigation .menu a,
+	html:not([data-theme="dark"]) body .site-navigation .main-small-navigation .menu a:visited {
+		color: #222 !important;
+	}
+
+	html:not([data-theme="dark"]) body .site-navigation .main-small-navigation .menu a:hover,
+	html:not([data-theme="dark"]) body .site-navigation .main-small-navigation .menu a:focus-visible {
+		color: #666 !important;
+	}
+}
