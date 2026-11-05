@@ -285,6 +285,65 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  return reserved;
 }
 
+/* Bounded-concurrency speculative search cache. The per-part scoped-search
+ * loop in retrieveEvidence decides sequentially which searches to issue,
+ * because later decisions read the facet bookkeeping and accumulated sources
+ * of earlier parts. Those decisions stay sequential; this cache only changes
+ * WHEN an already-determined search starts. Predictions start together (at
+ * most `concurrency` in flight) from the loop-entry snapshot, and the loop
+ * consumes each result at exactly the point where it would have issued the
+ * search itself. A prediction the loop never uses is discarded; a search the
+ * loop issues without a prediction runs directly. The merged output is
+ * therefore identical to the purely sequential flow for identical inputs.
+ * Each execution settles into a wrapper so an unused failure can never
+ * surface as an unhandled rejection; a consumed failure rethrows at the
+ * original call site, preserving the caller's existing try/catch behavior.
+ */
+export function createSearchPrefetch(library,{concurrency=4}={}){
+ const cache=new Map();
+ let active=0;
+ const waiters=[];
+ const keyOf=(query,options)=>[String(query||''),String(options?.bookId||''),
+  Number(options?.maxBooks)||'',Number(options?.pagesPerBook)||'',
+  options?.allowedBookIds?[...options.allowedBookIds].map(String).sort().join(','):'*']
+  .join('\n');
+ // Counting semaphore with slot transfer: a finishing job hands its slot
+ // directly to the oldest waiter instead of decrementing first, so a new
+ // synchronous prefetch can never overtake a queued job past the cap.
+ const acquire=()=>{
+  if(active<concurrency){active++;return null;}
+  return new Promise(resolve=>waiters.push(resolve));
+ };
+ const release=()=>{
+  const next=waiters.shift();
+  if(next)next();else active--;
+ };
+ const start=(query,options)=>{
+  const key=keyOf(query,options);
+  const existing=cache.get(key);
+  if(existing)return existing;
+  const promise=(async()=>{
+   const wait=acquire();
+   if(wait)await wait;
+   try{return {ok:true,value:await library.search(query,options)};}
+   catch(error){return {ok:false,error};}
+   finally{release();}
+  })();
+  cache.set(key,promise);
+  return promise;
+ };
+ return {
+  prefetch(query,options){start(query,options);},
+  async search(query,options){
+   const promise=cache.get(keyOf(query,options));
+   if(!promise)return library.search(query,options);
+   const settled=await promise;
+   if(settled.ok)return settled.value;
+   throw settled.error;
+  }
+ };
+}
+
 /* Shared browser/evaluator retrieval assembly. Both callers search the same
  * facet pool and hydrate the same canonical candidate pages. The browser and
  * evaluator pass this ordered pool to the Worker; final semantic selection
@@ -295,7 +354,7 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
 export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],gapQueryPartLinks=[],sourceGroups=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
  maxCandidates=LIVE_RETRIEVAL_CONFIG.maxCandidates,maxBooks=LIVE_RETRIEVAL_CONFIG.maxBooks,
- pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000}={}){
+ pagesPerBook=LIVE_RETRIEVAL_CONFIG.pagesPerBook,pageLimit=14000,prefetchPartSearches=true}={}){
  const direct=String(question||'').trim();
  if(direct.length<5||direct.length>400)throw Error('Question must contain 5–400 characters.');
  if(!library||typeof library.search!=='function'||!Array.isArray(books)||
@@ -567,6 +626,61 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  const primaryPartIds=comparisonSides.length===2
   ?new Set(comparisonSides.map(side=>side.part.partId))
   :new Set(scopedPartQuestions.map(part=>part?.partId).filter(Boolean));
+ // Speculatively start the per-part scoped searches this loop can already
+ // determine from the loop-entry snapshot, so they overlap instead of
+ // queueing behind each part's sequential decisions. For the facet a part
+ // attaches to at snapshot time the predictions cover every search the loop
+ // can go on to issue for it: facet target lists only grow as parts merge,
+ // so a book predicted missing can only turn out already covered, never the
+ // reverse. The loop consumes a prediction only for the exact search it
+ // issues itself, and any search it issues without one (for example a part
+ // reusing a facet another part created mid-loop) runs directly.
+ // Decisions, facet order, error handling, and merges below are unchanged
+ // from the sequential flow. Four concurrent searches bound the burst each
+ // search fans out into index-partition and book-shard downloads, while the
+ // per-part job count is small enough that four still overlaps nearly all
+ // of the serial wait.
+ const partSearch=prefetchPartSearches?createSearchPrefetch(library):null;
+ if(partSearch){
+  let predictedFallbacks=0;
+  for(const part of scopedPartQuestions){
+   if(!primaryPartIds.has(part?.partId)||typeof part?.question!=='string')continue;
+   const query=part.question.trim();
+   const sourceIds=partSourceBookIds.get(part.partId)||[];
+   if(!sourceIds.length)continue;
+   const scopedIds=sourceIds.filter(id=>retrievalAllowed.has(String(id)));
+   const facet=searchQueries.findIndex(value=>
+    value.trim().toLocaleLowerCase()===query.toLocaleLowerCase());
+   // Predict the quote fallback with the loop's own gates evaluated on the
+   // loop-entry snapshot, including its two-fallback budget in plan order.
+   // A part whose snapshot gates already fail never reaches the retry, so
+   // starting its search would add a call the sequential flow never makes.
+   // The gates can only close further as parts merge (and a pruned facet
+   // can reopen one, which simply leaves that part's retry unpredicted).
+   if(!selected.length&&scopedIds.length===1&&predictedFallbacks<2&&
+      hasSubstantialQuotedPhrase(part.question)){
+    const bookId=String(scopedIds[0]);
+    const quoteAlreadyRetrieved=searchSets.flatMap(set=>set.sources||[])
+     .filter(source=>String(source.bookId)===bookId)
+     .some(source=>quotedPhraseMatchLength(part.question,source.preview||source.text||'')>0);
+    const queryAlreadyScoped=facet>=0&&
+     (searchSets[facet]?.targetBookIds||[]).map(String).includes(bookId);
+    if(!quoteAlreadyRetrieved&&!queryAlreadyScoped){
+     predictedFallbacks++;
+     partSearch.prefetch(query,{bookId,allowedBookIds:retrievalAllowed,
+      maxBooks,pagesPerBook});
+    }
+   }
+   if(facet<0&&scopedIds.length<2)continue;
+   const searched=new Set((facet>=0?(searchSets[facet]?.targetBookIds||[]):[]).map(String));
+   for(const bookId of sourceIds){
+    if(!retrievalAllowed.has(String(bookId))||searched.has(String(bookId)))continue;
+    partSearch.prefetch(query,{bookId:String(bookId),
+     allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook});
+   }
+  }
+ }
+ const scopedSearch=partSearch?partSearch.search:(query,options)=>library.search(query,options);
  let quotedPartFallbacks=0;
  for(const part of scopedPartQuestions){
   if(!primaryPartIds.has(part?.partId)||typeof part?.question!=='string')continue;
@@ -596,7 +710,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
     quotedPartFallbacks++;
     let scopedSources=[];
     try{
-     const retry=await library.search(query,{bookId,allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook});
+     const retry=await scopedSearch(query,{bookId,allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook});
      scopedSources=(Array.isArray(retry?.sources)?retry.sources:[])
       .filter(source=>String(source.bookId)===bookId)
       .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
@@ -632,7 +746,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   const missingIds=sourceIds.filter(id=>retrievalAllowed.has(String(id))&&!alreadySearched.has(String(id)));
   if(!missingIds.length)continue;
   const scopedResults=await Promise.all(missingIds.map(async bookId=>{
-   try{return await library.search(query,{bookId:String(bookId),allowedBookIds:retrievalAllowed,
+   try{return await scopedSearch(query,{bookId:String(bookId),allowedBookIds:retrievalAllowed,
     maxBooks,pagesPerBook});}catch{return {sources:[]};}
   }));
   const retained=(searchSet?.sources||[]).filter(source=>sourceIds.includes(String(source.bookId)));
