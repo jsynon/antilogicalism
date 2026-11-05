@@ -1341,6 +1341,26 @@ export function sourcesUsedForWorkerSelection(selection,workerSelected,submitted
  return workerSelected.length?workerSelected:submittedPool;
 }
 
+// Observational per-case stage timings for evaluation reports, mirroring
+// the Worker trace's {stage, elapsedMs, status} stage entries. Worker
+// request durations are captured from callJson's own progress events,
+// which are measured after the inter-call pacing wait; local retrieval
+// stages are timed around the existing calls. Recording never changes
+// request flow, ordering, concurrency, or results.
+function createStageTimingRecorder(progressEvent){
+ const stageTimings=[];
+ const requestStageMs={planner:0,'gap-planner':0,answer:0};
+ const timedProgressEvent=async event=>{
+  if((event.status==='completed'||event.status==='failed')&&
+   Object.hasOwn(requestStageMs,event.stage)&&Number.isFinite(event.elapsedMs))
+   requestStageMs[event.stage]+=event.elapsedMs;
+  return progressEvent(event);
+ };
+ return {stageTimings,requestStageMs,timedProgressEvent,
+  record:(stage,status,elapsedMs)=>stageTimings.push({stage,elapsedMs,status}),
+  attach:error=>{if(error&&typeof error==='object'&&error.requestFailure)
+   error.requestFailure.stageTimings=stageTimings;}};
+}
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,preparedPlan=null,answerVariant='with-review',retrievalProfile='baseline',onProgress=async()=>{}}){
  if(!['with-review','compose-only','paired-review-ablation','with-expansion','paired-expansion-ablation','paired-selection-ablation'].includes(answerVariant))
   throw Error('Unsupported answer variant.');
@@ -1349,6 +1369,8 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  const progressEvent=async event=>onProgress({caseId:item.id,...event});
  const progress=async(stage,status,message,details={})=>progressEvent({stage,status,message,...details});
  await progress('case','started',`Starting ${answerVariant} evaluation for this question.`);
+ const timing=createStageTimingRecorder(progressEvent);
+ const stageTimings=timing.stageTimings;
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
  let plan,queries,plannerFallback=false,plannerFailure=null,plannerFailureDiagnostics=null,plannerSkipped=false,plannerReused=false,
@@ -1366,17 +1388,20 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   plannerWorkerSourceRevision=preparedPlan.workerSourceRevision||null;
   await progress('planner','reused','Reusing the paired all-books plan and queries; only the selected-book scope changes.',
    {queryCount:queries.length});
+  timing.record('planner','reused',0);
  }else if(useFixedQueries&&validSearchPlan(item.planner_queries)){
   queries=item.planner_queries;
   plannerSkipped=true;
   await progress('planner','skipped','Using the fixed evaluation queries; no planner request is needed.',{queryCount:queries.length});
+  timing.record('planner','skipped',0);
  }else try{
-  plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner',progressEvent);
+  plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner',timing.timedProgressEvent);
   if(!validSearchPlan(plan?.queries)){
    const error=attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{httpStatus:200,failureCode:'invalid-response',failureDetail:'invalid_output',workerFailure:false});
    throw error;
   }
   queries=plan.queries;
+  timing.record('planner','completed',timing.requestStageMs.planner);
   plannerWorkerVersionId=plan.workerVersionId||null;
   plannerWorkerSourceBuild=plan.workerSourceBuild||null;
   plannerWorkerSourceRevision=plan.workerSourceRevision||null;
@@ -1386,7 +1411,12 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   plannerWorkerVersionId=failure.workerVersionId||null;
   plannerWorkerSourceBuild=failure.workerSourceBuild||null;
   plannerWorkerSourceRevision=failure.workerSourceRevision||null;
-  if(!canFallbackToDirectSearch(failure.httpStatus,failure.failureCode))throw error;
+  if(!canFallbackToDirectSearch(failure.httpStatus,failure.failureCode)){
+   timing.record('planner','failed',timing.requestStageMs.planner);
+   timing.attach(error);
+   throw error;
+  }
+  timing.record('planner','fallback',timing.requestStageMs.planner);
   plannerFallback=true;
   plannerFailure={httpStatus:failure.httpStatus,failureCode:failure.failureCode};
   // Keep the established compact field stable for existing artifact readers;
@@ -1403,8 +1433,10 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  let loaded;
  await progress('retrieval','started',`Searching ${new Set([...queries,...partQueries.map(value=>value.query)]).size} distinct facets and assembling source pages.`,
   {queryCount:queries.length,partFacetCount:partQueries.length,partFacetWarnings:partFacets.warnings});
+ const retrievalStarted=Date.now();
  try{loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,
-  partQueries,partQuestions,retrievalConfig:RETRIEVAL_PROFILES[retrievalProfile]});}
+  partQueries,partQuestions,retrievalConfig:RETRIEVAL_PROFILES[retrievalProfile]});
+  timing.record('retrieval','completed',Date.now()-retrievalStarted);}
  catch(error){error.requestFailure={stage:'retrieval',httpStatus:null,failureCode:'retrieval-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   error.requestFailure.plannerFallback=plannerFallback;
   error.requestFailure.plannerSkipped=plannerSkipped;
@@ -1412,7 +1444,9 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;
-   if(plannerFailureDiagnostics)error.requestFailure.plannerFailureDiagnostics=plannerFailureDiagnostics;throw error;}
+   if(plannerFailureDiagnostics)error.requestFailure.plannerFailureDiagnostics=plannerFailureDiagnostics;
+  timing.record('retrieval','failed',Date.now()-retrievalStarted);
+  timing.attach(error);throw error;}
  let gapQueries=[],gapQueryPartLinks=[],gapPlannerFailure=null,gapPlannerFailureDiagnostics=null;
  const initialSearches=loaded.searches;
  const initialRetrievalCandidates=loaded.retrievalCandidates;
@@ -1434,7 +1468,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
       coverageReason:part.coverageReason,coverageSource:part.coverageSource})),
      originalQueries:[...queries,...partQueries.map(value=>value.query)].slice(0,7),
      candidates:loaded.retrievalCandidates.slice(0,6).map(source=>({title:source.title,excerpt:source.excerpt.slice(0,420)}))
-    }},beforeCall,'gap-planner',progressEvent);
+    }},beforeCall,'gap-planner',timing.timedProgressEvent);
    if(!Array.isArray(gap?.queries)||gap.queries.length>3||gap.queries.some(value=>
      typeof value!=='string'||value.trim().length<8||value.trim().length>160))
     throw attachRequestFailure(new Error('Conditional retrieval planner returned invalid queries.'),
@@ -1450,17 +1484,29 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     gapQueryPartLinks=gapQueries.map(query=>({query,partIds:[[...weakPartIds][0]]}));
    await progress('gap-planner','completed',`Conditional retrieval returned ${gapQueries.length} optional search terms.`,
     {queryCount:gapQueries.length,usage:gap.usage||null});
+   timing.record('gap-planner','completed',timing.requestStageMs['gap-planner']);
    if(gapQueries.length){
-    loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,
-     partQueries,partQuestions,gapQueries,gapQueryPartLinks,retrievalConfig:RETRIEVAL_PROFILES[retrievalProfile]});
-    gapRetrievalRerun=true;
-    retrievalCoverage=assessEvidenceCoverage(loaded.retrievalCandidates,item.question,partQuestions);
+    const gapRetrievalStarted=Date.now();
+    try{
+     loaded=await loadSources(item,queries,{library,manifest,allowed,directFallback:plannerFallback,
+      partQueries,partQuestions,gapQueries,gapQueryPartLinks,retrievalConfig:RETRIEVAL_PROFILES[retrievalProfile]});
+     gapRetrievalRerun=true;
+     retrievalCoverage=assessEvidenceCoverage(loaded.retrievalCandidates,item.question,partQuestions);
+     timing.record('gap-retrieval','completed',Date.now()-gapRetrievalStarted);
+    }catch(rerunError){
+     timing.record('gap-retrieval','failed',Date.now()-gapRetrievalStarted);
+     throw rerunError;
+    }
    }
   }catch(error){
    const failure=error.requestFailure||{};
+   const gapPlannerRecorded=stageTimings.some(entry=>entry.stage==='gap-planner');
    if(!canFallbackToDirectSearch(failure.httpStatus,failure.failureCode)){
-    failure.gapPlannerAttempted=true;error.requestFailure=failure;throw error;
+    if(!gapPlannerRecorded)timing.record('gap-planner','failed',timing.requestStageMs['gap-planner']);
+    failure.gapPlannerAttempted=true;error.requestFailure=failure;
+    error.requestFailure.stageTimings=stageTimings;throw error;
    }
+   if(!gapPlannerRecorded)timing.record('gap-planner','fallback',timing.requestStageMs['gap-planner']);
    gapPlannerFailure=failure.failureCode||'gap-planning-failed';
    gapPlannerFailureDiagnostics={stage:'gap-planner',workerFailureStage:failure.workerFailureStage||'gap-planning',
     httpStatus:failure.httpStatus,failureCode:gapPlannerFailure,
@@ -1474,6 +1520,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    'retrieval',{failureCode:'no-eligible-sources',workerFailure:false});
   error.requestFailure.gapPlannerAttempted=gapSearchTriggered;
   if(gapPlannerFailure)error.requestFailure.gapPlannerFailure=gapPlannerFailure;
+  error.requestFailure.stageTimings=stageTimings;
   throw error;
  }
  const {selected,searches,retrievalCandidates}=loaded;
@@ -1504,7 +1551,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     // Match the live client handoff so offline acceptance runs exercise the
     // same part-linked evidence packet that the Worker receives in production.
     sources:answerSources.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
-     ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))},beforeCall,'answer',progressEvent);
+     ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))},beforeCall,'answer',timing.timedProgressEvent);
    const candidateByLocator=new Map(loaded.candidates.map(source=>[String(source.bookId)+':'+source.page,source]));
    const workerSelected=(Array.isArray(data.sourceSelection?.pages)?data.sourceSelection.pages:[])
     .map(source=>{
@@ -1526,13 +1573,16 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    await progress('answer','completed',`${variant} returned ${audit.outcome||'no outcome'} with ${audit.coverage} coverage and ${audit.citationCount} citations.`,
     {variant,outcome:audit.outcome,coverage:audit.coverage,citations:audit.citationCount,usage:data.usage||null});
   }
+  timing.record('answer','completed',timing.requestStageMs.answer);
  }catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   error.requestFailure.plannerFallback=plannerFallback;
   error.requestFailure.plannerSkipped=plannerSkipped;
   error.requestFailure.plannerWorkerVersionId=plannerWorkerVersionId;
   error.requestFailure.plannerWorkerSourceBuild=plannerWorkerSourceBuild;
   error.requestFailure.plannerWorkerSourceRevision=plannerWorkerSourceRevision;
-  if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;throw error;}
+  if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;
+  timing.record('answer','failed',timing.requestStageMs.answer);
+  timing.attach(error);throw error;}
  const primary=variantResults.find(result=>result.answerVariant==='with-review')||variantResults[0];
  const answerVariantComparison=['paired-review-ablation','paired-expansion-ablation','paired-selection-ablation'].includes(answerVariant)?{
   ...(answerVariant==='paired-selection-ablation'?{selectionComparison}:{}),
@@ -1566,22 +1616,33 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   partFacetWarnings:partFacets.warnings,
   answerVariant,retrievalProfile,...(answerVariantComparison?{answerVariantComparison}:{}),
   ...(answerVariant==='paired-review-ablation'?{reviewAblation:answerVariantComparison}:{}),
+  stageTimings,
   elapsedMs:Date.now()-startTime};
 }
 export async function evaluatePlannerCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},onProgress=async()=>{}}={}){
  const startTime=Date.now();
  const progressEvent=async event=>onProgress({caseId:item.id,...event});
  const progress=async(stage,status,message,details={})=>progressEvent({stage,status,message,...details});
+ const timing=createStageTimingRecorder(progressEvent);
  await progress('case','started','Starting planner-only retrieval evaluation.');
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
- const plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,
-  bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner',progressEvent);
- if(!validSearchPlan(plan?.queries))
-  throw attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{
+ let plan;
+ try{plan=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,
+  bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token'},beforeCall,'planner',timing.timedProgressEvent);}
+ catch(error){timing.record('planner','failed',timing.requestStageMs.planner);
+  timing.attach(error);throw error;}
+ if(!validSearchPlan(plan?.queries)){
+  timing.record('planner','failed',timing.requestStageMs.planner);
+  const invalidPlan=attachRequestFailure(new Error('Planner returned an invalid search plan.'),'planner',{
    httpStatus:200,failureCode:'invalid-response',workerFailure:false,
    workerVersionId:plan?.workerVersionId,workerSourceBuild:plan?.workerSourceBuild,workerSourceRevision:plan?.workerSourceRevision});
+  timing.attach(invalidPlan);
+  throw invalidPlan;
+ }
+ timing.record('planner','completed',timing.requestStageMs.planner);
  let loaded;
+ const retrievalStarted=Date.now();
  const partFacets=partFacetsFromPlan(plan?.plan?.parts);
  const {partQueries,partQuestions}=partFacets;
  await progress('retrieval','started',`Searching ${new Set([...plan.queries,...partQueries.map(value=>value.query)]).size} planner and part facets.`,
@@ -1591,8 +1652,11 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
   const wrapped=attachRequestFailure(error,'retrieval',{failureCode:'retrieval-failed',workerFailure:false,
    workerVersionId:plan.workerVersionId,workerSourceBuild:plan.workerSourceBuild,workerSourceRevision:plan.workerSourceRevision});
   wrapped.requestFailure.plannerSkipped=false;
+  timing.record('retrieval','failed',Date.now()-retrievalStarted);
+  timing.attach(wrapped);
   throw wrapped;
  }
+ timing.record('retrieval','completed',Date.now()-retrievalStarted);
  const {selected,searches,retrievalCandidates}=loaded;
  const retrievalFallbackCount=searches.filter(value=>value.fallbackFrom).length;
  await progress('retrieval','completed',`Retrieved ${searches.reduce((sum,value)=>sum+(Number(value.resultCount)||0),0)} indexed matches; selected ${selected.length} verified pages.`+
@@ -1627,6 +1691,7 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
   citationBookIds:[],citationSources:[],inlineCitationCount:0,inlineIdsWithoutSource:[],
   evidenceHighlightCount:0,evidenceHighlights:[],questionParts:[],
   questionPartCoverage:{total:0,supported:0,partial:0,unsupported:0},evidenceMap:[],
+  stageTimings:timing.stageTimings,
   elapsedMs:Date.now()-startTime};
 }
 function failedCaseResult(item,error){
@@ -1642,7 +1707,8 @@ function failedCaseResult(item,error){
   answerWorkerSourceRevision:failure.stage==='answer'?failure.workerSourceRevision:null,
   plannerFallback:failure.plannerFallback===true,gapPlannerAttempted:failure.gapPlannerAttempted===true,
   ...(failure.gapPlannerFailure?{gapPlannerFailure:failure.gapPlannerFailure}:{}),
-  ...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),searches:[],
+  ...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),
+  stageTimings:Array.isArray(failure.stageTimings)?failure.stageTimings:[],searches:[],
   submittedSources:[],outcome:'request-failed',coverage:'none',reviewStatus:'request-failed',noAnswerFailure:true,
   answerText:'',citationCount:0,citationBookIds:[],citationSources:[],inlineCitationCount:0,
   inlineIdsWithoutSource:[],submittedSourceCount:0,
