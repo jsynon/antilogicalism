@@ -256,7 +256,7 @@ function termFamily(term, partition) {
   }
   return [...variants];
 }
-export function substantivePageEvidence(text, terms, headerTerms = new Set(), phrase = '') {
+export function substantivePageEvidence(text, terms, headerTerms = new Set(), phrase = '', options = null) {
   if (isNavigationPage(text) || isPublicationPage(text)) return null;
   const words = String(text || '').toLowerCase().match(/[a-z0-9]+/g) || [];
   if (words.length < 10) return null;
@@ -270,12 +270,21 @@ export function substantivePageEvidence(text, terms, headerTerms = new Set(), ph
   }
   const groupByTerm=new Map();
   termGroups.forEach((group,index)=>group.forEach(term=>groupByTerm.set(term,index)));
+  // Optional IDF-weighted scoring (options = {groupWeights, avgPageWords}).
+  // Weights are parallel to termGroups; a missing or non-numeric weight
+  // defaults to 1. Without options the legacy unweighted score is returned
+  // unchanged, so other callers and tests are unaffected.
+  const weights = options ? termGroups.map((_, index) => {
+    const value = options.groupWeights?.[index];
+    return typeof value === 'number' && Number.isFinite(value) ? value : 1;
+  }) : null;
+  const groupCounts = weights ? new Array(termGroups.length).fill(0) : null;
   let hits = 0, best = {score:0, center:0, unique:0}, unique = new Set();
   const normalized = words.map((word, index) =>
     index < 24 && headerTerms.has(wordStem(word)) ? '' : wordStem(word));
   for (let i = 0; i < normalized.length; i++) {
     const groupIndex=groupByTerm.get(normalized[i]);
-    if(groupIndex!==undefined){unique.add(groupIndex);hits++;}
+    if(groupIndex!==undefined){unique.add(groupIndex);hits++;if(groupCounts)groupCounts[groupIndex]++;}
   }
   if (!hits) return null;
   // Find the most locally concentrated part of the actual page. An isolated
@@ -288,7 +297,12 @@ export function substantivePageEvidence(text, terms, headerTerms = new Set(), ph
       const groupIndex=groupByTerm.get(word);
       if(groupIndex!==undefined){present.add(groupIndex);matched++;}
     }
-    const score = 9 * present.size + Math.min(8, matched);
+    let presentWeight = present.size;
+    if (weights) {
+      presentWeight = 0;
+      for (const groupIndex of present) presentWeight += weights[groupIndex];
+    }
+    const score = 9 * presentWeight + Math.min(8, matched);
     if (score > best.score) best = {
       score, center:Math.min(words.length-1, i+55), unique:present.size
     };
@@ -301,7 +315,22 @@ export function substantivePageEvidence(text, terms, headerTerms = new Set(), ph
   // page has fewer surrounding topic words than a commentary page. Reward
   // exact occurrence and modestly favor pages where it appears in context.
   const phraseBoost=phraseMatches?48+8*Math.min(3,phraseMatches-1):0;
-  let score = best.score + 2 * unique.size + Math.min(5, Math.log1p(hits)) + phraseBoost;
+  // Weighted mode also rewards sustained whole-page discussion: a BM25-style
+  // term-frequency component per group, length-normalized against the book's
+  // average page. The returned unique/localUnique stay raw group counts;
+  // callers use them as a relevance floor.
+  let weightedUnique = unique.size, tfScore = 0;
+  if (weights) {
+    weightedUnique = 0;
+    for (const groupIndex of unique) weightedUnique += weights[groupIndex];
+    const avgPageWords = options.avgPageWords > 0 ? options.avgPageWords : words.length;
+    const lengthNorm = 0.25 + 0.75 * (words.length / avgPageWords);
+    for (let g = 0; g < groupCounts.length; g++) {
+      const tf = groupCounts[g];
+      if (tf > 0) tfScore += weights[g] * 4 * (tf * 2.2) / (tf + 1.2 * lengthNorm);
+    }
+  }
+  let score = best.score + 2 * weightedUnique + Math.min(5, Math.log1p(hits)) + phraseBoost + tfScore;
   const opening = String(text).trim().slice(0, 180);
   if (/^(?:(?:\d+|[ivxlc]+)\s+)?(?:introduction|preface|foreword|acknowledg(?:e)?ments)\b/i.test(opening)) {
     score -= 12; // A preference, not a ban; introductions can contain arguments.
@@ -541,6 +570,16 @@ export class RemoteLibrary {
       .flatMap(term=>termFamily(term,data.get(term.slice(0,2)))))])
       .filter(group=>group.length);
     const evidenceTerms=[...new Set(termGroups.flat())];
+    // IDF weight per query term group, parallel to termGroups. Candidate
+    // generation below already weighs rare terms more heavily when ranking
+    // books; page selection inside each book now gets the same signal, so a
+    // rare discriminative term is not drowned out by a common one when the
+    // four cited pages per book are chosen. Posting lists are delta-encoded,
+    // but their length is still the document frequency of the term.
+    const totalPages=manifest.page_books.length;
+    const termGroupWeights=termGroups.map(group=>Math.log1p(
+      totalPages/(1+group.reduce((sum,term)=>
+        sum+(data.get(term.slice(0,2))?.[term]||[]).length,0))));
     const scores = new Map();
     for (const group of termGroups) {
       for (const term of group) {
@@ -630,6 +669,19 @@ export class RemoteLibrary {
         .filter(term=>!bookAuthorTerms.has(wordStem(term))))
         .filter(group=>group.length);
       const bookEvidenceTerms=bookEvidenceGroups.flat();
+      // Carry each group's IDF weight through the same author-term filter:
+      // a weight survives exactly when its filtered group is non-empty, so
+      // the weights stay parallel to bookEvidenceGroups. Normalize to mean 1
+      // so weighted page scores stay on the same scale as the legacy scorer
+      // regardless of how rare this query's terms happen to be.
+      const bookGroupWeights=termGroups
+        .map((group,index)=>group.some(term=>!bookAuthorTerms.has(wordStem(term)))
+          ? termGroupWeights[index] : null)
+        .filter(weight=>weight!==null);
+      if(bookGroupWeights.length){
+        const mean=bookGroupWeights.reduce((sum,weight)=>sum+weight,0)/bookGroupWeights.length;
+        if(mean>0)for(let i=0;i<bookGroupWeights.length;i++)bookGroupWeights[i]/=mean;
+      }
       // Keep the existing roughly-half relevance floor (minimum two,
       // maximum three) based on the reader/planner's original indexed terms.
       // Equivalent source phrases are one local evidence concept, so their
@@ -640,6 +692,26 @@ export class RemoteLibrary {
       const shard = await this.jsonGzip('book-' + book.id + '.json');
       booksScanned++;
       if (!Array.isArray(shard.pages)) throw new Error('Invalid source shard for ' + book.id);
+      // Mean word count over this shard's usable prose pages, for BM25-style
+      // length normalization in the weighted page scorer. The pre-pass uses
+      // the same page-eligibility checks as the scan loop below; the scan
+      // itself stays a single pass.
+      let avgPageWords=0;
+      {
+        let wordTotal=0, prosePages=0;
+        for (const item of shard.pages) {
+          if (!Number.isSafeInteger(item.id) || String(manifest.page_books[item.id]) !== book.id ||
+              !Number.isSafeInteger(item.page) || item.page <= 0 ||
+              typeof item.text !== 'string' || !item.text.trim()) continue;
+          const visibleText = this.searchVisibleText(item.text, book.id, item.page, suppressionPolicy);
+          if (!visibleText.trim()) continue;
+          if (isNavigationPage(visibleText) || isPublicationPage(visibleText)) continue;
+          wordTotal += (visibleText.toLowerCase().match(/[a-z0-9]+/g) || []).length;
+          prosePages++;
+        }
+        if (prosePages) avgPageWords = wordTotal / prosePages;
+      }
+      const evidenceOptions={groupWeights:bookGroupWeights, avgPageWords};
       // The book shard is already downloaded. Inspect its entire indexed
       // main text, not just the first sixty lexical hits; morphological
       // variants and contextual discussion may lie outside that shortlist.
@@ -656,7 +728,7 @@ export class RemoteLibrary {
         }
         if ((visibleText.match(/[a-z]+/gi) || []).length >= 10 &&
             !proseByPage.has(item.page)) proseByPage.set(item.page, {item, text:visibleText});
-        const evidence = substantivePageEvidence(visibleText, bookEvidenceGroups, bookTitleTerms,phrase);
+        const evidence = substantivePageEvidence(visibleText, bookEvidenceGroups, bookTitleTerms,phrase,evidenceOptions);
         if (!evidence || (evidence.localUnique < minimumEvidenceTerms&&!evidence.phraseMatches)) continue;
         const hit = relevant.get(item.id);
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
@@ -676,7 +748,7 @@ export class RemoteLibrary {
         const item=neighborRecord?.item||null;
         const neighborText=neighborRecord?.text||'';
         const neighborEvidence=neighborRecord&&substantivePageEvidence(neighborText,
-          bookEvidenceGroups,bookTitleTerms,phrase);
+          bookEvidenceGroups,bookTitleTerms,phrase,evidenceOptions);
         const relevantNeighbor=neighborEvidence&&
           (neighborEvidence.localUnique>=1||neighborEvidence.phraseMatches>0);
         const phraseContinuesAcrossBoundary=phrase&&exactPhraseMatchCount(
