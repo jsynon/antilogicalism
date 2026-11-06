@@ -57,8 +57,13 @@ export function partFacetsFromPlan(parts){
    warnings.push('invalid-part');
    continue;
   }
+  const requirementTexts=Array.isArray(part.requirements)?part.requirements
+   .map(item=>typeof item==='string'?item:item?.text)
+   .filter(text=>typeof text==='string'&&text.trim().length>=5&&text.trim().length<=200)
+   .map(text=>text.trim()).slice(0,4):[];
   partQuestions.push({partId,question:question.trim(),
-   sourceBookIds:Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):null});
+   sourceBookIds:Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):null,
+   ...(requirementTexts.length?{requirements:requirementTexts}:{})});
   const proposed=Array.isArray(part.searchQueries)&&part.searchQueries.length
    ?part.searchQueries:[question];
   let candidates=proposed.filter(validPartText).map(value=>value.trim());

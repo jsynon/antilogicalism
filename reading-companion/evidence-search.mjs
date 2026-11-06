@@ -374,6 +374,25 @@ export function createSearchPrefetch(library,{concurrency=4,cache:sharedCache=nu
  * the only environment difference (browser shard cache versus evaluator
  * RemoteLibrary access).
  */
+/* The plan's per-part requirement texts, when the caller threads them
+ * through partQuestions (companion and the evaluation harness do; older
+ * callers do not). Bounded and shape-tolerant: plain strings or {text}
+ * entries, trimmed, deduplicated. Anything else is dropped, and a part
+ * with no usable requirement falls back to its own question wording in
+ * the coverage trigger below. */
+function partRequirementTexts(part){
+ const raw=Array.isArray(part?.requirements)?part.requirements:[];
+ const seen=new Set(),texts=[];
+ for(const item of raw){
+  const value=typeof item==='string'?item:typeof item?.text==='string'?item.text:'';
+  const text=value.trim();
+  const key=text.toLocaleLowerCase();
+  if(text.length<5||text.length>200||seen.has(key))continue;
+  seen.add(key);texts.push(text);
+  if(texts.length>=4)break;
+ }
+ return texts;
+}
 export async function retrieveEvidence({question,queries,partQueries=[],gapQueries=[],gapQueryPartLinks=[],sourceGroups=[],library,books,allowedBookIds,
  selectedBookIds=[],pageLoader,directFallback=false,allowedPage=()=>true,partQuestions=[],
  maxCandidates=LIVE_RETRIEVAL_CONFIG.maxCandidates,maxBooks=LIVE_RETRIEVAL_CONFIG.maxBooks,
@@ -848,6 +867,94 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    partGapRecovery:true,starvedPartId:partId});
   partFacetIndices.push({partId,facet,kind:'part-gap'});
  }
+ // Batch 6 (B6-6): coverage-triggered targeted search. The starved-part
+ // trigger above rescues a part with NO candidates; a different failure
+ // is a part whose candidates exist but none of them reaches the part's
+ // requirement — its facets found the topic in general, not the specific
+ // thing the part must establish (the phase-2 Smith case missed the
+ // Book V material twice this way while candidates shipped). After gap
+ // planning has run, give each such part ONE targeted search worded from
+ // its first uncovered requirement, inside its already-validated source
+ // scope: the same budget shape as the starved-part trigger, traced the
+ // same way with a coverage reason. This is local index work only.
+ //
+ // Coverage derivation (deterministic): a requirement's terms are its
+ // facetTerms; a candidate's reach is localFacetTextMatch's overlap of
+ // those terms within the candidate's search snippet (the text this
+ // module holds pre-hydration). A requirement counts as uncovered when
+ // the best candidate shares fewer than two of its terms — the two-term
+ // floor the facet linker already uses. A part whose plan requirements
+ // were not threaded through falls back to its own question as the sole
+ // requirement text. This remains a retrieval trigger, never a support
+ // verdict; answer review still decides what a passage proves.
+ //
+ // The trigger belongs to the post-gap-planning call — the invocation
+ // that carries gapQueries/gapQueryPartLinks — so it backstops the
+ // gap planner instead of pre-empting it in the initial round, where
+ // the established recovery triggers (scoped searches, quote fallback,
+ // source-group recovery, starvation) run first.
+ if(gapQueries.length||gapQueryPartLinks.length)
+ for(const part of scopedPartQuestions){
+  if(typeof part?.partId!=='string'||typeof part?.question!=='string')continue;
+  const partId=part.partId;
+  const scopeIds=partSourceBookIds.get(partId)||[];
+  const allowedScopeIds=scopeIds.filter(id=>retrievalAllowed.has(String(id)));
+  if(scopeIds.length&&!allowedScopeIds.length)continue;
+  const candidateSources=[];
+  for(const item of partFacetIndices){
+   if(item.partId!==partId)continue;
+   for(const source of searchSets[item.facet]?.sources||[]){
+    if(scopeIds.length&&!scopeIds.includes(String(source.bookId)))continue;
+    candidateSources.push(source);
+   }
+  }
+  // Zero candidates is the starved-part trigger's case, handled above.
+  if(!candidateSources.length)continue;
+  const requirementTexts=partRequirementTexts(part);
+  const texts=requirementTexts.length?requirementTexts:[part.question.trim()];
+  let uncoveredQuery='';
+  for(const text of texts){
+   if(facetTerms(text).length<2)continue;
+   let best=0,judged=0;
+   for(const source of candidateSources){
+    const snippet=source.preview||source.excerpt||source.text||'';
+    if(!snippet)continue;
+    judged++;
+    const overlap=localFacetTextMatch(text,snippet).overlap;
+    if(overlap>best)best=overlap;
+    if(best>=2)break;
+   }
+   // Candidates carrying no snippet text at all cannot judge coverage;
+   // absence of text is not evidence of a low-overlap miss.
+   if(judged&&best<2){uncoveredQuery=text;break;}
+  }
+  if(uncoveredQuery.length<5)continue;
+  const query=uncoveredQuery;
+  // Do not repeat an execution this call already ran for the part under
+  // the same wording with its full scope targeted (mirrors the
+  // starved-part trigger's guard): it would return the same result set.
+  const alreadyRan=partFacetIndices.some(item=>item.partId===partId&&
+   searchQueries[item.facet]?.trim().toLocaleLowerCase()===query.toLocaleLowerCase()&&
+   (!scopeIds.length||scopeIds.every(id=>
+    (searchSets[item.facet]?.targetBookIds||[]).map(String).includes(id))));
+  if(alreadyRan)continue;
+  const facet=searchQueries.length;
+  searchQueries.push(query);
+  let recovered=[];
+  try{
+   const result=await runSearch(query,{allowedBookIds:scopeIds.length?
+    new Set(allowedScopeIds):retrievalAllowed,maxBooks,pagesPerBook});
+   recovered=(Array.isArray(result?.sources)?result.sources:[])
+    .filter(source=>!scopeIds.length||scopeIds.includes(String(source.bookId)))
+    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+  }catch{
+   // A failed targeted search leaves the coverage gap visible in the
+   // traces; it must not interrupt retrieval for the other parts.
+  }
+  searchSets.push({sources:recovered,executedQuery:query,targetBookIds:scopeIds,
+   partGapRecovery:true,starvedPartId:partId,gapRecoveryReason:'coverage'});
+  partFacetIndices.push({partId,facet,kind:'part-gap'});
+ }
  const partFacetScopes=partQuestions.length?partFacetIndices.map(item=>({partId:item.partId,facet:item.facet,
   sourceBookIds:(item.kind==='gap'||item.kind==='part-gap')?(partSourceBookIds.get(item.partId)||[]):
    (partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[])})):[];
@@ -926,7 +1033,9 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   ...(searchSets[index].fallbackFrom?{fallbackFrom:searchSets[index].fallbackFrom,
    fallbackReason:'empty-source-side-facet'}:{}),
   ...(searchSets[index].partGapRecovery?{partGapRecovery:true,
-   starvedPartId:searchSets[index].starvedPartId}:{}),
+   starvedPartId:searchSets[index].starvedPartId,
+   ...(searchSets[index].gapRecoveryReason?
+    {reason:searchSets[index].gapRecoveryReason}:{})}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
   ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),
   // The offline gold audit needs to distinguish a search miss from evidence
