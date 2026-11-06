@@ -492,6 +492,11 @@ test('recorder keeps every claim link when box entries share one quote text (bat
   ]}]},[{bookId:'140',page:33}],[]);
  assert.deepEqual(result.evidenceHighlights[0].quotes.map(entry=>entry.claimId),['P1-C1','P1-C2']);
  assert.deepEqual(result.highlightRelevance.excerpts.map(entry=>entry.claimId),['P1-C1','P1-C2']);
+ // Batch 10 (B10-5): the recorder keeps the gateway's box keying, so
+ // display dedupe is measurable from the report itself.
+ assert.deepEqual(result.evidenceHighlights[0].quotes.map(entry=>entry.box),[0,0]);
+ assert.deepEqual(result.evidenceHighlights[0].quotes.map(entry=>entry.claimIds),
+  [['P1-C1','P1-C2'],['P1-C1','P1-C2']]);
 });
 
 test('evidence coverage alone does not establish answer completeness',()=>{
@@ -1496,7 +1501,7 @@ test('audit report preserves answer text, citation locations, and Worker quote h
  assert.deepEqual(result.evidenceHighlights,[{sourceId:'S1',title:'Bible',page:1821,
   quote:'A passage excerpt.',claimId:'P1-C1',point:'Supported claim.',quoteLocated:null,
   quotes:[{claimId:'P1-C1',partId:'P1',point:'Supported claim.',quote:'A passage excerpt.',
-   quoteLocated:null,partialMatch:false}]}]);
+   quoteLocated:null,partialMatch:false,box:null,claimIds:[]}]}]);
  assert.equal('evidenceHighlightsLocated' in result,false);
 });
 

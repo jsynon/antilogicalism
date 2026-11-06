@@ -1331,6 +1331,64 @@ test('an unmentioned but catalog-valid planner source does not become an exclusi
  assert.equal(plan.parts[0].sourceBookIds,null);
 });
 
+test('planner requirements survive normalization with the retrieval bounds applied (batch 10 B10-6)',()=>{
+ const question='How do Aristotle and Darwin differ in explaining change?';
+ const catalog={
+  '4':'Metaphysics — Aristotle','529':'On the Origin of Species — Charles Darwin'
+ };
+ const plan=normalizePlan({intent:'compare',sources:[
+  {label:'Aristotle',role:'primary',bookIds:['4']},
+  {label:'Darwin',role:'primary',bookIds:['529']}
+ ],parts:[
+  {question:'How does Aristotle explain change?',requirements:[
+   'state the four causes account of change',
+   {text:'give the role of form and matter in change'},
+   'state the four causes account of change',
+   'no',
+   'x'.repeat(201),
+   'name the unmoved mover as final cause',
+   'distinguish potency from actuality in change',
+   'a fifth requirement beyond the cap of four']},
+  {question:'How does Darwin explain change?'}
+ ],queries:['Aristotle change','Darwin change']},question,catalog);
+ assert.deepEqual(plan.parts[0].requirements,[
+  'state the four causes account of change',
+  'give the role of form and matter in change',
+  'name the unmoved mover as final cause',
+  'distinguish potency from actuality in change'],
+  'string and {text} forms survive; duplicates, out-of-bound entries, and entries past four are dropped');
+ assert.ok(!('requirements' in plan.parts[1]),
+  'a part the planner gave no requirements keeps its previous shape');
+});
+
+test('a plan without requirements normalizes exactly as before (batch 10 B10-6)',()=>{
+ const question='How does Aristotle explain change?';
+ const catalog={'4':'Metaphysics — Aristotle'};
+ const plan=normalizePlan({intent:'explain',sources:[
+  {label:'Aristotle',role:'primary',bookIds:['4']}
+ ],parts:[{question:'How does Aristotle explain change?'}],
+ queries:['Aristotle change']},question,catalog);
+ assert.ok(plan.parts.every(part=>!('requirements' in part)));
+ assert.deepEqual(Object.keys(plan.parts[0]).sort(),
+  ['id','question','searchQueries','sourceBookIds']);
+});
+
+test('requirements are carried when parts collapse to a single direct question (batch 10 B10-6)',()=>{
+ const question='What does Aristotle say about change?';
+ const catalog={'4':'Metaphysics — Aristotle'};
+ const plan=normalizePlan({intent:'explain',sources:[
+  {label:'Aristotle',role:'primary',bookIds:['4']}
+ ],parts:[{question:'What does Aristotle say about change?',requirements:[
+  'state the four causes account of change',
+  {text:'distinguish potency from actuality in change'}]}],
+ queries:['Aristotle change']},question,catalog);
+ assert.equal(plan.parts.length,1);
+ assert.deepEqual(plan.parts[0].requirements,[
+  'state the four causes account of change',
+  'distinguish potency from actuality in change'],
+  'the single-part shape live questions take keeps the planner requirements');
+});
+
 test('an explicitly selected book stays scoped and named work in collected volume remains retrievable',()=>{
  const collection={'212':'The Complete Works of William Shakespeare — William Shakespeare'};
  const selected=normalizePlan({intent:'explain',sources:[],parts:['What does this book say?']},
@@ -1593,8 +1651,9 @@ test('All Books retries a missing quotation once inside its trusted single-work 
   {id:'230',title:'The Courage to Be — Paul Tillich'}];
  const parts=[{partId:'P1',question:partQuestion,sourceBookIds:['212']}];
  const calls=[];
- const library={search:async(query,{bookId}={})=>{
-  calls.push({query,bookId:String(bookId||'')});
+ const library={search:async(query,{bookId,allowedBookIds}={})=>{
+  calls.push({query,bookId:String(bookId||''),
+   allowed:[...(allowedBookIds||[])].map(String)});
   if(query===partQuestion&&bookId==='212')return {sources:[{
    bookId:'212',title:books[0].title,page:454,globalPageId:100454,score:92,
    preview:'Thus conscience does make cowards of us all.'
@@ -1640,8 +1699,14 @@ test('All Books retries a missing quotation once inside its trusted single-work 
    {partId:'P1',query:plannerPartQuery}],partQuestions:parts,
   library,books,allowedBookIds:new Set(books.map(book=>book.id)),selectedBookIds:['212'],
   pageLoader:async()=>({text:'A selected-book page.'})});
- assert.ok(!calls.some(call=>call.query===partQuestion),
+ assert.ok(!calls.some(call=>call.query===partQuestion&&call.bookId==='212'),
   'Selected Books already targets its chosen work and does not add this fallback');
+ // Batch 10 (B10-7): the per-position chase may still search the part's
+ // wording in this mode — its candidates never reach the part's question —
+ // but only inside the part's validated scope, here the chosen work alone.
+ assert.ok(calls.filter(call=>call.query===partQuestion)
+   .every(call=>call.allowed.length===1&&call.allowed[0]==='212'),
+  'any part-wording search in Selected Books stays inside the chosen work');
 });
 
 test('All Books skips the quote retry when a scoped result already contains the phrase',async()=>{

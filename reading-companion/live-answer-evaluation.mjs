@@ -805,7 +805,12 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
    quote:typeof quote?.quote==='string'?quote.quote:'',
    quoteLocated:typeof quote?.quoteLocated==='boolean'?quote.quoteLocated:
     locateHighlightInSubmittedPage({...item,quote:quote?.quote},citations,submitted),
-   partialMatch:quote?.partialMatch===true
+   partialMatch:quote?.partialMatch===true,
+   // Batch 10 (B10-5): keep the gateway's display-box keying in the record
+   // so passage dedupe is measurable from evaluation reports (batch 9
+   // shipped the fields but the recorder dropped them here).
+   box:Number.isSafeInteger(quote?.box)?quote.box:null,
+   claimIds:Array.isArray(quote?.claim_ids)?quote.claim_ids.map(String):[]
   }));
   const nestedLocated=quotes.some(quote=>quote.quoteLocated===true)?true:
    quotes.some(quote=>typeof quote.quoteLocated==='boolean')?false:null;
@@ -1350,7 +1355,8 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
  const retrievalCandidates=populated.map(({bookId,title,page,globalPageId,score,facet,facetRanks,
   matchedFacets,candidatePartIds,preview,text})=>({bookId,title,page,globalPageId,score,facet,facetRanks,
   matchedFacets,candidatePartIds,excerpt:String(preview||text||'').slice(0,1200)}));
- return {selected,candidates:answerCandidates,candidatePacket,searches:retrieval.searches,retrievalCandidates,
+ return {selected,candidates:answerCandidates,candidatePacket,searches:retrieval.searches,
+  positionCoverage:retrieval.positionCoverage,retrievalCandidates,
   selectionCoverage:auditSelectionCoverage(answerCandidates,selected,partQuestions),selectionAudit};
 }
 export function sourcesUsedForWorkerSelection(selection,workerSelected,submittedPool){
@@ -1469,6 +1475,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   timing.attach(error);throw error;}
  let gapQueries=[],gapQueryPartLinks=[],gapPlannerFailure=null,gapPlannerFailureDiagnostics=null;
  const initialSearches=loaded.searches;
+ const initialPositionCoverage=loaded.positionCoverage;
  const initialRetrievalCandidates=loaded.retrievalCandidates;
  const initialRetrievalCoverage=assessEvidenceCoverage(initialRetrievalCandidates,item.question,partQuestions);
  let retrievalCoverage=initialRetrievalCoverage;
@@ -1620,6 +1627,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   ...(plannerFailure?{plannerFailure}:{}),...(plannerFailureDiagnostics?{plannerFailureDiagnostics}:{}),plannerPlan:plan?.plan||null,
   searchesBeforeGap:initialSearches,retrievalCandidatesBeforeGap:initialRetrievalCandidates,
   searches,retrievalCandidates,
+  positionCoverageBeforeGap:initialPositionCoverage,positionCoverage:loaded.positionCoverage,
   retrievalCoverage:{triggered:gapSearchTriggered,
    parts:initialRetrievalCoverage.parts,weakParts:initialRetrievalCoverage.weakParts},
   ...(gapRetrievalRerun?{retrievalCoverageAfterGap:{parts:retrievalCoverage.parts,
@@ -1703,6 +1711,7 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
   plannerQueries:plan.queries,plannerFallback:false,partFacetWarnings:partFacets.warnings,
   plannerWorkerVersionId:plan.workerVersionId||null,plannerWorkerSourceBuild:plan.workerSourceBuild||null,plannerWorkerSourceRevision:plan.workerSourceRevision||null,
   answerWorkerVersionId:null,answerWorkerSourceBuild:null,searches,retrievalCandidates,
+  positionCoverage:loaded.positionCoverage,
   submittedSources:selected.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,
    excerpt:String(preview||'').slice(0,1200)})),
   submittedSourceCount:selected.length,sourceGroups,passed,

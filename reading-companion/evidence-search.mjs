@@ -867,16 +867,29 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    partGapRecovery:true,starvedPartId:partId});
   partFacetIndices.push({partId,facet,kind:'part-gap'});
  }
- // Batch 6 (B6-6): coverage-triggered targeted search. The starved-part
- // trigger above rescues a part with NO candidates; a different failure
- // is a part whose candidates exist but none of them reaches the part's
- // requirement — its facets found the topic in general, not the specific
- // thing the part must establish (the phase-2 Smith case missed the
- // Book V material twice this way while candidates shipped). After gap
- // planning has run, give each such part ONE targeted search worded from
- // its first uncovered requirement, inside its already-validated source
- // scope: the same budget shape as the starved-part trigger, traced the
- // same way with a coverage reason. This is local index work only.
+ // Batch 10 (B10-7): per-position chase — the generalization of batch 6's
+ // coverage-triggered search (B6-6). The starved-part trigger above rescues
+ // a part with NO candidates; a different failure is a part whose candidates
+ // exist but never reach one of the positions its plan names: its facets
+ // found the topic in general, not the specific thing the part must
+ // establish (the phase-2 Smith case missed the Book V material twice this
+ // way while candidates shipped; batch 9's catalogue-shaped answers were
+ // the same failure at the level of individual requirements). Judge EVERY
+ // requirement text of the part — not just the first uncovered one — and
+ // give each uncovered requirement one targeted search worded from the
+ // requirement itself, inside the part's already-validated source scope.
+ // A requirement whose covering candidates all come from a single book in
+ // an UNSCOPED part is diversity-starved (lexically covered, evidentially
+ // one source deep): its chase is scoped to the allowlist minus the
+ // covering book(s), so new material must come from elsewhere. Chases are
+ // bounded globally — at most POSITION_CHASE_LIMIT per invocation,
+ // allocated in plan order — and the loop runs in every invocation, not
+ // only the post-gap-planning one: the batch-9 failures are per-position
+ // gaps inside lexically adequate parts, which never produce a gap round
+ // for the old gate to backstop. The search cache the live caller threads
+ // through both rounds dedupes leaf executions across rounds. This is
+ // local index work only; it adds no model call, and the part's original
+ // candidates are never removed.
  //
  // Coverage derivation (deterministic): a requirement's terms are its
  // facetTerms; a candidate's reach is localFacetTextMatch's overlap of
@@ -888,12 +901,15 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  // requirement text. This remains a retrieval trigger, never a support
  // verdict; answer review still decides what a passage proves.
  //
- // The trigger belongs to the post-gap-planning call — the invocation
- // that carries gapQueries/gapQueryPartLinks — so it backstops the
- // gap planner instead of pre-empting it in the initial round, where
- // the established recovery triggers (scoped searches, quote fallback,
- // source-group recovery, starvation) run first.
- if(gapQueries.length||gapQueryPartLinks.length)
+ // The loop records what it learns in the returned positionCoverage
+ // block — per part, per requirement: whether it was covered, chased
+ // (and whether the chase returned candidates), or left unchased at the
+ // cap, and which books cover it — so an evaluation can count planned
+ // positions with evidence before composition instead of inferring the
+ // gap from a failed answer.
+ const POSITION_CHASE_LIMIT=6;
+ let positionChasesRun=0;
+ const positionCoverage=[];
  for(const part of scopedPartQuestions){
   if(typeof part?.partId!=='string'||typeof part?.question!=='string')continue;
   const partId=part.partId;
@@ -912,48 +928,89 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   if(!candidateSources.length)continue;
   const requirementTexts=partRequirementTexts(part);
   const texts=requirementTexts.length?requirementTexts:[part.question.trim()];
-  let uncoveredQuery='';
+  const records=[];
   for(const text of texts){
    if(facetTerms(text).length<2)continue;
-   let best=0,judged=0;
+   let best=0,judged=0;const coveringBooks=new Set();
    for(const source of candidateSources){
     const snippet=source.preview||source.excerpt||source.text||'';
     if(!snippet)continue;
     judged++;
     const overlap=localFacetTextMatch(text,snippet).overlap;
     if(overlap>best)best=overlap;
-    if(best>=2)break;
+    if(overlap>=2)coveringBooks.add(String(source.bookId));
    }
    // Candidates carrying no snippet text at all cannot judge coverage;
-   // absence of text is not evidence of a low-overlap miss.
-   if(judged&&best<2){uncoveredQuery=text;break;}
+   // absence of text is not evidence of a low-overlap miss (B6-6's rule).
+   // The part's candidate pool stands as the covering base; no chase fires.
+   if(!judged){
+    records.push({requirement:text,status:'covered',
+     booksCovering:[...new Set(candidateSources.map(source=>String(source.bookId)))]});
+    continue;
+   }
+   const diversityStarved=best>=2&&!scopeIds.length&&coveringBooks.size===1;
+   if(best>=2&&!diversityStarved){
+    records.push({requirement:text,status:'covered',booksCovering:[...coveringBooks]});
+    continue;
+   }
+   // The requirement needs a chase of its own. A diversity chase must
+   // look outside the one covering book; if the allowlist holds nothing
+   // else, there is nowhere to chase and the narrow base stands as-is.
+   const chaseScopeIds=diversityStarved
+    ?[...retrievalAllowed].map(String).filter(id=>!coveringBooks.has(id)):[];
+   if(diversityStarved&&!chaseScopeIds.length){
+    records.push({requirement:text,status:'covered',booksCovering:[...coveringBooks]});
+    continue;
+   }
+   if(positionChasesRun>=POSITION_CHASE_LIMIT){
+    records.push({requirement:text,status:'unchased-cap',booksCovering:[...coveringBooks]});
+    continue;
+   }
+   // Do not repeat an execution this call already ran for the part under
+   // the same wording with its full scope targeted (mirrors the
+   // starved-part trigger's guard): it would return the same result set.
+   // That execution's outcome stands as this requirement's chase result.
+   const ranItem=partFacetIndices.find(item=>item.partId===partId&&
+    searchQueries[item.facet]?.trim().toLocaleLowerCase()===text.toLocaleLowerCase()&&
+    (diversityStarved||!scopeIds.length||scopeIds.every(id=>
+     (searchSets[item.facet]?.targetBookIds||[]).map(String).includes(id))));
+   if(ranItem){
+    const prior=(searchSets[ranItem.facet]?.sources||[])
+     .filter(source=>!scopeIds.length||scopeIds.includes(String(source.bookId)));
+    records.push({requirement:text,
+     status:prior.length?'chased-covered':'chased-empty',
+     booksCovering:[...coveringBooks]});
+    continue;
+   }
+   positionChasesRun++;
+   const facet=searchQueries.length;
+   searchQueries.push(text);
+   let recovered=[];
+   try{
+    const result=await runSearch(text,{allowedBookIds:diversityStarved?
+     new Set(chaseScopeIds):scopeIds.length?new Set(allowedScopeIds):retrievalAllowed,
+     maxBooks,pagesPerBook});
+    recovered=(Array.isArray(result?.sources)?result.sources:[])
+     .filter(source=>diversityStarved?!coveringBooks.has(String(source.bookId))
+      :!scopeIds.length||scopeIds.includes(String(source.bookId)))
+     .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+   }catch{
+    // A failed targeted search leaves the coverage gap visible in the
+    // traces; it must not interrupt retrieval for the other parts.
+   }
+   searchSets.push({sources:recovered,executedQuery:text,
+    targetBookIds:diversityStarved?chaseScopeIds:scopeIds,
+    partGapRecovery:true,starvedPartId:partId,gapRecoveryReason:'position',
+    ...(diversityStarved?{gapRecoveryDiversity:true}:{})});
+   partFacetIndices.push({partId,facet,kind:'part-gap'});
+   // Later requirements of the same part judge against the enlarged pool.
+   candidateSources.push(...recovered);
+   records.push({requirement:text,
+    status:recovered.length?'chased-covered':'chased-empty',
+    booksCovering:[...new Set([...coveringBooks,
+     ...recovered.map(source=>String(source.bookId))])]});
   }
-  if(uncoveredQuery.length<5)continue;
-  const query=uncoveredQuery;
-  // Do not repeat an execution this call already ran for the part under
-  // the same wording with its full scope targeted (mirrors the
-  // starved-part trigger's guard): it would return the same result set.
-  const alreadyRan=partFacetIndices.some(item=>item.partId===partId&&
-   searchQueries[item.facet]?.trim().toLocaleLowerCase()===query.toLocaleLowerCase()&&
-   (!scopeIds.length||scopeIds.every(id=>
-    (searchSets[item.facet]?.targetBookIds||[]).map(String).includes(id))));
-  if(alreadyRan)continue;
-  const facet=searchQueries.length;
-  searchQueries.push(query);
-  let recovered=[];
-  try{
-   const result=await runSearch(query,{allowedBookIds:scopeIds.length?
-    new Set(allowedScopeIds):retrievalAllowed,maxBooks,pagesPerBook});
-   recovered=(Array.isArray(result?.sources)?result.sources:[])
-    .filter(source=>!scopeIds.length||scopeIds.includes(String(source.bookId)))
-    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
-  }catch{
-   // A failed targeted search leaves the coverage gap visible in the
-   // traces; it must not interrupt retrieval for the other parts.
-  }
-  searchSets.push({sources:recovered,executedQuery:query,targetBookIds:scopeIds,
-   partGapRecovery:true,starvedPartId:partId,gapRecoveryReason:'coverage'});
-  partFacetIndices.push({partId,facet,kind:'part-gap'});
+  if(records.length)positionCoverage.push({partId,requirements:records});
  }
  const partFacetScopes=partQuestions.length?partFacetIndices.map(item=>({partId:item.partId,facet:item.facet,
   sourceBookIds:(item.kind==='gap'||item.kind==='part-gap')?(partSourceBookIds.get(item.partId)||[]):
@@ -1021,7 +1078,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
     ...(partFacetIndices.length?{candidatePartIds:[...candidatePartIds]}:{})});
   if(populated.length>=maxCandidates)break;
  }
- return {candidates:populated,partFacetIndices,searches:searchSets.map((set,index)=>({
+ return {candidates:populated,partFacetIndices,positionCoverage,searches:searchSets.map((set,index)=>({
   query:searchSets[index].executedQuery+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
   ...(searchSets[index].scopeReference?{originalQuery:searchQueries[index],scopeInherited:true}:{}),
   ...(searchSets[index].inheritedPartScope?{partScopeInherited:searchSets[index].inheritedPartScope}:{}),
@@ -1035,7 +1092,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   ...(searchSets[index].partGapRecovery?{partGapRecovery:true,
    starvedPartId:searchSets[index].starvedPartId,
    ...(searchSets[index].gapRecoveryReason?
-    {reason:searchSets[index].gapRecoveryReason}:{})}:{}),
+    {reason:searchSets[index].gapRecoveryReason}:{}),
+   ...(searchSets[index].gapRecoveryDiversity?{diversity:true}:{})}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
   ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),
   // The offline gold audit needs to distinguish a search miss from evidence

@@ -10,7 +10,7 @@ import {RemoteLibrary} from './remote-library.mjs';
 import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.2';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.5';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -293,6 +293,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
       populated=retrieval.candidates;
       if(diagnosticState){
         diagnosticState.searches=retrieval.searches;
+        diagnosticState.positionCoverage=retrieval.positionCoverage;
         diagnosticState.gapQueries=gapQueries;
       }
       if(diagnosticState&&plan)diagnosticState.plannerPlan=plan;
