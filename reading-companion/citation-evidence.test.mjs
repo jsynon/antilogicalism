@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {claimQuotesForCitation,citationExcerptsForAnswer} from './citation-evidence.mjs';
+import {claimQuotesForCitation,citationExcerptsForAnswer,keyPassageExcerpts} from './citation-evidence.mjs';
 
 const client=readFileSync(new URL('./companion-v112.mjs',import.meta.url),'utf8');
 const answer='The gifts of Fortune reveal that true happiness cannot be found in external, changeable matters, as these goods lose their value when examined or are subject to being lost. [S1] Lady Philosophy observes that wealth is not inherently valuable for its own nature but depends on human use, and it becomes less of a possession when it is scattered to others. [S1]';
@@ -54,6 +54,46 @@ test('inline citations retain claim excerpts when Markdown splits the rendered t
     {S1:[approved[1].quote]},
     {S1:[approved[3].quote]},
   ]);
+});
+
+test('key passages render one excerpt per display box, not per claim entry',()=>{
+  const highlight={source_id:'S1',page:33,quote:'Passage one text.',quotes:[
+    {claim_id:'P1-C1',part_id:'P1',point:'First claim.',quote:'Passage one text.',claim_ids:['P1-C1','P1-C2'],box:0},
+    {claim_id:'P1-C2',part_id:'P1',point:'Second claim.',quote:'Passage one text.',claim_ids:['P1-C1','P1-C2'],box:0},
+    {claim_id:'P1-C3',part_id:'P1',point:'Third claim.',quote:'Passage two text.',claim_ids:['P1-C3','P2-C1'],box:1},
+    {claim_id:'P2-C1',part_id:'P2',point:'Fourth claim.',quote:'Passage two text.',claim_ids:['P1-C3','P2-C1'],box:1},
+  ]};
+  assert.deepEqual(keyPassageExcerpts(highlight),['Passage one text.','Passage two text.']);
+});
+
+test('key passages dedupe identical quotes in payloads without box indexes',()=>{
+  const highlight={quotes:[
+    {claim_id:'P1-C1',quote:'It is easy to see, though it scarcely needs to be pointed out, that Faith is not a form of knowledge.'},
+    {claim_id:'P1-C2',quote:'It is easy to see, though it scarcely needs  to be pointed out,\nthat Faith is not a form of knowledge.'},
+    {claim_id:'P1-C3',quote:'Now if we assume that it is as we have supposed, the object of Faith is not the teaching but the Teacher.'},
+  ]};
+  const excerpts=keyPassageExcerpts(highlight);
+  assert.equal(excerpts.length,2);
+  assert.equal(excerpts[0],highlight.quotes[0].quote);
+  assert.equal(excerpts[1],highlight.quotes[2].quote);
+});
+
+test('key passages cap counts boxes, so four distinct boxes render three excerpts',()=>{
+  const highlight={quotes:[0,1,2,3].map(box=>({
+    claim_id:'P1-C'+(box+1),quote:'Distinct passage '+(box+1)+'.',box}))};
+  assert.deepEqual(keyPassageExcerpts(highlight),
+    ['Distinct passage 1.','Distinct passage 2.','Distinct passage 3.']);
+});
+
+test('key passages fall back to the source quote when no quote entries survive',()=>{
+  assert.deepEqual(keyPassageExcerpts({quote:'Primary passage.',quotes:[]}),['Primary passage.']);
+  assert.deepEqual(keyPassageExcerpts({quote:'Primary passage.'}),['Primary passage.']);
+  assert.deepEqual(keyPassageExcerpts({quotes:[{quote:'  '}]}),[]);
+});
+
+test('the live key passages card renders excerpts through the box grouping helper',()=>{
+  assert.match(client,/import \{keyPassageExcerpts\} from '\.\/citation-evidence\.mjs'/);
+  assert.match(client,/const excerpts=keyPassageExcerpts\(highlight\);/);
 });
 
 test('the live response path uses reviewed evidence, not the capped page summary, for inline citations',()=>{

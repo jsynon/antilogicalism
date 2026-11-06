@@ -26,7 +26,7 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.20.3'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.20.4'));
  assert.match(clientV49,/distinctiveTerms:item\.distinctiveTerms/);
  assert.match(clientV49,/matchedDistinctiveTerms:item\.matchedDistinctiveTerms/);
  assert.match(clientV49,/sharedMatchedTerms:item\.sharedMatchedTerms/);
@@ -68,6 +68,36 @@ test('v49 answer renderer keeps default prose out of accidental ordered lists',(
  const numbered=parseAnswerMarkdown('1. First reason\n2. Second reason',{allowLists:true});
  assert.equal(numbered[0].type,'list');
  assert.equal(numbered[0].ordered,true);
+});
+test('batch 9 parser backstop unwraps whole-paragraph bold but spares titles, labels, and short bold',()=>{
+ // A part opener wrapped in one bold pair (the live B9-8 shape) becomes a
+ // plain paragraph: no heading block and no paragraph-wide strong span.
+ const wrapped='**Faith as a Paradoxical Encounter In Philosophical Fragments, the pseudonymous speaker describes faith as the result of an encounter between Reason and the Paradox [S1]. This encounter occurs in a "Moment" where Reason sets itself aside to allow the Paradox to bestow itself upon the learner [S1].**';
+ const blocks=parseAnswerMarkdown(wrapped);
+ assert.equal(blocks.length,1);
+ assert.equal(blocks[0].type,'paragraph');
+ assert.equal(blocks[0].text,wrapped.slice(2,-2));
+ assert.equal(parseInlineMarkdown(blocks[0].text).some(token=>token.type==='strong'),false);
+ // The same wrap split across lines unwraps when the lines are joined.
+ const multiline=parseAnswerMarkdown('**Faith as a Paradoxical Encounter In Philosophical Fragments, the\npseudonymous speaker describes faith as the result of an encounter between\nReason and the Paradox [S1]. This encounter occurs in a "Moment" where Reason\nsets itself aside to allow the Paradox to bestow itself [S1].**');
+ assert.equal(multiline.length,1);
+ assert.equal(multiline[0].type,'paragraph');
+ assert.equal(multiline[0].text.startsWith('**'),false);
+ assert.equal(multiline[0].text.endsWith('[S1].'),true);
+ // The underscore form unwraps on length alone (one long sentence).
+ const longInner=('word '.repeat(50)).trim()+'.';
+ const underscored=parseAnswerMarkdown('__'+longInner+'__');
+ assert.deepEqual(underscored,[{type:'paragraph',text:longInner}]);
+ // A standalone bold title line still becomes a heading.
+ assert.deepEqual(parseAnswerMarkdown('**Faith and the Individual**'),
+  [{type:'heading',text:'Faith and the Individual'}]);
+ // A short bold paragraph under the threshold keeps its markers.
+ const shortBold=parseAnswerMarkdown('**Faith is a leap, a passionate\ncommitment of the self.**');
+ assert.deepEqual(shortBold,[{type:'paragraph',
+  text:'**Faith is a leap, a passionate commitment of the self.**'}]);
+ // A bold lead-in inside a paragraph is untouched.
+ const leadIn='Faith involves two movements of the soul. **Beyond Resignation:** faith goes further than infinite resignation, receiving the finite back through the power of the absurd.';
+ assert.deepEqual(parseAnswerMarkdown(leadIn),[{type:'paragraph',text:leadIn}]);
 });
 test('answer source packet allows six verified passages',()=>{
  assert.match(client,/const MAX_ANSWER_SOURCES=6/);

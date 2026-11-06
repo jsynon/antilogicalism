@@ -468,6 +468,32 @@ test('citation highlight coverage is reported separately from structural answer 
  assert.equal(withHighlight.structuralPassed,true);
 });
 
+test('audit records the gateway depth-repair summary and normalizes its absence',()=>{
+ const base={coverage:'full',answerCompleteness:'full',answer:'A supported claim [S1].',
+  citations:[{id:'S1',bookId:'529',title:'On the Origin of Species',page:18}]};
+ const fired=auditLiveAnswer({...base,depthRepair:{triggered:true,reasons:['thin-part'],applied:true}},
+  [{bookId:'529',page:18}],[]);
+ assert.deepEqual(fired.depthRepair,{triggered:true,reasons:['thin-part'],applied:true});
+ const absent=auditLiveAnswer(base,[{bookId:'529',page:18}],[]);
+ assert.equal(absent.depthRepair,null);
+ const malformed=auditLiveAnswer({...base,depthRepair:{triggered:'yes',reasons:'thin-part',applied:1}},
+  [{bookId:'529',page:18}],[]);
+ assert.deepEqual(malformed.depthRepair,{triggered:false,reasons:[],applied:false});
+});
+
+test('recorder keeps every claim link when box entries share one quote text (batch 9 B9-6)',()=>{
+ const citation={id:'S1',bookId:'140',title:'Fear and Trembling',page:33};
+ const quote='It is easy to see, though it scarcely needs to be pointed out, that Faith is not a form of knowledge.';
+ const result=auditLiveAnswer({coverage:'full',answerCompleteness:'full',
+  answer:'Faith is not a form of knowledge [S1].',citations:[citation],
+  evidenceHighlights:[{source_id:'S1',page:33,quote,quoteLocated:true,quotes:[
+   {claim_id:'P1-C1',part_id:'P1',point:'Faith is not a form of knowledge.',quote,claim_ids:['P1-C1','P1-C2'],box:0,quoteLocated:true},
+   {claim_id:'P1-C2',part_id:'P1',point:'Faith is not a form of knowledge.',quote,claim_ids:['P1-C1','P1-C2'],box:0,quoteLocated:true},
+  ]}]},[{bookId:'140',page:33}],[]);
+ assert.deepEqual(result.evidenceHighlights[0].quotes.map(entry=>entry.claimId),['P1-C1','P1-C2']);
+ assert.deepEqual(result.highlightRelevance.excerpts.map(entry=>entry.claimId),['P1-C1','P1-C2']);
+});
+
 test('evidence coverage alone does not establish answer completeness',()=>{
  const result=auditLiveAnswer({coverage:'full',answer:'A source-supported point [S1].',
   citations:[{id:'S1',bookId:'529'}],

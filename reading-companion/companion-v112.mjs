@@ -16,6 +16,7 @@ import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
 import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
 import {citationExcerptsForAnswer} from './citation-evidence.mjs';
+import {keyPassageExcerpts} from './citation-evidence.mjs';
 import {parseAnswerMarkdown,parseInlineMarkdown} from './answer-markdown.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
@@ -426,9 +427,10 @@ function renderResponse(data,turnQuestion=''){
     for(const source of orderedCitations){
       const highlight=highlights.find(item=>
         item.source_id===source.id&&Number(item.page)===Number(source.page));
-      const excerpts=(Array.isArray(highlight?.quotes)?highlight.quotes.map(item=>item?.quote):[])
-        .filter(value=>typeof value==='string'&&value.trim()).slice(0,3);
-      if(!excerpts.length&&typeof highlight?.quote==='string'&&highlight.quote.trim())excerpts.push(highlight.quote);
+      // One blockquote per display box: quotes recorded under several claims
+      // share a box and identical text, so grouping by box keeps the card
+      // from repeating the same passage once per claim (batch 9, B9-2/B9-6).
+      const excerpts=keyPassageExcerpts(highlight);
       const card=node('article',undefined,'companion-key-passage');
       // Keep the source-card DOM order aligned with its displayed reading order.
       if(excerpts.length){
