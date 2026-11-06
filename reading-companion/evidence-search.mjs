@@ -883,7 +883,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  // one source deep): its chase is scoped to the allowlist minus the
  // covering book(s), so new material must come from elsewhere. Chases are
  // bounded globally — at most POSITION_CHASE_LIMIT per invocation,
- // allocated in plan order — and the loop runs in every invocation, not
+ // allocated with a per-part reservation (batch 11 B11-7, at the
+ // loop below) — and the loop runs in every invocation, not
  // only the post-gap-planning one: the batch-9 failures are per-position
  // gaps inside lexically adequate parts, which never produce a gap round
  // for the old gate to backstop. The search cache the live caller threads
@@ -907,9 +908,29 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  // cap, and which books cover it — so an evaluation can count planned
  // positions with evidence before composition instead of inferring the
  // gap from a failed answer.
+ // Batch 11 (B11-7): per-part reservation. Batch 10 allocated the
+ // chase budget strictly part-major — parts in plan order,
+ // requirements in order within a part — so an early part could
+ // spend the whole global cap on its second, third, and fourth
+ // uncovered requirements before a later part’s first was even
+ // judged (the batch-10 narrators case: all six chases went to the
+ // early parts and a later part’s requirement ended unchased-cap
+ // exactly where the defects concentrated). The per-part setup is
+ // therefore hoisted into a state list built once, in plan order,
+ // and the chase body runs round-major over requirement index:
+ // round r judges only requirement r of each part, so a part’s
+ // second chase can only run after every part has had its
+ // first-chase turn. The body itself is unchanged — coverage
+ // judgment, already-ran dedupe, cap check, execution, records —
+ // and each part’s later judgments still see its own enlarged
+ // pool, because its earlier-round chases pushed into its own
+ // candidateSources before its later-round turn. Cross-part
+ // coupling remains the shared budget only; statuses and the
+ // positionCoverage shape are unchanged.
  const POSITION_CHASE_LIMIT=6;
  let positionChasesRun=0;
  const positionCoverage=[];
+ const partChaseStates=[];
  for(const part of scopedPartQuestions){
   if(typeof part?.partId!=='string'||typeof part?.question!=='string')continue;
   const partId=part.partId;
@@ -928,89 +949,101 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   if(!candidateSources.length)continue;
   const requirementTexts=partRequirementTexts(part);
   const texts=requirementTexts.length?requirementTexts:[part.question.trim()];
-  const records=[];
-  for(const text of texts){
-   if(facetTerms(text).length<2)continue;
-   let best=0,judged=0;const coveringBooks=new Set();
-   for(const source of candidateSources){
-    const snippet=source.preview||source.excerpt||source.text||'';
-    if(!snippet)continue;
-    judged++;
-    const overlap=localFacetTextMatch(text,snippet).overlap;
-    if(overlap>best)best=overlap;
-    if(overlap>=2)coveringBooks.add(String(source.bookId));
-   }
-   // Candidates carrying no snippet text at all cannot judge coverage;
-   // absence of text is not evidence of a low-overlap miss (B6-6's rule).
-   // The part's candidate pool stands as the covering base; no chase fires.
-   if(!judged){
-    records.push({requirement:text,status:'covered',
-     booksCovering:[...new Set(candidateSources.map(source=>String(source.bookId)))]});
-    continue;
-   }
-   const diversityStarved=best>=2&&!scopeIds.length&&coveringBooks.size===1;
-   if(best>=2&&!diversityStarved){
-    records.push({requirement:text,status:'covered',booksCovering:[...coveringBooks]});
-    continue;
-   }
-   // The requirement needs a chase of its own. A diversity chase must
-   // look outside the one covering book; if the allowlist holds nothing
-   // else, there is nowhere to chase and the narrow base stands as-is.
-   const chaseScopeIds=diversityStarved
-    ?[...retrievalAllowed].map(String).filter(id=>!coveringBooks.has(id)):[];
-   if(diversityStarved&&!chaseScopeIds.length){
-    records.push({requirement:text,status:'covered',booksCovering:[...coveringBooks]});
-    continue;
-   }
-   if(positionChasesRun>=POSITION_CHASE_LIMIT){
-    records.push({requirement:text,status:'unchased-cap',booksCovering:[...coveringBooks]});
-    continue;
-   }
-   // Do not repeat an execution this call already ran for the part under
-   // the same wording with its full scope targeted (mirrors the
-   // starved-part trigger's guard): it would return the same result set.
-   // That execution's outcome stands as this requirement's chase result.
-   const ranItem=partFacetIndices.find(item=>item.partId===partId&&
-    searchQueries[item.facet]?.trim().toLocaleLowerCase()===text.toLocaleLowerCase()&&
-    (diversityStarved||!scopeIds.length||scopeIds.every(id=>
-     (searchSets[item.facet]?.targetBookIds||[]).map(String).includes(id))));
-   if(ranItem){
-    const prior=(searchSets[ranItem.facet]?.sources||[])
-     .filter(source=>!scopeIds.length||scopeIds.includes(String(source.bookId)));
-    records.push({requirement:text,
-     status:prior.length?'chased-covered':'chased-empty',
-     booksCovering:[...coveringBooks]});
-    continue;
-   }
-   positionChasesRun++;
-   const facet=searchQueries.length;
-   searchQueries.push(text);
-   let recovered=[];
-   try{
-    const result=await runSearch(text,{allowedBookIds:diversityStarved?
-     new Set(chaseScopeIds):scopeIds.length?new Set(allowedScopeIds):retrievalAllowed,
-     maxBooks,pagesPerBook});
-    recovered=(Array.isArray(result?.sources)?result.sources:[])
-     .filter(source=>diversityStarved?!coveringBooks.has(String(source.bookId))
-      :!scopeIds.length||scopeIds.includes(String(source.bookId)))
-     .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
-   }catch{
-    // A failed targeted search leaves the coverage gap visible in the
-    // traces; it must not interrupt retrieval for the other parts.
-   }
-   searchSets.push({sources:recovered,executedQuery:text,
-    targetBookIds:diversityStarved?chaseScopeIds:scopeIds,
-    partGapRecovery:true,starvedPartId:partId,gapRecoveryReason:'position',
-    ...(diversityStarved?{gapRecoveryDiversity:true}:{})});
-   partFacetIndices.push({partId,facet,kind:'part-gap'});
-   // Later requirements of the same part judge against the enlarged pool.
-   candidateSources.push(...recovered);
-   records.push({requirement:text,
-    status:recovered.length?'chased-covered':'chased-empty',
-    booksCovering:[...new Set([...coveringBooks,
-     ...recovered.map(source=>String(source.bookId))])]});
+  partChaseStates.push({partId,scopeIds,allowedScopeIds,candidateSources,texts,records:[]});
+ }
+ const chaseRequirement=async(state,text)=>{
+  const {partId,scopeIds,allowedScopeIds,candidateSources,records}=state;
+  if(facetTerms(text).length<2)return;
+  let best=0,judged=0;const coveringBooks=new Set();
+  for(const source of candidateSources){
+   const snippet=source.preview||source.excerpt||source.text||'';
+   if(!snippet)continue;
+   judged++;
+   const overlap=localFacetTextMatch(text,snippet).overlap;
+   if(overlap>best)best=overlap;
+   if(overlap>=2)coveringBooks.add(String(source.bookId));
   }
-  if(records.length)positionCoverage.push({partId,requirements:records});
+  // Candidates carrying no snippet text at all cannot judge coverage;
+  // absence of text is not evidence of a low-overlap miss (B6-6's rule).
+  // The part's candidate pool stands as the covering base; no chase fires.
+  if(!judged){
+   records.push({requirement:text,status:'covered',
+    booksCovering:[...new Set(candidateSources.map(source=>String(source.bookId)))]});
+   return;
+  }
+  const diversityStarved=best>=2&&!scopeIds.length&&coveringBooks.size===1;
+  if(best>=2&&!diversityStarved){
+   records.push({requirement:text,status:'covered',booksCovering:[...coveringBooks]});
+   return;
+  }
+  // The requirement needs a chase of its own. A diversity chase must
+  // look outside the one covering book; if the allowlist holds nothing
+  // else, there is nowhere to chase and the narrow base stands as-is.
+  const chaseScopeIds=diversityStarved
+   ?[...retrievalAllowed].map(String).filter(id=>!coveringBooks.has(id)):[];
+  if(diversityStarved&&!chaseScopeIds.length){
+   records.push({requirement:text,status:'covered',booksCovering:[...coveringBooks]});
+   return;
+  }
+  if(positionChasesRun>=POSITION_CHASE_LIMIT){
+   records.push({requirement:text,status:'unchased-cap',booksCovering:[...coveringBooks]});
+   return;
+  }
+  // Do not repeat an execution this call already ran for the part under
+  // the same wording with its full scope targeted (mirrors the
+  // starved-part trigger's guard): it would return the same result set.
+  // That execution's outcome stands as this requirement's chase result.
+  const ranItem=partFacetIndices.find(item=>item.partId===partId&&
+   searchQueries[item.facet]?.trim().toLocaleLowerCase()===text.toLocaleLowerCase()&&
+   (diversityStarved||!scopeIds.length||scopeIds.every(id=>
+    (searchSets[item.facet]?.targetBookIds||[]).map(String).includes(id))));
+  if(ranItem){
+   const prior=(searchSets[ranItem.facet]?.sources||[])
+    .filter(source=>!scopeIds.length||scopeIds.includes(String(source.bookId)));
+   records.push({requirement:text,
+    status:prior.length?'chased-covered':'chased-empty',
+    booksCovering:[...coveringBooks]});
+   return;
+  }
+  positionChasesRun++;
+  const facet=searchQueries.length;
+  searchQueries.push(text);
+  let recovered=[];
+  try{
+   const result=await runSearch(text,{allowedBookIds:diversityStarved?
+    new Set(chaseScopeIds):scopeIds.length?new Set(allowedScopeIds):retrievalAllowed,
+    maxBooks,pagesPerBook});
+   recovered=(Array.isArray(result?.sources)?result.sources:[])
+    .filter(source=>diversityStarved?!coveringBooks.has(String(source.bookId))
+     :!scopeIds.length||scopeIds.includes(String(source.bookId)))
+    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+  }catch{
+   // A failed targeted search leaves the coverage gap visible in the
+   // traces; it must not interrupt retrieval for the other parts.
+  }
+  searchSets.push({sources:recovered,executedQuery:text,
+   targetBookIds:diversityStarved?chaseScopeIds:scopeIds,
+   partGapRecovery:true,starvedPartId:partId,gapRecoveryReason:'position',
+   ...(diversityStarved?{gapRecoveryDiversity:true}:{})});
+  partFacetIndices.push({partId,facet,kind:'part-gap'});
+  // Later requirements of the same part judge against the enlarged pool.
+  candidateSources.push(...recovered);
+  records.push({requirement:text,
+   status:recovered.length?'chased-covered':'chased-empty',
+   booksCovering:[...new Set([...coveringBooks,
+    ...recovered.map(source=>String(source.bookId))])]});
+ };
+ const widestRequirementList=partChaseStates.reduce(
+  (max,state)=>Math.max(max,state.texts.length),0);
+ for(let round=0;round<widestRequirementList;round++){
+  for(const state of partChaseStates){
+   if(round>=state.texts.length)continue;
+   await chaseRequirement(state,state.texts[round]);
+  }
+ }
+ for(const state of partChaseStates){
+  if(state.records.length)positionCoverage.push({partId:state.partId,
+   requirements:state.records});
  }
  const partFacetScopes=partQuestions.length?partFacetIndices.map(item=>({partId:item.partId,facet:item.facet,
   sourceBookIds:(item.kind==='gap'||item.kind==='part-gap')?(partSourceBookIds.get(item.partId)||[]):
