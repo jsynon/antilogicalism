@@ -410,7 +410,7 @@ test('a part with two uncovered requirements gets both chased (batch 10 B10-7)',
    {requirement:REQUIREMENT_R2,status:'chased-covered',booksCovering:['10']}]}]);
 });
 
-test('the chase stops at the global cap and records the rest as unchased-cap (batch 10 B10-7)',async()=>{
+test('the chase stops at the global cap, reserved across parts, and records the rest as unchased-cap (batch 11 B11-7)',async()=>{
  const requirements=[
   'identify the recommended timing for pruning dormant shrubs',
   'describe the method for sharpening secateurs safely',
@@ -447,13 +447,61 @@ test('the chase stops at the global cap and records the rest as unchased-cap (ba
   pageLoader:async()=>({text:'A page of seasonal garden notes covering the requested work in full.'})});
  const chases=calls.filter(call=>requirements.includes(call.query)&&!call.bookId);
  assert.equal(chases.length,6,'exactly the capped number of chases executes');
- assert.deepEqual(chases.map(call=>call.query),requirements.slice(0,6),
-  'the cap is spent in plan order: all of P1, then P2 in order');
+ assert.deepEqual(chases.map(call=>call.query),
+  [requirements[0],requirements[4],requirements[1],requirements[5],
+   requirements[2],requirements[6]],
+  'the cap is spent round-major under the per-part reservation: the parts alternate, each part’s first chase before any part’s second');
  assert.deepEqual(result.positionCoverage.map(entry=>entry.partId),['P1','P2']);
  assert.deepEqual(result.positionCoverage[0].requirements.map(record=>record.status),
-  ['chased-covered','chased-covered','chased-covered','chased-covered']);
+  ['chased-covered','chased-covered','chased-covered','unchased-cap']);
  assert.deepEqual(result.positionCoverage[1].requirements.map(record=>record.status),
-  ['chased-covered','chased-covered','unchased-cap','unchased-cap']);
+  ['chased-covered','chased-covered','chased-covered','unchased-cap']);
+});
+
+test('the reservation gives a later part its first chase before an earlier part’s second, past a covered middle part (batch 11 B11-7)',async()=>{
+ const first='identify the recommended timing for pruning dormant shrubs';
+ const second='describe the method for sharpening secateurs safely';
+ const covered='describe the history and practice of ornamental gardening';
+ const third='explain how to store harvested potatoes through winter';
+ const fourth='list the steps for dividing overgrown rhubarb crowns';
+ const chased=[first,second,third,fourth];
+ const calls=[];
+ const genericSource={bookId:'10',title:COVERAGE_BOOKS[0].title,page:44,
+  globalPageId:1044,score:39,preview:GENERIC_PREVIEW};
+ const library={search:async(query,options={})=>{
+  const bookId=options.bookId?String(options.bookId):'';
+  const allowed=[...(options.allowedBookIds||[])].map(String);
+  calls.push({query,bookId,allowed});
+  if(bookId==='10')return {sources:[genericSource]};
+  if(bookId)return {sources:[]};
+  if(chased.includes(query)&&allowed.length===1&&allowed[0]==='10')
+   return {sources:[{bookId:'10',title:COVERAGE_BOOKS[0].title,page:71,
+    globalPageId:1071,score:55,preview:'Notes on '+query}]};
+  return {sources:[]};
+ }};
+ const part=(partId,requirements)=>({partId,
+  question:'What does Green say about seasonal garden work?',
+  sourceBookIds:['10'],requirements});
+ const result=await retrieveEvidence({question:COVERAGE_QUESTION,
+  queries:['Green gardening soil preparation','Green gardening pruning advice'],
+  partQueries:[{partId:'P1',query:'Green pruning guidance'},
+   {partId:'P2',query:'Green gardening history'},
+   {partId:'P3',query:'Green storage guidance'}],
+  partQuestions:[part('P1',[first,second]),part('P2',[covered]),part('P3',[third,fourth])],
+  library,books:COVERAGE_BOOKS,
+  allowedBookIds:new Set(COVERAGE_BOOKS.map(book=>book.id)),
+  pageLoader:async()=>({text:'A page of seasonal garden notes covering the requested work in full.'})});
+ const chases=calls.filter(call=>chased.includes(call.query)&&!call.bookId);
+ assert.deepEqual(chases.map(call=>call.query),[first,third,second,fourth],
+  'round-major order: P3’s first chase precedes P1’s second, and the covered middle part spends nothing');
+ assert.deepEqual(result.positionCoverage.map(entry=>entry.partId),['P1','P2','P3']);
+ assert.deepEqual(result.positionCoverage[0].requirements.map(record=>record.status),
+  ['chased-covered','chased-covered']);
+ assert.deepEqual(result.positionCoverage[1].requirements,
+  [{requirement:covered,status:'covered',booksCovering:['10']}],
+  'the middle part’s requirement is covered by its own candidates and never chased');
+ assert.deepEqual(result.positionCoverage[2].requirements.map(record=>record.status),
+  ['chased-covered','chased-covered']);
 });
 
 // --- B10-7: diversity-starved requirements chase outside the single book --
