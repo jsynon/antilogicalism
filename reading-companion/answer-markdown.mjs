@@ -56,6 +56,23 @@ export function parseInlineMarkdown(value){
  return parseInlineRange(String(value||''));
 }
 
+// The Worker unwraps whole-paragraph bold at assembly (batch 9, B9-8); this
+// is the same rule as a parser backstop for any payload that bypasses it. A
+// paragraph counts as long — worth unwrapping — at two or more sentences or
+// over 200 characters of inner text, mirroring the Worker's threshold.
+function isLongWrappedText(text){
+ const sentences=(text.match(/[.!?](?=\s|$)/gu)||[]).length;
+ return text.length>200||sentences>=2;
+}
+
+function unwrapBoldWrappedParagraph(text){
+ const marker=text.startsWith('**')?'**':text.startsWith('__')?'__':null;
+ if(!marker||!text.endsWith(marker))return text;
+ if(text.split(marker).length-1!==2)return text;
+ const inner=text.slice(marker.length,-marker.length).trim();
+ return inner&&!inner.includes(marker)&&isLongWrappedText(inner)?inner:text;
+}
+
 function splitInlineListMarkers(line){
  // Split obvious model-emitted list markers when they follow prose on the same
  // line. Two or more spaces after a bullet marker are unambiguous; for the
@@ -104,7 +121,7 @@ export function parseAnswerMarkdown(value,{allowLists=false}={}){
  const blocks=[];let paragraph=[],listItems=[],listType='',listRun=false;
  const flushParagraph=()=>{
   const text=paragraph.join(' ').trim();
-  if(text)blocks.push({type:'paragraph',text});
+  if(text)blocks.push({type:'paragraph',text:unwrapBoldWrappedParagraph(text)});
   paragraph=[];
  };
  const flushList=()=>{
@@ -123,6 +140,14 @@ export function parseAnswerMarkdown(value,{allowLists=false}={}){
   if(!line){flushAll();continue;}
   const standalone=line.match(/^(?:#{1,3}\s+(.+?)\s*|\*\*([^*\n]+)\*\*|__([^_\n]+)__)$/u);
   if(standalone){
+   const wrappedLine=standalone[2]??standalone[3];
+   if(wrappedLine!==undefined&&isLongWrappedText(wrappedLine.trim())){
+    // A whole paragraph wrapped in one bold pair on a single line is not a
+    // title: keep it as paragraph prose with the pair stripped, so it never
+    // renders as one giant heading (batch 9, B9-8 backstop). Short bold
+    // title lines still take the heading path below.
+    flushAll();paragraph.push(wrappedLine.trim());continue;
+   }
    flushAll();blocks.push({type:'heading',text:(standalone[1]??standalone[2]??standalone[3]).trim()});continue;
   }
   const heading=inlineHeading(line);

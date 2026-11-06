@@ -49,3 +49,28 @@ export function citationExcerptsForAnswer(answer,evidenceMap=[]){
   return inlineCitationGroups(text).map(group=>Object.fromEntries(
     group.ids.map(id=>[id,claimQuotesForCitation(text,group.start,id,evidenceMap)])));
 }
+
+/* Build the Key passages excerpts for one source card. The gateway groups
+ * claim-linked quotes into display boxes (batch 9, B9-2/B9-6): entries that
+ * share a `box` index carry identical quote text recorded under different
+ * claims, so the passage renders once per box while every claim keeps its
+ * own payload entry. Older payloads have no box index; group those by
+ * normalized quote text so an identical passage still renders once. The cap
+ * counts boxes, matching the card's previous three-quote limit.
+ */
+export function keyPassageExcerpts(highlight,limit=3){
+  const quotes=Array.isArray(highlight?.quotes)?highlight.quotes:[];
+  const seen=new Set();const excerpts=[];
+  for(const entry of quotes){
+    const quote=typeof entry?.quote==='string'?entry.quote:'';
+    if(!quote.trim())continue;
+    const key=Number.isSafeInteger(entry?.box)?'box:'+entry.box:
+      'text:'+quote.replace(/\s+/g,' ').trim();
+    if(seen.has(key))continue;
+    seen.add(key);excerpts.push(quote);
+    if(excerpts.length>=limit)break;
+  }
+  if(!excerpts.length&&typeof highlight?.quote==='string'&&highlight.quote.trim())
+    excerpts.push(highlight.quote);
+  return excerpts;
+}

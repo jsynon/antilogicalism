@@ -669,6 +669,14 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const missingInline=citationAudit.inlineIdsWithoutSource;
  const outcome=String(data?.outcome||'');
  const reviewStatus=String(data?.reviewStatus||'');
+ // The gateway reports whether its depth-repair pass fired for this answer
+ // (batch 9, B9-1c). Carry a normalized copy into the case record so a
+ // validation run can measure the firing rate; older gateways omit it.
+ const depthRepair=data?.depthRepair&&typeof data.depthRepair==='object'?
+  {triggered:data.depthRepair.triggered===true,
+   reasons:Array.isArray(data.depthRepair.reasons)?
+    data.depthRepair.reasons.map(reason=>String(reason)):[],
+   applied:data.depthRepair.applied===true}:null;
  const selectionHandoffAudit=auditSelectionHandoff(data?.trace||data?.evidenceTrace);
  const evidenceContinuityAudit=auditEvidenceContinuity(data?.trace||data?.evidenceTrace);
  // A reviewed source-free answer is structurally valid only when the Worker
@@ -877,6 +885,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   answerCoverageConsistent,evidenceCoverageConsistent:answerCoverageConsistent,
   answerCompletenessConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
   evidenceHighlightCount:highlights.length,evidenceHighlights,citationHighlightAudit,highlightPartCoverage,
+  depthRepair,
   highlightRelevance,
   manualReview,highlightHumanReview,structuralPassed,
   answerQualityStatus:'pending-human-review',answerQualityPass:null,
@@ -1188,6 +1197,7 @@ export function recheckQualityReport(report){
      outcome:variant.outcome,reviewStatus:variant.reviewStatus,
      citations:variant.citationSources,questionParts:variant.questionParts,evidenceMap:variant.evidenceMap,
      evidenceHighlights:variant.evidenceHighlights,evidenceTrace:variant.evidenceTrace,
+     depthRepair:variant.depthRepair,
      workerVersionId:variant.workerVersionId,
      workerSourceBuild:variant.workerSourceBuild,workerSourceRevision:variant.workerSourceRevision},
      Array.isArray(variant.submittedSources)?variant.submittedSources:Array.isArray(item.submittedSources)?item.submittedSources:[],
