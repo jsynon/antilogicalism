@@ -1474,6 +1474,26 @@ test('audit report preserves answer text, citation locations, and Worker quote h
  assert.equal('evidenceHighlightsLocated' in result,false);
 });
 
+test('audit report records every claim-linked quote a source carries, not just the first three',()=>{
+ const claimIds=['P1-C1','P1-C2','P1-C3','P1-C4','P1-C5','P1-C6'];
+ const result=auditLiveAnswer({coverage:'full',answerCompleteness:'full',
+  answer:'Johannes de Silentio presents faith as a paradox that cannot be mediated [S1].',
+  citations:[{id:'S1',bookId:'140',title:'Fear and Trembling',page:40}],
+  questionParts:[{part:'Faith as paradox',status:'supported',answerStatus:'answered',evidenceIds:['S1']}],
+  evidenceHighlights:[{source_id:'S1',title:'Fear and Trembling',page:40,
+   quote:'A verified excerpt about Abraham and the paradox of faith.',claim_id:'P1-C1',
+   point:'Faith is presented as a paradox.',quoteLocated:true,
+   quotes:claimIds.map((claimId,index)=>({claim_id:claimId,part_id:'P1',
+    point:`Supported point ${index+1} about the paradox of faith.`,
+    quote:`Verified passage excerpt number ${index+1} concerning Abraham and faith.`,
+    quoteLocated:true}))}]},
+  [{bookId:'140',page:40}],[]);
+ assert.deepEqual(result.evidenceHighlights[0].quotes.map(quote=>quote.claimId),claimIds,
+  'all six claimIds on the source are recorded, in gateway order');
+ assert.deepEqual(result.highlightRelevance.excerpts.map(excerpt=>excerpt.claimId),claimIds,
+  'downstream relevance excerpts see every recorded claim link');
+});
+
 test('live runner records a failed Worker case and continues with checkpoint callbacks',async()=>{
  const items=[{id:'a',question:'first',required_source_groups:[]},{id:'b',question:'second',required_source_groups:[]}];
  const seen=[];let calls=0;
