@@ -140,6 +140,27 @@ export function auditFinalAnswer(answer,sources){
 }
 export function normalizePlan(raw,question,catalog={},selectedBookId=''){
   const bounded=(v,max)=>typeof v==='string'?v.trim().slice(0,max):'';
+  // Batch 10 (B10-6): preserve the planner's per-part requirement texts so
+  // live retrieval judges the positions the plan actually named (the eval
+  // harness reads the raw plan and has always seen them; the normalized
+  // plan dropped them, so every requirement-keyed retrieval mechanism ran
+  // on part-question wording for real readers). The bounds mirror exactly
+  // what the retrieval layer enforces on threaded requirements: plain
+  // strings or {text} entries, trimmed, 5–200 chars, deduplicated, ≤4.
+  const normalizeRequirements=value=>{
+    const seen=new Set(),texts=[];
+    for(const item of Array.isArray(value)?value:[]){
+      const text=typeof item==='string'?item.trim()
+        :typeof item?.text==='string'?item.text.trim():'';
+      const key=text.toLocaleLowerCase();
+      if(text.length<5||text.length>200||seen.has(key))continue;
+      seen.add(key);texts.push(text);
+      if(texts.length>=4)break;
+    }
+    return texts;
+  };
+  const withRequirements=(part,requirements)=>requirements.length
+    ?{...part,requirements}:part;
   const fallback=catalogFallbackPlan(question,catalog,selectedBookId);
   const planInput=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:fallback;
   const resolvedQuestion=bounded(planInput.resolvedQuestion,600)||question;
@@ -185,7 +206,9 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
   if(selectedBookId)sources.splice(0,sources.length,{label:catalog[selectedBookId],role:'primary',bookIds:[selectedBookId]});
   const intent=['explain','compare','interpret','locate'].includes(planInput.intent)?planInput.intent:'explain';
   const queries=Array.isArray(planInput.queries)?planInput.queries.slice(0,4).map(q=>bounded(q,160)).filter(Boolean):[];
-  const parts=(Array.isArray(planInput.parts)?planInput.parts:[]).slice(0,6).map((p,i)=>({id:'P'+(i+1),question:bounded(typeof p==='string'?p:p?.question,240)})).filter(p=>p.question);
+  const parts=(Array.isArray(planInput.parts)?planInput.parts:[]).slice(0,6).map((p,i)=>withRequirements(
+    {id:'P'+(i+1),question:bounded(typeof p==='string'?p:p?.question,240)},
+    normalizeRequirements(typeof p==='string'?null:p?.requirements))).filter(p=>p.question);
   let normalizedParts=parts.length?parts:[{id:'P1',question}];
   const identityText=value=>String(value||'').normalize('NFKC').toLocaleLowerCase()
     .replace(/[’‘]/g,"'").replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
@@ -212,7 +235,8 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
   // question as one part; use search leads and supported prose for helpful
   // context instead of turning inferred themes into new answer requirements.
   if(!explicitMultiPartRequest&&!hypotheticalAuthorResponse)
-    normalizedParts=[{id:'P1',question:resolvedQuestion}];
+    normalizedParts=[withRequirements({id:'P1',question:resolvedQuestion},
+      normalizeRequirements(normalizedParts.flatMap(part=>part.requirements||[])))];
   const sourcePhrases=source=>{
     const phrases=[source.label];
     for(const token of String(source.label||'').split(/[^\p{L}\p{N}]+/u))
@@ -257,7 +281,8 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
     const broadAuthorQuestion=resolvedQuestion.match(/^\s*what\s+(?:(?:did|does|do)\s+)?(.{2,100}?)\s+(?:have\s+to\s+say|say|think|argue|believe|write|teach|hold|maintain)\s+(?:anything\s+)?(?:about|on|regarding|concerning)\s+(.+?)\??\s*$/i);
     const topic=broadAuthorQuestion?.[2]||'';
     if(broadAuthorQuestion&&!/\b(?:and|or|versus|vs\.?|compare|contrast)\b/i.test(topic))
-      normalizedParts=[{id:'P1',question:resolvedQuestion}];
+      normalizedParts=[withRequirements({id:'P1',question:resolvedQuestion},
+        normalizeRequirements(normalizedParts.flatMap(part=>part.requirements||[])))];
   }
   const questionNamedSources=sources.map((source,index)=>({source,index,phrases:sourcePhrases(source)}))
     .filter(group=>group.phrases.some(phrase=>containsSourcePhrase(resolvedQuestion,phrase)));

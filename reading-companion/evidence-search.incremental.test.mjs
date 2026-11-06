@@ -228,12 +228,13 @@ test('two starved parts each receive exactly one targeted search',async()=>{
   source.candidatePartIds.includes('P3')));
 });
 
-// --- B6-6: coverage-triggered targeted search ----------------------------
-// A part can end the post-gap round with candidates that never reach its
-// requirement: its facets found the topic in general, not the specific
-// thing the part must establish. The coverage trigger gives such a part
-// one targeted search worded from the uncovered requirement, inside its
-// validated scope, traced as a part gap recovery with reason 'coverage'.
+// --- B6-6 → B10-7: per-position chase -------------------------------------
+// A part can end retrieval with candidates that never reach one of its
+// requirements: its facets found the topic in general, not the specific
+// thing the part must establish. Batch 6 chased only the first uncovered
+// requirement, and only in the post-gap round; batch 10 judges every
+// requirement in every invocation, traces each chase as a part gap
+// recovery with reason 'position', and returns a positionCoverage record.
 
 const COVERAGE_BOOKS=[
  {id:'10',title:'A Treatise on Gardening — A. Green'},
@@ -298,11 +299,17 @@ test('a part whose candidates miss its requirement gets one targeted search word
  const traced=result.searches.filter(search=>search.partGapRecovery);
  assert.equal(traced.length,1,'only the uncovered part traces a recovery');
  assert.equal(traced[0].starvedPartId,'P2');
- assert.equal(traced[0].reason,'coverage');
+ assert.equal(traced[0].reason,'position');
  assert.equal(traced[0].resultCount,1);
  assert.ok(result.candidates.some(source=>source.bookId==='10'&&source.page===57&&
   source.candidatePartIds.includes('P2')),
   'the recovered page joins the pool linked to the uncovered part');
+ assert.deepEqual(result.positionCoverage,[
+  {partId:'P1',requirements:[{requirement:'identify the steps used to prepare soil before planting',
+    status:'covered',booksCovering:['10']}]},
+  {partId:'P2',requirements:[{requirement:REQUIREMENT_P2,
+    status:'chased-covered',booksCovering:['10']}]}],
+  'the coverage record shows which planned positions had evidence');
 });
 
 test('no coverage search fires when the candidates already reach every requirement',async()=>{
@@ -313,12 +320,14 @@ test('no coverage search fires when the candidates already reach every requireme
   'covered requirements trigger no part gap recovery');
 });
 
-test('the coverage trigger waits for the post-gap-planning call',async()=>{
+test('the per-position chase fires in the initial round, before any gap planning (batch 10 B10-7)',async()=>{
  const {calls,input}=coverageFixture();
  const result=await retrieveEvidence(input);
- assert.equal(calls.filter(call=>call.query===REQUIREMENT_P2).length,0,
-  'the initial round leaves the miss to the gap planner first');
- assert.ok(!result.searches.some(search=>search.partGapRecovery));
+ assert.equal(calls.filter(call=>call.query===REQUIREMENT_P2).length,1,
+  'a per-position gap inside a lexically adequate part is chased immediately, not left to a gap round that may never come');
+ const traced=result.searches.filter(search=>search.partGapRecovery);
+ assert.equal(traced.length,1);
+ assert.equal(traced[0].reason,'position');
 });
 
 test('a part without threaded requirements falls back to its own question as the requirement text',async()=>{
@@ -352,7 +361,170 @@ test('a part without threaded requirements falls back to its own question as the
  const traced=result.searches.filter(search=>search.partGapRecovery);
  assert.equal(traced.length,1);
  assert.equal(traced[0].starvedPartId,'P1');
- assert.equal(traced[0].reason,'coverage');
+ assert.equal(traced[0].reason,'position');
+});
+
+// --- B10-7: every uncovered requirement is chased, up to a global cap -----
+
+const SHARPENING_PREVIEW='Sharpen secateurs on a whetstone; the method keeps the blade safe and clean.';
+const REQUIREMENT_R2='describe the method for sharpening secateurs safely';
+
+test('a part with two uncovered requirements gets both chased (batch 10 B10-7)',async()=>{
+ const calls=[];
+ const genericSource={bookId:'10',title:COVERAGE_BOOKS[0].title,page:44,
+  globalPageId:1044,score:39,preview:GENERIC_PREVIEW};
+ const pruningSource={bookId:'10',title:COVERAGE_BOOKS[0].title,page:57,
+  globalPageId:1057,score:61,preview:PRUNING_PREVIEW};
+ const sharpeningSource={bookId:'10',title:COVERAGE_BOOKS[0].title,page:63,
+  globalPageId:1063,score:58,preview:SHARPENING_PREVIEW};
+ const library={search:async(query,options={})=>{
+  const bookId=options.bookId?String(options.bookId):'';
+  const allowed=[...(options.allowedBookIds||[])].map(String);
+  calls.push({query,bookId,allowed});
+  if(bookId==='10')return {sources:[genericSource]};
+  if(bookId)return {sources:[]};
+  if(query===REQUIREMENT_P2&&allowed.length===1&&allowed[0]==='10')
+   return {sources:[pruningSource]};
+  if(query===REQUIREMENT_R2&&allowed.length===1&&allowed[0]==='10')
+   return {sources:[sharpeningSource]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question:COVERAGE_QUESTION,
+  queries:['Green gardening soil preparation','Green gardening pruning advice'],
+  partQueries:[{partId:'P1',query:'Green pruning guidance'}],
+  partQuestions:[{partId:'P1',question:'What does Green say about pruning and tool care?',
+   sourceBookIds:['10'],requirements:[REQUIREMENT_P2,REQUIREMENT_R2]}],
+  library,books:COVERAGE_BOOKS,
+  allowedBookIds:new Set(COVERAGE_BOOKS.map(book=>book.id)),
+  pageLoader:async source=>({text:source.page===57?PRUNING_PREVIEW:
+   source.page===63?SHARPENING_PREVIEW:GENERIC_PREVIEW})});
+ const chases=calls.filter(call=>!call.bookId&&call.allowed.length===1);
+ assert.deepEqual(chases.map(call=>call.query),[REQUIREMENT_P2,REQUIREMENT_R2],
+  'both uncovered requirements are searched, in plan order — not just the first');
+ const traced=result.searches.filter(search=>search.partGapRecovery);
+ assert.equal(traced.length,2);
+ assert.ok(traced.every(search=>search.starvedPartId==='P1'&&search.reason==='position'));
+ assert.deepEqual(result.positionCoverage,[
+  {partId:'P1',requirements:[
+   {requirement:REQUIREMENT_P2,status:'chased-covered',booksCovering:['10']},
+   {requirement:REQUIREMENT_R2,status:'chased-covered',booksCovering:['10']}]}]);
+});
+
+test('the chase stops at the global cap and records the rest as unchased-cap (batch 10 B10-7)',async()=>{
+ const requirements=[
+  'identify the recommended timing for pruning dormant shrubs',
+  'describe the method for sharpening secateurs safely',
+  'explain how to store harvested potatoes through winter',
+  'list the steps for dividing overgrown rhubarb crowns',
+  'state when to sow broad beans in autumn beds',
+  'describe how to protect brassicas from cabbage moths',
+  'explain the rotation of legumes in vegetable plots',
+  'identify signs of blight on tomato foliage early'];
+ const calls=[];
+ const genericSource={bookId:'10',title:COVERAGE_BOOKS[0].title,page:44,
+  globalPageId:1044,score:39,preview:GENERIC_PREVIEW};
+ const library={search:async(query,options={})=>{
+  const bookId=options.bookId?String(options.bookId):'';
+  const allowed=[...(options.allowedBookIds||[])].map(String);
+  calls.push({query,bookId,allowed});
+  if(bookId==='10')return {sources:[genericSource]};
+  if(bookId)return {sources:[]};
+  if(requirements.includes(query)&&allowed.length===1&&allowed[0]==='10')
+   return {sources:[{bookId:'10',title:COVERAGE_BOOKS[0].title,page:70,
+    globalPageId:1070,score:55,preview:'Notes on '+query}]};
+  return {sources:[]};
+ }};
+ const part=(partId,offset)=>({partId,
+  question:'What does Green say about seasonal garden work?',
+  sourceBookIds:['10'],requirements:requirements.slice(offset,offset+4)});
+ const result=await retrieveEvidence({question:COVERAGE_QUESTION,
+  queries:['Green gardening soil preparation','Green gardening pruning advice'],
+  partQueries:[{partId:'P1',query:'Green pruning guidance'},
+   {partId:'P2',query:'Green soil preparation steps'}],
+  partQuestions:[part('P1',0),part('P2',4)],
+  library,books:COVERAGE_BOOKS,
+  allowedBookIds:new Set(COVERAGE_BOOKS.map(book=>book.id)),
+  pageLoader:async()=>({text:'A page of seasonal garden notes covering the requested work in full.'})});
+ const chases=calls.filter(call=>requirements.includes(call.query)&&!call.bookId);
+ assert.equal(chases.length,6,'exactly the capped number of chases executes');
+ assert.deepEqual(chases.map(call=>call.query),requirements.slice(0,6),
+  'the cap is spent in plan order: all of P1, then P2 in order');
+ assert.deepEqual(result.positionCoverage.map(entry=>entry.partId),['P1','P2']);
+ assert.deepEqual(result.positionCoverage[0].requirements.map(record=>record.status),
+  ['chased-covered','chased-covered','chased-covered','chased-covered']);
+ assert.deepEqual(result.positionCoverage[1].requirements.map(record=>record.status),
+  ['chased-covered','chased-covered','unchased-cap','unchased-cap']);
+});
+
+// --- B10-7: diversity-starved requirements chase outside the single book --
+
+const DIVERSITY_BOOKS=[
+ {id:'10',title:'A Treatise on Gardening — A. Green'},
+ {id:'11',title:'Poems of the Seasons — R. Brown'},
+ {id:'12',title:'Essays on Gardens — C. White'}
+];
+const DIVERSITY_REQUIREMENT='identify the recommended timing for pruning dormant shrubs';
+const DIVERSITY_COVERING={bookId:'10',title:DIVERSITY_BOOKS[0].title,page:57,
+ globalPageId:1057,score:61,
+ preview:'The recommended timing for pruning dormant shrubs is late winter.'};
+const DIVERSITY_ELSEWHERE={bookId:'12',title:DIVERSITY_BOOKS[2].title,page:88,
+ globalPageId:1288,score:52,
+ preview:'White advises pruning dormant shrubs after the first frosts lift.'};
+
+function diversityFixture({scoped=false}={}){
+ const calls=[];
+ const library={search:async(query,options={})=>{
+  const bookId=options.bookId?String(options.bookId):'';
+  const allowed=[...(options.allowedBookIds||[])].map(String);
+  calls.push({query,bookId,allowed});
+  if(bookId)return {sources:bookId==='10'?[DIVERSITY_COVERING]:[]};
+  if(query===DIVERSITY_REQUIREMENT&&!allowed.includes('10'))
+   return {sources:[DIVERSITY_ELSEWHERE]};
+  return {sources:[DIVERSITY_COVERING]};
+ }};
+ const input={question:'When should dormant shrubs be pruned?',
+  queries:['pruning dormant shrubs recommended timing','late winter shrub pruning guidance'],
+  partQueries:[{partId:'P1',query:'pruning dormant shrubs timing'}],
+  partQuestions:[{partId:'P1',question:'When should dormant shrubs be pruned?',
+   ...(scoped?{sourceBookIds:['10']}:{}),
+   requirements:[DIVERSITY_REQUIREMENT]}],
+  library,books:DIVERSITY_BOOKS,
+  allowedBookIds:new Set(DIVERSITY_BOOKS.map(book=>book.id)),
+  pageLoader:async source=>({text:source.bookId==='12'
+   ?'White advises pruning dormant shrubs after the first frosts lift, once the sap begins to rise.'
+   :'The recommended timing for pruning dormant shrubs is late winter, before the buds break.'})};
+ return {calls,input};
+}
+
+test('a diversity-starved unscoped part chases outside its single covering book (batch 10 B10-7)',async()=>{
+ const {calls,input}=diversityFixture();
+ const result=await retrieveEvidence(input);
+ const chases=calls.filter(call=>call.query===DIVERSITY_REQUIREMENT);
+ assert.equal(chases.length,1,'the lexically covered but one-book-deep requirement is chased');
+ assert.deepEqual(chases[0].allowed,['11','12'],
+  'the diversity chase is scoped to the allowlist minus the covering book');
+ const traced=result.searches.filter(search=>search.partGapRecovery);
+ assert.equal(traced.length,1);
+ assert.equal(traced[0].reason,'position');
+ assert.equal(traced[0].diversity,true);
+ assert.deepEqual(result.positionCoverage,[
+  {partId:'P1',requirements:[{requirement:DIVERSITY_REQUIREMENT,
+    status:'chased-covered',booksCovering:['10','12']}]}],
+  'the record shows the position now rests on two books');
+ assert.ok(result.candidates.some(source=>source.bookId==='12'&&
+  source.candidatePartIds.includes('P1')),
+  'the elsewhere page joins the pool linked to the part');
+});
+
+test('a scoped part never diversity-chases (batch 10 B10-7)',async()=>{
+ const {calls,input}=diversityFixture({scoped:true});
+ const result=await retrieveEvidence(input);
+ assert.equal(calls.filter(call=>call.query===DIVERSITY_REQUIREMENT).length,0,
+  'single-book coverage is the design of a scoped part, not a gap');
+ assert.ok(!result.searches.some(search=>search.partGapRecovery));
+ assert.deepEqual(result.positionCoverage,[
+  {partId:'P1',requirements:[{requirement:DIVERSITY_REQUIREMENT,
+    status:'covered',booksCovering:['10']}]}]);
 });
 
 test('starved-part recovery traces carry no coverage reason',async()=>{
