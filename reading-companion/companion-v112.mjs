@@ -10,7 +10,7 @@ import {RemoteLibrary} from './remote-library.mjs';
 import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.1';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.2';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -656,8 +656,17 @@ async function askQuestion(questionText){
         if(diagnosticState)diagnosticState.fallbackMode=true;
       }
       currentPlan=planned?.plan||null;
-      partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>
-        ({partId:part.id,question:part.question,sourceBookIds:part.sourceBookIds})):[];
+      partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>{
+        // Thread the plan's requirement texts through so retrieval can
+        // spot a part whose candidates never reach its requirement
+        // (the coverage-triggered targeted search in evidence-search).
+        // Parts without usable requirements keep their previous shape.
+        const requirements=Array.isArray(part.requirements)?part.requirements
+         .map(item=>typeof item==='string'?item:item?.text)
+         .filter(text=>typeof text==='string'&&text.trim().length>=5&&text.trim().length<=200)
+         .map(text=>text.trim()).slice(0,4):[];
+        return {partId:part.id,question:part.question,sourceBookIds:part.sourceBookIds,
+         ...(requirements.length?{requirements}:{})};}):[];
       if(planned)setStatus('I found a few promising leads. Let me find the pages themselves…');
       // One search cache serves both retrieval rounds of this question, so
       // the conditional gap round below executes only its new searches
