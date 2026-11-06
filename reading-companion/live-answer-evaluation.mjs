@@ -786,7 +786,12 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
    reason:aligned?'':'evidence-does-not-match-expected-part-source'};
  });
  const evidenceHighlights=highlights.map(item=>{
-  const quotes=(Array.isArray(item?.quotes)?item.quotes:[]).slice(0,3).map(quote=>({
+  // Record every claim-linked quote the gateway returned. The cap is a
+  // recording bound, not a linkage limit: it sits well above the gateway's
+  // per-source claim cap so no claim ranked past the first few on its source
+  // is dropped from the report (the old 3-quote truncation understated
+  // claim-level highlight linkage).
+  const quotes=(Array.isArray(item?.quotes)?item.quotes:[]).slice(0,12).map(quote=>({
    claimId:String(quote?.claim_id||''),partId:String(quote?.part_id||''),
    point:typeof quote?.point==='string'?quote.point:'',
    quote:typeof quote?.quote==='string'?quote.quote:'',
