@@ -879,6 +879,10 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed'&&
   selectionHandoffAudit.status!=='mismatch';
  return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,answerCompleteness,reviewStatus,
+  // The Worker currently returns this reader-facing disclosure as a string.
+  // Preserve that field in each evaluation record so uncited packet-linked
+  // parts can be checked against the actual wording shown to readers.
+  missing:typeof data?.missing==='string'?data.missing:'',
   reviewerLabels,failureCode,failureStage,noAnswerFailure,
   answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIds:inline,
@@ -1716,7 +1720,7 @@ export async function evaluatePlannerCase(item,{library,manifest,allowed,token,f
    excerpt:String(preview||'').slice(0,1200)})),
   submittedSourceCount:selected.length,sourceGroups,passed,
   outcome:passed?'planner-retrieval-ready':'planner-retrieval-miss',
-  coverage:'not-evaluated',reviewStatus:'planner-only',answerText:'',citationCount:0,
+  coverage:'not-evaluated',reviewStatus:'planner-only',answerText:'',missing:'',citationCount:0,
   citationBookIds:[],citationSources:[],inlineCitationCount:0,inlineIdsWithoutSource:[],
   evidenceHighlightCount:0,evidenceHighlights:[],questionParts:[],
   questionPartCoverage:{total:0,supported:0,partial:0,unsupported:0},evidenceMap:[],
@@ -1734,6 +1738,7 @@ function failedCaseResult(item,error){
   answerWorkerVersionId:failure.stage==='answer'?failure.workerVersionId:null,
   answerWorkerSourceBuild:failure.stage==='answer'?failure.workerSourceBuild:null,
   answerWorkerSourceRevision:failure.stage==='answer'?failure.workerSourceRevision:null,
+  missing:'',
   plannerFallback:failure.plannerFallback===true,gapPlannerAttempted:failure.gapPlannerAttempted===true,
   ...(failure.gapPlannerFailure?{gapPlannerFailure:failure.gapPlannerFailure}:{}),
   ...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),

@@ -453,6 +453,15 @@ test('audit requires expected-source coverage and citations with no orphan marke
  assert.deepEqual(bad.inlineIdsWithoutSource,['S2']);
 });
 
+test('answer case records preserve the Worker missing-evidence disclosure string',()=>{
+ const missing='Retrieved passages could not be verified as supporting this part of the question: How does Hume explain necessity?';
+ const result=auditLiveAnswer({outcome:'verified-source-draft',coverage:'partial',reviewStatus:'claim-review',
+  answer:'A claim [S1].',missing,citations:[{id:'S1',bookId:'529'}]},[{bookId:'529'}],[]);
+ assert.equal(result.missing,missing);
+ const absent=auditLiveAnswer({answer:'A claim [S1].',citations:[{id:'S1',bookId:'529'}]},[{bookId:'529'}],[]);
+ assert.equal(absent.missing,'','records keep a stable field when older Workers omit the disclosure');
+});
+
 test('citation highlight coverage is reported separately from structural answer validity',()=>{
  const citation={id:'S1',bookId:'529',title:'On the Origin of Species',page:18};
  const without=auditLiveAnswer({coverage:'full',answerCompleteness:'full',answer:'A supported claim [S1].',citations:[citation]},
@@ -1688,6 +1697,7 @@ test('request-failure case records preserve attached stage timings and default t
   throw error;
  }});
  assert.equal(run.results[0].outcome,'request-failed');
+ assert.equal(run.results[0].missing,'');
  assert.deepEqual(run.results[0].stageTimings,stageTimings);
  assert.deepEqual(run.results[1].stageTimings,[]);
 });
