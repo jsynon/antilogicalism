@@ -654,6 +654,42 @@ export function summarizeEvidenceContinuity(cases){
    averageSpanCount:avg('spanCount'),averageSpanReferenceCount:avg('spanReferenceCount'),
    averageSerializedCharacters:avg('serializedCharacters')}};
 }
+export function auditHighlightClaimCoverage(evidenceMap,evidenceHighlights,inlineIds){
+ const inline=new Set(Array.isArray(inlineIds)?inlineIds.map(String):[]);
+ const citedSourcesByClaim=new Map();
+ for(const entry of Array.isArray(evidenceMap)?evidenceMap:[]){
+  const claimId=String(entry?.claimId||'');
+  const sourceId=String(entry?.id||'');
+  if(!claimId||!sourceId||!inline.has(sourceId))continue;
+  if(!citedSourcesByClaim.has(claimId))citedSourcesByClaim.set(claimId,new Set());
+  citedSourcesByClaim.get(claimId).add(sourceId);
+ }
+ const citedClaimIds=new Set(citedSourcesByClaim.keys());
+ const linkedClaimIds=new Set();
+ for(const item of Array.isArray(evidenceHighlights)?evidenceHighlights:[]){
+  const sourceId=String(item?.sourceId||item?.source_id||'');
+  if(!sourceId)continue;
+  const quotes=Array.isArray(item?.quotes)&&item.quotes.length?item.quotes:[item];
+  for(const quote of quotes){
+   const located=typeof quote?.quoteLocated==='boolean'?
+    quote.quoteLocated:item?.quoteLocated===true;
+   if(!located)continue;
+   const claimIds=[quote?.claimId,quote?.claim_id,
+    ...(Array.isArray(quote?.claimIds)?quote.claimIds:[]),
+    ...(Array.isArray(quote?.claim_ids)?quote.claim_ids:[])].map(String).filter(Boolean);
+   for(const claimId of claimIds){
+    if(citedClaimIds.has(claimId)&&citedSourcesByClaim.get(claimId)?.has(sourceId))
+     linkedClaimIds.add(claimId);
+   }
+  }
+ }
+ const unlinkedClaimIds=[...citedClaimIds].filter(claimId=>!linkedClaimIds.has(claimId));
+ const citedClaimCount=citedClaimIds.size;
+ const linkedClaimCount=linkedClaimIds.size;
+ return {method:'located-highlight-claim-source-intersection',citedClaimCount,linkedClaimCount,
+  ratio:citedClaimCount?Number((linkedClaimCount/citedClaimCount).toFixed(4)):null,
+  unlinkedClaimIds};
+}
 export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSources=[],options={}){
  const citations=Array.isArray(data?.citations)?data.citations:[];
  const workerVersionId=typeof data?.workerVersionId==='string'&&data.workerVersionId.length<=128?data.workerVersionId:null;
@@ -835,6 +871,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   withLocatedHighlight:questionParts.filter((_part,index)=>locatedHighlightPartIds.has('P'+(index+1))).length,
   withoutLocatedHighlight:questionParts.map((part,index)=>({part:String(part?.part||''),partId:'P'+(index+1)}))
    .filter(item=>!locatedHighlightPartIds.has(item.partId))};
+ const highlightClaimCoverage=auditHighlightClaimCoverage(evidenceMap,evidenceHighlights,inline);
  const highlightRelevance=highlightRelevanceAudit(answer,citations,evidenceHighlights);
  const evidencePartsConsistent=questionParts.length===0?null:
   coverage==='full'?questionParts.every(part=>part?.status==='supported'):
@@ -894,6 +931,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   answerCoverageConsistent,evidenceCoverageConsistent:answerCoverageConsistent,
   answerCompletenessConsistent,coverageContradictions:proseContradictions,evidenceMap,evidenceAuditScope,
   evidenceHighlightCount:highlights.length,evidenceHighlights,citationHighlightAudit,highlightPartCoverage,
+  highlightClaimCoverage,
   depthRepair,
   highlightRelevance,
   manualReview,highlightHumanReview,structuralPassed,
