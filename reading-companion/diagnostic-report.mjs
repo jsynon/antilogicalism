@@ -129,7 +129,9 @@ function questionPartSummary(value,submittedSources=[]){
     const requirements=Array.isArray(item.requirements)?item.requirements.slice(0,4).flatMap(requirement=>{
       const id=typeof requirement?.id==='string'&&/^P[1-9]\d*-R[1-9]\d*$/.test(requirement.id)?requirement.id:null;
       const text=typeof requirement?.text==='string'?requirement.text.trim().slice(0,200):'';
-      return id&&text?[{id,text}]:[];
+      const questionAnchor=typeof requirement?.questionAnchor==='string'?
+        requirement.questionAnchor.trim().slice(0,400):'';
+      return id&&text?[{id,text,...(questionAnchor?{questionAnchor}:{})}]:[];
     }):[];
     const requirementCoverage=Array.isArray(item.requirementCoverage)?item.requirementCoverage.slice(0,4).flatMap(decision=>{
       const requirementId=typeof decision?.requirementId==='string'&&
@@ -242,7 +244,10 @@ export function createDiagnosticReport(input={}){
         ...(Array.isArray(part?.requirements)?{requirements:part.requirements.slice(0,4).flatMap(requirement=>{
           const id=typeof requirement?.id==='string'&&/^P[1-9]\d*-R[1-9]\d*$/.test(requirement.id)?requirement.id:null;
           const text=typeof requirement?.text==='string'?requirement.text.trim().slice(0,200):'';
-          return id&&id.startsWith(string(part?.id,8)+'-R')&&text?[{id,text}]:[];
+          const questionAnchor=typeof requirement?.questionAnchor==='string'?
+            requirement.questionAnchor.trim().slice(0,400):'';
+          return id&&id.startsWith(string(part?.id,8)+'-R')&&text?
+            [{id,text,...(questionAnchor?{questionAnchor}:{})}]:[];
         })}:{})})):[],
     }:null,
     pipeline:string(input.pipeline,48)||null,

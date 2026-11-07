@@ -160,8 +160,10 @@ test('diagnostic reports all six source pages sent to the answer service',()=>{
 test('diagnostics preserve bounded requirement-to-claim links across planner, review, and highlights',()=>{
  const report=createDiagnosticReport({
   plannerPlan:{parts:[{id:'P1',question:'Explain necessity and custom.',requirements:[
-   {id:'P1-R1',text:'Explain how repeated conjunction gives rise to necessity.'},
-   {id:'P1-R2',text:'Explain how custom leads to inference.'},
+   {id:'P1-R1',text:'Explain how repeated conjunction gives rise to necessity.',
+    questionAnchor:'How does Hume explain causal necessity'},
+   {id:'P1-R2',text:'Explain how custom leads to inference.',
+    questionAnchor:'what role does custom play'},
    {id:'P1-R3',text:'x'.repeat(260)},
    {id:'bad-R4',text:'ignore malformed id'}]}]},
   submittedSources:[{id:'S1'}],
@@ -179,8 +181,10 @@ test('diagnostics preserve bounded requirement-to-claim links across planner, re
     requirement_ids:['P1-R2','bad-R3'],point:'Custom leads to inference.',quote:'Exact reviewed quote.'}]}]
  });
  assert.deepEqual(report.plannerPlan.parts[0].requirements,[
-  {id:'P1-R1',text:'Explain how repeated conjunction gives rise to necessity.'},
-  {id:'P1-R2',text:'Explain how custom leads to inference.'},
+  {id:'P1-R1',text:'Explain how repeated conjunction gives rise to necessity.',
+   questionAnchor:'How does Hume explain causal necessity'},
+  {id:'P1-R2',text:'Explain how custom leads to inference.',
+   questionAnchor:'what role does custom play'},
   {id:'P1-R3',text:'x'.repeat(200)}
  ]);
  assert.deepEqual(report.answer.questionParts[0],{
