@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -495,6 +495,8 @@ test('recorder keeps every claim link when box entries share one quote text (bat
  const quote='It is easy to see, though it scarcely needs to be pointed out, that Faith is not a form of knowledge.';
  const result=auditLiveAnswer({coverage:'full',answerCompleteness:'full',
   answer:'Faith is not a form of knowledge [S1].',citations:[citation],
+  evidenceMap:[{id:'S1',claimId:'P1-C1'},{id:'S1',claimId:'P1-C2'},
+   {id:'S1',claimId:'P1-C3'}],
   evidenceHighlights:[{source_id:'S1',page:33,quote,quoteLocated:true,quotes:[
    {claim_id:'P1-C1',part_id:'P1',point:'Faith is not a form of knowledge.',quote,claim_ids:['P1-C1','P1-C2'],box:0,quoteLocated:true},
    {claim_id:'P1-C2',part_id:'P1',point:'Faith is not a form of knowledge.',quote,claim_ids:['P1-C1','P1-C2'],box:0,quoteLocated:true},
@@ -506,6 +508,20 @@ test('recorder keeps every claim link when box entries share one quote text (bat
  assert.deepEqual(result.evidenceHighlights[0].quotes.map(entry=>entry.box),[0,0]);
  assert.deepEqual(result.evidenceHighlights[0].quotes.map(entry=>entry.claimIds),
   [['P1-C1','P1-C2'],['P1-C1','P1-C2']]);
+ assert.deepEqual(result.highlightClaimCoverage,{method:'located-highlight-claim-source-intersection',
+  citedClaimCount:3,linkedClaimCount:2,ratio:0.6667,unlinkedClaimIds:['P1-C3']});
+});
+
+test('highlight claim coverage requires a located quote on the same cited source',()=>{
+ const audit=auditHighlightClaimCoverage([
+  {id:'S1',claimId:'P1-C1'},{id:'S2',claimId:'P1-C2'}
+ ],[
+  {source_id:'S1',quoteLocated:true,quotes:[{claimId:'P1-C1',quoteLocated:true}]},
+  {source_id:'S2',quoteLocated:false,quotes:[{claimId:'P1-C2',quoteLocated:false}]},
+  {source_id:'S1',quoteLocated:true,quotes:[{claimId:'P1-C2',quoteLocated:true}]},
+ ],['S1','S2']);
+ assert.deepEqual(audit,{method:'located-highlight-claim-source-intersection',
+  citedClaimCount:2,linkedClaimCount:1,ratio:0.5,unlinkedClaimIds:['P1-C2']});
 });
 
 test('evidence coverage alone does not establish answer completeness',()=>{
