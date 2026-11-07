@@ -131,7 +131,7 @@ test('waiting screen sets a time expectation and explains the quick check',()=>{
  assert.match(clientV49,/function armLongWaitNotice\(\)/);
  assert.match(clientV49,/},45000\);/);
  assert.match(clientV49,/I’m following those ideas through the sources and sorting out the details…/);
- assert.match(clientV49,/setStatus\('Now I’m bringing the best passages together and checking the sources\. This can take a little while…'\);\n    armLongWaitNotice\(\);/);
+ assert.match(clientV49,/setStatus\('I’ve found a trail of promising pages—now I’m picking out the best clues…'\);\n    armLongWaitNotice\(\);/);
  assert.match(clientV49,/cancelLongWaitNotice\(\);\n    answering=false;/);
 });
 test('selected-book requests skip the planner call with a deterministic plan; all-books keeps it',()=>{
