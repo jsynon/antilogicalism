@@ -130,8 +130,8 @@ test('waiting screen sets a time expectation and explains the quick check',()=>{
   'quick-check explanation sits immediately before the Turnstile widget container');
  assert.match(clientV49,/function armLongWaitNotice\(\)/);
  assert.match(clientV49,/},45000\);/);
- assert.match(clientV49,/Still checking the passages carefully — thorough answers take a little longer\./);
- assert.match(clientV49,/setStatus\('Now I’m bringing the best passages together and checking the sources\. This can take a little while…'\);\n    armLongWaitNotice\(\);/);
+ assert.match(clientV49,/I’m following those ideas through the sources and sorting out the details…/);
+ assert.match(clientV49,/setStatus\('I’ve found a trail of promising pages—now I’m picking out the best clues…'\);\n    armLongWaitNotice\(\);/);
  assert.match(clientV49,/cancelLongWaitNotice\(\);\n    answering=false;/);
 });
 test('selected-book requests skip the planner call with a deterministic plan; all-books keeps it',()=>{
@@ -187,7 +187,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/function refreshStatusState\(\)/);
  assert.match(client,/status\.setAttribute\('aria-busy',String\(busy\)\)/);
  assert.match(client,/askButton\.textContent=searching\|\|answering\?'Working…':'Ask Reading Companion'/);
- assert.match(clientV49,/Now I’m bringing the best passages together and checking the sources\. This can take a little while…/);
+ assert.match(clientV49,/I’ve found a trail of promising pages—now I’m picking out the best clues…/);
  assert.doesNotMatch(html,/Press Enter to ask|companion-question-help/);
  assert.match(client,/question\.addEventListener\('keydown',event=>\{/);
  assert.match(client,/event\.key!=='Enter'\|\|event\.shiftKey\|\|event\.isComposing/);
