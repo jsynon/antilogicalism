@@ -97,8 +97,16 @@ function refreshStatusState(){
 }
 function setStatus(message){status.textContent=message;refreshStatusState();}
 let longWaitNotice=null;
+let additionalLongWaitNotices=[];
 function armLongWaitNotice(){
   cancelLongWaitNotice();
+  additionalLongWaitNotices=[
+    [20000,'I’m working through the passages I found…'],
+    [65000,'I’m still here, making sure the answer stays grounded in the books.'],
+    [85000,'Thanks for waiting — I’m giving the sources another careful look before I finish.']
+  ].map(([delay,message])=>setTimeout(()=>{
+    if(answering)setStatus(message);
+  },delay));
   longWaitNotice=setTimeout(()=>{
     longWaitNotice=null;
     if(answering)setStatus('Still checking the passages carefully — thorough answers take a little longer.');
@@ -106,6 +114,8 @@ function armLongWaitNotice(){
 }
 function cancelLongWaitNotice(){
   if(longWaitNotice!==null){clearTimeout(longWaitNotice);longWaitNotice=null;}
+  for(const timer of additionalLongWaitNotices)clearTimeout(timer);
+  additionalLongWaitNotices=[];
 }
 function refreshDiagnostic(){
   if(!diagnosticState||!diagnosticOutput)return;
