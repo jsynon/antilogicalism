@@ -96,26 +96,52 @@ function refreshStatusState(){
   status.setAttribute('aria-busy',String(busy));
 }
 function setStatus(message){status.textContent=message;refreshStatusState();}
+const longWaitNotices=[
+  [20000,'The strongest passages are gathered. I’m checking how their ideas fit together…'],
+  [65000,'The pieces are coming together. I’m shaping them into a clear answer…'],
+  [85000,'The answer’s taking shape; I’m checking that each point has a passage to stand on…']
+];
+const continuingLongWaitNotices=[
+  'Now I’m giving the citations and key passages a careful once-over…',
+  'I’m polishing the explanation so the ideas are easy to follow…',
+  'I’m tracing each part of the answer back to the right page…',
+  'Still among the books, making sure the details all line up…'
+];
 let longWaitNotice=null;
 let additionalLongWaitNotices=[];
+let continuingLongWaitNoticeStart=null;
+let continuingLongWaitNoticeInterval=null;
 function armLongWaitNotice(){
   cancelLongWaitNotice();
-  additionalLongWaitNotices=[
-    [20000,'I’m working through the passages I found…'],
-    [65000,'I’m still here, making sure the answer stays grounded in the books.'],
-    [85000,'Thanks for waiting — I’m giving the sources another careful look before I finish.']
-  ].map(([delay,message])=>setTimeout(()=>{
+  additionalLongWaitNotices=longWaitNotices.map(([delay,message])=>setTimeout(()=>{
     if(answering)setStatus(message);
   },delay));
   longWaitNotice=setTimeout(()=>{
     longWaitNotice=null;
-    if(answering)setStatus('Still checking the passages carefully — thorough answers take a little longer.');
+    if(answering)setStatus('I’m following those ideas through the sources and sorting out the details…');
   },45000);
+  continuingLongWaitNoticeStart=setTimeout(()=>{
+    if(!answering)return;
+    let index=0;
+    setStatus(continuingLongWaitNotices[index]);
+    index=(index+1)%continuingLongWaitNotices.length;
+    continuingLongWaitNoticeInterval=setInterval(()=>{
+      if(!answering)return;
+      setStatus(continuingLongWaitNotices[index]);
+      index=(index+1)%continuingLongWaitNotices.length;
+    },20000);
+  },105000);
 }
 function cancelLongWaitNotice(){
   if(longWaitNotice!==null){clearTimeout(longWaitNotice);longWaitNotice=null;}
   for(const timer of additionalLongWaitNotices)clearTimeout(timer);
   additionalLongWaitNotices=[];
+  if(continuingLongWaitNoticeStart!==null){
+    clearTimeout(continuingLongWaitNoticeStart);continuingLongWaitNoticeStart=null;
+  }
+  if(continuingLongWaitNoticeInterval!==null){
+    clearInterval(continuingLongWaitNoticeInterval);continuingLongWaitNoticeInterval=null;
+  }
 }
 function refreshDiagnostic(){
   if(!diagnosticState||!diagnosticOutput)return;
@@ -741,7 +767,7 @@ async function askQuestion(questionText){
       refreshDiagnostic();
     }
     turnstileToken='';
-    setStatus('Now I’m bringing the best passages together and checking the sources. This can take a little while…');
+    setStatus('I’ve found a trail of promising pages—now I’m picking out the best clues…');
     armLongWaitNotice();
     const response=await fetch(API+'/api/pilot-answer',{
       method:'POST',headers:{'Content-Type':'application/json'},
