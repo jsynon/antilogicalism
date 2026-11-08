@@ -102,6 +102,16 @@ test('batch-17 transport suite pairs all 16 phase-2 questions without changing t
  assert.equal(evaluationUsesLivePlanner('transport-ab','case-default'),true);
 });
 
+test('batch-17 stage profile selects the four registered all-books and selected-book cases',()=>{
+ const cases=selectLiveCases({cases:[]},'transport-ab','stage-profile-4');
+ assert.deepEqual(cases.map(item=>item.id),[
+  'library-all-hobbes-rousseau-nature','library-all-progress-idea',
+  'library-selected-conrad-marlow-kurtz','library-selected-kierkegaard-silentio-speaker'
+ ]);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='all-books').length,2);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='selected-books').length,2);
+});
+
 test('transport summary distinguishes timer races, acknowledged stream cancellation and incomplete answers',()=>{
  const report=summarizeInferenceTransport([{id:'case-a',answerVariantComparison:{variants:[
   {inferenceTransport:'default',realWorkStageSumMs:100_000,evidenceTrace:{inferenceCalls:[{timeoutClassification:'timer-race-no-cancel'}]}},
