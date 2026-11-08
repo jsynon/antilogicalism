@@ -112,6 +112,26 @@ test('batch-17 stage profile selects the four registered all-books and selected-
  assert.equal(cases.filter(item=>item.evaluation_scope==='selected-books').length,2);
 });
 
+test('batch-18 acceptance is one balanced four-question configured-default screen',()=>{
+ const cases=selectLiveCases({cases:[]},'batch18-acceptance','stage-profile-4');
+ assert.deepEqual(cases.map(item=>item.id),[
+  'library-all-hobbes-rousseau-nature','library-all-progress-idea',
+  'library-selected-conrad-marlow-kurtz','library-selected-kierkegaard-silentio-speaker'
+ ]);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='all-books').length,2);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='selected-books').length,2);
+ assert.equal(evaluationUsesLivePlanner('batch18-acceptance','case-default'),true);
+});
+
+test('batch-18 workflow is a single with-review pass that uses configured transport',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const workflow=readFileSync(new URL('../.github/workflows/reading-companion-batch-18-acceptance.yml',import.meta.url),'utf8');
+ assert.match(workflow,/--mode batch18-acceptance --scope case-default --case stage-profile-4/);
+ assert.match(workflow,/--repeat 1 --answer-variant with-review/);
+ assert.match(workflow,/name: reading-companion-batch-18-acceptance/);
+ assert.doesNotMatch(workflow,/--answer-variant transport-ab/);
+});
+
 test('transport summary distinguishes timer races, acknowledged stream cancellation and incomplete answers',()=>{
  const report=summarizeInferenceTransport([{id:'case-a',answerVariantComparison:{variants:[
   {inferenceTransport:'default',realWorkStageSumMs:100_000,evidenceTrace:{inferenceCalls:[{timeoutClassification:'timer-race-no-cancel'}]}},
