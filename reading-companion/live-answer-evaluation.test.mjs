@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -93,6 +93,45 @@ test('phase-2 suites permit one selected case and no question duplicates an earl
   'no phase-2 question duplicates an earlier suite question');
  assert.ok(phase2.every(item=>!earlierIds.has(item.id)),'no phase-2 case id repeats an earlier suite');
 });
+test('batch-17 transport suite pairs all 16 phase-2 questions without changing their scopes',()=>{
+ const cases=selectLiveCases({cases:[]},'transport-ab','all');
+ assert.equal(cases.length,16);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='all-books').length,8);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='selected-books').length,8);
+ assert.equal(new Set(cases.map(item=>item.id)).size,16);
+ assert.equal(evaluationUsesLivePlanner('transport-ab','case-default'),true);
+});
+
+test('transport summary distinguishes timer races, acknowledged stream cancellation and incomplete answers',()=>{
+ const report=summarizeInferenceTransport([{id:'case-a',answerVariantComparison:{variants:[
+  {inferenceTransport:'default',realWorkStageSumMs:100_000,evidenceTrace:{inferenceCalls:[{timeoutClassification:'timer-race-no-cancel'}]}},
+  {inferenceTransport:'streaming',realWorkStageSumMs:90_000,evidenceTrace:{inferenceCalls:[{timeoutFired:true,timeoutClassification:'stream-cancel-acknowledged',providerInferenceCancellation:'unconfirmed'}]}}
+ ]}},{id:'case-b',answerVariantComparison:{variants:[
+  {inferenceTransport:'default',realWorkStageSumMs:140_000},
+  {inferenceTransport:'streaming',realWorkStageSumMs:150_000,noAnswerFailure:true}
+ ]}}]);
+ assert.equal(report.default.realWorkStageSumMs.median,120_000);
+ assert.equal(report.default.timerRaceCases,1);
+ assert.equal(report.streaming.acknowledgedStreamCancels,1);
+ assert.equal(report.streaming.unconfirmedProviderTerminations,1);
+ assert.equal(report.streaming.requestFailures,1);
+});
+
+test('transport scorecard template uses rubric-v2 answer and highlight dimensions per path',()=>{
+ const report={mode:'transport-ab',cases:[{id:'paired-case',question:'Question?',answerVariantComparison:{variants:[
+  {inferenceTransport:'default',answerText:'Answer [S1].',evidenceHighlights:[{}]},
+  {inferenceTransport:'streaming',noAnswerFailure:true,answerText:'',evidenceHighlights:[]}
+ ]}}]};
+ const card=createHumanScorecardTemplate(report);
+ assert.equal(card.schema,'antilogicalism-reading-companion-phase2-rubric-v2-transport-scorecard');
+ assert.deepEqual(Object.keys(card.scores[0].answer.scores),['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness']);
+ assert.deepEqual(Object.keys(card.scores[0].highlights.scores),['fidelity','coverage','context','claimRelevance','completeness']);
+ assert.equal(card.scores[1].inferenceTransport,'streaming');
+ assert.equal(card.scores[1].noAnswerFailure,true);
+ assert.equal(card.protocol.latency.medianMaximumSeconds,95);
+ assert.equal(card.protocol.latency.p90MaximumSeconds,145);
+});
+
 test('malformed optional planner facets are dropped or fall back without blocking base retrieval',()=>{
  const result=partFacetsFromPlan([
   {id:'P1',question:'What did the priests say about Helen?',searchQueries:['']},
@@ -1107,6 +1146,38 @@ test('all-books evaluation sends retrieved candidates for Worker selection befor
  assert.equal(answerBody.sources.length,6);
  assert.deepEqual(new Set(answerBody.sources.map(source=>source.bookId)),new Set(['529','102']));
  assert.equal(result.submittedSources.length,6);
+});
+
+test('transport A/B selects one verified packet and reuses it for both complete answer paths',async()=>{
+ const calls=[];
+ const item={id:'transport-pair-liberty',question:'What does the source say about liberty?',
+  selected_book_ids:['1'],planner_queries:['What does the source say about liberty?'],review_focus:[],required_source_groups:[]};
+ const library={search:async()=>({sources:[{id:'page-1',bookId:'1',title:'A Source',page:1,globalPageId:1,
+   preview:'The source discusses liberty and the meaning of individual freedom.',score:10}]}),
+  jsonGzip:async()=>({pages:[{id:1,page:1,text:'The source discusses liberty and the meaning of individual freedom.'}]})};
+ const snapshot=[{bookId:'1',page:1,candidateId:'C1',candidatePartIds:[],candidatePartSupport:[]}];
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{1:{title:'A Source'}}},allowed:new Set(['1']),
+  token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,answerVariant:'transport-ab',
+  fetcher:async(_url,options)=>{
+   const body=JSON.parse(options.body);calls.push(body);
+   if(body.selectionOnly)return new Response(JSON.stringify({selectionOnly:true,selectionSnapshot:snapshot,
+    sourceSelectionStatus:'selected',sourceSelection:{status:'selected',pages:[{id:'S1',bookId:'1',page:1,candidatePartIds:[]}]}}),
+    {status:200,headers:{'content-type':'application/json'}});
+   return new Response(JSON.stringify({inferenceTransport:body.inferenceTransport,
+    outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'The source discusses liberty [S1].',
+    citations:[{id:'S1',bookId:'1'}],evidenceHighlights:[],sourceSelection:{status:'selected',pages:[{id:'S1',bookId:'1',page:1,candidatePartIds:[]}]}}),
+    {status:200,headers:{'content-type':'application/json'}});
+  }});
+ const answerCalls=calls.filter(body=>body.selectionOnly||body.inferenceTransport);
+ assert.equal(answerCalls.length,3);
+ assert.equal(answerCalls[0].selectionOnly,true);
+ assert.ok(answerCalls.slice(1).every(body=>JSON.stringify(body.selectionSnapshot)===JSON.stringify(snapshot)));
+ assert.deepEqual(new Set(answerCalls.slice(1).map(body=>body.inferenceTransport)),new Set(['default','streaming']));
+ assert.deepEqual(answerCalls[1].sources,answerCalls[2].sources);
+ assert.deepEqual(answerCalls[1].plan,answerCalls[2].plan);
+ assert.equal(result.answerVariantComparison.sharedSelection.status,'completed');
+ assert.equal(result.answerVariantComparison.variants.length,2);
+ assert.ok(result.answerVariantComparison.variants.every(variant=>variant.answerText));
 });
 
 test('planner-only evaluation checks selected and All Books retrieval without answer calls',async()=>{
