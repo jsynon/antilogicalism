@@ -250,6 +250,9 @@ const PLANNER_CASE_IDS=[
  'quality-all-books-cross-work-science',
 ];
 const CALL_GAP_MS=30_500;
+const BATCH18_ACCEPTANCE_CASE_IDS=['library-all-hobbes-rousseau-nature',
+ 'library-all-progress-idea','library-selected-conrad-marlow-kurtz',
+ 'library-selected-kierkegaard-silentio-speaker'];
 
 function copyEvaluationCase(item){
  return {...item,selected_book_ids:[...item.selected_book_ids],planner_queries:[...item.planner_queries],
@@ -264,7 +267,7 @@ function sourceRevision(){
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
- const evaluationCases=mode==='transport-ab'?[...LIBRARY_ALL_CASES,...LIBRARY_SELECTED_CASES]:mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
+ const evaluationCases=mode==='transport-ab'||mode==='batch18-acceptance'?[...LIBRARY_ALL_CASES,...LIBRARY_SELECTED_CASES]:mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
  if(mode==='transport-ab'&&caseId==='stage-profile-4'){
@@ -273,6 +276,12 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   const byId=new Map(evaluationCases.map(item=>[item.id,item]));
   const selected=ids.map(id=>byId.get(id));
   if(selected.some(item=>!item))throw Error('The four registered stage-profile questions are missing from the transport A/B suite.');
+  return selected.map(copyEvaluationCase);
+ }
+ if(mode==='batch18-acceptance'&&['all','stage-profile-4'].includes(caseId)){
+  const byId=new Map(evaluationCases.map(item=>[item.id,item]));
+  const selected=BATCH18_ACCEPTANCE_CASE_IDS.map(id=>byId.get(id));
+  if(selected.some(item=>!item))throw Error('A registered Batch 18 acceptance question is missing.');
   return selected.map(copyEvaluationCase);
  }
  if(mode==='acceptance'&&caseId==='repeatable-calibration'){
@@ -288,7 +297,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return selected.map(copyEvaluationCase);
  }
  if(caseId&&caseId!=='all'){
-  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3, handoff, philosophy3, library-all, library-selected and transport-ab cases can be selected in their respective suites.');
+  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab','batch18-acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3, handoff, philosophy3, library-all, library-selected, transport-ab and batch18-acceptance cases can be selected in their respective suites.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
@@ -316,7 +325,12 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff, philosophy3, library-all, library-selected, transport-ab or full.');
+ if(mode==='batch18-acceptance')return BATCH18_ACCEPTANCE_CASE_IDS.map(id=>{
+  const item=evaluationCases.find(value=>value.id===id);
+  if(!item)throw Error('A registered Batch 18 acceptance question is missing.');
+  return copyEvaluationCase(item);
+ });
+ throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff, philosophy3, library-all, library-selected, transport-ab, batch18-acceptance or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(scope==='case-default')return cases.map(item=>({...item,selected_book_ids:item.evaluation_scope==='all-books'?[]:[...item.selected_book_ids]}));
@@ -326,7 +340,7 @@ export function applyQualityScope(cases,scope='selected-books'){
  return cases.map(item=>({...item,selected_book_ids:[]}));
 }
 export function evaluationUsesLivePlanner(mode,scope){
- if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3'||mode==='library-all'||mode==='library-selected'||mode==='transport-ab')return true;
+ if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3'||mode==='library-all'||mode==='library-selected'||mode==='transport-ab'||mode==='batch18-acceptance')return true;
  return ['quality','focused','paired','holdout','acceptance'].includes(mode)&&
   (mode==='paired'||scope==='all-books');
 }
@@ -1775,6 +1789,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
      plannerPlan:plan?.plan||null,candidateSources:retrievalCandidates});
    variantResults.push({answerVariant:answerVariant==='paired-selection-ablation'?'with-review':variant,
     selectionVariant:answerVariant==='paired-selection-ablation'?variant:null,
+    inferenceTransport:data.inferenceTransport||null,
     selectionStatus:data.sourceSelection?.status||null,
     selectionCoverage:auditSelectionCoverage(loaded.candidates,submitted,partQuestions),
     selectionAudit:auditEvidencePacketSelection(loaded.candidates,submitted,item.question,partQuestions),
@@ -2060,11 +2075,11 @@ async function main(){
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation','transport-ab'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
  if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
- const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab'].includes(args.mode);
+ const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab','batch18-acceptance'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in a supported evaluation suite.');
- if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&args.mode!=='library-all'&&args.mode!=='library-selected'&&args.mode!=='transport-ab'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
- if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff'||args.mode==='philosophy3'||args.mode==='library-all'||args.mode==='library-selected'||args.mode==='transport-ab')&&args.scope!=='case-default')throw Error('Fresh, handoff and phase-2 library question suites must use case-default scope.');
+ if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&args.mode!=='library-all'&&args.mode!=='library-selected'&&args.mode!=='transport-ab'&&args.mode!=='batch18-acceptance'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff'||args.mode==='philosophy3'||args.mode==='library-all'||args.mode==='library-selected'||args.mode==='transport-ab'||args.mode==='batch18-acceptance')&&args.scope!=='case-default')throw Error('Fresh, handoff and phase-2 library question suites must use case-default scope.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
   throw Error('Repeat count must be an integer from 1 to 3.');
@@ -2097,6 +2112,16 @@ async function main(){
  const conditionalGapPlannerCallAllowance=args.mode==='planner'?0:reportCaseCount;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   evaluationRun:evaluationRunContext(),
+  ...(args.mode==='batch18-acceptance'?{experiment:'batch-18-configured-streaming-default-acceptance',
+   protocol:'One with-review answer pass over four registered questions. The answer request omits inferenceTransport so the Worker applies its deployed default; artifact records the transport confirmed by the Worker.',
+   phase2ScoringTargets:PHASE2_SCORE_TARGETS,
+   qualityProtocolStatus:'semantic scoring pending; complete the phase-2 rubric-v2 claim audit, then score answer and highlights for all five dimensions',
+   acceptanceThresholds:{answerProducedMeanMinimum:8.2,highlightProducedMeanMinimum:8.85,
+    latencyMedianMaximumMs:95000,latencyP90MaximumMs:145000,
+    registeredDimensionFloorsAndBatch16Means:PHASE2_SCORE_TARGETS,
+    transport:'all four completed cases must confirm streaming as configured default unless environment rollback is intentionally set to default',
+    safeguards:'no request failures; standard with-review and existing citation/review checks remain enabled',
+    sampleLimit:'four cases are a diagnostic screen; latency percentiles are descriptive and cannot certify the registered production P90'} }:{}),
   ...(args.mode==='transport-ab'?{experiment:'batch-17-inference-transport-ab',phase2ScoringTargets:PHASE2_SCORE_TARGETS,
    qualityProtocolStatus:'semantic scoring pending; score each answer and highlight for both transports with the phase-2 rubric v2 after claim audit'}:{}),
   answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,
@@ -2105,7 +2130,7 @@ async function main(){
   repeatCount:args.repeatCount>1?args.repeatCount:undefined,
   repeatedCaseIds:args.repeatCount>1?baseCases.map(item=>item.id):undefined,
   estimatedWorkerAiCalls,conditionalGapPlannerCallAllowance,
-  callsPerCase:args.mode==='transport-ab'?'1 shared planner + 1 shared evidence-selection call + two with-review answer generations and reviews (default and buffered streaming); optional conditional gap planning is shared':args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
+  callsPerCase:args.mode==='transport-ab'?'1 shared planner + 1 shared evidence-selection call + two with-review answer generations and reviews (default and buffered streaming); optional conditional gap planning is shared':args.mode==='batch18-acceptance'?'one with-review answer pipeline per case; planning, selection, composition, and review each run once; optional conditional gap planning may add one planner request per case':args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
    (args.answerVariant==='paired-selection-ablation'?'1 shared planner + 6 Worker selection/composition/review calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope':
     '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope'):
    (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer/selection calls per case'+
