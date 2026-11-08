@@ -264,7 +264,7 @@ function sourceRevision(){
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
- const evaluationCases=mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
+ const evaluationCases=mode==='transport-ab'?[...LIBRARY_ALL_CASES,...LIBRARY_SELECTED_CASES]:mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
  if(mode==='acceptance'&&caseId==='repeatable-calibration'){
@@ -280,7 +280,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return selected.map(copyEvaluationCase);
  }
  if(caseId&&caseId!=='all'){
-  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3, handoff, philosophy3, library-all and library-selected cases can be selected in their respective suites.');
+  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3, handoff, philosophy3, library-all, library-selected and transport-ab cases can be selected in their respective suites.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
@@ -296,6 +296,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  if(mode==='philosophy3')return PHILOSOPHY3_CASES.map(copyEvaluationCase);
  if(mode==='library-all')return LIBRARY_ALL_CASES.map(copyEvaluationCase);
  if(mode==='library-selected')return LIBRARY_SELECTED_CASES.map(copyEvaluationCase);
+ if(mode==='transport-ab')return [...LIBRARY_ALL_CASES,...LIBRARY_SELECTED_CASES].map(copyEvaluationCase);
  if(mode==='planner')return PLANNER_CASE_IDS.map(id=>{
   const item=QUALITY_CASES.find(value=>value.id===id);
   if(!item)throw Error('The planner-only cases are missing from the quality suite.');
@@ -307,7 +308,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff, philosophy3, library-all, library-selected or full.');
+ throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff, philosophy3, library-all, library-selected, transport-ab or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(scope==='case-default')return cases.map(item=>({...item,selected_book_ids:item.evaluation_scope==='all-books'?[]:[...item.selected_book_ids]}));
@@ -317,7 +318,7 @@ export function applyQualityScope(cases,scope='selected-books'){
  return cases.map(item=>({...item,selected_book_ids:[]}));
 }
 export function evaluationUsesLivePlanner(mode,scope){
- if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3'||mode==='library-all'||mode==='library-selected')return true;
+ if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3'||mode==='library-all'||mode==='library-selected'||mode==='transport-ab')return true;
  return ['quality','focused','paired','holdout','acceptance'].includes(mode)&&
   (mode==='paired'||scope==='all-books');
 }
@@ -1099,6 +1100,25 @@ export function summarizeQualityByFailureStage(cases){
 /** Create a blank answer/highlight scorecard bound to this exact saved evaluation. */
 export function createHumanScorecardTemplate(report){
  if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
+ if(report.mode==='transport-ab'){
+  const answerDimensions=Object.keys(PHASE2_SCORE_TARGETS.answer.dimensions);
+  const highlightDimensions=Object.keys(PHASE2_SCORE_TARGETS.highlights.dimensions);
+  const empty=dimensions=>Object.fromEntries(dimensions.map(key=>[key,null]));
+  const scoreRows=report.cases.flatMap(item=>(item.answerVariantComparison?.variants||[]).map(variant=>({
+   caseId:item.id,...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
+   inferenceTransport:variant.inferenceTransport,
+   noAnswerFailure:variant.noAnswerFailure===true,
+   answer:{scores:empty(answerDimensions),notes:''},highlights:{scores:empty(highlightDimensions),notes:''}})));
+  return {schema:'antilogicalism-reading-companion-phase2-rubric-v2-transport-scorecard',
+   evaluationIdentity:scorecardEvaluationIdentity(report),scale:{min:0,max:2},
+   protocol:PHASE2_SCORE_TARGETS,
+   instructions:'Complete claim audit first. Score answer and highlights independently for each transport. Keep produced means separate from completion-adjusted means; failed/no-answer variants are zero only in completion-adjusted means.',
+   cases:report.cases.map(item=>({caseId:item.id,attemptNumber:item.attemptNumber||item.repeatAttempt||null,
+    question:item.question,variants:(item.answerVariantComparison?.variants||[]).map(variant=>({
+     inferenceTransport:variant.inferenceTransport,noAnswerFailure:variant.noAnswerFailure===true,
+     answerPresent:Boolean(String(variant.answerText||'').trim()),highlightCount:Array.isArray(variant.evidenceHighlights)?variant.evidenceHighlights.length:0}))})),
+   scores:scoreRows};
+ }
  const scores=report.cases.filter(item=>!item.noAnswerFailure&&String(item.answerText||'').trim())
   .map(item=>({caseId:item.id,
    ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
@@ -1311,6 +1331,23 @@ function attachRequestFailure(error,stage,details={}){
   ...(typeof details.workerFailureStage==='string'&&
    ['planning','gap-planning'].includes(details.workerFailureStage)?
    {workerFailureStage:details.workerFailureStage}:{}),
+  ...(Array.isArray(details.transportDiagnostics)?{transportDiagnostics:details.transportDiagnostics.slice(0,12).map(value=>{
+   const safe={};for(const key of ['transport','stage','timeoutClassification','cancelOutcome','providerInferenceCancellation'])
+    if(typeof value?.[key]==='string'&&value[key].length<=48)safe[key]=value[key];
+   for(const key of ['timeoutMs','elapsedMs','timeoutAtMs','firstChunkMs','cancelElapsedMs'])
+    if(Number.isSafeInteger(value?.[key])&&value[key]>=0)safe[key]=value[key];
+   for(const key of ['timeoutFired','cancelRequested','cancelSettled','retrySafe','providerSettled','settledAfterDeadline'])
+    if(typeof value?.[key]==='boolean')safe[key]=value[key];
+   return safe;
+  })}:{}),
+  ...(Array.isArray(details.selectionSnapshot)?{selectionSnapshot:details.selectionSnapshot.slice(0,6).map(value=>({
+   bookId:String(value?.bookId||'').slice(0,32),page:Number.isInteger(value?.page)?value.page:null,
+   ...(typeof value?.candidateId==='string'&&/^C\d{1,3}$/.test(value.candidateId)?{candidateId:value.candidateId}:{}),
+   candidatePartIds:Array.isArray(value?.candidatePartIds)?value.candidatePartIds.filter(id=>typeof id==='string'&&/^P[1-9]\d*$/.test(id)).slice(0,12):[],
+   candidatePartSupport:Array.isArray(value?.candidatePartSupport)?value.candidatePartSupport.filter(entry=>
+    entry&&typeof entry.partId==='string'&&/^P[1-9]\d*$/.test(entry.partId)&&typeof entry.support==='string'&&
+    entry.support.length<=100).slice(0,24).map(entry=>({partId:entry.partId,support:entry.support,
+     ...(typeof entry.excerpt==='string'&&entry.excerpt.length<=500?{excerpt:entry.excerpt}:{})})):[]}))}:{}),
   workerVersionId:typeof details.workerVersionId==='string'&&details.workerVersionId.length<=128?details.workerVersionId:null,
   workerSourceBuild:typeof details.workerSourceBuild==='string'&&details.workerSourceBuild.length<=128?details.workerSourceBuild:null,
   workerSourceRevision:typeof details.workerSourceRevision==='string'&&/^[a-f0-9]{40}$/i.test(details.workerSourceRevision)?details.workerSourceRevision.toLowerCase():null};
@@ -1343,6 +1380,7 @@ async function callJson(fetcher,url,token,body,beforeCall=async()=>{},stage='wor
   throw attachRequestFailure(new Error(String(data?.failureCode||data?.error||'Worker request failed').slice(0,240)),stage,{
   httpStatus:response.status,failureCode:String(data?.failureCode||'http-error'),
   failureDetail:data?.failureDetail,workerFailure:true,workerFailureStage:data?.failureStage,
+  transportDiagnostics:data?.inferenceTransportDiagnostics,selectionSnapshot:data?.selectionSnapshot,
   workerVersionId:data?.workerVersionId,workerSourceBuild:data?.workerSourceBuild,workerSourceRevision:data?.workerSourceRevision});
  }
  await onProgress({stage,status:'completed',elapsedMs:Date.now()-started,
@@ -1417,7 +1455,7 @@ export function sourcesUsedForWorkerSelection(selection,workerSelected,submitted
 // request flow, ordering, concurrency, or results.
 function createStageTimingRecorder(progressEvent){
  const stageTimings=[];
- const requestStageMs={planner:0,'gap-planner':0,answer:0};
+ const requestStageMs={planner:0,'gap-planner':0,selection:0,answer:0};
  const timedProgressEvent=async event=>{
   if((event.status==='completed'||event.status==='failed')&&
    Object.hasOwn(requestStageMs,event.stage)&&Number.isFinite(event.elapsedMs))
@@ -1430,7 +1468,7 @@ function createStageTimingRecorder(progressEvent){
    error.requestFailure.stageTimings=stageTimings;}};
 }
 export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetcher=fetch,beforeCall=async()=>{},useFixedQueries=false,preparedPlan=null,answerVariant='with-review',retrievalProfile='baseline',onProgress=async()=>{}}){
- if(!['with-review','compose-only','paired-review-ablation','with-expansion','paired-expansion-ablation','paired-selection-ablation'].includes(answerVariant))
+ if(!['with-review','compose-only','paired-review-ablation','with-expansion','paired-expansion-ablation','paired-selection-ablation','transport-ab'].includes(answerVariant))
   throw Error('Unsupported answer variant.');
  if(!Object.hasOwn(RETRIEVAL_PROFILES,retrievalProfile))throw Error('Unknown retrieval profile.');
  const startTime=Date.now();
@@ -1604,12 +1642,105 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   selectionMethod:'Worker semantic selector after fingerprint verification',
   narrowPool:loaded.selected.map(candidate=>({bookId:candidate.bookId,title:candidate.title,page:candidate.page})),
   fullPool:loaded.candidatePacket.map(candidate=>({bookId:candidate.bookId,title:candidate.title,page:candidate.page}))};
- const variants=answerVariant==='paired-review-ablation'?['with-review','compose-only']:
+ const transportOrder=(Array.from(String(item.id)).reduce((sum,char)=>sum+char.charCodeAt(0),Number(item.repeatAttempt)||0)%2)===1?['streaming','default']:['default','streaming'];
+ const variants=answerVariant==='transport-ab'?transportOrder:
+  answerVariant==='paired-review-ablation'?['with-review','compose-only']:
   answerVariant==='paired-expansion-ablation'?['with-review','with-expansion']:
   answerVariant==='paired-selection-ablation'?['narrow-retrieval-pool','full-retrieval-pool']:[answerVariant];
  const variantResults=[];
+ let selectionSnapshot=null;
+ let sharedSelectionResult=null,sharedSelectionFailure=null,sharedSelectionElapsedMs=0;
+ if(answerVariant==='transport-ab'){
+  await progress('selection','started','Selecting and verifying one evidence packet for both answer transports.');
+  await beforeCall();
+  const selectionStarted=Date.now();
+  try{
+   sharedSelectionResult=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
+    bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
+    answerVariant:'with-review',selectionOnly:true,
+    sources:loaded.candidatePacket.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
+     ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))},async()=>{},'selection',timing.timedProgressEvent);
+   sharedSelectionElapsedMs=Date.now()-selectionStarted;
+   if(sharedSelectionResult.selectionOnly!==true||!Array.isArray(sharedSelectionResult.selectionSnapshot))
+    throw attachRequestFailure(new Error('Worker did not confirm shared evaluation evidence selection.'),'selection',
+     {httpStatus:200,failureCode:'selection-snapshot-invalid',workerFailure:false});
+   selectionSnapshot=sharedSelectionResult.selectionSnapshot;
+   timing.record('selection','completed',sharedSelectionElapsedMs);
+   await progress('selection','completed','One verified evidence packet is ready for both transport paths.',
+    {sourceCount:selectionSnapshot.length,requestElapsedMs:sharedSelectionElapsedMs,
+     usage:sharedSelectionResult.sourceSelection?.usage||null});
+  }catch(error){
+   sharedSelectionElapsedMs=Date.now()-selectionStarted;
+   sharedSelectionFailure=error.requestFailure||{stage:'selection',httpStatus:null,
+    failureCode:'selection-request-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
+   if(Array.isArray(sharedSelectionFailure.selectionSnapshot))selectionSnapshot=sharedSelectionFailure.selectionSnapshot;
+   timing.record('selection','failed',sharedSelectionElapsedMs);
+   await progress('selection','failed','Shared evidence selection failed; both transport answers are recorded as unavailable.',
+    {requestElapsedMs:sharedSelectionElapsedMs,failureCode:sharedSelectionFailure.failureCode});
+  }
+ }
+ const sharedRealWorkStageSumMs=stageTimings.filter(entry=>entry.stage!=='answer'&&Number.isFinite(entry.elapsedMs))
+  .reduce((sum,entry)=>sum+entry.elapsedMs,0);
  try{
   for(const variant of variants){
+   if(answerVariant==='transport-ab'){
+    const inferenceTransport=variant;
+    if(sharedSelectionFailure){
+     variantResults.push({answerVariant:'with-review',inferenceTransport,requestElapsedMs:0,
+      realWorkStageSumMs:sharedRealWorkStageSumMs,noAnswerFailure:true,answerText:'',outcome:'shared-selection-failed',
+      structuralPassed:false,passed:false,requestFailure:sharedSelectionFailure,
+      ...(Array.isArray(sharedSelectionFailure.transportDiagnostics)?{evidenceTrace:{inferenceCalls:sharedSelectionFailure.transportDiagnostics}}:{})});
+     continue;
+    }
+    const answerSources=loaded.candidatePacket;
+    await progress('answer','started',`Submitting ${answerSources.length} verified candidates using ${inferenceTransport} inference transport.`,
+     {variant:inferenceTransport,sourceCount:answerSources.length});
+    await beforeCall();
+    const requestStarted=Date.now();
+    try{
+     const data=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
+      bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
+      answerVariant:'with-review',inferenceTransport,
+      ...(selectionSnapshot!==null?{selectionSnapshot}:{}),
+      sources:answerSources.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
+       ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))},async()=>{},'answer',timing.timedProgressEvent);
+     const requestElapsedMs=Date.now()-requestStarted;
+     if(Array.isArray(data.selectionSnapshot))selectionSnapshot=data.selectionSnapshot;
+     if(data.inferenceTransport!==inferenceTransport)
+      throw attachRequestFailure(new Error('Worker did not confirm the requested inference transport.'),'answer',
+       {httpStatus:200,failureCode:'transport-mismatch',failureDetail:'unconfirmed-transport',workerFailure:false});
+     const candidateByLocator=new Map(loaded.candidates.map(source=>[String(source.bookId)+':'+source.page,source]));
+     const workerSelected=(Array.isArray(data.sourceSelection?.pages)?data.sourceSelection.pages:[])
+      .map(source=>{const candidate=candidateByLocator.get(String(source.bookId)+':'+source.page);
+       return candidate?{...candidate,id:source.id,candidatePartIds:source.candidatePartIds||[]}:null;}).filter(Boolean);
+     const submitted=sourcesUsedForWorkerSelection(data.sourceSelection,workerSelected,answerSources);
+     const audit=auditLiveAnswer(data,submitted,item.required_source_groups,item.required_part_source_groups||[],
+      {scope:item.selected_book_ids?.length?'selected-books':'all-books',plannerPlan:plan?.plan||null,candidateSources:retrievalCandidates});
+     variantResults.push({answerVariant:'with-review',inferenceTransport,requestElapsedMs,
+      realWorkStageSumMs:sharedRealWorkStageSumMs+requestElapsedMs,
+      selectionStatus:data.sourceSelection?.status||null,
+      selectionCoverage:auditSelectionCoverage(loaded.candidates,submitted,partQuestions),
+      selectionAudit:auditEvidencePacketSelection(loaded.candidates,submitted,item.question,partQuestions),
+      submittedSources:submitted.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,excerpt:String(preview||'').slice(0,1200)})),
+      pipeline:data.pipeline||null,...audit,usage:data.usage||null,
+      ...(data.trace?{evidenceTrace:data.trace}:{})});
+     await progress('answer','completed',`${inferenceTransport} returned ${audit.outcome||'no outcome'} with ${audit.coverage} coverage and ${audit.citationCount} citations.`,
+      {variant:inferenceTransport,outcome:audit.outcome,coverage:audit.coverage,citations:audit.citationCount,
+       requestElapsedMs,usage:data.usage||null});
+    }catch(error){
+     const requestElapsedMs=Date.now()-requestStarted;
+     const failure=error.requestFailure||{stage:'answer',httpStatus:null,failureCode:'answer-failed',
+      message:String(error.message||error).slice(0,240),workerFailure:false};
+     if(Array.isArray(failure.selectionSnapshot))selectionSnapshot=failure.selectionSnapshot;
+     variantResults.push({answerVariant:'with-review',inferenceTransport,requestElapsedMs,
+      realWorkStageSumMs:sharedRealWorkStageSumMs+requestElapsedMs,noAnswerFailure:true,answerText:'',
+      outcome:'request-failed',structuralPassed:false,passed:false,requestFailure:failure,
+      ...(Array.isArray(failure.transportDiagnostics)?{evidenceTrace:{inferenceCalls:failure.transportDiagnostics}}:{})});
+     await progress('answer','failed',`${inferenceTransport} request failed (${failure.failureCode||'answer-failed'}).`,
+      {variant:inferenceTransport,requestElapsedMs,failureCode:failure.failureCode||'answer-failed'});
+    }
+    continue;
+   }
    const answerSources=variant==='narrow-retrieval-pool'?selected:loaded.candidatePacket;
    await progress('answer','started',`Submitting ${answerSources.length} verified retrieval candidates; the Worker will select evidence before composition.`,
     {variant,sourceCount:answerSources.length});
@@ -1652,10 +1783,22 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   if(plannerFailure)error.requestFailure.plannerFailure=plannerFailure;
   timing.record('answer','failed',timing.requestStageMs.answer);
   timing.attach(error);throw error;}
- const primary=variantResults.find(result=>result.answerVariant==='with-review')||variantResults[0];
- const answerVariantComparison=['paired-review-ablation','paired-expansion-ablation','paired-selection-ablation'].includes(answerVariant)?{
+ const primary=variantResults.find(result=>result.inferenceTransport==='default'&&!result.noAnswerFailure)||
+  variantResults.find(result=>!result.noAnswerFailure)||variantResults.find(result=>result.inferenceTransport==='default')||
+  variantResults.find(result=>result.answerVariant==='with-review')||variantResults[0];
+ const answerVariantComparison=['transport-ab','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation'].includes(answerVariant)?{
+  ...(answerVariant==='transport-ab'?{protocol:'Same planner output, retrieval, selected candidates, answer variant and budgets; only inference transport differs.',
+   transportOrder,sharedRealWorkStageSumMs,
+   sharedSelection:{status:sharedSelectionFailure?'failed':sharedSelectionResult?'completed':'not-run',
+    requestElapsedMs:sharedSelectionElapsedMs,sourceSelectionStatus:sharedSelectionResult?.sourceSelectionStatus||null,
+    usage:sharedSelectionResult?.sourceSelection?.usage||null,
+    ...(sharedSelectionFailure?{failureCode:sharedSelectionFailure.failureCode}:{}),
+    selectionSnapshotPages:Array.isArray(selectionSnapshot)?selectionSnapshot.length:null},
+   realWorkStageSumDefinition:'shared planner, retrieval, optional gap-planner/retrieval and one shared selection request plus this transport variant’s answer endpoint request duration; excludes harness pacing'}:{}),
   ...(answerVariant==='paired-selection-ablation'?{selectionComparison}:{}),
-  comparison:answerVariant==='paired-expansion-ablation'?
+  comparison:answerVariant==='transport-ab'?
+   'Paired transport test. Both paths buffer a complete answer before returning it; streaming is not expected to reduce successful generation time automatically. It tests stream cancellation behavior at the same deadline while recording complete-request latency.':
+   answerVariant==='paired-expansion-ablation'?
    'Same resolved question and submitted pages; compare ordinary composition with post-composition expansion before the same evidence review.':
    answerVariant==='paired-selection-ablation'?
    'Both answers use the same verified Worker semantic selector, composer and reviewer; compare a six-page browser candidate pool with the full retrieved candidate pool.':
@@ -1855,20 +1998,67 @@ function parseArgs(argv){const out={mode:process.env.LIVE_EVAL_MODE||'smoke',sco
   if(!['mode','scope','case','answer-variant','retrieval-profile','repeat','report-only','output','confirm-live-ai'].includes(key))throw Error('Unknown option '+flag);const value=inline??argv[++i];if(value===undefined)throw Error('Missing value for '+flag);
   if(key==='mode')out.mode=value;else if(key==='scope')out.scope=value;else if(key==='case')out.caseId=value;else if(key==='answer-variant')out.answerVariant=value;else if(key==='retrieval-profile')out.retrievalProfile=value;else if(key==='repeat')out.repeatCount=Number(value);else if(key==='report-only')out.reportOnly=value==='true';else if(key==='output')out.output=value;else out.confirm=value==='true';}
  return out;}
+const PHASE2_SCORE_TARGETS={protocol:'phase-2 rubric v2; claim audit precedes scoring; each dimension 0–2',
+ answer:{dimensions:{accuracy:{batch16Mean:1.72,registeredFloor:1.55,target:1.72},
+  questionCoverage:{batch16Mean:1.69,registeredFloor:1.65,target:1.69},
+  explanationQuality:{batch16Mean:1.72,registeredFloor:1.80,target:1.80},
+  citationSupport:{batch16Mean:1.62,registeredFloor:1.50,target:1.62},
+  citationCompleteness:{batch16Mean:1.55,registeredFloor:1.70,target:1.70}},
+  producedMeanOutOf10:8.2,completionAdjustedMeanReported:true},
+ highlights:{dimensions:{fidelity:{batch16Mean:1.72,registeredFloor:1.80,target:1.80},
+  coverage:{batch16Mean:1.69,registeredFloor:1.55,target:1.69},
+  context:{batch16Mean:1.72,registeredFloor:1.85,target:1.85},
+  claimRelevance:{batch16Mean:1.72,registeredFloor:1.70,target:1.72},
+  completeness:{batch16Mean:1.90,registeredFloor:1.95,target:1.95}},
+  producedMeanOutOf10:8.85,completionAdjustedMeanReported:true},
+ latency:{metric:'real-work stage sum per transport; shared planner/retrieval/selection stages plus that answer request; excludes harness pacing',
+  medianMaximumSeconds:95,p90MaximumSeconds:145}};
+function summarizeInferenceTransport(cases){
+ const values=(cases||[]).flatMap(item=>(item.answerVariantComparison?.variants||[]).filter(variant=>
+  ['default','streaming'].includes(variant.inferenceTransport)).map(variant=>({caseId:item.id,
+   attemptNumber:item.attemptNumber||item.repeatAttempt||null,...variant})));
+ const percentile=(sorted,p)=>sorted.length?sorted[Math.max(0,Math.ceil(sorted.length*p)-1)]:null;
+ return Object.fromEntries(['default','streaming'].map(transport=>{
+  const rows=values.filter(row=>row.inferenceTransport===transport);
+  const durations=rows.map(row=>row.realWorkStageSumMs).filter(Number.isFinite).sort((a,b)=>a-b);
+  const median=durations.length?(durations.length%2?durations[(durations.length-1)/2]:
+   (durations[durations.length/2-1]+durations[durations.length/2])/2):null;
+  const p90=percentile(durations,.9);
+  return [transport,{attempts:rows.length,successfulAnswers:rows.filter(row=>!row.noAnswerFailure).length,
+   structuralPasses:rows.filter(row=>row.structuralPassed===true).length,
+   structuralFailures:rows.filter(row=>row.structuralPassed===false).length,
+   requestFailures:rows.filter(row=>row.noAnswerFailure).length,realWorkStageSumMs:{sampleCount:durations.length,
+    median:median===null?null:Number(median.toFixed(1)),p90:p90===null?null:Number(p90.toFixed(1)),
+    mean:durations.length?Number((durations.reduce((sum,value)=>sum+value,0)/durations.length).toFixed(1)):null,
+    goalMedianMs:PHASE2_SCORE_TARGETS.latency.medianMaximumSeconds*1000,
+    goalP90Ms:PHASE2_SCORE_TARGETS.latency.p90MaximumSeconds*1000,
+    goalStatus:{medianMet:median!==null&&median<=PHASE2_SCORE_TARGETS.latency.medianMaximumSeconds*1000,
+     p90Met:p90!==null&&p90<=PHASE2_SCORE_TARGETS.latency.p90MaximumSeconds*1000}},
+   timerRaceCases:rows.filter(row=>(row.evidenceTrace?.inferenceCalls||[]).some(call=>call.timeoutClassification==='timer-race-no-cancel')).length,
+   acknowledgedStreamCancels:rows.filter(row=>(row.evidenceTrace?.inferenceCalls||[]).some(call=>call.timeoutClassification==='stream-cancel-acknowledged')).length,
+   unconfirmedProviderTerminations:rows.filter(row=>(row.evidenceTrace?.inferenceCalls||[]).some(call=>
+    call.timeoutFired===true&&call.providerInferenceCancellation==='unconfirmed')).length,
+   requestFailuresByCode:Object.fromEntries([...new Set(rows.filter(row=>row.noAnswerFailure)
+    .map(row=>row.requestFailure?.failureCode||'unknown'))].map(code=>[code,rows.filter(row=>
+      row.noAnswerFailure&&(row.requestFailure?.failureCode||'unknown')===code).length]))}];
+ }));
+}
+export {summarizeInferenceTransport};
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|handoff|philosophy3|library-all|library-selected|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|handoff|philosophy3|library-all|library-selected|transport-ab|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation|transport-ab] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
- if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
+ if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation','transport-ab'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
  if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
- const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected'].includes(args.mode);
+ const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in a supported evaluation suite.');
- if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&args.mode!=='library-all'&&args.mode!=='library-selected'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
- if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff'||args.mode==='philosophy3'||args.mode==='library-all'||args.mode==='library-selected')&&args.scope!=='case-default')throw Error('Fresh, handoff and phase-2 library question suites must use case-default scope.');
+ if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&args.mode!=='library-all'&&args.mode!=='library-selected'&&args.mode!=='transport-ab'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff'||args.mode==='philosophy3'||args.mode==='library-all'||args.mode==='library-selected'||args.mode==='transport-ab')&&args.scope!=='case-default')throw Error('Fresh, handoff and phase-2 library question suites must use case-default scope.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
   throw Error('Repeat count must be an integer from 1 to 3.');
  const repeatableFreshSelection=(args.mode==='fresh'&&(args.caseId==='all'||FRESH_CASES.some(item=>item.id===args.caseId)))||
+  (args.mode==='transport-ab'&&(args.caseId===''||args.caseId==='all'))||
   (args.mode==='fresh3'&&(args.caseId==='all'||FRESH3_CASES.some(item=>item.id===args.caseId)));
  const repeatableAcceptanceSelection=args.mode==='acceptance'&&(
   ['repeatable-calibration','quality-calibration'].includes(args.caseId)||
@@ -1886,7 +2076,7 @@ async function main(){
   baseCases.map(item=>({...item,repeatAttempt:index+1}))).flat():baseCases;
  const evaluationUsesPlanner=evaluationUsesLivePlanner(args.mode,args.scope);
  const plannerCalls=args.mode==='paired'?cases.length:usesEvaluationMode&&!evaluationUsesPlanner?0:cases.length;
- const answerCallsPerCase=args.answerVariant==='paired-review-ablation'?5:
+ const answerCallsPerCase=args.answerVariant==='transport-ab'?5:args.answerVariant==='paired-review-ablation'?5:
   args.answerVariant==='paired-expansion-ablation'?7:
   args.answerVariant==='paired-selection-ablation'?6:
   args.answerVariant==='compose-only'?2:3;
@@ -1896,18 +2086,21 @@ async function main(){
  const conditionalGapPlannerCallAllowance=args.mode==='planner'?0:reportCaseCount;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   evaluationRun:evaluationRunContext(),
+  ...(args.mode==='transport-ab'?{experiment:'batch-17-inference-transport-ab',phase2ScoringTargets:PHASE2_SCORE_TARGETS,
+   qualityProtocolStatus:'semantic scoring pending; score each answer and highlight for both transports with the phase-2 rubric v2 after claim audit'}:{}),
   answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,
-  retrievalConfig:{...RETRIEVAL_PROFILES[args.retrievalProfile]},caseCount:reportCaseCount,pairedQuestionCount:args.mode==='paired'?cases.length:undefined,
+  retrievalConfig:{...RETRIEVAL_PROFILES[args.retrievalProfile]},caseCount:reportCaseCount,
+  pairedQuestionCount:['paired','transport-ab'].includes(args.mode)?cases.length:undefined,
   repeatCount:args.repeatCount>1?args.repeatCount:undefined,
   repeatedCaseIds:args.repeatCount>1?baseCases.map(item=>item.id):undefined,
   estimatedWorkerAiCalls,conditionalGapPlannerCallAllowance,
-  callsPerCase:args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
+  callsPerCase:args.mode==='transport-ab'?'1 shared planner + 1 shared evidence-selection call + two with-review answer generations and reviews (default and buffered streaming); optional conditional gap planning is shared':args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
    (args.answerVariant==='paired-selection-ablation'?'1 shared planner + 6 Worker selection/composition/review calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope':
     '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope'):
    (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer/selection calls per case'+
    (args.answerVariant==='paired-selection-ablation'?' (each answer run performs Worker selection, composition and review)':'')+
    ', including one Worker evidence-selection call before composition; plus up to one conditional gap-planner call when page text weakly covers a requested part',
-  answerQualityNote:args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
+  answerQualityNote:args.mode==='transport-ab'?'Structural checks are reported per transport. Semantic quality remains pending the phase-2 rubric-v2 claim audit and five answer/five highlight dimensions. Report produced and completion-adjusted means separately; no-answer transport failures count as zero only in adjusted means.':args.mode==='planner'?'Planner queries and expected-book retrieval are checked; answer generation and answer quality are not evaluated.':
    'Structural checks cover source identity and citation linkage. Answer quality remains pending until a human scores accuracy, question coverage, explanation quality, citation support, and citation completeness from 0 (fail) to 2 (strong). A structural pass is not a quality pass.',
   qualityStatus:args.mode==='planner'?'not-assessed':'pending-human-review',
   executionStatus:'initializing',completedCases:0,notRunCases:cases.length,requestFailureCases:0,plannerFallbackCases:0,plannerSkippedCases:0,workerVersionIds:[],workerSourceRevisions:[],stopReason:'',cases:[]};
@@ -1978,6 +2171,7 @@ async function main(){
    report.humanReview=summarizeManualReviews(results);
    report.highlightReview=summarizeHighlightReviews(results);
    report.answerVariants=summarizeAnswerVariants(results);
+   if(args.mode==='transport-ab')report.transportComparison=summarizeInferenceTransport(results);
    report.selectionVariants=summarizeSelectionVariants(results);
    if(args.repeatCount>1){
     report.repeatSummary=Object.fromEntries(baseCases.map(item=>{
@@ -1990,8 +2184,10 @@ async function main(){
       meanAnswerWords:wordCounts.length?Math.round(wordCounts.reduce((sum,count)=>sum+count,0)/wordCounts.length):0}];
     }));
    }
-   report.workerVersionIds=[...new Set(results.flatMap(item=>[item.plannerWorkerVersionId,item.answerWorkerVersionId]).filter(value=>typeof value==='string'&&value))];
-   report.workerSourceRevisions=[...new Set(results.flatMap(item=>[item.plannerWorkerSourceRevision,item.answerWorkerSourceRevision]).filter(value=>typeof value==='string'&&/^[a-f0-9]{40}$/.test(value)))];
+   report.workerVersionIds=[...new Set(results.flatMap(item=>[item.plannerWorkerVersionId,item.answerWorkerVersionId,
+    ...(item.answerVariantComparison?.variants||[]).map(variant=>variant.workerVersionId)].filter(value=>typeof value==='string'&&value)))];
+   report.workerSourceRevisions=[...new Set(results.flatMap(item=>[item.plannerWorkerSourceRevision,item.answerWorkerSourceRevision,
+    ...(item.answerVariantComparison?.variants||[]).map(variant=>variant.workerSourceRevision)]).filter(value=>typeof value==='string'&&/^[a-f0-9]{40}$/.test(value)))];
    report.scopeSummary=Object.fromEntries(['all-books','selected-books'].map(scope=>{
     const scoped=results.filter(item=>{
     // Current answer records use evaluationScope; scope remains for older/paired rows.
@@ -2040,6 +2236,7 @@ async function main(){
    highlightReview:summarizeHighlightReviews(report.cases),
    answerVariants:summarizeAnswerVariants(report.cases),
    selectionVariants:summarizeSelectionVariants(report.cases),
+   ...(args.mode==='transport-ab'?{transportComparison:summarizeInferenceTransport(report.cases)}:{}),
    questionPartStatusCounts:report.cases.reduce((totals,item)=>{
     const counts=item.questionPartCoverage||{};
     for(const status of ['supported','partial','unsupported'])

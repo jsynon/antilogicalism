@@ -1,0 +1,63 @@
+name: Reading Companion batch 17 transport A/B
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_ai:
+        description: I understand this compares two complete answer pipelines across both phase-2 suites and incurs AI usage
+        type: boolean
+        required: true
+        default: false
+      repeats:
+        description: Full paired passes over the 16 phase-2 questions
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+        required: true
+        default: '2'
+
+permissions:
+  contents: read
+
+# Keep paired latency measurements isolated from all other evaluation workflows.
+concurrency:
+  group: reading-companion-cross-run-regression
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: ${{ inputs.confirm_live_ai }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify explicit live AI confirmation and evaluation token
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          test "${{ inputs.confirm_live_ai }}" = "true"
+          test -n "$PILOT_EVALUATION_TOKEN"
+          mkdir -p "$GITHUB_WORKSPACE/reading-companion-batch-17-transport-ab"
+      - name: Run paired default and streaming transport evaluation
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode transport-ab --scope case-default --case all \
+            --repeat "${{ inputs.repeats }}" --answer-variant transport-ab \
+            --retrieval-profile baseline --report-only true \
+            --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-batch-17-transport-ab/report.json"
+      - name: Preserve paired traces and phase-2 scorecard template
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-companion-batch-17-transport-ab
+          path: ${{ github.workspace }}/reading-companion-batch-17-transport-ab/*.json
+          if-no-files-found: warn
+          retention-days: 30
