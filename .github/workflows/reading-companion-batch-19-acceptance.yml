@@ -1,0 +1,52 @@
+name: Reading Companion batch 19 compact-review acceptance
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_ai:
+        description: I understand this runs four live with-review answers and incurs AI usage
+        type: boolean
+        required: true
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reading-companion-cross-run-regression
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: ${{ inputs.confirm_live_ai }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify live AI confirmation and evaluation token
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          test "${{ inputs.confirm_live_ai }}" = "true"
+          test -n "$PILOT_EVALUATION_TOKEN"
+          mkdir -p "$GITHUB_WORKSPACE/reading-companion-batch-19-acceptance"
+      - name: Run one acceptance pass over four registered questions
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode batch19-acceptance --scope case-default --case stage-profile-4 \
+            --repeat 1 --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-batch-19-acceptance/report.json"
+      - name: Preserve response traces and rubric-v2 scorecard template
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-companion-batch-19-acceptance
+          path: ${{ github.workspace }}/reading-companion-batch-19-acceptance/*.json
+          if-no-files-found: warn
+          retention-days: 30

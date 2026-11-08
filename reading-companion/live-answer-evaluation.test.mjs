@@ -123,6 +123,17 @@ test('batch-18 acceptance is one balanced four-question configured-default scree
  assert.equal(evaluationUsesLivePlanner('batch18-acceptance','case-default'),true);
 });
 
+test('batch-19 acceptance reuses the same four registered questions and live planner path',()=>{
+ const cases=selectLiveCases({cases:[]},'batch19-acceptance','stage-profile-4');
+ assert.deepEqual(cases.map(item=>item.id),[
+  'library-all-hobbes-rousseau-nature','library-all-progress-idea',
+  'library-selected-conrad-marlow-kurtz','library-selected-kierkegaard-silentio-speaker'
+ ]);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='all-books').length,2);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='selected-books').length,2);
+ assert.equal(evaluationUsesLivePlanner('batch19-acceptance','case-default'),true);
+});
+
 test('batch-18 workflow is a single with-review pass that uses configured transport',async()=>{
  const {readFileSync}=await import('node:fs');
  const workflow=readFileSync(new URL('../.github/workflows/reading-companion-batch-18-acceptance.yml',import.meta.url),'utf8');
@@ -130,6 +141,15 @@ test('batch-18 workflow is a single with-review pass that uses configured transp
  assert.match(workflow,/--repeat 1 --answer-variant with-review/);
  assert.match(workflow,/name: reading-companion-batch-18-acceptance/);
  assert.doesNotMatch(workflow,/--answer-variant transport-ab/);
+});
+
+test('batch-19 workflow is one compact-review acceptance pass over four cases',async()=>{
+ const {readFileSync}=await import('node:fs');
+ const workflow=readFileSync(new URL('../.github/workflows/reading-companion-batch-19-acceptance.yml',import.meta.url),'utf8');
+ assert.match(workflow,/--mode batch19-acceptance --scope case-default --case stage-profile-4/);
+ assert.match(workflow,/--repeat 1 --answer-variant with-review/);
+ assert.match(workflow,/timeout-minutes: 25/);
+ assert.match(workflow,/name: reading-companion-batch-19-acceptance/);
 });
 
 test('transport summary distinguishes timer races, acknowledged stream cancellation and incomplete answers',()=>{
@@ -526,6 +546,16 @@ test('audit requires expected-source coverage and citations with no orphan marke
  assert.deepEqual(bad.inlineIdsWithoutSource,['S2']);
 });
 
+test('reader-facing internal claim and requirement IDs are counted and fail structural acceptance',()=>{
+ const data={outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',
+  answer:'This is the answer (P1-C3), covering P1-R2. [S1].',
+  citations:[{id:'S1',bookId:'35'}],questionParts:[],evidenceMap:[]};
+ const result=auditLiveAnswer(data,[{bookId:'35',page:42}],[]);
+ assert.deepEqual(result.answerInternalIdLeaks,['P1-C3','P1-R2']);
+ assert.equal(result.internalIdLeakCount,2);
+ assert.equal(result.structuralPassed,false);
+});
+
 test('answer case records preserve the Worker missing-evidence disclosure string',()=>{
  const missing='Retrieved passages could not be verified as supporting this part of the question: How does Hume explain necessity?';
  const result=auditLiveAnswer({outcome:'verified-source-draft',coverage:'partial',reviewStatus:'claim-review',
@@ -670,11 +700,11 @@ test('highlight relevance audit links excerpt to its claim wording within the ci
 test('highlight human review scores are separate from answer scores and remain pending until filled',()=>{
  const answer={id:'case-a',manualReview:{status:'not-reviewed',scores:{accuracy:2,questionCoverage:2,
   explanationQuality:2,citationSupport:2,citationCompleteness:2}},highlightHumanReview:{status:'not-reviewed',
-  scores:{accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null}}};
+  scores:{fidelity:null,coverage:null,context:null,claimRelevance:null,completeness:null}}};
  const report=summarizeHighlightReviews([answer]);
  assert.equal(report.reviewed,0);
  assert.equal(report.pending,1);
- assert.equal(report.averageScores.accuracy,null);
+ assert.equal(report.averageScores.fidelity,null);
  assert.equal(report.entries[0].status,'pending');
 });
 
@@ -767,8 +797,9 @@ test('human rubric summary keeps semantic review separate from structural passes
 
 test('quality averages show produced-answer scores and completion-adjusted scores with no-answer failures as zero',()=>{
  const score={accuracy:2,questionCoverage:2,explanationQuality:1,citationSupport:2,citationCompleteness:1};
+ const highlightScore={fidelity:2,coverage:2,context:1,claimRelevance:2,completeness:1};
  const entries=[
-  {id:'answered',answerText:'A substantive answer.',manualReview:{scores:score},highlightHumanReview:{scores:score}},
+  {id:'answered',answerText:'A substantive answer.',manualReview:{scores:score},highlightHumanReview:{scores:highlightScore}},
   {id:'provider-failure',noAnswerFailure:true,requestFailure:{stage:'planner',failureCode:'ai-capacity-unavailable'},
    answerText:'',manualReview:{scores:{}},highlightHumanReview:{scores:{}}}
  ];
@@ -802,13 +833,16 @@ test('human quality score summaries group answer and highlight scores by explici
  const score=total=>{let remaining=total;return {status:'complete',scores:Object.fromEntries(
   ['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness']
    .map(key=>{const value=Math.min(2,remaining);remaining-=value;return [key,value];}))};};
+ const highlightScore=total=>{let remaining=total;return {status:'complete',scores:Object.fromEntries(
+  ['fidelity','coverage','context','claimRelevance','completeness']
+   .map(key=>{const value=Math.min(2,remaining);remaining-=value;return [key,value];}))};};
  const groups=summarizeQualityByFailureStage([
   {id:'review-timeout',answerText:'A usable draft.',failureStage:'review',
-   manualReview:score(6),highlightHumanReview:score(5)},
+   manualReview:score(6),highlightHumanReview:highlightScore(5)},
   {id:'retrieval-failed',answerText:'',noAnswerFailure:true,failureStage:'retrieval'},
   {id:'weak-evidence',answerText:'A partial answer.',answerCompleteness:'partial',
    evidenceApplicability:'required',partEvidenceAudit:[{status:'partial',structurallyComplete:false}],
-   manualReview:score(4),highlightHumanReview:score(3)}
+   manualReview:score(4),highlightHumanReview:highlightScore(3)}
  ]);
  const byStage=Object.fromEntries(groups.map(group=>[group.stage,group]));
  assert.equal(byStage.review.basis,'explicit-trace');
@@ -860,11 +894,13 @@ test('paired variant summary reports structural results and human scores separat
 test('paired variant quality summaries carry no-answer failures into completion adjustment',()=>{
  const strong={accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:2,citationCompleteness:2};
  const missing={accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null};
+ const highlightStrong={fidelity:2,coverage:2,context:2,claimRelevance:2,completeness:2};
+ const highlightMissing={fidelity:null,coverage:null,context:null,claimRelevance:null,completeness:null};
  const variants=[
   {answerVariant:'with-review',answerText:'A complete answer.',manualReview:{scores:strong},
-   highlightHumanReview:{scores:strong}},
+   highlightHumanReview:{scores:highlightStrong}},
   {answerVariant:'compose-only',answerText:'',noAnswerFailure:true,manualReview:{scores:missing},
-   highlightHumanReview:{scores:missing}}
+   highlightHumanReview:{scores:highlightMissing}}
  ];
  const answers=summarizeAnswerVariants([{id:'pair',reviewAblation:{variants}}]);
  const highlights=summarizeHighlightReviews([{id:'pair',reviewAblation:{variants}}]);
@@ -1047,21 +1083,26 @@ test('offline scorecard applies separate answer and highlight scores to a named 
    answerText:'A sourced claim [S1].',coverage:'full',citations:[],citationSources:[],questionParts:[],evidenceMap:[],
    evidenceHighlights:[],submittedSources:[]} ]}}]};
  const scores={accuracy:2,questionCoverage:1,explanationQuality:2,citationSupport:1,citationCompleteness:2};
+ const highlightScores={fidelity:1,coverage:2,context:1,claimRelevance:2,completeness:1};
  const checked=applyHumanScorecard(report,{scores:[{caseId:'acceptance-descartes-cogito',
   answerVariant:'with-review',selectionVariant:'full-retrieval-pool',
   answer:{scores,notes:'Covers the claim; citation explanation could be clearer.'},
-  highlights:{scores:{...scores,accuracy:1},notes:'The excerpt is located but loosely tied to the claim.'}}]});
+  highlights:{scores:highlightScores,notes:'The excerpt is located but loosely tied to the claim.'}}]});
  const saved=checked.cases[0].reviewAblation.variants[0];
  assert.equal(saved.manualReview.status,'complete');
  assert.equal(saved.manualReview.scores.accuracy,2);
- assert.equal(saved.highlightHumanReview.scores.accuracy,1);
+ assert.equal(saved.highlightHumanReview.scores.fidelity,1);
  assert.equal(checked.humanReview.reviewed,1);
  assert.equal(checked.highlightReview.reviewed,1);
  assert.equal(checked.humanReview.averageScores.accuracy,2);
- assert.equal(checked.highlightReview.averageScores.accuracy,1);
+ assert.equal(checked.highlightReview.averageScores.fidelity,1);
  assert.equal(checked.qualityByFailureStage[0].answer.producedOnlyAverageOutOf10,8);
  assert.equal(checked.qualityByFailureStage[0].highlights.producedOnlyAverageOutOf10,7);
  assert.equal(checked.offlineRecheck,undefined,'scorecard ingestion does not fabricate a structural recheck');
+ assert.throws(()=>applyHumanScorecard(report,{scores:[{caseId:'acceptance-descartes-cogito',
+  answerVariant:'with-review',selectionVariant:'full-retrieval-pool',highlights:{scores,notes:''}}]}),
+  /highlights scores must include each dimension exactly once/,
+  'answer dimension labels are not silently treated as the distinct highlight rubric');
 });
 
 test('generated scorecard templates bind scores to the exact run, revision, case, and attempt',()=>{
@@ -1084,11 +1125,13 @@ test('generated scorecard templates bind scores to the exact run, revision, case
  ]);
  assert.deepEqual(template.scores.map(item=>item.attemptNumber),[1,2]);
  assert.deepEqual(Object.values(template.scores[0].answer.scores),[null,null,null,null,null]);
+ assert.deepEqual(Object.keys(template.scores[0].highlights.scores),['fidelity','coverage','context','claimRelevance','completeness']);
  const dimensions={accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:2,citationCompleteness:2};
  template.scores[0].answer.scores={...dimensions};
- template.scores[0].highlights.scores={...dimensions};
+ const highlightDimensions={fidelity:2,coverage:2,context:2,claimRelevance:2,completeness:2};
+ template.scores[0].highlights.scores={...highlightDimensions};
  template.scores[1].answer.scores={accuracy:1,questionCoverage:1,explanationQuality:1,citationSupport:1,citationCompleteness:1};
- template.scores[1].highlights.scores={...template.scores[1].answer.scores};
+ template.scores[1].highlights.scores={fidelity:1,coverage:1,context:1,claimRelevance:1,completeness:1};
  const checked=applyHumanScorecard(report,template);
  assert.equal(checked.humanReview.averageTotalScoreOutOf10,7.5);
  assert.equal(checked.humanReview.completionAdjustedTotalScoreOutOf10,5);

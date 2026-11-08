@@ -267,7 +267,7 @@ function sourceRevision(){
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
- const evaluationCases=mode==='transport-ab'||mode==='batch18-acceptance'?[...LIBRARY_ALL_CASES,...LIBRARY_SELECTED_CASES]:mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
+ const evaluationCases=mode==='transport-ab'||mode==='batch18-acceptance'||mode==='batch19-acceptance'?[...LIBRARY_ALL_CASES,...LIBRARY_SELECTED_CASES]:mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
  if(mode==='transport-ab'&&caseId==='stage-profile-4'){
@@ -278,7 +278,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   if(selected.some(item=>!item))throw Error('The four registered stage-profile questions are missing from the transport A/B suite.');
   return selected.map(copyEvaluationCase);
  }
- if(mode==='batch18-acceptance'&&['all','stage-profile-4'].includes(caseId)){
+ if((mode==='batch18-acceptance'||mode==='batch19-acceptance')&&['all','stage-profile-4'].includes(caseId)){
   const byId=new Map(evaluationCases.map(item=>[item.id,item]));
   const selected=BATCH18_ACCEPTANCE_CASE_IDS.map(id=>byId.get(id));
   if(selected.some(item=>!item))throw Error('A registered Batch 18 acceptance question is missing.');
@@ -297,7 +297,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return selected.map(copyEvaluationCase);
  }
  if(caseId&&caseId!=='all'){
-  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab','batch18-acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3, handoff, philosophy3, library-all, library-selected, transport-ab and batch18-acceptance cases can be selected in their respective suites.');
+  if(!['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab','batch18-acceptance','batch19-acceptance'].includes(mode))throw Error('A specific case can be selected only in quality, focused, paired, holdout or acceptance mode; fresh, fresh3, handoff, philosophy3, library-all, library-selected, transport-ab and batch18/19-acceptance cases can be selected in their respective suites.');
   const selected=evaluationCases.find(item=>item.id===caseId);
   if(!selected)throw Error('Unknown '+mode+' case: '+caseId);
   return [copyEvaluationCase(selected)];
@@ -325,12 +325,12 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
   return [...LIVE_CASES,...selected];
  }
  if(mode==='full')return [...suite.cases];
- if(mode==='batch18-acceptance')return BATCH18_ACCEPTANCE_CASE_IDS.map(id=>{
+ if(mode==='batch18-acceptance'||mode==='batch19-acceptance')return BATCH18_ACCEPTANCE_CASE_IDS.map(id=>{
   const item=evaluationCases.find(value=>value.id===id);
   if(!item)throw Error('A registered Batch 18 acceptance question is missing.');
   return copyEvaluationCase(item);
  });
- throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff, philosophy3, library-all, library-selected, transport-ab, batch18-acceptance or full.');
+ throw Error('Mode must be smoke, planner, quality, focused, paired, holdout, acceptance, fresh, fresh3, handoff, philosophy3, library-all, library-selected, transport-ab, batch18-acceptance, batch19-acceptance or full.');
 }
 export function applyQualityScope(cases,scope='selected-books'){
  if(scope==='case-default')return cases.map(item=>({...item,selected_book_ids:item.evaluation_scope==='all-books'?[]:[...item.selected_book_ids]}));
@@ -340,7 +340,7 @@ export function applyQualityScope(cases,scope='selected-books'){
  return cases.map(item=>({...item,selected_book_ids:[]}));
 }
 export function evaluationUsesLivePlanner(mode,scope){
- if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3'||mode==='library-all'||mode==='library-selected'||mode==='transport-ab'||mode==='batch18-acceptance')return true;
+ if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3'||mode==='library-all'||mode==='library-selected'||mode==='transport-ab'||mode==='batch18-acceptance'||mode==='batch19-acceptance')return true;
  return ['quality','focused','paired','holdout','acceptance'].includes(mode)&&
   (mode==='paired'||scope==='all-books');
 }
@@ -920,21 +920,22 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const evidenceAuditScope='Evidence IDs are checked for consistent linkage across question parts, the reviewed evidence map, cited sources, and submitted pages. This is a structural check, not a semantic judge of whether a passage truly supports a claim; review the answer and source text.';
  const failureCode=typeof data?.failureCode==='string'?data.failureCode:'';
  const failureStage=typeof data?.failureStage==='string'?data.failureStage:'';
+ const answerInternalIdLeaks=[...new Set(answer.match(/\bP\d+-(?:C|R)\d+\b/giu)||[])];
  const noAnswerFailure=!answer.trim()&&Boolean(failureCode||data?.requestFailure||
   outcome==='request-failed'||reviewStatus==='pipeline-failed');
  const manualReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
   accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
- // Keep evidence-excerpt quality independent from answer prose quality. The
- // same five 0–2 dimensions allow comparable human scoring, but reviewers
- // score the excerpts and their claim links rather than the generated answer.
+ // Keep evidence-excerpt quality independent from answer prose quality.
+ // Highlights use their own rubric dimensions and are scored from the excerpts
+ // and claim links rather than from the generated answer.
  const highlightHumanReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
-  accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
+  fidelity:null,coverage:null,context:null,claimRelevance:null,completeness:null},notes:''};
  const completenessContractSatisfied=answerCompleteness==='full'||
   (answerCompleteness==='unknown'&&coverage==='full');
  const structuralPassed=(completenessContractSatisfied||generalContextOnly)&&sourceGroups.every(group=>group.found&&group.linkedToSupportedEvidence!==false)&&
   missingInline.length===0&&(citations.length>0||generalContextOnly)&&answerCoverageConsistent!==false&&partEvidenceComplete!==false&&
   sourcePartAlignment.every(item=>item.aligned)&&reviewerLabels.contractStatus!=='incomplete'&&
-  !failureCode&&reviewStatus!=='pipeline-failed'&&
+  !failureCode&&!answerInternalIdLeaks.length&&reviewStatus!=='pipeline-failed'&&
   reviewStatus!=='review-contract-incomplete'&&
   reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed'&&
   selectionHandoffAudit.status!=='mismatch';
@@ -944,7 +945,8 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   // parts can be checked against the actual wording shown to readers.
   missing:typeof data?.missing==='string'?data.missing:'',
   reviewerLabels,failureCode,failureStage,noAnswerFailure,
-  answerText:answer,citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
+  answerText:answer,answerInternalIdLeaks,internalIdLeakCount:answerInternalIdLeaks.length,
+  citationCount:citations.length,citationBookIds,citationSources,inlineCitationCount:inline.length,
   inlineIds:inline,
   inlineIdsWithoutSource:missingInline,submittedSourceCount:submitted.length,
   sourceGroups,questionParts,questionPartCoverage,questionPartAnswerCompleteness,partEvidenceAudit,partEvidenceComplete,
@@ -962,6 +964,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   passed:reviewStatus==='answer-draft-unverified'?null:structuralPassed};
 }
 const MANUAL_REVIEW_DIMENSIONS=['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness'];
+const HIGHLIGHT_REVIEW_DIMENSIONS=['fidelity','coverage','context','claimRelevance','completeness'];
 export function summarizeManualReviews(cases){
  const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
   (item.answerVariantComparison||item.reviewAblation).variants.map(variant=>({id:item.id,attemptNumber:item.attemptNumber,
@@ -1005,23 +1008,23 @@ export function summarizeHighlightReviews(cases){
     (item.noAnswerFailure===true&&!String(variant.answerText||'').trim())})):
   [{id:item.id,attemptNumber:item.attemptNumber,answerVariant:item.answerVariant||'with-review',
    selectionVariant:item.selectionVariant,review:item.highlightHumanReview,noAnswerFailure:item.noAnswerFailure===true}]);
- const complete=entry=>MANUAL_REVIEW_DIMENSIONS.every(key=>
+ const complete=entry=>HIGHLIGHT_REVIEW_DIMENSIONS.every(key=>
   Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2);
  const reviewed=entries.filter(complete);
- const averageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,reviewed.length?
+ const averageScores=Object.fromEntries(HIGHLIGHT_REVIEW_DIMENSIONS.map(key=>[key,reviewed.length?
   Number((reviewed.reduce((sum,entry)=>sum+entry.review.scores[key],0)/reviewed.length).toFixed(2)):null]));
  const adjustedReady=entries.every(entry=>entry.noAnswerFailure||complete(entry));
- const completionAdjustedAverageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,
+ const completionAdjustedAverageScores=Object.fromEntries(HIGHLIGHT_REVIEW_DIMENSIONS.map(key=>[key,
   entries.length&&adjustedReady?Number((entries.reduce((sum,entry)=>sum+
    (entry.noAnswerFailure?0:entry.review.scores[key]),0)/entries.length).toFixed(2)):null]));
  const scoreable=entries.filter(entry=>!entry.noAnswerFailure);
  const averageTotalScoreOutOf10=scoreable.length&&scoreable.every(entry=>reviewed.includes(entry))?
-  Number((reviewed.reduce((sum,entry)=>sum+MANUAL_REVIEW_DIMENSIONS.reduce((total,key)=>
+  Number((reviewed.reduce((sum,entry)=>sum+HIGHLIGHT_REVIEW_DIMENSIONS.reduce((total,key)=>
    total+entry.review.scores[key],0),0)/scoreable.length).toFixed(2)):null;
  const completionAdjustedTotalScoreOutOf10=adjustedReady&&entries.length?
-  Number((entries.reduce((sum,entry)=>sum+(entry.noAnswerFailure?0:MANUAL_REVIEW_DIMENSIONS.reduce((total,key)=>
+  Number((entries.reduce((sum,entry)=>sum+(entry.noAnswerFailure?0:HIGHLIGHT_REVIEW_DIMENSIONS.reduce((total,key)=>
    total+entry.review.scores[key],0)),0)/entries.length).toFixed(2)):null;
- return {scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,reviewed:reviewed.length,
+ return {scale:{min:0,max:2},dimensions:HIGHLIGHT_REVIEW_DIMENSIONS,reviewed:reviewed.length,
   pending:scoreable.filter(entry=>!complete(entry)).length,noAnswerFailures:entries.filter(entry=>entry.noAnswerFailure).length,
   averageTotalScoreOutOf10,completionAdjustedAverageScores,completionAdjustedTotalScoreOutOf10,
   completionAdjustedPending:adjustedReady?0:entries.filter(entry=>!entry.noAnswerFailure&&!complete(entry)).length,
@@ -1031,20 +1034,21 @@ export function summarizeHighlightReviews(cases){
    ...(entry.noAnswerFailure?{noAnswerFailure:true}:{}),status:entry.noAnswerFailure?'failed-zero':complete(entry)?'complete':'pending'})),averageScores,qualityPass:null,
   note:'Score the displayed excerpts and their claim links separately from answer prose. Exact location is not a semantic relevance score.'};
 }
-function normalizeHumanScore(review,label){
+function normalizeHumanScore(review,kind){
+ const label=kind==='answer'?'answer':'highlights';
+ const dimensions=kind==='answer'?MANUAL_REVIEW_DIMENSIONS:HIGHLIGHT_REVIEW_DIMENSIONS;
  if(!review||typeof review!=='object'||Array.isArray(review)||
    !review.scores||typeof review.scores!=='object'||Array.isArray(review.scores))
   throw Error(label+' must contain a scores object.');
  const keys=Object.keys(review.scores);
- if(keys.length!==MANUAL_REVIEW_DIMENSIONS.length||
-   keys.some(key=>!MANUAL_REVIEW_DIMENSIONS.includes(key))||
-   MANUAL_REVIEW_DIMENSIONS.some(key=>!Number.isInteger(review.scores[key])||
+ if(keys.length!==dimensions.length||keys.some(key=>!dimensions.includes(key))||
+   dimensions.some(key=>!Number.isInteger(review.scores[key])||
     review.scores[key]<0||review.scores[key]>2))
   throw Error(label+' scores must include each dimension exactly once with an integer from 0 to 2.');
  if(review.notes!==undefined&&(typeof review.notes!=='string'||review.notes.length>2000))
   throw Error(label+' notes must be text of at most 2000 characters.');
- return {status:'complete',scale:{min:0,max:2},
-  scores:Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,review.scores[key]])),
+ const scores=Object.fromEntries(dimensions.map(key=>[key,review.scores[key]]));
+ return {status:'complete',scale:{min:0,max:2},scores,
   notes:review.notes||''};
 }
 function scorecardEvaluationIdentity(report){
@@ -1058,12 +1062,16 @@ function scorecardEvaluationIdentity(report){
   clientSourceRevision:report.reproducibility?.clientSourceRevision||null,
   workerSourceRevisions:revisions,cases};
 }
-function emptyManualScores(){return Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,null]));}
-function scoredTotal(review){
+function emptyManualScores(kind='answer'){
+ const dimensions=kind==='highlights'?HIGHLIGHT_REVIEW_DIMENSIONS:MANUAL_REVIEW_DIMENSIONS;
+ return Object.fromEntries(dimensions.map(key=>[key,null]));
+}
+function scoredTotal(review,kind='answer'){
+ const dimensions=kind==='highlights'?HIGHLIGHT_REVIEW_DIMENSIONS:MANUAL_REVIEW_DIMENSIONS;
  if(review?.status!=='complete'||!review.scores||
-   !MANUAL_REVIEW_DIMENSIONS.every(key=>Number.isInteger(review.scores[key])&&
+   !dimensions.every(key=>Number.isInteger(review.scores[key])&&
     review.scores[key]>=0&&review.scores[key]<=2))return null;
- return MANUAL_REVIEW_DIMENSIONS.reduce((sum,key)=>sum+review.scores[key],0);
+ return dimensions.reduce((sum,key)=>sum+review.scores[key],0);
 }
 function qualityFailureStage(item){
  const explicitStage=String(item?.failureStage||item?.requestFailure?.stage||'').trim();
@@ -1098,7 +1106,7 @@ export function summarizeQualityByFailureStage(cases){
   const noAnswer=item?.noAnswerFailure===true||!String(item?.answerText||'').trim();
   if(noAnswer)group.noAnswerFailures++;
   const answerScore=noAnswer?0:scoredTotal(item?.manualReview);
-  const highlightScore=noAnswer?0:scoredTotal(item?.highlightHumanReview);
+  const highlightScore=noAnswer?0:scoredTotal(item?.highlightHumanReview,'highlights');
   if(answerScore===null)group.answerPending++;
   else{group.answerAdjustedScores.push(answerScore);if(!noAnswer)group.answerProducedScores.push(answerScore);}
   if(highlightScore===null)group.highlightPending++;
@@ -1147,11 +1155,11 @@ export function createHumanScorecardTemplate(report){
    ...(typeof item.answerVariant==='string'?{answerVariant:item.answerVariant}:{}),
    ...(typeof item.selectionVariant==='string'?{selectionVariant:item.selectionVariant}:{}),
    answer:{scores:emptyManualScores(),notes:''},
-   highlights:{scores:emptyManualScores(),notes:''}}));
+   highlights:{scores:emptyManualScores('highlights'),notes:''}}));
  return {schema:'antilogicalism-reading-companion-human-scorecard-v1',
   evaluationIdentity:scorecardEvaluationIdentity(report),
-  scale:{min:0,max:2},dimensions:MANUAL_REVIEW_DIMENSIONS,
-  instructions:'Fill every answer and highlights dimension with an integer from 0 to 2. Leave the case manifest intact.',
+  scale:{min:0,max:2},dimensions:{answer:MANUAL_REVIEW_DIMENSIONS,highlights:HIGHLIGHT_REVIEW_DIMENSIONS},
+  instructions:'Complete the claim audit first. Fill every answer and highlights dimension with an integer from 0 to 2 using that section’s dimension names. Score the answer and excerpts independently. Leave the case manifest intact.',
   cases:report.cases.map(item=>({caseId:item.id,
    ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
    noAnswerFailure:item.noAnswerFailure===true,answerPresent:Boolean(String(item.answerText||'').trim()),
@@ -2075,11 +2083,11 @@ async function main(){
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation','transport-ab'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
  if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
- const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab','batch18-acceptance'].includes(args.mode);
+ const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','transport-ab','batch18-acceptance','batch19-acceptance'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in a supported evaluation suite.');
- if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&args.mode!=='library-all'&&args.mode!=='library-selected'&&args.mode!=='transport-ab'&&args.mode!=='batch18-acceptance'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
- if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff'||args.mode==='philosophy3'||args.mode==='library-all'||args.mode==='library-selected'||args.mode==='transport-ab'||args.mode==='batch18-acceptance')&&args.scope!=='case-default')throw Error('Fresh, handoff and phase-2 library question suites must use case-default scope.');
+ if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&args.mode!=='library-all'&&args.mode!=='library-selected'&&args.mode!=='transport-ab'&&args.mode!=='batch18-acceptance'&&args.mode!=='batch19-acceptance'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
+ if((args.mode==='fresh'||args.mode==='fresh3'||args.mode==='handoff'||args.mode==='philosophy3'||args.mode==='library-all'||args.mode==='library-selected'||args.mode==='transport-ab'||args.mode==='batch18-acceptance'||args.mode==='batch19-acceptance')&&args.scope!=='case-default')throw Error('Fresh, handoff and phase-2 library question suites must use case-default scope.');
  if(args.mode==='acceptance'&&args.scope!=='all-books')throw Error('The acceptance suite must run in all-books mode.');
  if(!Number.isInteger(args.repeatCount)||args.repeatCount<1||args.repeatCount>3)
   throw Error('Repeat count must be an integer from 1 to 3.');
@@ -2112,7 +2120,7 @@ async function main(){
  const conditionalGapPlannerCallAllowance=args.mode==='planner'?0:reportCaseCount;
  const report={schema:'antilogicalism-reading-companion-live-answer-eval-v2',generatedAt:new Date().toISOString(),mode:args.mode,searchScope:usesEvaluationMode?args.scope:null,selectedCaseId:args.caseId&&args.caseId!=='all'?args.caseId:null,
   evaluationRun:evaluationRunContext(),
-  ...(args.mode==='batch18-acceptance'?{experiment:'batch-18-configured-streaming-default-acceptance',
+  ...(['batch18-acceptance','batch19-acceptance'].includes(args.mode)?{experiment:args.mode==='batch19-acceptance'?'batch-19-compact-review-acceptance':'batch-18-configured-streaming-default-acceptance',
    protocol:'One with-review answer pass over four registered questions. The answer request omits inferenceTransport so the Worker applies its deployed default; artifact records the transport confirmed by the Worker.',
    phase2ScoringTargets:PHASE2_SCORE_TARGETS,
    qualityProtocolStatus:'semantic scoring pending; complete the phase-2 rubric-v2 claim audit, then score answer and highlights for all five dimensions',
@@ -2120,7 +2128,9 @@ async function main(){
     latencyMedianMaximumMs:95000,latencyP90MaximumMs:145000,
     registeredDimensionFloorsAndBatch16Means:PHASE2_SCORE_TARGETS,
     transport:'all four completed cases must confirm streaming as configured default unless environment rollback is intentionally set to default',
-    safeguards:'no request failures; standard with-review and existing citation/review checks remain enabled',
+    reviewCompletion:'4/4 cases must complete the final review contract; review-format-failed and review-contract-incomplete count as misses',
+    internalIdLeaksMaximum:0,
+    safeguards:'no request failures or structural failures; standard with-review and existing citation/review checks remain enabled',
     sampleLimit:'four cases are a diagnostic screen; latency percentiles are descriptive and cannot certify the registered production P90'} }:{}),
   ...(args.mode==='transport-ab'?{experiment:'batch-17-inference-transport-ab',phase2ScoringTargets:PHASE2_SCORE_TARGETS,
    qualityProtocolStatus:'semantic scoring pending; score each answer and highlight for both transports with the phase-2 rubric v2 after claim audit'}:{}),
@@ -2130,7 +2140,7 @@ async function main(){
   repeatCount:args.repeatCount>1?args.repeatCount:undefined,
   repeatedCaseIds:args.repeatCount>1?baseCases.map(item=>item.id):undefined,
   estimatedWorkerAiCalls,conditionalGapPlannerCallAllowance,
-  callsPerCase:args.mode==='transport-ab'?'1 shared planner + 1 shared evidence-selection call + two with-review answer generations and reviews (default and buffered streaming); optional conditional gap planning is shared':args.mode==='batch18-acceptance'?'one with-review answer pipeline per case; planning, selection, composition, and review each run once; optional conditional gap planning may add one planner request per case':args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
+  callsPerCase:args.mode==='transport-ab'?'1 shared planner + 1 shared evidence-selection call + two with-review answer generations and reviews (default and buffered streaming); optional conditional gap planning is shared':['batch18-acceptance','batch19-acceptance'].includes(args.mode)?'one with-review answer pipeline per case; planning, selection, composition, and review each run once; optional conditional gap planning may add one planner request per case':args.mode==='planner'?'1 planner inference + local retrieval per case; answer generation is skipped':args.mode==='paired'?
    (args.answerVariant==='paired-selection-ablation'?'1 shared planner + 6 Worker selection/composition/review calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope':
     '1 shared planner + answer pipeline calls for each scope; selected-books reuses the plan and query set; retrieval may add one conditional gap-planner call per scope'):
    (evaluationUsesPlanner?'1 planner + ':'0 planner + ')+answerCallsPerCase+' answer/selection calls per case'+
