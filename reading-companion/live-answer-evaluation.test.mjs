@@ -152,6 +152,24 @@ test('batch-19 workflow is one compact-review acceptance pass over four cases',a
  assert.match(workflow,/name: reading-companion-batch-19-acceptance/);
 });
 
+test('Batch 21 compact acceptance is one eight-case pass split across both library scopes',async()=>{
+ const cases=selectLiveCases({cases:[]},'batch21-compact-acceptance','compact-8');
+ assert.equal(cases.length,8);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='all-books').length,4);
+ assert.equal(cases.filter(item=>item.evaluation_scope==='selected-books').length,4);
+ assert.equal(new Set(cases.map(item=>item.id)).size,8);
+ assert.ok(evaluationUsesLivePlanner('batch21-compact-acceptance','case-default'));
+ assert.deepEqual(applyQualityScope(cases,'case-default').map(item=>item.selected_book_ids.length>0),
+  [false,false,false,false,true,true,true,true]);
+ const {readFileSync}=await import('node:fs');
+ const workflow=readFileSync(new URL('../.github/workflows/reading-companion-batch-21-compact-acceptance.yml',import.meta.url),'utf8');
+ assert.match(workflow,/--mode batch21-compact-acceptance --scope case-default --case compact-8 --repeat 1/);
+ assert.match(workflow,/timeout-minutes: 60/);
+ assert.match(workflow,/--answer-variant with-review/);
+ assert.match(workflow,/name: reading-companion-batch-21-compact-acceptance/);
+ assert.doesNotMatch(workflow,/--repeat 2|Pass 2|repeats:/);
+});
+
 test('transport summary distinguishes timer races, acknowledged stream cancellation and incomplete answers',()=>{
  const report=summarizeInferenceTransport([{id:'case-a',answerVariantComparison:{variants:[
   {inferenceTransport:'default',realWorkStageSumMs:100_000,evidenceTrace:{inferenceCalls:[{timeoutClassification:'timer-race-no-cancel'}]}},
@@ -1139,6 +1157,23 @@ test('generated scorecard templates bind scores to the exact run, revision, case
  assert.equal(checked.highlightReview.completionAdjustedTotalScoreOutOf10,5);
  const wrongRun={...template,evaluationIdentity:{...template.evaluationIdentity,runId:'41506134949'}};
  assert.throws(()=>applyHumanScorecard(report,wrongRun),/identity does not match/);
+});
+
+test('phase-2 scorecard template preserves an editable claim audit before rubric scores',()=>{
+ const report={mode:'batch21-compact-acceptance',workflow:'Batch 21',cases:[{
+  id:'case-a',question:'Question?',answerText:'A claim [S1].',evidenceMap:[
+   {partId:'P1',claimId:'P1-C1',id:'S1',quote:'exact source sentence'}],
+  evidenceTrace:{reviewContract:{reviewDecisions:[{partId:'P1',claimId:'P1-C1',
+   claimText:'A claim',sourceId:'S1',sourceStatus:'answered',accepted:true,
+   evidenceRole:'work-assertion',supportBoundary:'states only the narrow claim'}]}}
+ }]};
+ const card=createHumanScorecardTemplate(report);
+ assert.equal(card.claimAudit.length,1);
+ assert.deepEqual(card.claimAudit[0],{caseId:'case-a',attemptNumber:null,partId:'P1',
+  claimId:'P1-C1',answerClaim:'A claim',sourceId:'S1',exactQuotes:['exact source sentence'],
+  reviewerStatus:'answered',reviewerAccepted:true,evidenceRole:'work-assertion',
+  supportBoundary:'states only the narrow claim',auditorVerdict:null,auditorNotes:''});
+ assert.match(card.instructions,/Complete claimAudit first/);
 });
 
 test('offline scorecard rejects unknown cases, ambiguous variants, and incomplete score dimensions',()=>{
