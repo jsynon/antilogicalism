@@ -1159,6 +1159,23 @@ test('generated scorecard templates bind scores to the exact run, revision, case
  assert.throws(()=>applyHumanScorecard(report,wrongRun),/identity does not match/);
 });
 
+test('phase-2 scorecard template preserves an editable claim audit before rubric scores',()=>{
+ const report={mode:'batch21-compact-acceptance',workflow:'Batch 21',cases:[{
+  id:'case-a',question:'Question?',answerText:'A claim [S1].',evidenceMap:[
+   {partId:'P1',claimId:'P1-C1',id:'S1',quote:'exact source sentence'}],
+  evidenceTrace:{reviewContract:{reviewDecisions:[{partId:'P1',claimId:'P1-C1',
+   claimText:'A claim',sourceId:'S1',sourceStatus:'answered',accepted:true,
+   evidenceRole:'work-assertion',supportBoundary:'states only the narrow claim'}]}}
+ }]};
+ const card=createHumanScorecardTemplate(report);
+ assert.equal(card.claimAudit.length,1);
+ assert.deepEqual(card.claimAudit[0],{caseId:'case-a',attemptNumber:null,partId:'P1',
+  claimId:'P1-C1',answerClaim:'A claim',sourceId:'S1',exactQuotes:['exact source sentence'],
+  reviewerStatus:'answered',reviewerAccepted:true,evidenceRole:'work-assertion',
+  supportBoundary:'states only the narrow claim',auditorVerdict:null,auditorNotes:''});
+ assert.match(card.instructions,/Complete claimAudit first/);
+});
+
 test('offline scorecard rejects unknown cases, ambiguous variants, and incomplete score dimensions',()=>{
  const variantReport={cases:[{id:'case-a',reviewAblation:{variants:[
   {answerVariant:'with-review',selectionVariant:'full-retrieval-pool'}]}}]};

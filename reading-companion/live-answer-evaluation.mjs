@@ -1173,15 +1173,31 @@ export function createHumanScorecardTemplate(report){
    ...(typeof item.selectionVariant==='string'?{selectionVariant:item.selectionVariant}:{}),
    answer:{scores:emptyManualScores(),notes:''},
    highlights:{scores:emptyManualScores('highlights'),notes:''}}));
+ const claimAudit=report.cases.flatMap(item=>{
+  const trace=item.evidenceTrace||{};
+  const decisions=Array.isArray(trace.reviewContract?.reviewDecisions)?trace.reviewContract.reviewDecisions:[];
+  const map=Array.isArray(item.evidenceMap)?item.evidenceMap:[];
+  return decisions.filter(decision=>decision&&typeof decision.claimId==='string').map(decision=>{
+   const sourceId=String(decision.sourceId||'');
+   const linked=map.filter(entry=>entry.claimId===decision.claimId&&entry.partId===decision.partId&&
+    (!sourceId||entry.id===sourceId));
+   return {caseId:item.id,attemptNumber:item.attemptNumber||item.repeatAttempt||null,
+    partId:decision.partId||'',claimId:decision.claimId,answerClaim:decision.claimText||'',
+    sourceId,exactQuotes:linked.map(entry=>entry.quote||'').filter(Boolean),
+    reviewerStatus:decision.sourceStatus||decision.claimStatus||'',
+    reviewerAccepted:decision.accepted===true,evidenceRole:decision.evidenceRole||'',
+    supportBoundary:decision.supportBoundary||'',auditorVerdict:null,auditorNotes:''};
+  });
+ });
  return {schema:'antilogicalism-reading-companion-human-scorecard-v1',
   evaluationIdentity:scorecardEvaluationIdentity(report),
   scale:{min:0,max:2},dimensions:{answer:MANUAL_REVIEW_DIMENSIONS,highlights:HIGHLIGHT_REVIEW_DIMENSIONS},
-  instructions:'Complete the claim audit first. Fill every answer and highlights dimension with an integer from 0 to 2 using that section’s dimension names. Score the answer and excerpts independently. Leave the case manifest intact.',
+  instructions:'Complete claimAudit first by checking each claim against its answer text, exact quote, source, reviewer status, evidence role, and support boundary. Then fill every answer and highlights dimension with an integer from 0 to 2 using that section’s dimension names. Score the answer and excerpts independently. Leave the case manifest intact.',
   cases:report.cases.map(item=>({caseId:item.id,
    ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
    noAnswerFailure:item.noAnswerFailure===true,answerPresent:Boolean(String(item.answerText||'').trim()),
    highlightCount:Array.isArray(item.evidenceHighlights)?item.evidenceHighlights.length:0})),
-  scores};
+  claimAudit,scores};
 }
 export function evaluationRunContext(env=process.env){
  return {repository:env.GITHUB_REPOSITORY||null,
