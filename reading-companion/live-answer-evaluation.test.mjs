@@ -110,10 +110,14 @@ test('transport summary distinguishes timer races, acknowledged stream cancellat
   {inferenceTransport:'default',realWorkStageSumMs:140_000},
   {inferenceTransport:'streaming',realWorkStageSumMs:150_000,noAnswerFailure:true}
  ]}}]);
+ assert.equal(report.default.attempts,2);
+ assert.equal(report.default.structuralPasses,0);
  assert.equal(report.default.realWorkStageSumMs.median,120_000);
  assert.equal(report.default.timerRaceCases,1);
+ assert.equal(report.default.acknowledgedStreamCancels,0);
  assert.equal(report.streaming.acknowledgedStreamCancels,1);
  assert.equal(report.streaming.unconfirmedProviderTerminations,1);
+ assert.equal(report.streaming.successfulAnswers,1);
  assert.equal(report.streaming.requestFailures,1);
 });
 
@@ -1163,6 +1167,7 @@ test('transport A/B selects one verified packet and reuses it for both complete 
    if(body.selectionOnly)return new Response(JSON.stringify({selectionOnly:true,selectionSnapshot:snapshot,
     sourceSelectionStatus:'selected',sourceSelection:{status:'selected',pages:[{id:'S1',bookId:'1',page:1,candidatePartIds:[]}]}}),
     {status:200,headers:{'content-type':'application/json'}});
+   await new Promise(resolve=>setTimeout(resolve,body.inferenceTransport==='default'?5:15));
    return new Response(JSON.stringify({inferenceTransport:body.inferenceTransport,
     outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'The source discusses liberty [S1].',
     citations:[{id:'S1',bookId:'1'}],evidenceHighlights:[],sourceSelection:{status:'selected',pages:[{id:'S1',bookId:'1',page:1,candidatePartIds:[]}]}}),
@@ -1178,6 +1183,22 @@ test('transport A/B selects one verified packet and reuses it for both complete 
  assert.equal(result.answerVariantComparison.sharedSelection.status,'completed');
  assert.equal(result.answerVariantComparison.variants.length,2);
  assert.ok(result.answerVariantComparison.variants.every(variant=>variant.answerText));
+ const answerStages=Object.fromEntries(result.stageTimings
+  .filter(entry=>entry.stage.startsWith('answer-')).map(entry=>[entry.stage,entry]));
+ assert.deepEqual(Object.keys(answerStages).sort(),['answer-default','answer-streaming']);
+ for(const variant of result.answerVariantComparison.variants){
+  const stage=answerStages['answer-'+variant.inferenceTransport];
+  assert.equal(stage.status,'completed');
+  assert.equal(stage.elapsedMs,variant.requestElapsedMs,
+   'each stage duration must be the matching transport request, not the sum of both requests');
+  assert.equal(variant.realWorkStageSumMs,
+   result.answerVariantComparison.sharedRealWorkStageSumMs+stage.elapsedMs,
+   'each route total must add shared work to only its own answer request');
+ }
+ assert.equal(result.stageTimings.some(entry=>entry.stage==='answer'),false,
+  'transport A/B cases must not publish a combined generic answer stage');
+ assert.ok(answerStages['answer-streaming'].elapsedMs>answerStages['answer-default'].elapsedMs,
+  'different mocked route durations must remain visibly separate');
 });
 
 test('planner-only evaluation checks selected and All Books retrieval without answer calls',async()=>{

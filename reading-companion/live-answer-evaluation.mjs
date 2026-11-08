@@ -1686,6 +1686,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    if(answerVariant==='transport-ab'){
     const inferenceTransport=variant;
     if(sharedSelectionFailure){
+     timing.record(`answer-${inferenceTransport}`,'skipped',0);
      variantResults.push({answerVariant:'with-review',inferenceTransport,requestElapsedMs:0,
       realWorkStageSumMs:sharedRealWorkStageSumMs,noAnswerFailure:true,answerText:'',outcome:'shared-selection-failed',
       structuralPassed:false,passed:false,requestFailure:sharedSelectionFailure,
@@ -1716,6 +1717,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
      const submitted=sourcesUsedForWorkerSelection(data.sourceSelection,workerSelected,answerSources);
      const audit=auditLiveAnswer(data,submitted,item.required_source_groups,item.required_part_source_groups||[],
       {scope:item.selected_book_ids?.length?'selected-books':'all-books',plannerPlan:plan?.plan||null,candidateSources:retrievalCandidates});
+     timing.record(`answer-${inferenceTransport}`,'completed',requestElapsedMs);
      variantResults.push({answerVariant:'with-review',inferenceTransport,requestElapsedMs,
       realWorkStageSumMs:sharedRealWorkStageSumMs+requestElapsedMs,
       selectionStatus:data.sourceSelection?.status||null,
@@ -1729,6 +1731,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
        requestElapsedMs,usage:data.usage||null});
     }catch(error){
      const requestElapsedMs=Date.now()-requestStarted;
+     timing.record(`answer-${inferenceTransport}`,'failed',requestElapsedMs);
      const failure=error.requestFailure||{stage:'answer',httpStatus:null,failureCode:'answer-failed',
       message:String(error.message||error).slice(0,240),workerFailure:false};
      if(Array.isArray(failure.selectionSnapshot))selectionSnapshot=failure.selectionSnapshot;
@@ -1773,7 +1776,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    await progress('answer','completed',`${variant} returned ${audit.outcome||'no outcome'} with ${audit.coverage} coverage and ${audit.citationCount} citations.`,
     {variant,outcome:audit.outcome,coverage:audit.coverage,citations:audit.citationCount,usage:data.usage||null});
   }
-  timing.record('answer','completed',timing.requestStageMs.answer);
+  if(answerVariant!=='transport-ab')timing.record('answer','completed',timing.requestStageMs.answer);
  }catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
   error.requestFailure.plannerFallback=plannerFallback;
   error.requestFailure.plannerSkipped=plannerSkipped;
@@ -2011,7 +2014,7 @@ const PHASE2_SCORE_TARGETS={protocol:'phase-2 rubric v2; claim audit precedes sc
   claimRelevance:{batch16Mean:1.72,registeredFloor:1.70,target:1.72},
   completeness:{batch16Mean:1.90,registeredFloor:1.95,target:1.95}},
   producedMeanOutOf10:8.85,completionAdjustedMeanReported:true},
- latency:{metric:'real-work stage sum per transport; shared planner/retrieval/selection stages plus that answer request; excludes harness pacing',
+  latency:{metric:'real-work stage sum per transport; shared planner/retrieval/selection stages plus that answer request; excludes harness pacing',
   medianMaximumSeconds:95,p90MaximumSeconds:145}};
 function summarizeInferenceTransport(cases){
  const values=(cases||[]).flatMap(item=>(item.answerVariantComparison?.variants||[]).filter(variant=>
@@ -2236,7 +2239,9 @@ async function main(){
    highlightReview:summarizeHighlightReviews(report.cases),
    answerVariants:summarizeAnswerVariants(report.cases),
    selectionVariants:summarizeSelectionVariants(report.cases),
-   ...(args.mode==='transport-ab'?{transportComparison:summarizeInferenceTransport(report.cases)}:{}),
+   ...(args.mode==='transport-ab'?{
+    transportComparison:summarizeInferenceTransport(report.cases),
+    caseProjectionNote:'The generic case totals above count one representative result per paired attempt. They are not pooled A/B totals; use transportComparison for per-transport counts and latency.'}:{}),
    questionPartStatusCounts:report.cases.reduce((totals,item)=>{
     const counts=item.questionPartCoverage||{};
     for(const status of ['supported','partial','unsupported'])
@@ -2253,7 +2258,16 @@ async function main(){
     return totals;
    },{full:0,partial:0,none:0,unknown:0})})};
   await saveReport();
-  console.log(args.mode==='planner'?
+  if(args.mode==='transport-ab'){
+   const comparisons=report.summary.transportComparison;
+   const pathSummary=transport=>{
+    const value=comparisons[transport],latency=value.realWorkStageSumMs;
+    return `${transport}: ${value.structuralPasses}/${value.attempts} structural passes, `+
+     `median ${(latency.median/1000).toFixed(1)}s, p90 ${(latency.p90/1000).toFixed(1)}s`;
+   };
+   console.log('Done paired transport A/B — '+pathSummary('default')+'; '+pathSummary('streaming')+
+    '. Semantic answer quality still requires the separate human rubric.');
+  }else console.log(args.mode==='planner'?
    'Done: '+report.summary.passedCases+'/'+report.caseCount+' planner plans retrieved at least one expected book; no answers were generated.':
    (args.mode==='paired'?'Done: '+report.summary.passedCases+'/'+report.caseCount+' scope results met structural gates; paired scope totals are in scopeSummary. ':'Done: '+report.summary.passedCases+'/'+report.caseCount+' reviewed answers met structural gates; ')+report.summary.failedCases+' failed and '+report.summary.unscoredCases+' are unscored. Semantic answer quality requires the separate human rubric.');
   if(args.mode!=='planner'){
