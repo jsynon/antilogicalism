@@ -123,6 +123,10 @@ Each report includes a rubric-v2 scorecard template for both transports. Complet
 
 Timeout records distinguish an ordinary timer race (`timer-race-no-cancel`) from a locally acknowledged stream cancellation (`stream-cancel-acknowledged`). A stream cancellation acknowledgement confirms that the local stream reader accepted cancellation; provider-side inference termination remains unconfirmed unless the service supplies separate evidence. The workflow shares the cross-run latency concurrency group with the other evaluation workflows.
 
+## Batch 21: compact safeguard diagnostic
+
+The manual workflow `Reading Companion Batch 21 compact acceptance` runs one `with-review` pass over eight registered Phase 2 cases: four All Books questions and four selected-book questions. It saves the report and rubric-v2 scorecard template in one artifact, including the live trace and latency fields. Complete the claim audit before scoring each produced answer and highlight set across all five dimensions. This compact screen is diagnostic and does not replace the registered 32-case Phase 2 acceptance run or certify production latency percentiles. The workflow has a 60-minute hard timeout.
+
 ## Batch 18: configured streaming default acceptance
 
 The manual workflow `Reading Companion batch 18 configured-streaming acceptance` runs one `with-review` answer pass over four registered cases: two all-books and two selected-book questions. It does not set `inferenceTransport` on the answer request; the Worker applies its configured public default and reports the transport used. This verifies the production default after the Worker revision is deployed. It is a four-question acceptance screen, not a full-suite or statistically reliable P90 certification.
