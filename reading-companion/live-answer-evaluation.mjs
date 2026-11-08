@@ -267,6 +267,14 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  const evaluationCases=mode==='transport-ab'?[...LIBRARY_ALL_CASES,...LIBRARY_SELECTED_CASES]:mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
+ if(mode==='transport-ab'&&caseId==='stage-profile-4'){
+  const ids=['library-all-hobbes-rousseau-nature','library-all-progress-idea',
+   'library-selected-conrad-marlow-kurtz','library-selected-kierkegaard-silentio-speaker'];
+  const byId=new Map(evaluationCases.map(item=>[item.id,item]));
+  const selected=ids.map(id=>byId.get(id));
+  if(selected.some(item=>!item))throw Error('The four registered stage-profile questions are missing from the transport A/B suite.');
+  return selected.map(copyEvaluationCase);
+ }
  if(mode==='acceptance'&&caseId==='repeatable-calibration'){
   const ids=new Set(['acceptance-simulation-hypothesis','acceptance-buddha-on-death']);
   const selected=ACCEPTANCE_CASES.filter(item=>ids.has(item.id));
