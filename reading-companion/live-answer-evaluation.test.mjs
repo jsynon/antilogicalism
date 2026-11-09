@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -97,6 +97,23 @@ test('Batch 22 registered full-suite thresholds are present before evaluation',(
  assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.stageSumLatencyMedianMaximumMs,85000);
  assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.sourceRequiredPartsShippedUncitedMaximum,0);
  assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.citationGateRepairThrowsMaximum,0);
+});
+test('batch 22 capture excludes generated failure disclosures and latency sums elapsedMs stages',()=>{
+ const metrics=summarizeBatch22Metrics([
+  {outcome:'verified-source-draft',answerText:'A supported answer.',stageTimings:[
+   {stage:'planner',elapsedMs:20},{stage:'answer',elapsedMs:30}]},
+  {outcome:'generation-failed',answerText:'The answer could not be generated.',stageTimings:[
+   {stage:'planner',elapsedMs:40},{stage:'answer',elapsedMs:60}]}
+ ]);
+ assert.equal(hasProducedAnswer({outcome:'generation-failed',answerText:'Generation failed.'}),false);
+ assert.deepEqual(metrics.capture,{producedCases:1,totalCases:2,rate:0.5});
+ assert.equal(metrics.stageSumLatencyMs.sampleCount,2);
+ assert.equal(metrics.stageSumLatencyMs.median,75);
+ assert.equal(metrics.stageSumLatencyMs.p90,100);
+ const audited=auditLiveAnswer({outcome:'generation-failed',answer:'Generation failed; try again later.',
+  coverage:'none',reviewStatus:'generation-failed'},[],[],[]);
+ assert.equal(audited.noAnswerFailure,true);
+ assert.equal(audited.structuralPassed,false);
 });
 test('phase-2 library-selected suite scopes eight questions to eight distinct catalog books',()=>{
  const cases=selectLiveCases(suite,'library-selected','all');
