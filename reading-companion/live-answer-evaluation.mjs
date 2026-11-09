@@ -1124,6 +1124,27 @@ function completenessBand(ratio){
  if(ratio===null)return 2;
  return ratio>=0.9?2:ratio>=0.5?1:0;
 }
+function splitAnswerAuditUnits(answerText){
+ const text=String(answerText||'');
+ return text.split(/\n+/u).flatMap(line=>{
+  const cleaned=line.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+)/u,'').trim();
+  if(!cleaned||/^\*{1,2}[^*]+\*{1,2}:?$/u.test(cleaned))return [];
+  return cleaned.split(/(?<=[.!?])\s+/u)
+   .map(unit=>unit.trim()).filter(Boolean);
+ });
+}
+function citationIdsInAnswerUnit(answerClaim){
+ return [...new Set([...String(answerClaim||'').matchAll(/\[\s*(S\d+(?:\s*,\s*S\d+)*)\s*\]/gu)]
+  .flatMap(match=>match[1].split(/\s*,\s*/u)))];
+}
+function citationAuditCompleteness(rows){
+ const classified=rows.filter(row=>row.claimClassification==='source-required');
+ const cited=classified.filter(row=>Array.isArray(row.citationIds)&&row.citationIds.length>0);
+ const ratio=classified.length?cited.length/classified.length:null;
+ return {numerator:cited.length,denominator:classified.length,
+  ratio:ratio===null?null:Number(ratio.toFixed(4)),score:completenessBand(ratio),
+  method:'audited-source-required-answer-units-with-inline-citations'};
+}
 export function deriveLinkageCompleteness(item){
  const parts=Array.isArray(item?.questionParts)?item.questionParts:[];
  const shippedClaimIds=new Set(parts.flatMap(part=>Array.isArray(part?.claimIds)?part.claimIds.map(String):[]));
@@ -1250,10 +1271,17 @@ export function createHumanScorecardTemplate(report){
    ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
    ...(typeof item.answerVariant==='string'?{answerVariant:item.answerVariant}:{}),
    ...(typeof item.selectionVariant==='string'?{selectionVariant:item.selectionVariant}:{}),
-   linkageCompleteness,
-   answer:{scores:{...emptyManualScores(),citationCompleteness:linkageCompleteness.citation.score},notes:''},
+   linkageCompleteness:{...linkageCompleteness,citation:splitAnswerAuditUnits(item.answerText).length?
+    {numerator:null,denominator:null,ratio:null,score:null,method:'pending-manual-claim-classification'}:
+    linkageCompleteness.citation},
+   answer:{scores:{...emptyManualScores(),citationCompleteness:splitAnswerAuditUnits(item.answerText).length?null:linkageCompleteness.citation.score},notes:''},
    highlights:{scores:{...emptyManualScores('highlights'),completeness:linkageCompleteness.highlights.score},notes:''}};
   });
+ const answerUnits=report.cases.flatMap(item=>splitAnswerAuditUnits(item.answerText).map((answerClaim,index)=>({
+  caseId:item.id,attemptNumber:item.attemptNumber||item.repeatAttempt||null,
+  answerUnitId:`${item.id}-A${item.attemptNumber||item.repeatAttempt||0}-U${index+1}`,answerClaim,
+  citationIds:citationIdsInAnswerUnit(answerClaim),
+  claimClassification:null,auditorVerdict:null,auditorNotes:''})));
  const claimAudit=report.cases.flatMap(item=>{
   const trace=item.evidenceTrace||{};
   const decisions=Array.isArray(trace.reviewContract?.reviewDecisions)?trace.reviewContract.reviewDecisions:[];
@@ -1273,13 +1301,16 @@ export function createHumanScorecardTemplate(report){
  return {schema:'antilogicalism-reading-companion-human-scorecard-v1',
   evaluationIdentity:scorecardEvaluationIdentity(report),
   scale:{min:0,max:2},dimensions:{answer:MANUAL_REVIEW_DIMENSIONS,highlights:HIGHLIGHT_REVIEW_DIMENSIONS},
-  instructions:'Complete claimAudit first by checking each claim against its answer text, exact quote, source, reviewer status, evidence role, and support boundary. Then fill the remaining answer and highlights dimensions with an integer from 0 to 2. citationCompleteness and highlight completeness are script-derived from linkage data and must not be edited. Score the answer and excerpts independently. Leave the case manifest intact.',
+  instructions:'Complete answerUnits first: classify every final answer sentence as source-required or general-connective. Source-required includes substantive claims about a specific text, author, position, event, or quotation, including synthesis and comparison; general-connective covers framing and non-text-specific background. Then complete claimAudit by checking reviewer claims against answer text, exact quotes, sources, status, role, and support boundary. citationCompleteness is derived from the classified answerUnits: cited source-required units divided by all source-required units. Then fill the other answer and highlights dimensions. Leave the case manifest intact.',
   cases:report.cases.map(item=>({caseId:item.id,
    ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
    noAnswerFailure:item.noAnswerFailure===true||!hasProducedAnswer(item),answerPresent:hasProducedAnswer(item),
    highlightCount:Array.isArray(item.evidenceHighlights)?item.evidenceHighlights.length:0,
-   linkageCompleteness:deriveLinkageCompleteness(item)})),
-  claimAudit,scores};
+   linkageCompleteness:{...deriveLinkageCompleteness(item),
+    citation:splitAnswerAuditUnits(item.answerText).length?
+     {numerator:null,denominator:null,ratio:null,score:null,method:'pending-manual-claim-classification'}:
+     deriveLinkageCompleteness(item).citation}})),
+  answerUnits,claimAudit,scores};
 }
 export function evaluationRunContext(env=process.env){
  return {repository:env.GITHUB_REPOSITORY||null,
@@ -1296,6 +1327,23 @@ export function applyHumanScorecard(report,scorecard){
  if(scorecard.evaluationIdentity&&JSON.stringify(scorecard.evaluationIdentity)!==
     JSON.stringify(scorecardEvaluationIdentity(report)))
   throw Error('Scorecard evaluation identity does not match this report.');
+ const answerUnits=Array.isArray(scorecard.answerUnits)?scorecard.answerUnits:[];
+ const validClassifications=new Set(['source-required','general-connective']);
+ const expectedUnits=report.cases.flatMap(item=>splitAnswerAuditUnits(item.answerText).map((answerClaim,index)=>({
+  caseId:item.id,attemptNumber:item.attemptNumber||item.repeatAttempt||null,
+  answerUnitId:`${item.id}-A${item.attemptNumber||item.repeatAttempt||0}-U${index+1}`,answerClaim,
+  citationIds:citationIdsInAnswerUnit(answerClaim)})));
+ const answerScoresIncluded=scorecard.scores.some(row=>row?.answer!==undefined);
+ if(answerScoresIncluded&&expectedUnits.length&&answerUnits.length!==expectedUnits.length)
+  throw Error('Citation audit must include every final answer unit exactly once.');
+ for(const expected of answerScoresIncluded?expectedUnits:[]){
+  const matches=answerUnits.filter(row=>row?.answerUnitId===expected.answerUnitId&&
+   row?.caseId===expected.caseId&&(row?.attemptNumber??null)===expected.attemptNumber);
+  if(matches.length!==1||matches[0].answerClaim!==expected.answerClaim||
+    JSON.stringify(matches[0].citationIds)!==JSON.stringify(expected.citationIds)||
+    !validClassifications.has(matches[0].claimClassification))
+   throw Error('Citation audit is incomplete or does not match final answer text: '+expected.answerUnitId);
+ }
  const cases=report.cases.map(item=>({...item}));
  const applied=new Set();
  for(const [index,row] of scorecard.scores.entries()){
@@ -1331,10 +1379,12 @@ export function applyHumanScorecard(report,scorecard){
    applied.add(key);
    const linkageCompleteness=deriveLinkageCompleteness(scoredTarget);
    const dimension=kind==='answer'?'citationCompleteness':'completeness';
-   const computed=kind==='answer'?linkageCompleteness.citation.score:linkageCompleteness.highlights.score;
+   const auditedRows=answerUnits.filter(unit=>unit.caseId===row.caseId&&
+    (unit.attemptNumber??null)===(row.attemptNumber??null));
+   const computed=kind==='answer'?citationAuditCompleteness(auditedRows).score:linkageCompleteness.highlights.score;
    const supplied=row[kind]?.scores?.[dimension];
    if(supplied!==undefined&&supplied!==null&&supplied!==computed)
-    throw Error(dimension+' is script-derived from linkage data and cannot be overridden.');
+    throw Error(dimension+' is script-derived from its audit inputs and cannot be overridden.');
    const normalizedInput={...row[kind],scores:{...(row[kind]?.scores||{}),[dimension]:computed}};
    scoredTarget[kind==='answer'?'manualReview':'highlightHumanReview']=
     normalizeHumanScore(normalizedInput,kind==='answer'?'answer':'highlights');
