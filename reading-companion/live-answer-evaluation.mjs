@@ -1126,12 +1126,33 @@ function completenessBand(ratio){
 }
 function splitAnswerAuditUnits(answerText){
  const text=String(answerText||'');
- return text.split(/\n+/u).flatMap(line=>{
+ const rawUnits=text.split(/\n+/u).flatMap(line=>{
   const cleaned=line.replace(/^\s*(?:#{1,6}\s+|[-*+]\s+|\d+[.)]\s+)/u,'').trim();
   if(!cleaned||/^\*{1,2}[^*]+\*{1,2}:?$/u.test(cleaned))return [];
   return cleaned.split(/(?<=[.!?])\s+/u)
    .map(unit=>unit.trim()).filter(Boolean);
  });
+ // A citation cluster that follows sentence-ending punctuation ("Claim. [S1]
+ // Next sentence.") is split into the following unit by the punctuation split
+ // above, but it belongs to the sentence it trails. Reattach a leading
+ // citation cluster (and any bare punctuation trailing it) to the previous
+ // unit; a citation-only fragment at the very start stays its own unit.
+ const units=[];
+ for(const raw of rawUnits){
+  const leading=/^((?:\[\s*S\d+(?:\s*,\s*S\d+)*\s*\]\s*)+)([\s\S]*)$/u.exec(raw);
+  if(leading&&units.length){
+   const rest=leading[2].trim();
+   if(!rest||/^[.!?,;:]+$/u.test(rest)){
+    units[units.length-1]+=` ${leading[1].trim()}${rest}`;
+    continue;
+   }
+   units[units.length-1]+=` ${leading[1].trim()}`;
+   units.push(rest);
+   continue;
+  }
+  units.push(raw);
+ }
+ return units;
 }
 function citationIdsInAnswerUnit(answerClaim){
  return [...new Set([...String(answerClaim||'').matchAll(/\[\s*(S\d+(?:\s*,\s*S\d+)*)\s*\]/gu)]

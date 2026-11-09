@@ -1243,6 +1243,19 @@ test('citation audit sentence splitting preserves lowercase sentence starts',()=
   'First claim.','second claim [S1].']);
 });
 
+test('citation audit reattaches citations that follow sentence punctuation to the sentence they trail',()=>{
+ const card=createHumanScorecardTemplate({cases:[{id:'trailing-citation',answerText:'Kurtz held an unalterable conviction. [S1] Marlow doubted it. [S2]'}]});
+ assert.deepEqual(card.answerUnits.map(unit=>unit.answerClaim),[
+  'Kurtz held an unalterable conviction. [S1]','Marlow doubted it. [S2]']);
+ assert.deepEqual(card.answerUnits.map(unit=>unit.citationIds),[['S1'],['S2']]);
+});
+
+test('citation audit keeps a trailing citation on the final sentence instead of orphaning it',()=>{
+ const card=createHumanScorecardTemplate({cases:[{id:'final-trailing-citation',answerText:'First claim [S1]. Final claim. [S2]'}]});
+ assert.deepEqual(card.answerUnits.map(unit=>unit.answerClaim),[
+  'First claim [S1].','Final claim. [S2]']);
+});
+
 test('citation completeness waits for classification of every final answer unit',()=>{
  const item={id:'b22-links',answerText:'Claim one [S1]. Claim two. This is general framing.',inlineIds:['S1'],
   questionParts:[{partId:'P1',claimIds:['P1-C1','P1-C2','P1-C3']}],
