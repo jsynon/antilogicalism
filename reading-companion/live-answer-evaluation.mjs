@@ -943,8 +943,9 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const failureCode=typeof data?.failureCode==='string'?data.failureCode:'';
  const failureStage=typeof data?.failureStage==='string'?data.failureStage:'';
  const answerInternalIdLeaks=[...new Set(answer.match(/\bP\d+-(?:C|R)\d+\b/giu)||[])];
- const noAnswerFailure=!answer.trim()&&Boolean(failureCode||data?.requestFailure||
-  outcome==='request-failed'||reviewStatus==='pipeline-failed');
+ const noAnswerFailure=(!answer.trim()&&Boolean(failureCode||data?.requestFailure||
+  outcome==='request-failed'||reviewStatus==='pipeline-failed'))||
+  ['generation-failed','request-failed','shared-selection-failed'].includes(String(outcome||''));
  const manualReview={status:'not-reviewed',scale:{min:0,max:2},scores:{
   accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null},notes:''};
  // Keep evidence-excerpt quality independent from answer prose quality.
@@ -960,7 +961,7 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   !failureCode&&!answerInternalIdLeaks.length&&reviewStatus!=='pipeline-failed'&&
   reviewStatus!=='review-contract-incomplete'&&
   reviewStatus!=='generation-format-failed'&&reviewStatus!=='review-format-failed'&&
-  selectionHandoffAudit.status!=='mismatch';
+  selectionHandoffAudit.status!=='mismatch'&&!noAnswerFailure;
  return {workerVersionId,workerSourceBuild,workerSourceRevision,outcome,coverage,answerCompleteness,reviewStatus,
   // The Worker currently returns this reader-facing disclosure as a string.
   // Preserve that field in each evaluation record so uncited packet-linked
@@ -987,14 +988,44 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
 }
 const MANUAL_REVIEW_DIMENSIONS=['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness'];
 const HIGHLIGHT_REVIEW_DIMENSIONS=['fidelity','coverage','context','claimRelevance','completeness'];
+const NON_PRODUCED_OUTCOMES=new Set(['generation-failed','request-failed','shared-selection-failed']);
+function isNonProducedRecord(item){
+ return item?.noAnswerFailure===true||NON_PRODUCED_OUTCOMES.has(String(item?.outcome||''));
+}
+export function hasProducedAnswer(item){
+ return !isNonProducedRecord(item)&&
+  Boolean(String(item?.answerText||'').trim());
+}
+export function summarizeBatch22Metrics(cases){
+ const rows=Array.isArray(cases)?cases:[];
+ const produced=rows.filter(hasProducedAnswer).length;
+ const durations=rows.map(item=>Array.isArray(item?.stageTimings)?
+  item.stageTimings.reduce((sum,timing)=>sum+
+   (Number.isFinite(timing?.elapsedMs)&&timing.elapsedMs>=0?timing.elapsedMs:0),0):null)
+  .filter(Number.isFinite).sort((a,b)=>a-b);
+ const percentile=p=>durations.length?durations[Math.max(0,Math.ceil(durations.length*p)-1)]:null;
+ const median=durations.length?(durations.length%2?
+  durations[(durations.length-1)/2]:
+  (durations[durations.length/2-1]+durations[durations.length/2])/2):null;
+ const p90=percentile(.9);
+ return {capture:{producedCases:produced,totalCases:rows.length,
+   rate:rows.length?Number((produced/rows.length).toFixed(4)):null},
+  stageSumLatencyMs:{sampleCount:durations.length,
+   median:median===null?null:Number(median.toFixed(1)),
+   p90:p90===null?null:Number(p90.toFixed(1)),
+   goalMedianMs:BATCH22_ACCEPTANCE_THRESHOLDS.stageSumLatencyMedianMaximumMs,
+   goalP90Ms:145000,
+   goalStatus:{medianMet:median!==null&&median<=BATCH22_ACCEPTANCE_THRESHOLDS.stageSumLatencyMedianMaximumMs,
+    p90Met:p90!==null&&p90<=145000}}};
+}
 export function summarizeManualReviews(cases){
  const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
   (item.answerVariantComparison||item.reviewAblation).variants.map(variant=>({id:item.id,attemptNumber:item.attemptNumber,
    answerVariant:variant.answerVariant,selectionVariant:variant.selectionVariant,review:variant.manualReview,
-   noAnswerFailure:variant.noAnswerFailure===true||(item.noAnswerFailure===true&&
+   noAnswerFailure:isNonProducedRecord(variant)||(item.noAnswerFailure===true&&
     !String(variant.answerText||'').trim())})):
   [{id:item.id,attemptNumber:item.attemptNumber,answerVariant:item.answerVariant||'with-review',
-   review:item.manualReview,noAnswerFailure:item.noAnswerFailure===true}]);
+   review:item.manualReview,noAnswerFailure:isNonProducedRecord(item)}]);
  const completed=entries.filter(entry=>MANUAL_REVIEW_DIMENSIONS.every(key=>
   Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2));
  const averageScores=Object.fromEntries(MANUAL_REVIEW_DIMENSIONS.map(key=>[key,completed.length?
@@ -1026,10 +1057,11 @@ export function summarizeHighlightReviews(cases){
  const entries=(cases||[]).flatMap(item=>Array.isArray((item?.answerVariantComparison||item?.reviewAblation)?.variants)?
   (item.answerVariantComparison||item.reviewAblation).variants.map(variant=>({id:item.id,
    attemptNumber:item.attemptNumber,answerVariant:variant.answerVariant,selectionVariant:variant.selectionVariant,
-   review:variant.highlightHumanReview,noAnswerFailure:variant.noAnswerFailure===true||
+   review:variant.highlightHumanReview,noAnswerFailure:isNonProducedRecord(variant)||
     (item.noAnswerFailure===true&&!String(variant.answerText||'').trim())})):
   [{id:item.id,attemptNumber:item.attemptNumber,answerVariant:item.answerVariant||'with-review',
-   selectionVariant:item.selectionVariant,review:item.highlightHumanReview,noAnswerFailure:item.noAnswerFailure===true}]);
+   selectionVariant:item.selectionVariant,review:item.highlightHumanReview,
+   noAnswerFailure:isNonProducedRecord(item)}]);
  const complete=entry=>HIGHLIGHT_REVIEW_DIMENSIONS.every(key=>
   Number.isInteger(entry.review?.scores?.[key])&&entry.review.scores[key]>=0&&entry.review.scores[key]<=2);
  const reviewed=entries.filter(complete);
@@ -1207,11 +1239,11 @@ export function createHumanScorecardTemplate(report){
    instructions:'Complete claim audit first. Score answer and highlights independently for each transport. citationCompleteness and highlight completeness are script-derived from the linkage data and must not be edited. Keep produced means separate from completion-adjusted means; failed/no-answer variants are zero only in completion-adjusted means.',
    cases:report.cases.map(item=>({caseId:item.id,attemptNumber:item.attemptNumber||item.repeatAttempt||null,
     question:item.question,variants:(item.answerVariantComparison?.variants||[]).map(variant=>({
-     inferenceTransport:variant.inferenceTransport,noAnswerFailure:variant.noAnswerFailure===true,
-     answerPresent:Boolean(String(variant.answerText||'').trim()),highlightCount:Array.isArray(variant.evidenceHighlights)?variant.evidenceHighlights.length:0}))})),
+    inferenceTransport:variant.inferenceTransport,noAnswerFailure:variant.noAnswerFailure===true||!hasProducedAnswer(variant),
+    answerPresent:hasProducedAnswer(variant),highlightCount:Array.isArray(variant.evidenceHighlights)?variant.evidenceHighlights.length:0}))})),
    scores:scoreRows};
  }
- const scores=report.cases.filter(item=>!item.noAnswerFailure&&String(item.answerText||'').trim())
+ const scores=report.cases.filter(hasProducedAnswer)
   .map(item=>{
    const linkageCompleteness=deriveLinkageCompleteness(item);
    return {caseId:item.id,
@@ -1244,7 +1276,7 @@ export function createHumanScorecardTemplate(report){
   instructions:'Complete claimAudit first by checking each claim against its answer text, exact quote, source, reviewer status, evidence role, and support boundary. Then fill the remaining answer and highlights dimensions with an integer from 0 to 2. citationCompleteness and highlight completeness are script-derived from linkage data and must not be edited. Score the answer and excerpts independently. Leave the case manifest intact.',
   cases:report.cases.map(item=>({caseId:item.id,
    ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
-   noAnswerFailure:item.noAnswerFailure===true,answerPresent:Boolean(String(item.answerText||'').trim()),
+   noAnswerFailure:item.noAnswerFailure===true||!hasProducedAnswer(item),answerPresent:hasProducedAnswer(item),
    highlightCount:Array.isArray(item.evidenceHighlights)?item.evidenceHighlights.length:0,
    linkageCompleteness:deriveLinkageCompleteness(item)})),
   claimAudit,scores};
@@ -2461,11 +2493,6 @@ async function main(){
     return totals;
    },{full:0,partial:0,none:0,unknown:0})})};
   if(['library-all','library-selected'].includes(args.mode)){
-   const produced=report.cases.filter(item=>!item.noAnswerFailure&&String(item.answerText||'').trim()).length;
-   const durations=report.cases.map(item=>item.realWorkStageSumMs).filter(Number.isFinite).sort((a,b)=>a-b);
-   const median=durations.length?(durations.length%2?durations[(durations.length-1)/2]:
-    (durations[durations.length/2-1]+durations[durations.length/2])/2):null;
-   const p90=durations.length?durations[Math.max(0,Math.ceil(durations.length*0.9)-1)]:null;
    const shippedConflicts=report.cases.reduce((count,item)=>{
     const shipped=new Set((item.questionParts||[]).flatMap(part=>part.claimIds||[]));
     return count+(item.evidenceTrace?.reviewContract?.reviewDecisions||[]).filter(decision=>
@@ -2474,13 +2501,9 @@ async function main(){
      decision.accepted===true&&shipped.has(decision.claimId)&&
      ['conflict','unclear'].includes(decision.subjectAttributionStatus)).length;
    },0);
-   report.summary.batch22Metrics={capture:{producedCases:produced,totalCases:report.cases.length,
-     rate:report.cases.length?Number((produced/report.cases.length).toFixed(4)):null},
+   report.summary.batch22Metrics={...summarizeBatch22Metrics(report.cases),
     unverifiedSourceDraftShipments:report.cases.filter(item=>item.outcome==='unverified-source-draft').length,
     reviewedShippedAttributionConflicts:shippedConflicts,
-    stageSumLatencyMs:{sampleCount:durations.length,
-     median:median===null?null:Number(median.toFixed(1)),
-     p90:p90===null?null:Number(p90.toFixed(1))},
     citationGateIntegrity:report.summary.citationGateIntegrity};
   }
   await saveReport();
