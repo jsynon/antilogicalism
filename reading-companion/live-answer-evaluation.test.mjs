@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -14,6 +14,35 @@ test('live evaluation preflight accepts only matching v49 corpus and fingerprint
   /expected v49; fingerprint coverage v48, corpus v49/);
  assert.throws(()=>validatePublishedCorpus(coverage,{version:48}),
   /expected v49; fingerprint coverage v49, corpus v48/);
+});
+
+test('batch 22 counts source-required uncited parts and citation-gate outcomes',()=>{
+ const answer=auditLiveAnswer({outcome:'verified-source-draft',coverage:'full',
+  answerCompleteness:'full',reviewStatus:'claim-review',answer:'A supported claim [S1].',
+  citations:[{id:'S1',bookId:'529'}],evidenceMap:[{id:'S1'}],
+  questionParts:[
+   {part:'Sourced',partId:'P1',status:'supported',answerStatus:'answered',
+    sourceRequired:true,evidenceIds:['S1']},
+   {part:'Dropped',partId:'P2',status:'unsupported',answerStatus:'unanswered',
+    sourceRequired:true,evidenceIds:[]},
+   {part:'Context',partId:'P3',status:'supported',answerStatus:'answered',
+    sourceRequired:false,evidenceIds:[]}
+  ],trace:{citationGateSummary:{firings:2,adoptions:1,
+   outcomes:{adopted:1,repairRefused:0,repairThrew:1,reReviewRefused:0}},
+   sourceRequiredContainment:{droppedPartIds:['P2']}}},[{bookId:'529'}],[]);
+ assert.equal(answer.partEvidenceAudit[1].sourceRequiredUncited,false,
+  'a deterministically dropped requirement is not counted as shipped');
+ assert.equal(answer.partEvidenceAudit[2].evidenceApplicability,'not-applicable',
+  'general context remains within the uncited allowance');
+ assert.deepEqual(summarizeCitationGateIntegrity([{id:'fixture',...answer,evidenceTrace:{
+  citationGateSummary:{firings:2,adoptions:1,
+   outcomes:{adopted:1,repairRefused:0,repairThrew:1,reReviewRefused:0}},
+  sourceRequiredContainment:{droppedPartIds:['P2']}}}]),{
+  casesWithGateTrace:1,firings:2,adoptions:1,
+  outcomes:{adopted:1,repairRefused:0,repairThrew:1,reReviewRefused:0},
+  sourceRequiredParts:2,sourceRequiredPartsShippedUncited:0,
+  sourceRequiredPartsDropped:1,uncitedPartIds:[],
+  droppedPartIds:[{caseId:'fixture',partId:'P2'}]});
 });
 
 test('live evaluation preflight rejects selected or expected books missing from published coverage',()=>{
@@ -59,6 +88,15 @@ test('phase-2 library-all suite covers eight open all-books questions with no ex
   cases.map(()=>[]));
  assert.deepEqual(cases.map(item=>item.discipline),
   ['philosophy','philosophy','literature','history','science','history','literature','society']);
+});
+test('Batch 22 registered full-suite thresholds are present before evaluation',()=>{
+ assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.answerProducedMeanMinimum,7.9);
+ assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.highlightProducedMeanMinimum,8.4);
+ assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.captureRateMinimum,0.92);
+ assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.citationSupportMeanMinimum,1.5);
+ assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.stageSumLatencyMedianMaximumMs,85000);
+ assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.sourceRequiredPartsShippedUncitedMaximum,0);
+ assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.citationGateRepairThrowsMaximum,0);
 });
 test('phase-2 library-selected suite scopes eight questions to eight distinct catalog books',()=>{
  const cases=selectLiveCases(suite,'library-selected','all');
@@ -1100,8 +1138,8 @@ test('offline scorecard applies separate answer and highlight scores to a named 
   submittedSources:[],reviewAblation:{variants:[{answerVariant:'with-review',selectionVariant:'full-retrieval-pool',
    answerText:'A sourced claim [S1].',coverage:'full',citations:[],citationSources:[],questionParts:[],evidenceMap:[],
    evidenceHighlights:[],submittedSources:[]} ]}}]};
- const scores={accuracy:2,questionCoverage:1,explanationQuality:2,citationSupport:1,citationCompleteness:2};
- const highlightScores={fidelity:1,coverage:2,context:1,claimRelevance:2,completeness:1};
+ const scores={accuracy:2,questionCoverage:1,explanationQuality:2,citationSupport:1,citationCompleteness:0};
+ const highlightScores={fidelity:1,coverage:2,context:1,claimRelevance:2,completeness:2};
  const checked=applyHumanScorecard(report,{scores:[{caseId:'acceptance-descartes-cogito',
   answerVariant:'with-review',selectionVariant:'full-retrieval-pool',
   answer:{scores,notes:'Covers the claim; citation explanation could be clearer.'},
@@ -1114,8 +1152,8 @@ test('offline scorecard applies separate answer and highlight scores to a named 
  assert.equal(checked.highlightReview.reviewed,1);
  assert.equal(checked.humanReview.averageScores.accuracy,2);
  assert.equal(checked.highlightReview.averageScores.fidelity,1);
- assert.equal(checked.qualityByFailureStage[0].answer.producedOnlyAverageOutOf10,8);
- assert.equal(checked.qualityByFailureStage[0].highlights.producedOnlyAverageOutOf10,7);
+ assert.equal(checked.qualityByFailureStage[0].answer.producedOnlyAverageOutOf10,6);
+ assert.equal(checked.qualityByFailureStage[0].highlights.producedOnlyAverageOutOf10,8);
  assert.equal(checked.offlineRecheck,undefined,'scorecard ingestion does not fabricate a structural recheck');
  assert.throws(()=>applyHumanScorecard(report,{scores:[{caseId:'acceptance-descartes-cogito',
   answerVariant:'with-review',selectionVariant:'full-retrieval-pool',highlights:{scores,notes:''}}]}),
@@ -1142,19 +1180,20 @@ test('generated scorecard templates bind scores to the exact run, revision, case
   ['repeat-me',1,false],['repeat-me',2,false],['no-answer',undefined,true]
  ]);
  assert.deepEqual(template.scores.map(item=>item.attemptNumber),[1,2]);
- assert.deepEqual(Object.values(template.scores[0].answer.scores),[null,null,null,null,null]);
+ assert.deepEqual(template.scores[0].answer.scores,
+  {accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:2});
  assert.deepEqual(Object.keys(template.scores[0].highlights.scores),['fidelity','coverage','context','claimRelevance','completeness']);
  const dimensions={accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:2,citationCompleteness:2};
  template.scores[0].answer.scores={...dimensions};
  const highlightDimensions={fidelity:2,coverage:2,context:2,claimRelevance:2,completeness:2};
  template.scores[0].highlights.scores={...highlightDimensions};
- template.scores[1].answer.scores={accuracy:1,questionCoverage:1,explanationQuality:1,citationSupport:1,citationCompleteness:1};
- template.scores[1].highlights.scores={fidelity:1,coverage:1,context:1,claimRelevance:1,completeness:1};
+ template.scores[1].answer.scores={accuracy:1,questionCoverage:1,explanationQuality:1,citationSupport:1,citationCompleteness:2};
+ template.scores[1].highlights.scores={fidelity:1,coverage:1,context:1,claimRelevance:1,completeness:2};
  const checked=applyHumanScorecard(report,template);
- assert.equal(checked.humanReview.averageTotalScoreOutOf10,7.5);
- assert.equal(checked.humanReview.completionAdjustedTotalScoreOutOf10,5);
- assert.equal(checked.highlightReview.averageTotalScoreOutOf10,7.5);
- assert.equal(checked.highlightReview.completionAdjustedTotalScoreOutOf10,5);
+ assert.equal(checked.humanReview.averageTotalScoreOutOf10,8);
+ assert.equal(checked.humanReview.completionAdjustedTotalScoreOutOf10,5.33);
+ assert.equal(checked.highlightReview.averageTotalScoreOutOf10,8);
+ assert.equal(checked.highlightReview.completionAdjustedTotalScoreOutOf10,5.33);
  const wrongRun={...template,evaluationIdentity:{...template.evaluationIdentity,runId:'41506134949'}};
  assert.throws(()=>applyHumanScorecard(report,wrongRun),/identity does not match/);
 });
@@ -1174,6 +1213,35 @@ test('phase-2 scorecard template preserves an editable claim audit before rubric
   reviewerStatus:'answered',reviewerAccepted:true,evidenceRole:'work-assertion',
   supportBoundary:'states only the narrow claim',auditorVerdict:null,auditorNotes:''});
  assert.match(card.instructions,/Complete claimAudit first/);
+});
+
+test('Batch 22 completeness scores are computed per case from citation and highlight linkage',()=>{
+ const item={id:'b22-links',answerText:'Claim one [S1]. Claim two [S1].',inlineIds:['S1'],
+  questionParts:[{partId:'P1',claimIds:['P1-C1','P1-C2']}],
+  evidenceMap:[{partId:'P1',claimId:'P1-C1',id:'S1',quote:'one'}],
+  highlightClaimCoverage:{method:'located-highlight-claim-source-intersection',
+   citedClaimCount:2,linkedClaimCount:1,ratio:0.5,unlinkedClaimIds:['P1-C2']},
+  evidenceTrace:{reviewContract:{reviewDecisions:[
+   {partId:'P1',claimId:'P1-C1',sourceId:'S1',accepted:true},
+   {partId:'P1',claimId:'P1-C2',sourceId:'S1',accepted:true}]}}};
+ const derived=deriveLinkageCompleteness(item);
+ assert.deepEqual(derived,{citation:{numerator:1,denominator:2,ratio:0.5,score:1,
+  method:'shipped-source-claims-with-inline-citation-and-evidence-link'},
+  highlights:{numerator:1,denominator:2,ratio:0.5,score:1,
+   method:'located-highlight-claim-source-intersection'}});
+ const report={mode:'library-all',cases:[item]};
+ const card=createHumanScorecardTemplate(report);
+ assert.equal(card.scores[0].answer.scores.citationCompleteness,1);
+ assert.equal(card.scores[0].highlights.scores.completeness,1);
+ assert.deepEqual(card.scores[0].linkageCompleteness,derived);
+ const scores=card.scores[0];
+ scores.answer.scores={accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:1,citationCompleteness:1};
+ scores.highlights.scores={fidelity:2,coverage:2,context:2,claimRelevance:2,completeness:1};
+ const scored=applyHumanScorecard(report,card);
+ assert.equal(scored.cases[0].manualReview.scores.citationCompleteness,1);
+ assert.equal(scored.cases[0].highlightHumanReview.scores.completeness,1);
+ const forged=structuredClone(card);forged.scores[0].answer.scores.citationCompleteness=2;
+ assert.throws(()=>applyHumanScorecard(report,forged),/script-derived from linkage data/);
 });
 
 test('offline scorecard rejects unknown cases, ambiguous variants, and incomplete score dimensions',()=>{

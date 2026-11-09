@@ -127,6 +127,14 @@ Timeout records distinguish an ordinary timer race (`timer-race-no-cancel`) from
 
 The manual workflow `Reading Companion Batch 21 compact acceptance` runs one `with-review` pass over eight registered Phase 2 cases: four All Books questions and four selected-book questions. It saves the report and rubric-v2 scorecard template in one artifact, including the live trace and latency fields. Complete the claim audit before scoring each produced answer and highlight set across all five dimensions. This compact screen is diagnostic and does not replace the registered 32-case Phase 2 acceptance run or certify production latency percentiles. The workflow has a 60-minute hard timeout.
 
+## Batch 22: full Phase 2 safeguard and quality validation
+
+Use the existing manual workflow `Reading Companion phase-2 evaluation (new suites)` with two repeats. It produces four report segments: `library-all` and `library-selected`, each for pass 1 and pass 2. Combine those reports to evaluate the registered 32 cases. Each report now includes the Batch 22 threshold profile, per-segment capture and stage-sum latency, citation-gate firing/adoption/refusal/throw counts, and source-required uncited-part counts. The compact Batch 21 workflow remains a smoke screen.
+
+Complete each scorecard's claim audit first. Citation completeness and highlight completeness are prefilled by the evaluator from claim-to-citation/evidence linkage and located highlight-to-claim linkage; leave those scripted scores unchanged. The scorecard reports the ratios and methods beside the scores. All remaining answer and highlight dimensions are scored under rubric v2, with produced and completion-adjusted means reported separately. The amended completeness bands are 2 for at least 90%, 1 for 50–89%, and 0 below 50%, applied per case.
+
+Batch 22's registered thresholds are: produced answer mean at least 7.9/10, produced highlight mean at least 8.4/10, capture at least 92%, citation support at least 1.5/2, stage-sum latency median at most 85 seconds, zero unverified-source-draft shipments, zero shipped misattributions, zero source-required parts shipped without a linked citation, and zero citation-gate repair throws. A miss requires diagnosis before another batch is designed. The reported attribution-conflict count is a trace indicator; the claim audit remains the final check for misattributions.
+
 ## Batch 18: configured streaming default acceptance
 
 The manual workflow `Reading Companion batch 18 configured-streaming acceptance` runs one `with-review` answer pass over four registered cases: two all-books and two selected-book questions. It does not set `inferenceTransport` on the answer request; the Worker applies its configured public default and reports the transport used. This verifies the production default after the Worker revision is deployed. It is a four-question acceptance screen, not a full-suite or statistically reliable P90 certification.

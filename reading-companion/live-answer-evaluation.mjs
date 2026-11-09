@@ -779,16 +779,21 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
  const mappedEvidenceIds=new Set(evidenceMap.map(item=>String(item?.id||'')));
  const partEvidenceAudit=questionParts.map(part=>{
   const evidenceIds=[...new Set(Array.isArray(part?.evidenceIds)?part.evidenceIds.map(String):[])];
+  const sourceRequired=part?.sourceRequired===true;
+  const shipped=part?.answerStatus!=='unanswered'&&part?.status!=='unsupported';
+  const sourceRequiredUncited=sourceRequired&&shipped&&evidenceIds.length===0;
   const mappedEvidenceIdsForPart=evidenceIds.filter(id=>mappedEvidenceIds.has(id));
   const citedEvidenceIds=evidenceIds.filter(id=>citationIds.has(id));
   const submittedEvidenceIds=evidenceIds.filter(id=>submittedIds.has(id));
   const structurallyComplete=part?.status==='unsupported'?null:
+   sourceRequiredUncited?false:
    evidenceIds.length===0?null:
    evidenceIds.length>0&&mappedEvidenceIdsForPart.length===evidenceIds.length&&
    citedEvidenceIds.length===evidenceIds.length&&submittedEvidenceIds.length===evidenceIds.length;
-  return {part:String(part?.part||''),status:String(part?.status||''),
+  return {part:String(part?.part||''),partId:String(part?.partId||''),sourceRequired,
+   sourceRequiredUncited,status:String(part?.status||''),
    answerStatus:String(part?.answerStatus||''),evidenceIds,
-   evidenceApplicability:evidenceIds.length===0?'not-applicable':'required',
+   evidenceApplicability:sourceRequired||evidenceIds.length>0?'required':'not-applicable',
    mappedEvidenceIds:mappedEvidenceIdsForPart,citedEvidenceIds,submittedEvidenceIds,structurallyComplete};
  });
  const completeSupportedEvidenceIds=new Set(partEvidenceAudit
@@ -1083,6 +1088,42 @@ function emptyManualScores(kind='answer'){
  const dimensions=kind==='highlights'?HIGHLIGHT_REVIEW_DIMENSIONS:MANUAL_REVIEW_DIMENSIONS;
  return Object.fromEntries(dimensions.map(key=>[key,null]));
 }
+function completenessBand(ratio){
+ if(ratio===null)return 2;
+ return ratio>=0.9?2:ratio>=0.5?1:0;
+}
+export function deriveLinkageCompleteness(item){
+ const parts=Array.isArray(item?.questionParts)?item.questionParts:[];
+ const shippedClaimIds=new Set(parts.flatMap(part=>Array.isArray(part?.claimIds)?part.claimIds.map(String):[]));
+ const partByClaim=new Map(parts.flatMap(part=>(Array.isArray(part?.claimIds)?part.claimIds:[])
+  .map(id=>[String(id),String(part.partId||'')])));
+ const decisions=Array.isArray(item?.evidenceTrace?.reviewContract?.reviewDecisions)?
+  item.evidenceTrace.reviewContract.reviewDecisions:[];
+ const evidenceMap=Array.isArray(item?.evidenceMap)?item.evidenceMap:[];
+ const inline=new Set(Array.isArray(item?.inlineIds)?item.inlineIds.map(String):[]);
+ const sourceClaimKeys=new Set(decisions.filter(decision=>decision?.sourceId&&
+  shippedClaimIds.has(String(decision.claimId))).map(decision=>String(decision.claimId)));
+ const linkedClaimKeys=new Set();
+ for(const decision of decisions){
+  const claimId=String(decision?.claimId||''),sourceId=String(decision?.sourceId||'');
+  if(!sourceClaimKeys.has(claimId)||!sourceId||!inline.has(sourceId))continue;
+  if(evidenceMap.some(entry=>String(entry?.claimId||'')===claimId&&
+    String(entry?.partId||'')===String(decision.partId||partByClaim.get(claimId)||'')&&
+    String(entry?.id||'')===sourceId))linkedClaimKeys.add(claimId);
+ }
+ const sourceClaimCount=sourceClaimKeys.size;
+ const hasCitationMarker=inline.size>0||/\[\s*S\d+(?:\s*,\s*S\d+)*\s*\]/u.test(String(item?.answerText||''));
+ const citationRatio=sourceClaimCount?linkedClaimKeys.size/sourceClaimCount:hasCitationMarker?0:null;
+ const highlightRatio=Number.isFinite(item?.highlightClaimCoverage?.ratio)?
+  item.highlightClaimCoverage.ratio:null;
+ return {citation:{numerator:linkedClaimKeys.size,denominator:sourceClaimCount,
+   ratio:citationRatio===null?null:Number(citationRatio.toFixed(4)),
+   score:completenessBand(citationRatio),method:'shipped-source-claims-with-inline-citation-and-evidence-link'},
+  highlights:{numerator:Number(item?.highlightClaimCoverage?.linkedClaimCount)||0,
+   denominator:Number(item?.highlightClaimCoverage?.citedClaimCount)||0,
+   ratio:highlightRatio,score:completenessBand(highlightRatio),
+   method:'located-highlight-claim-source-intersection'}};
+}
 function scoredTotal(review,kind='answer'){
  const dimensions=kind==='highlights'?HIGHLIGHT_REVIEW_DIMENSIONS:MANUAL_REVIEW_DIMENSIONS;
  if(review?.status!=='complete'||!review.scores||
@@ -1151,15 +1192,19 @@ export function createHumanScorecardTemplate(report){
   const answerDimensions=Object.keys(PHASE2_SCORE_TARGETS.answer.dimensions);
   const highlightDimensions=Object.keys(PHASE2_SCORE_TARGETS.highlights.dimensions);
   const empty=dimensions=>Object.fromEntries(dimensions.map(key=>[key,null]));
-  const scoreRows=report.cases.flatMap(item=>(item.answerVariantComparison?.variants||[]).map(variant=>({
-   caseId:item.id,...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
-   inferenceTransport:variant.inferenceTransport,
-   noAnswerFailure:variant.noAnswerFailure===true,
-   answer:{scores:empty(answerDimensions),notes:''},highlights:{scores:empty(highlightDimensions),notes:''}})));
+  const scoreRows=report.cases.flatMap(item=>(item.answerVariantComparison?.variants||[]).map(variant=>{
+   const linkageCompleteness=deriveLinkageCompleteness(variant);
+   return {caseId:item.id,...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
+    inferenceTransport:variant.inferenceTransport,
+    noAnswerFailure:variant.noAnswerFailure===true,
+    linkageCompleteness,
+    answer:{scores:{...empty(answerDimensions),citationCompleteness:linkageCompleteness.citation.score},notes:''},
+    highlights:{scores:{...empty(highlightDimensions),completeness:linkageCompleteness.highlights.score},notes:''}};
+  }));
   return {schema:'antilogicalism-reading-companion-phase2-rubric-v2-transport-scorecard',
    evaluationIdentity:scorecardEvaluationIdentity(report),scale:{min:0,max:2},
    protocol:PHASE2_SCORE_TARGETS,
-   instructions:'Complete claim audit first. Score answer and highlights independently for each transport. Keep produced means separate from completion-adjusted means; failed/no-answer variants are zero only in completion-adjusted means.',
+   instructions:'Complete claim audit first. Score answer and highlights independently for each transport. citationCompleteness and highlight completeness are script-derived from the linkage data and must not be edited. Keep produced means separate from completion-adjusted means; failed/no-answer variants are zero only in completion-adjusted means.',
    cases:report.cases.map(item=>({caseId:item.id,attemptNumber:item.attemptNumber||item.repeatAttempt||null,
     question:item.question,variants:(item.answerVariantComparison?.variants||[]).map(variant=>({
      inferenceTransport:variant.inferenceTransport,noAnswerFailure:variant.noAnswerFailure===true,
@@ -1167,12 +1212,16 @@ export function createHumanScorecardTemplate(report){
    scores:scoreRows};
  }
  const scores=report.cases.filter(item=>!item.noAnswerFailure&&String(item.answerText||'').trim())
-  .map(item=>({caseId:item.id,
+  .map(item=>{
+   const linkageCompleteness=deriveLinkageCompleteness(item);
+   return {caseId:item.id,
    ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
    ...(typeof item.answerVariant==='string'?{answerVariant:item.answerVariant}:{}),
    ...(typeof item.selectionVariant==='string'?{selectionVariant:item.selectionVariant}:{}),
-   answer:{scores:emptyManualScores(),notes:''},
-   highlights:{scores:emptyManualScores('highlights'),notes:''}}));
+   linkageCompleteness,
+   answer:{scores:{...emptyManualScores(),citationCompleteness:linkageCompleteness.citation.score},notes:''},
+   highlights:{scores:{...emptyManualScores('highlights'),completeness:linkageCompleteness.highlights.score},notes:''}};
+  });
  const claimAudit=report.cases.flatMap(item=>{
   const trace=item.evidenceTrace||{};
   const decisions=Array.isArray(trace.reviewContract?.reviewDecisions)?trace.reviewContract.reviewDecisions:[];
@@ -1192,11 +1241,12 @@ export function createHumanScorecardTemplate(report){
  return {schema:'antilogicalism-reading-companion-human-scorecard-v1',
   evaluationIdentity:scorecardEvaluationIdentity(report),
   scale:{min:0,max:2},dimensions:{answer:MANUAL_REVIEW_DIMENSIONS,highlights:HIGHLIGHT_REVIEW_DIMENSIONS},
-  instructions:'Complete claimAudit first by checking each claim against its answer text, exact quote, source, reviewer status, evidence role, and support boundary. Then fill every answer and highlights dimension with an integer from 0 to 2 using that section’s dimension names. Score the answer and excerpts independently. Leave the case manifest intact.',
+  instructions:'Complete claimAudit first by checking each claim against its answer text, exact quote, source, reviewer status, evidence role, and support boundary. Then fill the remaining answer and highlights dimensions with an integer from 0 to 2. citationCompleteness and highlight completeness are script-derived from linkage data and must not be edited. Score the answer and excerpts independently. Leave the case manifest intact.',
   cases:report.cases.map(item=>({caseId:item.id,
    ...(Number.isInteger(item.attemptNumber)?{attemptNumber:item.attemptNumber}:{}),
    noAnswerFailure:item.noAnswerFailure===true,answerPresent:Boolean(String(item.answerText||'').trim()),
-   highlightCount:Array.isArray(item.evidenceHighlights)?item.evidenceHighlights.length:0})),
+   highlightCount:Array.isArray(item.evidenceHighlights)?item.evidenceHighlights.length:0,
+   linkageCompleteness:deriveLinkageCompleteness(item)})),
   claimAudit,scores};
 }
 export function evaluationRunContext(env=process.env){
@@ -1247,8 +1297,15 @@ export function applyHumanScorecard(report,scorecard){
    const key=JSON.stringify([row.caseId,row.attemptNumber??'',row.answerVariant||'',row.selectionVariant||'',kind]);
    if(applied.has(key))throw Error('Duplicate scorecard scores for '+row.caseId+' '+kind+'.');
    applied.add(key);
+   const linkageCompleteness=deriveLinkageCompleteness(scoredTarget);
+   const dimension=kind==='answer'?'citationCompleteness':'completeness';
+   const computed=kind==='answer'?linkageCompleteness.citation.score:linkageCompleteness.highlights.score;
+   const supplied=row[kind]?.scores?.[dimension];
+   if(supplied!==undefined&&supplied!==null&&supplied!==computed)
+    throw Error(dimension+' is script-derived from linkage data and cannot be overridden.');
+   const normalizedInput={...row[kind],scores:{...(row[kind]?.scores||{}),[dimension]:computed}};
    scoredTarget[kind==='answer'?'manualReview':'highlightHumanReview']=
-    normalizeHumanScore(row[kind],kind==='answer'?'answer':'highlights');
+    normalizeHumanScore(normalizedInput,kind==='answer'?'answer':'highlights');
   }
  }
  return {...report,cases,humanReview:summarizeManualReviews(cases),
@@ -1298,6 +1355,49 @@ export function summarizePipelineFailures(cases){
  }
  return {failedCases:failed.length,noAnswerFailures:failed.filter(item=>item?.noAnswerFailure||
   !String(item?.answerText||'').trim()).length,byStageAndCode:[...groups.values()]};
+}
+export function summarizeCitationGateIntegrity(cases){
+ const totals={casesWithGateTrace:0,firings:0,adoptions:0,
+  outcomes:{adopted:0,repairRefused:0,repairThrew:0,reReviewRefused:0},
+  sourceRequiredParts:0,sourceRequiredPartsShippedUncited:0,
+  sourceRequiredPartsDropped:0,uncitedPartIds:[],droppedPartIds:[]};
+ for(const item of cases||[]){
+  const trace=item?.evidenceTrace||{};
+  const gate=trace.citationGateSummary;
+  if(gate&&typeof gate==='object'){
+   totals.casesWithGateTrace++;
+   totals.firings+=Number(gate.firings)||0;
+   totals.adoptions+=Number(gate.adoptions)||0;
+   for(const key of Object.keys(totals.outcomes))
+    totals.outcomes[key]+=Number(gate.outcomes?.[key])||0;
+  }else if(Array.isArray(trace.citationGate)){
+   totals.casesWithGateTrace++;
+   for(const entry of trace.citationGate){
+    totals.firings++;
+    const adopted=entry?.action==='repair-applied';
+    if(adopted){totals.adoptions++;totals.outcomes.adopted++;}
+    else if(entry?.action==='repair-refused')totals.outcomes.repairRefused++;
+    else if(entry?.action==='repair-threw')totals.outcomes.repairThrew++;
+    if(entry?.refusal?.stage==='re-review')totals.outcomes.reReviewRefused++;
+   }
+  }
+  const partAudit=Array.isArray(item?.partEvidenceAudit)?item.partEvidenceAudit:[];
+  for(const part of partAudit){
+   if(part?.sourceRequired!==true)continue;
+   totals.sourceRequiredParts++;
+   if(part.sourceRequiredUncited===true){
+    totals.sourceRequiredPartsShippedUncited++;
+    totals.uncitedPartIds.push({caseId:item.id,part:part.part,partId:part.partId||''});
+   }
+  }
+  const containment=trace.sourceRequiredContainment;
+  if(Array.isArray(containment?.droppedPartIds)){
+   totals.sourceRequiredPartsDropped+=containment.droppedPartIds.length;
+   for(const partId of containment.droppedPartIds)
+    totals.droppedPartIds.push({caseId:item.id,partId});
+  }
+ }
+ return totals;
 }
 export function recheckQualityReport(report){
  if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
@@ -2080,6 +2180,18 @@ const PHASE2_SCORE_TARGETS={protocol:'phase-2 rubric v2; claim audit precedes sc
   producedMeanOutOf10:8.85,completionAdjustedMeanReported:true},
   latency:{metric:'real-work stage sum per transport; shared planner/retrieval/selection stages plus that answer request; excludes harness pacing',
   medianMaximumSeconds:95,p90MaximumSeconds:145}};
+export const BATCH22_ACCEPTANCE_THRESHOLDS={
+ answerProducedMeanMinimum:7.9,highlightProducedMeanMinimum:8.4,
+ captureRateMinimum:0.92,citationSupportMeanMinimum:1.5,
+ stageSumLatencyMedianMaximumMs:85000,
+ unverifiedSourceDraftShipmentsMaximum:0,shippedMisattributionsMaximum:0,
+ sourceRequiredPartsShippedUncitedMaximum:0,citationGateRepairThrowsMaximum:0,
+ completeness:{citationBands:{two:'at least 90%',one:'50–89%',zero:'below 50%'},
+  highlightBands:{two:'at least 90%',one:'50–89%',zero:'below 50%'},
+  computation:'scripted from answer-to-citation and answer-to-highlight linkage'},
+ scoringOrder:'claim audits first; then rubric-v2 answer and highlight scoring; report produced and completion-adjusted means',
+ sample:'combine library-all and library-selected reports for passes 1 and 2 to score the registered 32 cases'
+};
 function summarizeInferenceTransport(cases){
  const values=(cases||[]).flatMap(item=>(item.answerVariantComparison?.variants||[]).filter(variant=>
   ['default','streaming'].includes(variant.inferenceTransport)).map(variant=>({caseId:item.id,
@@ -2173,6 +2285,12 @@ async function main(){
     registeredDimensionFloorsAndBatch16Means:PHASE2_SCORE_TARGETS,
     internalIdLeaksMaximum:0,reviewCompletion:'all eight final review contracts must complete; no unverified-source-draft shipments or misattributions',
     sampleLimit:'eight cases and one pass provide a compact diagnostic only; the registered 32-case phase-2 run remains the full acceptance evaluation and this sample cannot certify production latency percentiles'} }:{}),
+  ...(['library-all','library-selected'].includes(args.mode)?{experiment:'batch-22-full-phase2-validation',
+   protocol:'One of four report segments in the registered 32-case validation. Combine library-all and library-selected reports from passes 1 and 2. Claim audits precede rubric-v2 scoring.',
+   phase2Rubric:{version:'v2',scale:{min:0,max:2},
+    answerDimensions:MANUAL_REVIEW_DIMENSIONS,highlightDimensions:HIGHLIGHT_REVIEW_DIMENSIONS},
+   qualityProtocolStatus:'semantic scoring pending; complete claim audits first, then score every produced answer and highlight set',
+   acceptanceThresholds:BATCH22_ACCEPTANCE_THRESHOLDS}:{}),
   ...(args.mode==='transport-ab'?{experiment:'batch-17-inference-transport-ab',phase2ScoringTargets:PHASE2_SCORE_TARGETS,
    qualityProtocolStatus:'semantic scoring pending; score each answer and highlight for both transports with the phase-2 rubric v2 after claim audit'}:{}),
   answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,
@@ -2323,6 +2441,7 @@ async function main(){
    highlightReview:summarizeHighlightReviews(report.cases),
    answerVariants:summarizeAnswerVariants(report.cases),
    selectionVariants:summarizeSelectionVariants(report.cases),
+   citationGateIntegrity:summarizeCitationGateIntegrity(report.cases),
    ...(args.mode==='transport-ab'?{
     transportComparison:summarizeInferenceTransport(report.cases),
     caseProjectionNote:'The generic case totals above count one representative result per paired attempt. They are not pooled A/B totals; use transportComparison for per-transport counts and latency.'}:{}),
@@ -2341,6 +2460,29 @@ async function main(){
     else totals.unknown++;
     return totals;
    },{full:0,partial:0,none:0,unknown:0})})};
+  if(['library-all','library-selected'].includes(args.mode)){
+   const produced=report.cases.filter(item=>!item.noAnswerFailure&&String(item.answerText||'').trim()).length;
+   const durations=report.cases.map(item=>item.realWorkStageSumMs).filter(Number.isFinite).sort((a,b)=>a-b);
+   const median=durations.length?(durations.length%2?durations[(durations.length-1)/2]:
+    (durations[durations.length/2-1]+durations[durations.length/2])/2):null;
+   const p90=durations.length?durations[Math.max(0,Math.ceil(durations.length*0.9)-1)]:null;
+   const shippedConflicts=report.cases.reduce((count,item)=>{
+    const shipped=new Set((item.questionParts||[]).flatMap(part=>part.claimIds||[]));
+    return count+(item.evidenceTrace?.reviewContract?.reviewDecisions||[]).filter(decision=>
+     decision.accepted===true&&shipped.has(decision.claimId)&&
+     ['conflict','unclear'].includes(decision.attributionStatus)||
+     decision.accepted===true&&shipped.has(decision.claimId)&&
+     ['conflict','unclear'].includes(decision.subjectAttributionStatus)).length;
+   },0);
+   report.summary.batch22Metrics={capture:{producedCases:produced,totalCases:report.cases.length,
+     rate:report.cases.length?Number((produced/report.cases.length).toFixed(4)):null},
+    unverifiedSourceDraftShipments:report.cases.filter(item=>item.outcome==='unverified-source-draft').length,
+    reviewedShippedAttributionConflicts:shippedConflicts,
+    stageSumLatencyMs:{sampleCount:durations.length,
+     median:median===null?null:Number(median.toFixed(1)),
+     p90:p90===null?null:Number(p90.toFixed(1))},
+    citationGateIntegrity:report.summary.citationGateIntegrity};
+  }
   await saveReport();
   if(args.mode==='transport-ab'){
    const comparisons=report.summary.transportComparison;
