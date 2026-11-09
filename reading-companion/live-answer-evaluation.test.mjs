@@ -1155,9 +1155,11 @@ test('offline scorecard applies separate answer and highlight scores to a named 
   submittedSources:[],reviewAblation:{variants:[{answerVariant:'with-review',selectionVariant:'full-retrieval-pool',
    answerText:'A sourced claim [S1].',coverage:'full',citations:[],citationSources:[],questionParts:[],evidenceMap:[],
    evidenceHighlights:[],submittedSources:[]} ]}}]};
- const scores={accuracy:2,questionCoverage:1,explanationQuality:2,citationSupport:1,citationCompleteness:0};
+ const scores={accuracy:2,questionCoverage:1,explanationQuality:2,citationSupport:1,citationCompleteness:2};
  const highlightScores={fidelity:1,coverage:2,context:1,claimRelevance:2,completeness:2};
- const checked=applyHumanScorecard(report,{scores:[{caseId:'acceptance-descartes-cogito',
+ const checked=applyHumanScorecard(report,{answerUnits:[{caseId:'acceptance-descartes-cogito',attemptNumber:null,
+  answerUnitId:'acceptance-descartes-cogito-A0-U1',answerClaim:'A sourced claim [S1].',
+  citationIds:['S1'],claimClassification:'source-required'}],scores:[{caseId:'acceptance-descartes-cogito',
   answerVariant:'with-review',selectionVariant:'full-retrieval-pool',
   answer:{scores,notes:'Covers the claim; citation explanation could be clearer.'},
   highlights:{scores:highlightScores,notes:'The excerpt is located but loosely tied to the claim.'}}]});
@@ -1169,7 +1171,7 @@ test('offline scorecard applies separate answer and highlight scores to a named 
  assert.equal(checked.highlightReview.reviewed,1);
  assert.equal(checked.humanReview.averageScores.accuracy,2);
  assert.equal(checked.highlightReview.averageScores.fidelity,1);
- assert.equal(checked.qualityByFailureStage[0].answer.producedOnlyAverageOutOf10,6);
+ assert.equal(checked.qualityByFailureStage[0].answer.producedOnlyAverageOutOf10,8);
  assert.equal(checked.qualityByFailureStage[0].highlights.producedOnlyAverageOutOf10,8);
  assert.equal(checked.offlineRecheck,undefined,'scorecard ingestion does not fabricate a structural recheck');
  assert.throws(()=>applyHumanScorecard(report,{scores:[{caseId:'acceptance-descartes-cogito',
@@ -1198,7 +1200,7 @@ test('generated scorecard templates bind scores to the exact run, revision, case
  ]);
  assert.deepEqual(template.scores.map(item=>item.attemptNumber),[1,2]);
  assert.deepEqual(template.scores[0].answer.scores,
-  {accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:2});
+  {accuracy:null,questionCoverage:null,explanationQuality:null,citationSupport:null,citationCompleteness:null});
  assert.deepEqual(Object.keys(template.scores[0].highlights.scores),['fidelity','coverage','context','claimRelevance','completeness']);
  const dimensions={accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:2,citationCompleteness:2};
  template.scores[0].answer.scores={...dimensions};
@@ -1206,6 +1208,7 @@ test('generated scorecard templates bind scores to the exact run, revision, case
  template.scores[0].highlights.scores={...highlightDimensions};
  template.scores[1].answer.scores={accuracy:1,questionCoverage:1,explanationQuality:1,citationSupport:1,citationCompleteness:2};
  template.scores[1].highlights.scores={fidelity:1,coverage:1,context:1,claimRelevance:1,completeness:2};
+ template.answerUnits.forEach(unit=>{unit.claimClassification='general-connective';});
  const checked=applyHumanScorecard(report,template);
  assert.equal(checked.humanReview.averageTotalScoreOutOf10,8);
  assert.equal(checked.humanReview.completionAdjustedTotalScoreOutOf10,5.33);
@@ -1229,12 +1232,20 @@ test('phase-2 scorecard template preserves an editable claim audit before rubric
   claimId:'P1-C1',answerClaim:'A claim',sourceId:'S1',exactQuotes:['exact source sentence'],
   reviewerStatus:'answered',reviewerAccepted:true,evidenceRole:'work-assertion',
   supportBoundary:'states only the narrow claim',auditorVerdict:null,auditorNotes:''});
- assert.match(card.instructions,/Complete claimAudit first/);
+ assert.match(card.instructions,/Complete answerUnits first/);
+ assert.equal(card.answerUnits.length,1);
+ assert.equal(card.answerUnits[0].claimClassification,null);
 });
 
-test('Batch 22 completeness scores are computed per case from citation and highlight linkage',()=>{
- const item={id:'b22-links',answerText:'Claim one [S1]. Claim two [S1].',inlineIds:['S1'],
-  questionParts:[{partId:'P1',claimIds:['P1-C1','P1-C2']}],
+test('citation audit sentence splitting preserves lowercase sentence starts',()=>{
+ const card=createHumanScorecardTemplate({cases:[{id:'lowercase-sentences',answerText:'First claim. second claim [S1].'}]});
+ assert.deepEqual(card.answerUnits.map(unit=>unit.answerClaim),[
+  'First claim.','second claim [S1].']);
+});
+
+test('citation completeness waits for classification of every final answer unit',()=>{
+ const item={id:'b22-links',answerText:'Claim one [S1]. Claim two. This is general framing.',inlineIds:['S1'],
+  questionParts:[{partId:'P1',claimIds:['P1-C1','P1-C2','P1-C3']}],
   evidenceMap:[{partId:'P1',claimId:'P1-C1',id:'S1',quote:'one'}],
   highlightClaimCoverage:{method:'located-highlight-claim-source-intersection',
    citedClaimCount:2,linkedClaimCount:1,ratio:0.5,unlinkedClaimIds:['P1-C2']},
@@ -1248,9 +1259,14 @@ test('Batch 22 completeness scores are computed per case from citation and highl
    method:'located-highlight-claim-source-intersection'}});
  const report={mode:'library-all',cases:[item]};
  const card=createHumanScorecardTemplate(report);
- assert.equal(card.scores[0].answer.scores.citationCompleteness,1);
+ assert.equal(card.scores[0].answer.scores.citationCompleteness,null);
  assert.equal(card.scores[0].highlights.scores.completeness,1);
- assert.deepEqual(card.scores[0].linkageCompleteness,derived);
+ assert.equal(card.scores[0].linkageCompleteness.citation.method,'pending-manual-claim-classification');
+ assert.deepEqual(derived.citation,{numerator:1,denominator:2,ratio:0.5,score:1,
+  method:'shipped-source-claims-with-inline-citation-and-evidence-link'});
+ card.answerUnits[0].claimClassification='source-required';
+ card.answerUnits[1].claimClassification='source-required';
+ card.answerUnits[2].claimClassification='general-connective';
  const scores=card.scores[0];
  scores.answer.scores={accuracy:2,questionCoverage:2,explanationQuality:2,citationSupport:1,citationCompleteness:1};
  scores.highlights.scores={fidelity:2,coverage:2,context:2,claimRelevance:2,completeness:1};
@@ -1258,7 +1274,9 @@ test('Batch 22 completeness scores are computed per case from citation and highl
  assert.equal(scored.cases[0].manualReview.scores.citationCompleteness,1);
  assert.equal(scored.cases[0].highlightHumanReview.scores.completeness,1);
  const forged=structuredClone(card);forged.scores[0].answer.scores.citationCompleteness=2;
- assert.throws(()=>applyHumanScorecard(report,forged),/script-derived from linkage data/);
+ assert.throws(()=>applyHumanScorecard(report,forged),/script-derived from its audit inputs/);
+ const incomplete=structuredClone(card);incomplete.answerUnits.pop();
+ assert.throws(()=>applyHumanScorecard(report,incomplete),/every final answer unit exactly once/);
 });
 
 test('offline scorecard rejects unknown cases, ambiguous variants, and incomplete score dimensions',()=>{
