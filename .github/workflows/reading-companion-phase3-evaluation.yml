@@ -1,0 +1,115 @@
+name: Reading Companion phase-3 evaluation (new suites)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_ai:
+        description: I understand this runs the new library-all-3 and library-selected-3 live Worker evaluations repeatedly in a single run and incurs AI usage
+        type: boolean
+        required: true
+        default: false
+      repeats:
+        description: How many full passes over both new suites to run inside this single workflow run
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+        required: true
+        default: '2'
+
+permissions:
+  contents: read
+
+# Share the cross-run regression group so this workflow and the older
+# evaluation workflows can never run simultaneously and distort each
+# other's latency measurements.
+concurrency:
+  group: reading-companion-cross-run-regression
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    if: ${{ inputs.confirm_live_ai }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify explicit live AI confirmation and evaluation token
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          test "${{ inputs.confirm_live_ai }}" = "true"
+          test -n "$PILOT_EVALUATION_TOKEN"
+          mkdir -p "$GITHUB_WORKSPACE/reading-companion-phase3-evaluation"
+      - name: Pass 1 — library-all-3 suite
+        if: ${{ !cancelled() }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode library-all-3 --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-phase3-evaluation/library-all3-pass1.json"
+      - name: Pass 1 — library-selected-3 suite
+        if: ${{ !cancelled() }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode library-selected-3 --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-phase3-evaluation/library-selected3-pass1.json"
+      - name: Pass 2 — library-all-3 suite
+        if: ${{ !cancelled() && inputs.repeats != '1' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode library-all-3 --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-phase3-evaluation/library-all3-pass2.json"
+      - name: Pass 2 — library-selected-3 suite
+        if: ${{ !cancelled() && inputs.repeats != '1' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode library-selected-3 --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-phase3-evaluation/library-selected3-pass2.json"
+      - name: Pass 3 — library-all-3 suite
+        if: ${{ !cancelled() && inputs.repeats == '3' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode library-all-3 --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-phase3-evaluation/library-all3-pass3.json"
+      - name: Pass 3 — library-selected-3 suite
+        if: ${{ !cancelled() && inputs.repeats == '3' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode library-selected-3 --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-phase3-evaluation/library-selected3-pass3.json"
+      - name: Preserve all evaluation reports and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-companion-phase3-evaluation
+          path: ${{ github.workspace }}/reading-companion-phase3-evaluation/*.json
+          if-no-files-found: warn
+          retention-days: 30
