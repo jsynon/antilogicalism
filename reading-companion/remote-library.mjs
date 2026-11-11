@@ -10,6 +10,17 @@ export const DEFAULT_INDEX_ROOT = 'https://jsynon.github.io/antilogicalism-libra
 // retrieval contract. Callers may ask for fewer works, but never more than four.
 export const PRODUCTION_MAX_BOOKS = 4;
 export const PRODUCTION_PAGES_PER_BOOK = 4;
+// Batch 33 (B33-7a): a search scoped to one large book may return up to
+// SCOPED_DIVERSITY_SLOTS pages beyond the per-book production cap. The
+// first pageLimit pages are the pure rank selection, exactly as before;
+// the extra slots are filled by section-spread reservation (best-ranked
+// floor-passing page from each page-extent quartile not yet represented),
+// then by rank. The reservation only activates for books whose extent
+// makes a single section able to sweep every rank slot.
+export const SCOPED_DIVERSITY_SLOTS = 2;
+export const SCOPED_DIVERSITY_MAX_PAGES = 6;
+export const SCOPED_DIVERSITY_MIN_EXTENT = 100;
+export const SCOPED_DIVERSITY_BANDS = 4;
 const SCRIPTURE_BOOK_NAMES = [
   'genesis','exodus','leviticus','numbers','deuteronomy','joshua','judges','ruth',
   '1 samuel','2 samuel','1 kings','2 kings','1 chronicles','2 chronicles',
@@ -293,6 +304,42 @@ export function termFamily(term, partition) {
   if(term.length>=4&&term.endsWith('re'))candidates.add(term.slice(0,-2)+'er');
   if(term.endsWith('ize'))candidates.add(term.slice(0,-3)+'ise');
   if(term.endsWith('ise'))candidates.add(term.slice(0,-3)+'ize');
+  // Batch 33 (B33-7c): proper-name transliteration bridges. A planner may
+  // write a name in one transliteration while the source text uses
+  // another (the batch-32 C&P pool spelled the character "Sonia"; planner
+  // facets saying "Sonya" could not reach those pages). The rules below
+  // generate the counterpart forms of the standard transliteration
+  // alternations; the attestation check at the end admits a form only
+  // when the index partition actually contains it, and every candidate
+  // is a whole word, so no substring or prefix merging is introduced.
+  // (i) Terminal -ya pairs with -ia (sonya <-> sonia, sofya <-> sofia),
+  // and terminal -y pairs with -i (dmitry <-> dmitri).
+  if(term.length>=4&&term.endsWith('ya'))candidates.add(term.slice(0,-2)+'ia');
+  if(term.length>=4&&term.endsWith('ia'))candidates.add(term.slice(0,-2)+'ya');
+  if(term.length>=5&&term.endsWith('y'))candidates.add(term.slice(0,-1)+'i');
+  if(term.length>=5&&term.endsWith('i'))candidates.add(term.slice(0,-1)+'y');
+  // (ii) The Slavic diminutive alternation: full forms in -fya/-fia pair
+  // with diminutives in -nya/-nia (sofya <-> sonya, agafya <-> ganya).
+  if(term.length>=5&&term.endsWith('fya'))candidates.add(term.slice(0,-3)+'nya');
+  if(term.length>=5&&term.endsWith('nya'))candidates.add(term.slice(0,-3)+'fya');
+  if(term.length>=5&&term.endsWith('fia'))candidates.add(term.slice(0,-3)+'nia');
+  if(term.length>=5&&term.endsWith('nia'))candidates.add(term.slice(0,-3)+'fia');
+  // (iii) ph pairs with f in vowel-final names (sophia <-> sofia). The
+  // vowel-final guard keeps ordinary ph/f words (graph, philosophy)
+  // untouched; the f -> ph direction fires only for a single medial f.
+  if(term.length>=5&&/[ae]$/.test(term)){
+    if(term.includes('ph'))candidates.add(term.replaceAll('ph','f'));
+    const fCount=term.split('f').length-1;
+    if(fCount===1&&!term.startsWith('f')&&!term.includes('ph'))
+      candidates.add(term.replace('f','ph'));
+  }
+  // (iv) Terminal -v pairs with -ff in transliterated surnames
+  // (romanov <-> romanoff), and an initial y pairs with i (yakov <->
+  // iakov).
+  if(term.length>=5&&term.endsWith('v'))candidates.add(term.slice(0,-1)+'ff');
+  if(term.length>=6&&term.endsWith('ff'))candidates.add(term.slice(0,-2)+'v');
+  if(term.length>=4&&term.startsWith('y'))candidates.add('i'+term.slice(1));
+  if(term.length>=4&&term.startsWith('i'))candidates.add('y'+term.slice(1));
   for(const candidate of candidates){
     if(candidate.length>=3&&Object.hasOwn(vocabulary,candidate))
       variants.add(candidate);
@@ -831,6 +878,15 @@ export class RemoteLibrary {
         candidates.push({item, rank:evidence.score + (hit ? Math.min(8,hit.score) : 0)});
       }
       candidates.sort((a,b) => b.rank - a.rank || a.item.page - b.item.page);
+      // Batch 33 (B33-7a): the leaf budget of a search scoped to one large
+      // book extends past the production per-book cap by the diversity
+      // slots; unscoped searches and small books keep the plain cap. The
+      // extent is the book's own last prose page, so the quartile bands
+      // below are relative to this book, never to absolute page numbers.
+      const bookExtent = proseByPage.size ? Math.max(...proseByPage.keys()) : 0;
+      const leafLimit = bookId && bookExtent >= SCOPED_DIVERSITY_MIN_EXTENT
+        ? Math.min(pageLimit + SCOPED_DIVERSITY_SLOTS, SCOPED_DIVERSITY_MAX_PAGES)
+        : pageLimit;
       // Fill the evidence budget with the strongest direct matches first.
       // If the strongest page visibly starts or ends mid-sentence, preserve
       // one relevant adjacent page even when the direct-match budget is full.
@@ -867,8 +923,32 @@ export class RemoteLibrary {
           }
         }
       }
+      // Batch 33 (B33-7a): fill the scoped diversity slots with the
+      // best-ranked floor-passing page from each page-extent quartile the
+      // rank selection has not reached, so a scoped question whose
+      // evidence sits late in a large book is not crowded out when one
+      // early section sweeps the rank slots. The rank-selected pages
+      // (including the top-ranked hit) are never displaced: reservation
+      // only appends, at most one page per uncovered quartile, and the
+      // ordinary rank fill below spends any slot reservation leaves.
+      if (leafLimit > pageLimit && selected.length < leafLimit) {
+        const bandWidth = Math.ceil(bookExtent / SCOPED_DIVERSITY_BANDS);
+        const bandOf = page => Math.min(SCOPED_DIVERSITY_BANDS - 1,
+          Math.floor((page - 1) / bandWidth));
+        const coveredBands = new Set(selected.map(entry => bandOf(entry.item.page)));
+        let reserved = 0;
+        for (const entry of candidates) {
+          if (selected.length >= leafLimit || reserved >= leafLimit - pageLimit) break;
+          if (selected.some(existing => existing.item.id === entry.item.id)) continue;
+          const band = bandOf(entry.item.page);
+          if (coveredBands.has(band)) continue;
+          coveredBands.add(band);
+          selected.push(entry);
+          reserved++;
+        }
+      }
       for (const entry of candidates) {
-        if (selected.length >= pageLimit) break;
+        if (selected.length >= leafLimit) break;
         if (!selected.some(existing => existing.item.id === entry.item.id)) selected.push(entry);
       }
       for (const entry of selected) {

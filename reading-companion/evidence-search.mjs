@@ -1956,25 +1956,102 @@ export function auditEvidencePacketSelection(candidates,selected,question,partQu
   selectedCount:Array.isArray(selected)?selected.length:0,parts:partAudits};
 }
 
+/* Batch 33 (B33-7b): the top floor-passing book of each retrieval facet,
+ * read from the candidates' facetRanks: for every facet, the book of the
+ * candidate holding that facet's best (smallest) rank. First candidate in
+ * list order wins a tie. Returns a Map of facet -> bookId, in the order
+ * the facets' top candidates appear. */
+export function facetTopBooks(candidates){
+ const tops=new Map();
+ if(!Array.isArray(candidates))return tops;
+ for(const candidate of candidates){
+  if(!candidate||!Array.isArray(candidate.facetRanks))continue;
+  const bookId=String(candidate.bookId||'');
+  if(!bookId)continue;
+  for(const entry of candidate.facetRanks){
+   if(!entry||!Number.isFinite(entry.rank))continue;
+   const current=tops.get(entry.facet);
+   if(!current||entry.rank<current.rank)
+    tops.set(entry.facet,{rank:entry.rank,bookId});
+  }
+ }
+ return new Map([...tops].map(([facet,value])=>[facet,value.bookId]));
+}
+
+/* Batch 33 (B33-7b): trace the facet-top books a finished selection
+ * passed over, with the concrete reason: a chosen book occupying two or
+ * more packet slots, or a packet that filled with distinct books. */
+export function selectionDroppedFacets(candidates,selected){
+ const chosenBooks=new Map();
+ for(const source of Array.isArray(selected)?selected:[]){
+  const key=String(source?.bookId||'');
+  if(key)chosenBooks.set(key,(chosenBooks.get(key)||0)+1);
+ }
+ const duplicateUsed=[...chosenBooks.values()].some(count=>count>=2);
+ const dropped=[];
+ for(const [facet,bookId] of facetTopBooks(candidates)){
+  if(chosenBooks.has(bookId))continue;
+  dropped.push({facet,bookId,
+   reason:duplicateUsed?'duplicate-book-slot-used':'packet-filled-with-distinct-books'});
+ }
+ return dropped.sort((a,b)=>String(a.facet).localeCompare(String(b.facet),undefined,{numeric:true}));
+}
+
 /* Build the bounded six-page comparison arm used by the candidate-pool
  * ablation. The live Worker applies the same page and byte limits after its
  * semantic selector maps IDs back to fingerprint-verified pages. */
 export function boundAnswerSources(candidates,question,turnstileToken,
-  {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[]}={}){
+  {maxSources=4,maxBytes=39000,maxSourceBytes=35000,history=[],priorityBooks=[]}={}){
  if(!Array.isArray(candidates)||typeof question!=='string'||typeof turnstileToken!=='string')return [];
- const chosen=[];let selectedSourceBytes=0;
- for(const candidate of candidates){
-  if(chosen.length>=maxSources)break;
-  if(!candidate||typeof candidate.text!=='string'||
-     !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
-     !Number.isSafeInteger(candidate.page)||candidate.page<1)continue;
+ const priority=new Set((Array.isArray(priorityBooks)?priorityBooks:[]).map(String));
+ // Books the retriever linked to at least one question part (through any
+ // of their candidate pages). A linked book's place in the packet is part
+ // of the part-evidence contract; see the deferral rule below.
+ const linkedBooks=new Set(candidates.filter(candidate=>
+  Array.isArray(candidate?.candidatePartIds)&&candidate.candidatePartIds.length)
+  .map(candidate=>String(candidate.bookId)));
+ const chosen=[],deferred=[];let selectedSourceBytes=0;
+ const chosenBooks=new Set();
+ const tryAdd=(candidate)=>{
   const candidateBytes=new TextEncoder().encode(candidate.text).byteLength;
-  if(selectedSourceBytes+candidateBytes>maxSourceBytes)continue;
+  if(selectedSourceBytes+candidateBytes>maxSourceBytes)return false;
   const next=[...chosen,candidate];
   const bytes=new TextEncoder().encode(JSON.stringify({question,turnstileToken,history,
    sources:next.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
     ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{})}))})).byteLength;
-  if(bytes<=maxBytes){chosen.push(candidate);selectedSourceBytes+=candidateBytes;}
+  if(bytes>maxBytes)return false;
+  chosen.push(candidate);selectedSourceBytes+=candidateBytes;
+  chosenBooks.add(String(candidate.bookId));
+  return true;
+ };
+ for(let index=0;index<candidates.length;index++){
+  if(chosen.length>=maxSources)break;
+  const candidate=candidates[index];
+  if(!candidate||typeof candidate.text!=='string'||
+     !/^[1-9]\d{0,3}$/.test(String(candidate.bookId))||
+     !Number.isSafeInteger(candidate.page)||candidate.page<1)continue;
+  // Batch 33 (B33-7b): a second page of an already-chosen book waits
+  // while a later candidate belongs to a facet-top book the packet has
+  // not represented yet. The deferred page still fills a leftover slot
+  // below; it simply cannot crowd out the facet representation the
+  // packet is built to carry. One precedence is preserved: when the
+  // duplicate's book is linked to a question part, it does not yield
+  // to a book with no part linkage at all — part-linked evidence is
+  // considered before unlinked facet candidates (a commentary or
+  // bibliographic hit can top a facet without being part evidence).
+  // Callers that pass no priority books (the model-ablation arm) see
+  // the established fill order unchanged.
+  if(priority.size&&chosenBooks.has(String(candidate.bookId))&&
+     candidates.slice(index+1).some(later=>later&&
+      priority.has(String(later.bookId))&&!chosenBooks.has(String(later.bookId))&&
+      !(linkedBooks.has(String(candidate.bookId))&&!linkedBooks.has(String(later.bookId))))){
+   deferred.push(candidate);continue;
+  }
+  tryAdd(candidate);
+ }
+ for(const candidate of deferred){
+  if(chosen.length>=maxSources)break;
+  tryAdd(candidate);
  }
  return chosen;
 }
@@ -2131,7 +2208,18 @@ export function selectAnswerSources(candidates,question,turnstileToken,
    (!Array.isArray(value.candidatePartIds)||!value.candidatePartIds.length));
   ordered=[...partRepresentatives,...rankRemaining(remainingLinked),...rankRemaining(remainingUnlinked)];
  }
- return boundAnswerSources(ordered,question,turnstileToken,{maxSources,maxBytes,maxSourceBytes,history});
+ // Batch 33 (B33-7b): hand the bounded fill the facet-top books as
+ // priority books, so a duplicate page cannot take a slot while one of
+ // them is still unrepresented, and trace any facet-top book the packet
+ // nevertheless passed over. The trace rides the returned array as a
+ // non-enumerable property: existing consumers (iteration, spread,
+ // deep-equality) see the plain source list unchanged.
+ const chosen=boundAnswerSources(ordered,question,turnstileToken,
+  {maxSources,maxBytes,maxSourceBytes,history,
+   priorityBooks:[...facetTopBooks(ordered).values()]});
+ Object.defineProperty(chosen,'selectionDroppedFacets',{
+  value:selectionDroppedFacets(ordered,chosen),enumerable:false});
+ return chosen;
 }
 
 /* Some catalogs publish the same passage in several edition records, with
