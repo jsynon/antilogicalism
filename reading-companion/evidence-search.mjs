@@ -276,6 +276,37 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
    }
    if(!added)break;
  }
+ // Batch-32 per-facet representation: after the reservation passes above,
+ // reserve each facet's own top pages before the global fill. A facet
+ // issued for one part of the question can return a decisive page at
+ // rank 3 that no other facet corroborates; reciprocal-rank aggregation
+ // alone lets corroborated pages from a few facets consume the whole cap,
+ // and that page is lost before hydration (the batch-31 Smith gap-facet
+ // loss). Each facet is guaranteed a fair share of the pool —
+ // floor(limit / facet count) pages, at most three — reserved round-robin
+ // by rank, strongest page first within each rank, so its proven pages
+ // cannot be crowded out by other facets' volume.
+ const facetShare=Math.min(3,Math.max(1,Math.floor(limit/Math.max(1,groups.length))));
+ for(let rank=0;rank<facetShare&&reserved.length<limit;rank++){
+   const round=[];
+   for(let facet=0;facet<groups.length;facet++){
+     const entry=groups[facet][rank];
+     if(!entry||!valid(entry))continue;
+     const key=String(entry.bookId)+':'+entry.page;
+     if(reservedKeys.has(key))continue;
+     const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
+     if(candidate)round.push(candidate);
+   }
+   round.sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0));
+   for(const candidate of round){
+     if(reserved.length>=limit)break;
+     const key=String(candidate.bookId)+':'+candidate.page;
+     // Two facets can nominate the same page at the same rank; the round
+     // was gathered before any of its pushes marked keys reserved.
+     if(reservedKeys.has(key))continue;
+     reserved.push(candidate);reservedKeys.add(key);
+   }
+ }
  for(const candidate of ranked){
    const key=String(candidate.bookId)+':'+candidate.page;
    if(reservedKeys.has(key))continue;
@@ -283,6 +314,69 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
    reserved.push(candidate);reservedKeys.add(key);
  }
  return reserved;
+}
+
+/* Batch-32 work-level edition identity. Two catalog entries are editions
+ * of one work when their work titles agree after edition and volume
+ * markers are stripped and their authors agree. This is what lets the
+ * pool stop spending two books' worth of slots on one text (the phase-3
+ * runs carried the Oxford Annotated Bible in both its fourth and fifth
+ * editions). Container volumes ("The Works of Aristotle", a Harvard
+ * Classics volume) keep their own identity: their titles do not reduce
+ * to the contained work's title, so a standalone work and a container
+ * holding it are NOT merged here.
+ */
+export function workEditionKey(title){
+ const identity=catalogIdentity(title);
+ const work=identity.work
+  .normalize('NFKC').toLocaleLowerCase()
+  .replace(/[’‘]/g,"'")
+  .replace(/\bwith the apocrypha\b/g,' ')
+  .replace(/\b(?:fully\s+)?(?:(?:revised|expanded|updated|annotated)\s+)?(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|\d+(?:st|nd|rd|th))\s+edition\b/g,' ')
+  .replace(/\b(?:revised|expanded|updated|annotated|new)\s+edition\b/g,' ')
+  .replace(/\bvol(?:ume)?\.?\s*(?:\d+|[ivxlcdm]+)\b/g,' ')
+  .replace(/\bpart\s+(?:\d+|[ivxlcdm]+)\b/g,' ')
+  .replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ')
+  .replace(/^the\s+/,'');
+ const author=(identity.authors[0]||'')
+  .normalize('NFKC').toLocaleLowerCase()
+  .replace(/[^a-z0-9]+/g,' ').trim().replace(/\s+/g,' ');
+ return work+'|'+author;
+}
+
+/* Apply the per-book page cap per WORK when a merged pool carries more
+ * than one edition of a work: the work as a whole keeps at most
+ * pagesPerBook pages, and the edition contributing more floor-passing
+ * leaf pages (leafPagesByBook, counted over the facet searches) claims
+ * the cap first. Works present in a single edition are untouched, as are
+ * distinct works by the same author. Pool order is preserved.
+ */
+export function dedupeWorkEditions(entries,{leafPagesByBook=new Map(),
+ pagesPerBook=PRODUCTION_PAGES_PER_BOOK}={}){
+ const cap=Math.max(1,Math.floor(Number(pagesPerBook)||0)||PRODUCTION_PAGES_PER_BOOK);
+ const byWork=new Map();
+ for(const entry of entries){
+   const key=workEditionKey(entry?.title||'');
+   if(!byWork.has(key))byWork.set(key,[]);
+   byWork.get(key).push(entry);
+ }
+ const dropped=new Set();
+ for(const group of byWork.values()){
+   const bookIds=[...new Set(group.map(entry=>String(entry.bookId)))];
+   if(bookIds.length<2)continue;
+   const preferred=bookIds.sort((a,b)=>
+     (leafPagesByBook.get(b)||0)-(leafPagesByBook.get(a)||0)||
+     group.filter(entry=>String(entry.bookId)===b).length-
+      group.filter(entry=>String(entry.bookId)===a).length||
+     Number(a)-Number(b))[0];
+   let kept=0;
+   for(const entry of [...group.filter(entry=>String(entry.bookId)===preferred),
+                        ...group.filter(entry=>String(entry.bookId)!==preferred)]){
+     if(kept<cap)kept++;
+     else dropped.add(entry);
+   }
+ }
+ return entries.filter(entry=>!dropped.has(entry));
 }
 
 /* Bounded-concurrency speculative search cache. The per-part scoped-search
@@ -1064,7 +1158,18 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  }):
   (searchSets[0]?.sources||[]).map((source,index)=>({...source,facet:0,
     facetRanks:[{facet:0,rank:index+1}]}));
- const filtered=results.filter(source=>allowedPage(source)&&
+ // Batch-32: when the pool carries two editions of one work, the per-book
+ // page cap applies to the work, with the edition that contributed more
+ // floor-passing leaf pages claiming the cap first.
+ const leafKeysByBook=new Map();
+ for(const set of searchSets)for(const source of set.sources||[]){
+  const id=String(source.bookId);
+  if(!leafKeysByBook.has(id))leafKeysByBook.set(id,new Set());
+  leafKeysByBook.get(id).add(source.page);
+ }
+ const leafPagesByBook=new Map([...leafKeysByBook].map(([id,pages])=>[id,pages.size]));
+ const pooled=dedupeWorkEditions(results,{leafPagesByBook,pagesPerBook});
+ const filtered=pooled.filter(source=>allowedPage(source)&&
   allowedBookIds.has(String(source.bookId))&&
   (!selected.length||selectedAllowed.has(String(source.bookId))));
  const representatives=[],others=[],visited=new Set();
@@ -1111,7 +1216,33 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
     ...(partFacetIndices.length?{candidatePartIds:[...candidatePartIds]}:{})});
   if(populated.length>=maxCandidates)break;
  }
- return {candidates:populated,partFacetIndices,positionCoverage,searches:searchSets.map((set,index)=>({
+ // Batch-32 trace: leaf pages that passed the search floor but never
+ // reached the candidate pool, attributed to the facet that found them
+ // and the assembly stage that lost them, so a search miss stays
+ // distinguishable from evidence lost during candidate assembly.
+ const populatedKeys=new Set(populated.map(source=>String(source.bookId)+':'+source.page));
+ const mergedKeys=new Set(results.map(source=>String(source.bookId)+':'+source.page));
+ const pooledKeys=new Set(pooled.map(source=>String(source.bookId)+':'+source.page));
+ const droppedPassingPages=[],droppedByFacet=new Map();
+ searchSets.forEach((set,facet)=>{
+  const seen=new Set();
+  for(const source of set.sources||[]){
+   const key=String(source.bookId)+':'+source.page;
+   if(seen.has(key))continue;
+   seen.add(key);
+   if(!allowedBookIds.has(String(source.bookId)))continue;
+   if(selected.length&&!selectedAllowed.has(String(source.bookId)))continue;
+   if(populatedKeys.has(key))continue;
+   const entry={bookId:String(source.bookId),page:source.page,
+    ...(source.globalPageId!==undefined?{globalPageId:source.globalPageId}:{}),
+    stage:!mergedKeys.has(key)?'merge':!pooledKeys.has(key)?'dedupe':'hydration'};
+   droppedPassingPages.push({facet,...entry});
+   if(!droppedByFacet.has(facet))droppedByFacet.set(facet,[]);
+   droppedByFacet.get(facet).push(entry);
+  }
+ });
+ return {candidates:populated,partFacetIndices,positionCoverage,droppedPassingPages,
+  searches:searchSets.map((set,index)=>({
   query:searchSets[index].executedQuery+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
   ...(searchSets[index].scopeReference?{originalQuery:searchQueries[index],scopeInherited:true}:{}),
   ...(searchSets[index].inheritedPartScope?{partScopeInherited:searchSets[index].inheritedPartScope}:{}),
@@ -1128,6 +1259,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
     {reason:searchSets[index].gapRecoveryReason}:{}),
    ...(searchSets[index].gapRecoveryDiversity?{diversity:true}:{})}:{}),
   resultCount:set.sources.length,partIds:partIdsForFacet(index),
+  ...(droppedByFacet.has(index)?{droppedPassingPages:droppedByFacet.get(index)}:{}),
   ...(set.targetBookIds.length?{targetBookIds:set.targetBookIds}:{}),
   // The offline gold audit needs to distinguish a search miss from evidence
   // lost during candidate assembly. Keep IDs plus a short excerpt for every

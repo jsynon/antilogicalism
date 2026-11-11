@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {gzipSync} from 'node:zlib';
-import {RemoteLibrary} from './remote-library.mjs';
+import {RemoteLibrary,termFamily} from './remote-library.mjs';
 import {mergeFacetSearches} from './evidence-search.mjs';
 
 const driveId='ABCDEFGHIJKLMNOPQRSTUVWXY123456';
@@ -136,4 +136,69 @@ test('fuzzy author scoping requires a distinct indexed topic term',async()=>{
  const result=await finder.search('kierkgaard?',{maxBooks:2,pagesPerBook:2});
  assert.equal(result.sources.length,0);
  assert.deepEqual(result.terms,[]);
+});
+
+// Batch-32 term-family bridges. The v49 probe measured the production
+// families directly: ambition stopped before ambitious, stupidity before
+// stupid, labor before labour, mutilation before mutilated. Each family
+// below is checked against a synthetic partition vocabulary; a variant is
+// admitted only when the vocabulary attests it.
+
+test('term families bridge the measured derivational gaps',()=>{
+ const ambition=termFamily('ambition',{ambition:[],ambit:[],ambitious:[],ambitions:[],ambience:[]});
+ assert.ok(ambition.includes('ambitious'),'ambition must reach ambitious');
+ assert.ok(ambition.includes('ambitions'),'ambition must reach its plural');
+ assert.ok(!ambition.includes('ambience'),
+  'an unrelated same-prefix word is not absorbed (no prefix merging)');
+ const stupidity=termFamily('stupidity',{stupidity:[],stupid:[]});
+ assert.ok(stupidity.includes('stupid'),'stupidity must reach stupid');
+ assert.ok(termFamily('stupid',{stupid:[],stupidity:[]}).includes('stupidity'),
+  'the -idity/-id bridge runs in both directions');
+ const labor=termFamily('labor',{labor:[],labour:[],laboratory:[]});
+ assert.ok(labor.includes('labour'),'labor must reach labour');
+ assert.ok(!labor.includes('laboratory'),
+  'a longer word sharing the prefix is not a spelling variant');
+ assert.ok(termFamily('labour',{labour:[],labor:[]}).includes('labor'),
+  'the -or/-our bridge runs in both directions');
+ const mutilation=termFamily('mutilation',{mutilation:[],mutilated:[],mutilate:[]});
+ assert.ok(mutilation.includes('mutilated'),'mutilation must reach mutilated');
+ assert.ok(mutilation.includes('mutilate'),'mutilation must reach the verb form');
+ assert.ok(termFamily('centre',{centre:[],center:[]}).includes('center'));
+ assert.ok(termFamily('organise',{organise:[],organize:[]}).includes('organize'));
+});
+
+test('term family bridges stay out when the index does not attest them',()=>{
+ assert.deepEqual(termFamily('ambition',{ambition:[]}),['ambition']);
+ assert.deepEqual(termFamily('stupidity',{stupidity:[]}),['stupidity']);
+ assert.ok(!termFamily('stated',{stated:[],station:[]}).includes('station'),
+  'a short-stem participle must not bridge to an unrelated -ion noun');
+});
+
+test('search bridges planner wording to source vocabulary at the page level',async()=>{
+ // Miniature of the Smith Book V miss: postings exist only under the
+ // source text's own words (stupid, labour); the query uses the planner's
+ // forms (stupidity, labor). Before the bridges this returned nothing.
+ const corpus={
+  'manifest.json':{
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,
+   pages:1,page_books:[42],partitions:['st','la'],
+   books:{'42':{title:'A Treatise on Work — A. Writer',
+    drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
+  },
+  'terms-st.json':{stupid:[0]},
+  'terms-la.json':{labour:[0]},
+  'book-42.json':{pages:[{id:0,page:612,text:'The man whose whole life is spent performing a few simple operations becomes as stupid and ignorant as it is possible for a human creature to become, and his labour is the cause of it.'}]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v49/',localFetch);
+ const result=await finder.search('labor stupidity',{allowedBookIds:new Set(['42']),
+  maxBooks:1,pagesPerBook:2});
+ assert.equal(result.sources.length,1);
+ assert.equal(result.sources[0]?.page,612);
 });

@@ -237,7 +237,7 @@ function titleTermStem(word) {
   // select the relevant work by an explicitly named author.
   return stem.length>6&&stem.endsWith('ical')?stem.slice(0,-2):stem;
 }
-function termFamily(term, partition) {
+export function termFamily(term, partition) {
   const vocabulary=partition||{};
   const variants=new Set([term]);
   const candidates=new Set([wordStem(term)]);
@@ -250,6 +250,49 @@ function termFamily(term, partition) {
   if(term.endsWith('uous'))candidates.add(term.slice(0,-4)+'ue');
   const derivation=term.replace(/(?:ions|ion)$/,'');
   if(derivation!==term) candidates.add(derivation);
+  // Batch-32 derivational bridges. The v49 probe measured these exact gaps:
+  // a query saying "stupidity" never reached pages saying "stupid", and
+  // "ambition" never reached "ambitious", because the families stopped at
+  // the bare stem. Each rule below generates the counterpart form and the
+  // attestation check at the end admits it only when the index partition
+  // actually contains it, so unattested or accidental forms stay out. No
+  // substring or prefix merging is introduced: every candidate is a whole
+  // word produced by a stated morphological or spelling rule.
+  // (a) -idity nouns pair with -id adjectives (stupidity <-> stupid).
+  if(term.length>6&&term.endsWith('idity'))candidates.add(term.slice(0,-3));
+  if(term.length>=5&&term.endsWith('id')&&!term.endsWith('oid'))
+    candidates.add(term+'ity');
+  // (b) -tion/-sion nouns pair with the verb and participle built on the
+  // shared stem (mutilation -> mutilate/mutilated), and a participle whose
+  // stem is long enough to be distinctive pairs back to its -ion noun
+  // (mutilated -> mutilation). The stem-length floor keeps short-stem
+  // collisions (stated -> station) out even when the noun is attested.
+  if(derivation!==term&&/(?:tion|sion)$/.test(term)){
+    candidates.add(derivation+'e');
+    candidates.add(derivation+'ed');
+  }
+  if((term.endsWith('ed')||term.endsWith('ing'))&&wordStem(term).length>=5)
+    candidates.add(wordStem(term)+'ion');
+  // (c) -ion nouns pair with -ious/-ous adjectives and with their plural
+  // (ambition -> ambitious, ambitions); adjectives pair back to the noun.
+  if(term.endsWith('ion')){
+    candidates.add(derivation+'ious');
+    candidates.add(derivation+'ous');
+    candidates.add(term+'s');
+  }
+  if(term.endsWith('ious')||term.endsWith('ous')){
+    const base=term.slice(0,-4);
+    if(base.length>=3)candidates.add(base+'ion');
+  }
+  // (d) Spelling classes: -or/-our, -er/-re, -ize/-ise. These matter for a
+  // corpus of mostly British-spelling source texts searched with American
+  // planner wording (labor never reached the 319 pages saying "labour").
+  if(term.length>=4&&term.endsWith('or'))candidates.add(term.slice(0,-2)+'our');
+  if(term.length>=5&&term.endsWith('our'))candidates.add(term.slice(0,-3)+'or');
+  if(term.length>=4&&term.endsWith('er'))candidates.add(term.slice(0,-2)+'re');
+  if(term.length>=4&&term.endsWith('re'))candidates.add(term.slice(0,-2)+'er');
+  if(term.endsWith('ize'))candidates.add(term.slice(0,-3)+'ise');
+  if(term.endsWith('ise'))candidates.add(term.slice(0,-3)+'ize');
   for(const candidate of candidates){
     if(candidate.length>=3&&Object.hasOwn(vocabulary,candidate))
       variants.add(candidate);
@@ -280,17 +323,31 @@ export function substantivePageEvidence(text, terms, headerTerms = new Set(), ph
   }) : null;
   const groupCounts = weights ? new Array(termGroups.length).fill(0) : null;
   let hits = 0, best = {score:0, center:0, unique:0}, unique = new Set();
+  const hitPositions = [];
   const normalized = words.map((word, index) =>
     index < 24 && headerTerms.has(wordStem(word)) ? '' : wordStem(word));
   for (let i = 0; i < normalized.length; i++) {
     const groupIndex=groupByTerm.get(normalized[i]);
-    if(groupIndex!==undefined){unique.add(groupIndex);hits++;if(groupCounts)groupCounts[groupIndex]++;}
+    if(groupIndex!==undefined){unique.add(groupIndex);hits++;hitPositions.push(i);
+      if(groupCounts)groupCounts[groupIndex]++;}
   }
   if (!hits) return null;
   // Find the most locally concentrated part of the actual page. An isolated
   // occurrence in a page heading should not dominate a full prose argument.
   // The small number of query terms keeps this inexpensive on large books.
-  for (let i = 0; i < normalized.length; i += 30) {
+  // Batch-32: evaluate windows anchored at each evidence hit as well as on
+  // the fixed grid. A fixed 30-word grid can split a genuinely clustered
+  // passage across two windows — two matching term groups ~100 words apart
+  // then count as isolated mentions and the page fails the coherence floor
+  // its own text satisfies (measured on the Wealth of Nations torpor
+  // passage, where the bridged groups sit 108 words apart and no grid
+  // window contains both). Anchoring at hits makes the concentration
+  // measure independent of grid alignment; the window set only grows, so
+  // no page that passed before can fail now.
+  const windowStarts=new Set();
+  for (let i = 0; i < normalized.length; i += 30) windowStarts.add(i);
+  for (const position of hitPositions) windowStarts.add(position);
+  for (const i of windowStarts) {
     const window = normalized.slice(i, i + 110);
     const present=new Set();let matched=0;
     for(const word of window){
@@ -650,6 +707,26 @@ export class RemoteLibrary {
     const authorScopedTitleMatches = books.filter(book=>book.titleOverlap>=1);
     if(!bookId&&!comparison&&namedAuthorBookIds.size&&authorScopedTitleMatches.length===1){
       books=authorScopedTitleMatches;
+    }
+    // Batch-32 scoped candidacy guarantee: a book-scoped search must scan
+    // its book even when no query term has postings there. Candidate books
+    // otherwise come only from posting lists, so a scoped query written in
+    // vocabulary the book does not use returned a hard empty with
+    // booksScanned = 0 and the exhaustive shard rescore below never ran.
+    // Synthesize the scoped book as a candidate so the rescore decides on
+    // the full text; scanned-and-zero stays distinguishable from
+    // never-scanned through the returned booksScanned count. The scope
+    // intersection is honored: a book the caller's allowlist excludes is
+    // never synthesized.
+    if (bookId && (!allowedBookIds || allowedBookIds.has(String(bookId))) &&
+        !books.some(book => book.id === String(bookId))) {
+      const meta = manifest.books[String(bookId)];
+      if (meta && PDF.test(meta.drive_url || '')) {
+        const titleTokens = new Set((String(meta.title || '').split(/\s+[—–-]\s+/)[0]
+          .toLowerCase().match(/[a-z0-9]+/g) || []).map(titleTermStem));
+        const overlap = baseTerms.filter(term => titleTokens.has(titleTermStem(term))).length;
+        books.push({id:String(bookId), hits:[], titleOverlap:overlap, score:-Infinity});
+      }
     }
     const sources = [];
     let booksScanned = 0, discardedNavigation = 0;

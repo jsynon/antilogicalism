@@ -571,7 +571,7 @@ test('generic author wording does not scope all-books retrieval to collective by
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,prepareAnswerCandidates} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,prepareAnswerCandidates,dedupeWorkEditions,workEditionKey} from './evidence-search.mjs';
 import {catalogFallbackPlan,catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
 import {sourceAttributionLabel} from './citation-numbering.mjs';
 
@@ -1953,4 +1953,118 @@ test('a linked conceptual gap query reaches its part and selection coverage reco
   plannedFacetCount:2,partQuestions});
  assert.deepEqual(auditSelectionCoverage(retrieval.candidates,selected,partQuestions),
   [{partId:'P1',linkedCandidateCount:1,selectedCount:1,status:'selected'}]);
+});
+
+// Batch-32 per-facet representation. Mirrors the batch-31 Smith loss: a
+// scoped gap facet returns one book's pages (book 13, target page 3) while
+// broad facets corroborate other books' pages so heavily that reciprocal
+// rank alone spends the whole 32 cap before the gap facet's deeper pages.
+// Verified against the pre-batch-32 merge: book 13 kept only page 1.
+test('per-facet reservation keeps a scoped facet rank-3 page under a crowded cap',()=>{
+ const src=(bookId,page,score)=>({bookId:String(bookId),page,globalPageId:page,
+  title:'Work '+bookId+' — Author '+bookId,score});
+ const facets=[];
+ for(let j=0;j<5;j++){
+  const sources=[];let pos=0;
+  for(let b=51;b<=58;b++)for(let p=1;p<=2;p++)sources.push(src(b,p,120-pos++));
+  facets.push({sources});
+ }
+ facets.push({sources:[1,2,3,4,5,6].map(p=>src(13,p,51-p))});
+ for(const base of [90,89]){
+  const sources=[];let pos=0;
+  for(let b=61;b<=64;b++)for(let p=1;p<=3;p++)sources.push(src(b,p,base-pos++));
+  facets.push({sources});
+ }
+ facets.push({sources:[81,82,83].flatMap(b=>[1,2].map(p=>src(b,p,66-((b-81)*2+p-1))))});
+ facets.push({sources:[91,92,93].flatMap(b=>[1,2].map(p=>src(b,p,60-((b-91)*2+p-1))))});
+ const out=mergeFacetSearches(facets,32);
+ assert.equal(out.length,32);
+ for(const page of [1,2,3])
+  assert.ok(out.some(source=>source.bookId==='13'&&source.page===page),
+   'the scoped facet page '+page+' must survive the merge');
+ assert.ok(!out.some(source=>source.bookId==='13'&&source.page===4),
+  'the guarantee is the facet share (top 3 of 10 facets at cap 32), not the whole facet');
+});
+
+// Batch-32 dropped-page trace: a floor-passing leaf page that never
+// reaches the pool is reported with its facet and the losing stage
+// instead of vanishing silently.
+test('retrieval traces floor-passing pages dropped at merge and hydration',async()=>{
+ const question='What does the alpha text say about beginnings?';
+ const sources=[1,2,3,4].map(page=>({bookId:'1',page,globalPageId:page,
+  title:'Alpha — A One',score:41-page,
+  preview:'Alpha passage about beginnings and first principles.'}));
+ const result=await retrieveEvidence({question,
+  queries:['alpha beginnings first principles','alpha origins and foundations'],
+  library:{search:async()=>({sources})},
+  books:[{id:'1',title:'Alpha — A One'}],allowedBookIds:new Set(['1']),
+  maxCandidates:2,
+  pageLoader:async source=>source.page===2?null:
+   {text:source.preview+' A substantive explanation of the beginning.'}
+ });
+ assert.deepEqual(result.candidates.map(source=>source.page),[1]);
+ const dropped=new Map(result.droppedPassingPages.map(entry=>[entry.page,entry]));
+ assert.equal(dropped.get(3)?.stage,'merge');
+ assert.equal(dropped.get(4)?.stage,'merge');
+ assert.equal(dropped.get(2)?.stage,'hydration');
+ assert.ok(result.searches.some(set=>(set.droppedPassingPages||[])
+  .some(entry=>entry.page===3&&entry.stage==='merge')),
+  'the per-search trace the harness records must carry the dropped pages');
+});
+
+// Batch-32 work-level edition dedupe.
+test('work identity strips edition markers but keeps distinct works distinct',()=>{
+ const fifth='The New Oxford Annotated Bible, Fully Revised Fifth Edition — edited by Michael D. Coogan';
+ const fourth='The New Oxford Annotated Bible, Fourth Edition, with the Apocrypha — edited by Michael D. Coogan';
+ assert.equal(workEditionKey(fifth),workEditionKey(fourth));
+ assert.notEqual(
+  workEditionKey('Nicomachean Ethics — Aristotle'),
+  workEditionKey('Politics — Aristotle'));
+ assert.notEqual(
+  workEditionKey('Nicomachean Ethics — Aristotle'),
+  workEditionKey('The Works of Aristotle — Aristotle (edited by W. D. Ross)'),
+  'a container volume is not the standalone work it contains');
+});
+
+test('edition dedupe caps the work, not each edition, preferring the richer edition',()=>{
+ const fifth='The New Oxford Annotated Bible, Fully Revised Fifth Edition — edited by Michael D. Coogan';
+ const fourth='The New Oxford Annotated Bible, Fourth Edition, with the Apocrypha — edited by Michael D. Coogan';
+ const entries=[
+  ...[1,2,3,4,5,6].map(page=>({bookId:'638',page,title:fifth})),
+  ...[1,2,3,4,5,6].map(page=>({bookId:'646',page,title:fourth}))
+ ];
+ const kept=dedupeWorkEditions(entries,{
+  leafPagesByBook:new Map([['638',5],['646',2]]),pagesPerBook:6});
+ assert.equal(kept.length,6,'one work keeps one per-book cap of pages, not two');
+ assert.ok(kept.every(entry=>entry.bookId==='638'),
+  'the edition with more floor-passing leaf pages claims the cap');
+ const distinct=dedupeWorkEditions([
+  ...[1,2,3,4,5,6].map(page=>({bookId:'7',page,title:'Nicomachean Ethics — Aristotle'})),
+  ...[1,2,3,4,5,6].map(page=>({bookId:'9',page,title:'Politics — Aristotle'}))
+ ],{pagesPerBook:6});
+ assert.equal(distinct.length,12,'distinct works by one author are never merged');
+});
+
+test('retrieval pools one edition of a duplicated work',async()=>{
+ const fifth='The New Oxford Annotated Bible, Fully Revised Fifth Edition — edited by Michael D. Coogan';
+ const fourth='The New Oxford Annotated Bible, Fourth Edition, with the Apocrypha — edited by Michael D. Coogan';
+ const question='What does the Bible say about death?';
+ const sources=[
+  ...[1,2,3,4,5,6].map(page=>({bookId:'638',page,globalPageId:page,title:fifth,
+   score:60-page,preview:'Scripture passage about death and consolation.'})),
+  ...[1,2,3,4,5,6].map(page=>({bookId:'646',page,globalPageId:100+page,title:fourth,
+   score:50-page,preview:'Scripture passage about death and consolation.'}))
+ ];
+ const result=await retrieveEvidence({question,
+  queries:['Bible teaching about death','scripture consolation and mortality'],
+  library:{search:async()=>({sources})},
+  books:[{id:'638',title:fifth},{id:'646',title:fourth}],
+  allowedBookIds:new Set(['638','646']),pagesPerBook:6,
+  pageLoader:async source=>({text:source.preview+' A substantive scriptural explanation.'})
+ });
+ assert.equal(result.candidates.length,6);
+ assert.ok(result.candidates.every(source=>source.bookId==='638'));
+ assert.ok(result.droppedPassingPages.some(entry=>
+  entry.bookId==='646'&&entry.stage==='dedupe'),
+  'pages cut by edition dedupe are traced with their stage');
 });
