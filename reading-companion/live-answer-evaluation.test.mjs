@@ -148,6 +148,52 @@ test('phase-2 suites permit one selected case and no question duplicates an earl
   'no phase-2 question duplicates an earlier suite question');
  assert.ok(phase2.every(item=>!earlierIds.has(item.id)),'no phase-2 case id repeats an earlier suite');
 });
+test('phase-3 library-all-3 suite covers eight open all-books questions with no expected sources',()=>{
+ const cases=selectLiveCases(suite,'library-all-3','all');
+ assert.equal(cases.length,8);
+ assert.ok(cases.every(item=>item.evaluation_scope==='all-books'));
+ assert.ok(cases.every(item=>item.selected_book_ids.length===0));
+ assert.ok(cases.every(item=>item.required_source_groups.length===0&&item.review_focus.length===0));
+ assert.ok(cases.every(item=>item.planner_queries.length===1&&item.planner_queries[0]===item.question));
+ assert.ok(evaluationUsesLivePlanner('library-all-3','case-default'));
+ assert.deepEqual(applyQualityScope(cases,'case-default').map(item=>item.selected_book_ids),
+  cases.map(()=>[]));
+ assert.deepEqual(cases.map(item=>item.discipline),
+  ['philosophy','society','history','philosophy','society','literature','philosophy','philosophy']);
+});
+test('phase-3 library-selected-3 suite scopes eight questions to eight distinct catalog books',()=>{
+ const cases=selectLiveCases(suite,'library-selected-3','all');
+ assert.equal(cases.length,8);
+ assert.ok(cases.every(item=>item.evaluation_scope==='selected-books'));
+ assert.ok(cases.every(item=>item.selected_book_ids.length===1));
+ assert.equal(new Set(cases.map(item=>item.selected_book_ids[0])).size,8);
+ assert.ok(cases.every(item=>item.required_source_groups.length===1&&
+  item.required_source_groups[0].book_ids.length===1&&
+  item.required_source_groups[0].book_ids[0]===item.selected_book_ids[0]));
+ assert.ok(cases.every(item=>item.planner_queries.length===1&&item.planner_queries[0]===item.question));
+ assert.ok(evaluationUsesLivePlanner('library-selected-3','case-default'));
+ assert.deepEqual(applyQualityScope(cases,'case-default').map(item=>item.selected_book_ids),
+  [['313'],['312'],['341'],['258'],['124'],['362'],['139'],['114']]);
+});
+test('phase-3 suites permit one selected case and no question duplicates an earlier suite',()=>{
+ const selected=selectLiveCases(suite,'library-selected-3','library-selected3-gatsby-nick-picture');
+ assert.equal(selected.length,1);
+ assert.deepEqual(selected[0].selected_book_ids,['313']);
+ assert.throws(()=>selectLiveCases(suite,'library-selected-3','not-a-library-case'),/Unknown library-selected-3 case/);
+ assert.throws(()=>selectLiveCases(suite,'library-all-3','library-selected3-gatsby-nick-picture'),/Unknown library-all-3 case/);
+ assert.throws(()=>selectLiveCases(suite,'smoke','library-all3-forgiveness-mercy'),
+  /only in quality, focused, paired, holdout or acceptance mode/);
+ const earlierQuestions=new Set(),earlierIds=new Set();
+ for(const mode of ['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected']){
+  for(const item of selectLiveCases({cases:[]},mode,'all')){earlierQuestions.add(item.question);earlierIds.add(item.id);}
+ }
+ const phase3=[...selectLiveCases({cases:[]},'library-all-3','all'),
+  ...selectLiveCases({cases:[]},'library-selected-3','all')];
+ assert.equal(new Set(phase3.map(item=>item.question)).size,16,'phase-3 questions are mutually distinct');
+ assert.ok(phase3.every(item=>!earlierQuestions.has(item.question)),
+  'no phase-3 question duplicates an earlier suite question');
+ assert.ok(phase3.every(item=>!earlierIds.has(item.id)),'no phase-3 case id repeats an earlier suite');
+});
 test('batch-17 transport suite pairs all 16 phase-2 questions without changing their scopes',()=>{
  const cases=selectLiveCases({cases:[]},'transport-ab','all');
  assert.equal(cases.length,16);
