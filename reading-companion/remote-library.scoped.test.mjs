@@ -523,3 +523,87 @@ test('scoped guarantee honors the allowlist intersection',async()=>{
  assert.equal(result.booksScanned,0,'a scoped book outside the allowlist is never synthesized');
  assert.deepEqual(result.sources,[]);
 });
+
+// Batch 33 (B33-7a) pilots: within-book diversity for large scoped books.
+// Book 42 has 120 pages: six strong evidence pages at the start sweep the
+// rank slots, and one more floor-passing page sits in the last page-extent
+// quartile (p. 119). Book 43 repeats the shape in 30 pages, below the
+// extent where section spread activates.
+const diversityStrong='The harbor lantern signal watch guided the fleet home each night. ' +
+  'Every harbor lantern signal watch was tended with care through the long winter season.';
+const diversityModerate='The harbor lantern hung above the dock while the crew repaired the boats. ' +
+  'Ordinary work filled the remaining hours of the quiet afternoon in the yard.';
+const diversityFiller='Ordinary prose about daily routines in the town fills this page with plain ' +
+  'sentences concerning markets gardens weather and the habits of its residents over many years.';
+function diversityCorpus(){
+  const pages42=[],pages43=[];
+  for(let page=1;page<=120;page++){
+    pages42.push({id:page-1,page,text:page<=6?diversityStrong:
+      page===119?diversityModerate:diversityFiller});
+  }
+  for(let page=1;page<=30;page++){
+    pages43.push({id:119+page,page,text:page<=6?diversityStrong:
+      page===29?diversityModerate:diversityFiller});
+  }
+  // Delta-encoded postings: harbor/lantern occur on the strong and
+  // moderate pages of both books; signal/watch only on the strong pages.
+  const strong42=[0,1,2,3,4,5],moderate42=[118],strong43=[120,121,122,123,124,125],moderate43=[148];
+  const deltas=ids=>ids.map((id,i)=>i?id-ids[i-1]:id);
+  const all=[...strong42,...moderate42,...strong43,...moderate43];
+  const strong=[...strong42,...strong43];
+  return {
+    'manifest.json':{
+      version:49,postings_encoding:'delta-json-v1',prefix_length:2,
+      pages:150,page_books:[...Array(120).fill(42),...Array(30).fill(43)],
+      partitions:['ha','la','si','wa'],
+      books:{
+        '42':{title:'The Long Voyage — A. Writer',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+        '43':{title:'The Short Voyage — A. Writer',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
+      }
+    },
+    'terms-ha.json':{harbor:deltas(all)},
+    'terms-la.json':{lantern:deltas(all)},
+    'terms-si.json':{signal:deltas(strong)},
+    'terms-wa.json':{watch:deltas(strong)},
+    'book-42.json':{pages:pages42},
+    'book-43.json':{pages:pages43}
+  };
+}
+function diversityFetch(corpus){
+  return async url=>{
+    const key=String(url).split('/').pop().replace(/\.gz$/,'');
+    if(key==='url-suppressions.json')
+      return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
+    return key in corpus?
+      new Response(gzipSync(JSON.stringify(corpus[key])),{status:200}):
+      new Response('Not found',{status:404});
+  };
+}
+
+test('scoped search in a large book reserves leaf slots for unreached sections',async()=>{
+  const finder=new RemoteLibrary('https://example.test/v49/',diversityFetch(diversityCorpus()));
+  const result=await finder.search('harbor lantern signal watch',{
+    bookId:'42',allowedBookIds:new Set(['42','43'])});
+  const pages=result.sources.map(source=>source.page);
+  // The four rank-selected pages keep the production cap positions and
+  // the top-ranked hit is never displaced; the diversity slots append
+  // the last-quartile page and the next rank page.
+  assert.deepEqual(pages.slice(0,4),[1,2,3,4]);
+  assert.equal(pages.length,6);
+  assert.ok(pages.includes(119),'the last-quartile evidence page is returned');
+});
+
+test('unscoped search keeps the plain per-book cap (no diversity slots)',async()=>{
+  const finder=new RemoteLibrary('https://example.test/v49/',diversityFetch(diversityCorpus()));
+  const result=await finder.search('harbor lantern signal watch',{
+    allowedBookIds:new Set(['42','43'])});
+  const book42=result.sources.filter(source=>source.bookId==='42').map(source=>source.page);
+  assert.deepEqual(book42,[1,2,3,4]);
+});
+
+test('scoped search in a small book keeps the plain per-book cap',async()=>{
+  const finder=new RemoteLibrary('https://example.test/v49/',diversityFetch(diversityCorpus()));
+  const result=await finder.search('harbor lantern signal watch',{
+    bookId:'43',allowedBookIds:new Set(['42','43'])});
+  assert.deepEqual(result.sources.map(source=>source.page),[1,2,3,4]);
+});

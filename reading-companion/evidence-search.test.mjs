@@ -571,7 +571,7 @@ test('generic author wording does not scope all-books retrieval to collective by
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,prepareAnswerCandidates,dedupeWorkEditions,workEditionKey} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,boundAnswerSources,facetTopBooks,selectionDroppedFacets,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,prepareAnswerCandidates,dedupeWorkEditions,workEditionKey} from './evidence-search.mjs';
 import {catalogFallbackPlan,catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
 import {sourceAttributionLabel} from './citation-numbering.mjs';
 
@@ -2067,4 +2067,85 @@ test('retrieval pools one edition of a duplicated work',async()=>{
  assert.ok(result.droppedPassingPages.some(entry=>
   entry.bookId==='646'&&entry.stage==='dedupe'),
   'pages cut by edition dedupe are traced with their stage');
+});
+
+// Batch 33 (B33-7b) pilots: selection-stage facet representation. In
+// batch 32 a submitted packet carried two pages of one book while
+// facet-top books went unrepresented and untraced. The bounded fill
+// now defers a duplicate page while an unrepresented facet-top book
+// remains later in the order, and selectAnswerSources traces the
+// facet-top books it still passes over.
+
+test('bounded fill defers a duplicate page behind an unrepresented facet-top book',()=>{
+ const candidates=[
+  {...page(10,'301'),text:'first page of the duplicated book',score:50},
+  {...page(11,'301'),text:'second page of the duplicated book',score:49},
+  {...page(20,'302'),text:'the facet-top book page',score:40},
+ ];
+ const chosen=boundAnswerSources(candidates,'question','token',
+  {maxSources:2,priorityBooks:['302']});
+ assert.deepEqual(chosen.map(item=>item.bookId+':'+item.page),['301:10','302:20'],
+  'the facet-top book takes the slot the duplicate would have filled');
+ const leftover=boundAnswerSources(candidates,'question','token',
+  {maxSources:3,priorityBooks:['302']});
+ assert.deepEqual(leftover.map(item=>item.bookId+':'+item.page),
+  ['301:10','302:20','301:11'],'the deferred page still fills a leftover slot');
+ const ablation=boundAnswerSources(candidates,'question','token',{maxSources:2});
+ assert.deepEqual(ablation.map(item=>item.bookId+':'+item.page),['301:10','301:11'],
+  'without priority books the established fill order is unchanged');
+});
+
+test('a part-linked book does not yield its second page to an unlinked facet top',()=>{
+ const candidates=[
+  {...page(10,'301'),text:'linked primary passage',score:50,candidatePartIds:['P1']},
+  {...page(11,'301'),text:'second linked-book passage',score:49,candidatePartIds:['P1']},
+  {...page(20,'302'),text:'unlinked commentary that topped a facet',score:40},
+ ];
+ const chosen=boundAnswerSources(candidates,'question','token',
+  {maxSources:2,priorityBooks:['302']});
+ assert.deepEqual(chosen.map(item=>item.bookId+':'+item.page),['301:10','301:11'],
+  'part-linked evidence keeps precedence over unlinked facet candidates');
+});
+
+test('selection traces facet-top books it passes over, with the reason',()=>{
+ const candidates=[
+  {...page(10,'301'),title:'Work A — Author',score:50,facetRanks:[{facet:0,rank:1}],text:'passage a'},
+  {...page(20,'302'),title:'Work B — Author',score:49,facetRanks:[{facet:1,rank:1}],text:'passage b'},
+  {...page(30,'303'),title:'Work C — Author',score:48,facetRanks:[{facet:2,rank:1}],text:'passage c'},
+ ];
+ assert.deepEqual([...facetTopBooks(candidates).values()],['301','302','303']);
+ assert.deepEqual(selectionDroppedFacets(candidates,[candidates[0],candidates[1]]),
+  [{facet:2,bookId:'303',reason:'packet-filled-with-distinct-books'}]);
+ assert.deepEqual(selectionDroppedFacets(candidates,
+   [candidates[0],candidates[0]]),
+  [{facet:1,bookId:'302',reason:'duplicate-book-slot-used'},
+   {facet:2,bookId:'303',reason:'duplicate-book-slot-used'}],
+  'a duplicated slot in the packet names the duplicate reason');
+ assert.deepEqual(selectionDroppedFacets(candidates,candidates),[],
+  'a fully represented selection traces nothing');
+});
+
+test('answer-source selection represents facet tops and exposes the dropped-facet trace',()=>{
+ const candidates=[
+  {...page(10,'301'),title:'Work A — Author',score:50,facetRanks:[{facet:0,rank:1}],
+   candidatePartIds:['P1'],text:'solitude and society in the first work'},
+  {...page(11,'301'),title:'Work A — Author',score:49,facetRanks:[{facet:0,rank:2}],
+   candidatePartIds:['P1'],text:'solitude and society continued in the first work'},
+  {...page(20,'302'),title:'Work B — Author',score:48,facetRanks:[{facet:1,rank:1}],
+   candidatePartIds:['P1'],text:'solitude and society in the second work'},
+  {...page(30,'303'),title:'Work C — Author',score:47,facetRanks:[{facet:2,rank:1}],
+   candidatePartIds:['P1'],text:'solitude and society in the third work'},
+ ];
+ const selected=selectAnswerSources(candidates,
+  'How do writers weigh solitude against life in society?','token',
+  {maxSources:2,plannedFacetCount:2,
+   partQuestions:[{partId:'P1',question:'How do writers weigh solitude against life in society?'}]});
+ const books=selected.map(item=>item.bookId);
+ assert.equal(new Set(books).size,books.length,'no book occupies two packet slots');
+ assert.ok(books.includes('302'),'the second facet-top book is represented');
+ assert.deepEqual(selected.selectionDroppedFacets,
+  [{facet:2,bookId:'303',reason:'packet-filled-with-distinct-books'}],
+  'the passed-over facet-top book is traced on the selection');
+ assert.deepEqual(Object.keys(selected),['0','1'],
+  'the trace is non-enumerable: consumers see the plain source list');
 });

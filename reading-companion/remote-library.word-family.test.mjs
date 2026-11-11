@@ -202,3 +202,71 @@ test('search bridges planner wording to source vocabulary at the page level',asy
  assert.equal(result.sources.length,1);
  assert.equal(result.sources[0]?.page,612);
 });
+
+// Batch 33 (B33-7c) pilots: proper-name transliteration bridges. The
+// batch-32 C&P pool spelled the character "Sonia" while planner facets
+// said "Sonya"; the family layer now generates the counterpart forms of
+// the standard transliteration alternations and admits each only when
+// the index partition attests it.
+
+test('term families bridge proper-name transliteration variants',()=>{
+ const sonya=termFamily('sonya',{sonya:[],sonia:[],sofya:[]});
+ assert.ok(sonya.includes('sonia'),'sonya must reach sonia (-ya/-ia)');
+ assert.ok(sonya.includes('sofya'),'sonya must reach sofya (diminutive alternation)');
+ const sofya=termFamily('sofya',{sofya:[],sofia:[],sonya:[],sophia:[]});
+ assert.ok(sofya.includes('sofia'),'sofya must reach sofia');
+ assert.ok(sofya.includes('sonya'),'sofya must reach its diminutive sonya');
+ assert.ok(termFamily('sophia',{sophia:[],sofia:[]}).includes('sofia'),
+  'sophia must reach sofia (ph/f)');
+ assert.ok(termFamily('sofia',{sofia:[],sophia:[]}).includes('sophia'),
+  'sofia must reach sophia (f/ph)');
+ assert.ok(termFamily('romanov',{romanov:[],romanoff:[]}).includes('romanoff'),
+  'romanov must reach romanoff (-v/-ff)');
+ assert.ok(termFamily('romanoff',{romanoff:[],romanov:[]}).includes('romanov'),
+  'romanoff must reach romanov');
+ assert.ok(termFamily('dmitry',{dmitry:[],dmitri:[]}).includes('dmitri'),
+  'dmitry must reach dmitri (terminal -y/-i)');
+ assert.ok(termFamily('yakov',{yakov:[],iakov:[]}).includes('iakov'),
+  'yakov must reach iakov (initial y/i)');
+});
+
+test('name bridges stay out when unattested and never merge by prefix',()=>{
+ assert.deepEqual(termFamily('sonya',{sonya:[]}),['sonya'],
+  'unattested variants (sonia, sofya) stay out');
+ const sonya=termFamily('sonya',{sonya:[],son:[],song:[],sonnet:[],sonin:[]});
+ assert.deepEqual(sonya,['sonya'],
+  'attested but unrelated same-prefix words (son, song, sonnet, sonin) are not absorbed');
+ const henry=termFamily('henry',{henry:[],henrie:[],henrick:[]});
+ assert.deepEqual(henry,['henry'],
+  'forms no rule generates stay out even when attested');
+ assert.ok(!termFamily('graph',{graph:[],graf:[]}).includes('graf'),
+  'the ph/f bridge is vowel-final only: graph does not reach graf');
+});
+
+test('scoped name search reaches the source spelling of a character name',async()=>{
+ // Miniature of the C&P Sonya miss: the index and text know the
+ // character only as "Sonia"; the query says "Sonya".
+ const corpus={
+  'manifest.json':{
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,
+   pages:1,page_books:[114],partitions:['so','ma'],
+   books:{'114':{title:'Crime and Punishment — Fyodor Dostoevsky',
+    drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
+  },
+  'terms-so.json':{sonia:[0]},
+  'terms-ma.json':{marmeladov:[0]},
+  'book-114.json':{pages:[{id:0,page:317,text:'Sonia followed him in silence. Marmeladov had been run over in the street, and Sonia stood beside the bed where the dying Marmeladov lay, her hands trembling as she held the candle for him.'}]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v49/',localFetch);
+ const result=await finder.search('Sonya Marmeladov',{bookId:'114',
+  allowedBookIds:new Set(['114']),maxBooks:1,pagesPerBook:2});
+ assert.equal(result.sources.length,1);
+ assert.equal(result.sources[0]?.page,317);
+});
