@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -1281,6 +1281,88 @@ test('phase-2 scorecard template preserves an editable claim audit before rubric
  assert.match(card.instructions,/Complete answerUnits first/);
  assert.equal(card.answerUnits.length,1);
  assert.equal(card.answerUnits[0].claimClassification,null);
+});
+
+test('scorecard claim audit includes rescue-reviewed and flip-vetoed claims missing from review decisions',()=>{
+ const report={mode:'library-selected',cases:[{
+  id:'wuthering-like',question:'Question?',answerText:'A shipped claim [S3].',
+  evidenceMap:[{partId:'P2',claimId:'P2-C9',id:'S3',quote:'map quote'}],
+  evidenceTrace:{
+   reviewContract:{reviewDecisions:[
+    {partId:'P2',claimId:'P2-C9',claimText:'A shipped claim',sourceId:'S3',sourceStatus:'answered',accepted:true,
+     evidenceRole:'work-assertion',supportBoundary:'states only the narrow claim'}],
+    vetoCensus:[{partId:'P2',claimId:'P2-C10',sourceId:'S5',layer:'clause',ground:'claim-source-not-supported',outcome:'vetoed'}]},
+   rescueReview:{parts:[{partId:'P2',flipped:1,trigger:'coverage-incomplete',outcome:'completed',claims:[
+    {claimId:'P2-C9',sourceId:'S3',verdict:'not-supported',fragment:'span fragment nine',
+     elements:[{element:'A shipped claim',stated:false}]},
+    {claimId:'P2-C10',sourceId:'S5',verdict:'supported',
+     fragment:'I told him as much as I thought proper of her illness',
+     elements:[{element:'when Heathcliff is questioning her about Catherine\'s illness, Nelly admits she told him only "as much as I thought proper"',stated:true},
+      {element:'indicating that she selectively filters facts based on her own discretion.',stated:true}],
+     flipOutcome:'vetoed',flipVeto:{reason:'claim-source-not-supported',layer:'clause'}}]}]},
+   vetoCensus:[{partId:'P2',claimId:'P2-C10',sourceId:'S5',layer:'clause',ground:'claim-source-not-supported',outcome:'vetoed'}]}
+ }]};
+ const card=createHumanScorecardTemplate(report);
+ // One decision row plus one rescue-only row; the rescue-reviewed P2-C9,
+ // which has a decision row, is not duplicated.
+ assert.equal(card.claimAudit.length,2);
+ assert.equal(card.claimAudit.filter(row=>row.claimId==='P2-C9').length,1);
+ assert.equal(card.claimAudit[0].auditSource,undefined);
+ const rescueRow=card.claimAudit.find(row=>row.claimId==='P2-C10');
+ assert.ok(rescueRow);
+ assert.equal(rescueRow.caseId,'wuthering-like');
+ assert.equal(rescueRow.partId,'P2');
+ assert.equal(rescueRow.sourceId,'S5');
+ assert.equal(rescueRow.rescueOnly,true);
+ assert.equal(rescueRow.auditSource,'rescue-review');
+ assert.equal(rescueRow.rescueVerdict,'supported');
+ assert.equal(rescueRow.reviewerStatus,'supported');
+ assert.equal(rescueRow.flipOutcome,'vetoed');
+ assert.deepEqual(rescueRow.flipVeto,{reason:'claim-source-not-supported',layer:'clause'});
+ assert.equal(rescueRow.reviewerAccepted,false);
+ assert.deepEqual(rescueRow.exactQuotes,['I told him as much as I thought proper of her illness']);
+ assert.match(rescueRow.answerClaim,/selectively filters facts/);
+ assert.equal(rescueRow.auditorVerdict,null);
+ assert.deepEqual(claimAuditCompletenessGaps(report,card.claimAudit),[]);
+ // The completeness check names the gap when the rescue row is absent.
+ const gaps=claimAuditCompletenessGaps(report,card.claimAudit.filter(row=>row.claimId!=='P2-C10'));
+ assert.deepEqual(gaps,[{caseId:'wuthering-like',partId:'P2',claimId:'P2-C10'}]);
+ // The merged rescue set itself is keyed partId+claimId across sources.
+ assert.deepEqual([...rescueOrVetoClaims(report.cases[0]).keys()].sort(),['P2|P2-C10','P2|P2-C9']);
+});
+
+test('scorecard claim audit records an accepted rescue flip that never had a review decision',()=>{
+ const report={mode:'library-selected',cases:[{
+  id:'flip-like',question:'Question?',answerText:'A rescued claim [S1].',
+  evidenceTrace:{rescueReview:{parts:[{partId:'P1',flipped:1,claims:[
+   {claimId:'P1-C4',sourceId:'S1',verdict:'supported',fragment:'rescued span text',
+    elements:[{element:'A rescued claim',stated:true}],flipOutcome:'accepted'}]}]}}
+ }]};
+ const card=createHumanScorecardTemplate(report);
+ assert.equal(card.claimAudit.length,1);
+ const row=card.claimAudit[0];
+ assert.equal(row.claimId,'P1-C4');
+ assert.equal(row.flipOutcome,'accepted');
+ assert.equal(row.reviewerAccepted,true);
+ assert.equal(row.rescueVerdict,'supported');
+ assert.equal(row.answerClaim,'A rescued claim');
+ assert.deepEqual(row.exactQuotes,['rescued span text']);
+});
+
+test('scorecard claim audit includes a flip-vetoed claim recorded only in the veto census',()=>{
+ const report={mode:'library-selected',cases:[{
+  id:'census-like',question:'Question?',answerText:'Text [S1].',
+  evidenceTrace:{vetoCensus:[
+   {partId:'P1',claimId:'P1-C7',sourceId:'S2',layer:'gate',ground:'subject-not-named-in-span',outcome:'vetoed'},
+   {partId:'P1',claimId:'P1-C8',sourceId:'S2',layer:'gate',ground:'subject-not-named-in-span',outcome:'suppressed'}]}
+ }]};
+ const card=createHumanScorecardTemplate(report);
+ // Only the vetoed claim forces a row; a suppressed layer vote does not.
+ assert.equal(card.claimAudit.length,1);
+ assert.equal(card.claimAudit[0].claimId,'P1-C7');
+ assert.equal(card.claimAudit[0].flipOutcome,'vetoed');
+ assert.deepEqual(card.claimAudit[0].flipVeto,{reason:'subject-not-named-in-span',layer:'gate'});
+ assert.deepEqual(claimAuditCompletenessGaps(report,card.claimAudit),[]);
 });
 
 test('citation audit sentence splitting preserves lowercase sentence starts',()=>{

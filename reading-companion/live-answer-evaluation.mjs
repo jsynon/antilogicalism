@@ -1286,6 +1286,78 @@ export function summarizeQualityByFailureStage(cases){
    highlights:summarize(group,highlightProducedScores,highlightAdjustedScores,highlightPending)};
  }).sort((left,right)=>right.caseCount-left.caseCount||left.stage.localeCompare(right.stage));
 }
+/** Batch 34 (B34-8): the claims scoring must be able to see beyond the
+ * initial review decisions — every claim that reached rescue review or a
+ * flip veto, keyed partId+claimId. Sources: the trace's rescueReview parts
+ * (per-claim rescue verdicts, flip outcomes, and veto records) and the veto
+ * census (entries whose outcome is a flip veto). reviewDecisions alone miss
+ * claims the gate demoted without a decision row: in batch 33, Wuthering
+ * Heights SP1's vetoed flip P2-C10 existed only in the rescue record, so the
+ * scorecard carried no row for it and a supported-but-vetoed claim was
+ * invisible to the flip-acceptance denominator. Values are merged per
+ * partId+claimId across the claim's per-source rescue records: a supported
+ * verdict on any paired source stands, and the flip record comes from
+ * whichever paired record carries one. */
+export function rescueOrVetoClaims(item){
+ const trace=item?.evidenceTrace||{};
+ const merged=new Map();
+ const record=(partId,claimId)=> {
+  const key=partId+'|'+claimId;
+  if(!merged.has(key))merged.set(key,{partId,claimId,sourceId:'',rescueVerdict:'',
+   flipOutcome:null,flipVeto:null,fragment:'',claimElements:[]});
+  return merged.get(key);
+ };
+ const parts=Array.isArray(trace.rescueReview?.parts)?trace.rescueReview.parts:[];
+ for(const part of parts){
+  const partId=typeof part?.partId==='string'?part.partId:'';
+  if(!partId||!Array.isArray(part.claims))continue;
+  for(const claim of part.claims){
+   if(!claim||typeof claim.claimId!=='string')continue;
+   const entry=record(partId,claim.claimId);
+   if(!entry.sourceId&&typeof claim.sourceId==='string')entry.sourceId=claim.sourceId;
+   if(claim.verdict==='supported')entry.rescueVerdict='supported';
+   else if(claim.verdict==='not-supported'&&!entry.rescueVerdict)entry.rescueVerdict='not-supported';
+   if(typeof claim.flipOutcome==='string'&&claim.flipOutcome){
+    entry.flipOutcome=claim.flipOutcome;
+    if(typeof claim.sourceId==='string'&&claim.sourceId)entry.sourceId=claim.sourceId;
+    if(claim.flipVeto&&typeof claim.flipVeto==='object')
+     entry.flipVeto={reason:String(claim.flipVeto.reason||''),layer:String(claim.flipVeto.layer||'')};
+   }
+   if(!entry.fragment&&typeof claim.fragment==='string')entry.fragment=claim.fragment;
+   if(!entry.claimElements.length&&Array.isArray(claim.elements))
+    entry.claimElements=claim.elements.map(element=>element?.element).filter(text=>typeof text==='string'&&text);
+  }
+ }
+ const censuses=[trace.vetoCensus,trace.reviewContract?.vetoCensus];
+ for(const census of censuses){
+  if(!Array.isArray(census))continue;
+  for(const entry of census){
+   if(!entry||entry.outcome!=='vetoed'||typeof entry.claimId!=='string'||
+    typeof entry.partId!=='string'||!entry.partId)continue;
+   const claim=record(entry.partId,entry.claimId);
+   if(!claim.flipOutcome)claim.flipOutcome='vetoed';
+   if(!claim.flipVeto)claim.flipVeto={reason:String(entry.ground||''),layer:String(entry.layer||'')};
+   if(!claim.sourceId&&typeof entry.sourceId==='string')claim.sourceId=entry.sourceId;
+  }
+ }
+ return merged;
+}
+/** Batch 34 (B34-8): completeness check for the scorecard claim audit —
+ * the rescue-reviewed / flip-vetoed claims of a report that have no
+ * claimAudit row. Returns one entry per missing claim; an empty result
+ * means the audit covers the full rescue-review denominator. */
+export function claimAuditCompletenessGaps(report,claimAudit){
+ const rows=Array.isArray(claimAudit)?claimAudit:[];
+ const audited=new Set(rows.map(row=>row&&row.caseId+'|'+row.partId+'|'+row.claimId));
+ const gaps=[];
+ for(const item of report?.cases||[]){
+  for(const claim of rescueOrVetoClaims(item).values()){
+   if(!audited.has(item.id+'|'+claim.partId+'|'+claim.claimId))
+    gaps.push({caseId:item.id,partId:claim.partId,claimId:claim.claimId});
+  }
+ }
+ return gaps;
+}
 /** Create a blank answer/highlight scorecard bound to this exact saved evaluation. */
 export function createHumanScorecardTemplate(report){
  if(!report||!Array.isArray(report.cases))throw Error('Input is not a live answer evaluation report.');
@@ -1346,6 +1418,29 @@ export function createHumanScorecardTemplate(report){
     supportBoundary:decision.supportBoundary||'',auditorVerdict:null,auditorNotes:''};
   });
  });
+ // Batch 34 (B34-8): claims that reached rescue review or a flip veto but
+ // never appeared in reviewDecisions still get a claimAudit row, carrying
+ // their rescue record, whether or not they shipped. Decision-derived rows
+ // are left untouched; only the missing claims are appended.
+ for(const item of report.cases){
+  const map=Array.isArray(item.evidenceMap)?item.evidenceMap:[];
+  for(const claim of rescueOrVetoClaims(item).values()){
+   if(claimAudit.some(row=>row.caseId===item.id&&row.partId===claim.partId&&row.claimId===claim.claimId))continue;
+   const linked=map.filter(entry=>entry.claimId===claim.claimId&&entry.partId===claim.partId&&
+    (!claim.sourceId||entry.id===claim.sourceId));
+   const linkedQuotes=linked.map(entry=>entry.quote||'').filter(Boolean);
+   claimAudit.push({caseId:item.id,attemptNumber:item.attemptNumber||item.repeatAttempt||null,
+    partId:claim.partId,claimId:claim.claimId,answerClaim:claim.claimElements.join(' '),
+    sourceId:claim.sourceId,exactQuotes:linkedQuotes.length?linkedQuotes:(claim.fragment?[claim.fragment]:[]),
+    reviewerStatus:claim.rescueVerdict,reviewerAccepted:claim.flipOutcome==='accepted',
+    evidenceRole:'',supportBoundary:'',auditorVerdict:null,auditorNotes:'',
+    auditSource:'rescue-review',rescueOnly:true,rescueVerdict:claim.rescueVerdict,
+    flipOutcome:claim.flipOutcome,flipVeto:claim.flipVeto});
+  }
+ }
+ const auditGaps=claimAuditCompletenessGaps(report,claimAudit);
+ if(auditGaps.length)throw Error('claimAudit is missing rows for rescue-reviewed or flip-vetoed claims: '+
+  auditGaps.map(gap=>gap.caseId+' '+gap.partId+' '+gap.claimId).join(', '));
  return {schema:'antilogicalism-reading-companion-human-scorecard-v1',
   evaluationIdentity:scorecardEvaluationIdentity(report),
   scale:{min:0,max:2},dimensions:{answer:MANUAL_REVIEW_DIMENSIONS,highlights:HIGHLIGHT_REVIEW_DIMENSIONS},
