@@ -456,3 +456,70 @@ test('an ellipsis-truncated final connector retains the relevant next page',asyn
  assert(result.sources[1].preview.includes('Dreams after death'));
 });
 
+
+// Batch-32 scoped candidacy guarantee. Before the fix, a bookId-scoped
+// search whose query terms had no postings in the book returned a hard
+// empty with booksScanned = 0: the book never became a candidate, so the
+// exhaustive shard rescore never ran. The corpus below attests the query
+// terms in the partitions but gives them no postings anywhere, while the
+// scoped book's shard text contains them clustered.
+const scopedCorpus={
+ 'manifest.json':{
+  version:49,postings_encoding:'delta-json-v1',prefix_length:2,
+  pages:2,page_books:[7,89],partitions:['we','gu','so'],
+  books:{
+   '7':{title:'The Weaver’s Tale — Jane Cooper',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'},
+   '89':{title:'Other Songs — John Ball',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}
+  }
+ },
+ 'terms-we.json':{weaver:[]},
+ 'terms-gu.json':{guild:[]},
+ 'terms-so.json':{solidarity:[]},
+ 'book-7.json':{pages:[
+   {id:0,page:31,text:'The weaver and his guild showed solidarity with the journeymen when the masters tried to cut their wages in the winter season.'}
+ ]},
+ 'book-89.json':{pages:[
+   {id:1,page:9,text:'A song about harvest time and the turning of the year in the village.'}
+ ]}
+};
+function scopedFetch(url){
+ const key=String(url).split('/').pop().replace(/\.gz$/,'');
+ if (key === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
+ return Promise.resolve(key in scopedCorpus?
+  new Response(gzipSync(JSON.stringify(scopedCorpus[key])),{status:200}):
+  new Response('Not found',{status:404}));
+}
+
+test('scoped search scans its book even when no query term has postings there',async()=>{
+ const finder=new RemoteLibrary('https://example.test/v49/',scopedFetch);
+ const result=await finder.search('weaver guild solidarity',{
+  bookId:'7',allowedBookIds:new Set(['7','89']),maxBooks:1,pagesPerBook:2
+ });
+ assert.equal(result.booksScanned,1,'the scoped book must actually be scanned');
+ assert.deepEqual(result.sources.map(source=>source.page),[31],
+  'the shard rescore must decide on full text when postings are absent');
+});
+
+test('scoped search distinguishes scanned-and-zero from never-scanned',async()=>{
+ const finder=new RemoteLibrary('https://example.test/v49/',scopedFetch);
+ const zero=await finder.search('weaver guild solidarity',{
+  bookId:'89',allowedBookIds:new Set(['7','89']),maxBooks:1,pagesPerBook:2
+ });
+ assert.equal(zero.booksScanned,1,'a scoped book with no matching text was still scanned');
+ assert.deepEqual(zero.sources,[]);
+ const unscoped=await finder.search('weaver guild solidarity',{
+  allowedBookIds:new Set(['7','89']),maxBooks:1,pagesPerBook:2
+ });
+ assert.equal(unscoped.booksScanned,0,
+  'unscoped search keeps the old behavior: no postings, no candidates, no scans');
+ assert.deepEqual(unscoped.sources,[]);
+});
+
+test('scoped guarantee honors the allowlist intersection',async()=>{
+ const finder=new RemoteLibrary('https://example.test/v49/',scopedFetch);
+ const result=await finder.search('weaver guild solidarity',{
+  bookId:'7',allowedBookIds:new Set(['89']),maxBooks:1,pagesPerBook:2
+ });
+ assert.equal(result.booksScanned,0,'a scoped book outside the allowlist is never synthesized');
+ assert.deepEqual(result.sources,[]);
+});
