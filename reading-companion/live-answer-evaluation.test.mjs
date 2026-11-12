@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps,structuralFailureReasons,traceSummaryParts,FIRING_FIELDS,firingCensusForCases,firingCensusLines} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,evaluateCaseWithCapacityRetry,CAPACITY_RETRY_DELAYS_MS,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps,structuralFailureReasons,traceSummaryParts,FIRING_FIELDS,firingCensusForCases,firingCensusLines} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -2008,8 +2008,8 @@ test('live runner records a failed Worker case and continues with checkpoint cal
  assert.equal(run.results[1].passed,true);
  assert.equal(run.stopReason,'');
 });
-test('live runner stops immediately on quota or provider availability failures',async()=>{
- for(const failureCode of ['ai-daily-limit-reached','ai-capacity-unavailable','ai-rate-limited']){
+test('live runner stops immediately on quota or rate-limit failures',async()=>{
+ for(const failureCode of ['ai-daily-limit-reached','ai-rate-limited']){
   let calls=0;
   const run=await runLiveCases(['a','b','c'].map(id=>({id,question:id,required_source_groups:[]})),{
    evaluateCase:async item=>{
@@ -2037,6 +2037,103 @@ test('live runner stops after two consecutive Worker failures and keeps prior re
  assert.equal(run.stopReason,'consecutive-worker-failures');
  assert.equal(run.results[0].passed,true);
  assert.equal(run.results[1].requestFailure.httpStatus,502);
+});
+const capacityError=()=>{const error=new Error('Worker capacity unavailable');
+ error.requestFailure={stage:'planner',httpStatus:502,failureCode:'ai-capacity-unavailable',
+  failureDetail:'capacity_unavailable',message:'ai-capacity-unavailable',workerFailure:true};return error;};
+test('capacity retry policy defaults to three attempts with 30s then 60s backoff',()=>{
+ assert.deepEqual(CAPACITY_RETRY_DELAYS_MS,[30_000,60_000]);
+});
+test('live runner retries a capacity failure and completes the case when a later attempt succeeds',async()=>{
+ const item={id:'a',question:'first',required_source_groups:[]};
+ const events=[],sleeps=[];let calls=0;
+ const run=await runLiveCases([item],{evaluateCase:async()=>{
+  calls++;
+  if(calls<3)throw capacityError();
+  return {id:item.id,question:item.question,passed:true,outcome:'verified-source-draft',sourceGroups:[]};
+ },capacityRetryDelaysMs:[5,7],capacityRetrySleep:async ms=>sleeps.push(ms),
+ onCapacityRetry:async event=>events.push(event)});
+ assert.equal(calls,3);
+ assert.deepEqual(sleeps,[5,7]);
+ assert.equal(run.stopReason,'');
+ assert.equal(run.results[0].passed,true);
+ assert.equal(run.results[0].capacityRetry.attempts,3);
+ assert.equal(run.results[0].capacityRetry.recovered,true);
+ assert.deepEqual(run.results[0].capacityRetry.history.map(entry=>entry.outcome),
+  ['capacity-failure','capacity-failure','succeeded']);
+ assert.deepEqual(run.results[0].capacityRetry.history.map(entry=>entry.delayBeforeMs),[0,5,7]);
+ assert.equal(run.results[0].capacityRetry.history[0].failureCode,'ai-capacity-unavailable');
+ assert.deepEqual(events.map(event=>event.phase),['waiting','waiting','recovered']);
+ assert.match(events[0].message,/CAPACITY RETRY/);
+ assert.match(events[2].message,/CAPACITY RECOVERED/);
+});
+test('live runner records a capacity-exhausted case as failed and still runs later cases',async()=>{
+ const items=[{id:'a',question:'first',required_source_groups:[]},{id:'b',question:'second',required_source_groups:[]}];
+ const events=[];let callsA=0,callsB=0;
+ const run=await runLiveCases(items,{evaluateCase:async item=>{
+  if(item.id==='a'){callsA++;throw capacityError();}
+  callsB++;return {id:item.id,question:item.question,passed:true,outcome:'verified-source-draft',sourceGroups:[]};
+ },capacityRetryDelaysMs:[0,0],onCapacityRetry:async event=>events.push(event)});
+ assert.equal(callsA,3);
+ assert.equal(callsB,1);
+ assert.equal(run.results.length,2);
+ assert.equal(run.stopReason,'');
+ assert.equal(run.results[0].outcome,'request-failed');
+ assert.equal(run.results[0].requestFailure.failureCode,'ai-capacity-unavailable');
+ assert.equal(run.results[0].capacityRetry.attempts,3);
+ assert.equal(run.results[0].capacityRetry.recovered,false);
+ assert.deepEqual(run.results[0].capacityRetry.history.map(entry=>entry.outcome),
+  ['capacity-failure','capacity-failure','capacity-failure']);
+ assert.equal(run.results[1].passed,true);
+ assert.equal(run.results[1].capacityRetry,undefined);
+ assert.ok(events.some(event=>event.phase==='exhausted'&&/continuing/.test(event.message)));
+});
+test('live runner does not retry a non-capacity failure and stops retrying if the failure class changes',async()=>{
+ const items=[{id:'a',question:'first',required_source_groups:[]}];
+ let callsPlain=0;
+ const plain=await runLiveCases(items,{evaluateCase:async()=>{
+  callsPlain++;
+  const error=new Error('HTTP 500');error.requestFailure={stage:'answer',httpStatus:500,failureCode:'http-error',message:'boom',workerFailure:true};throw error;
+ },capacityRetryDelaysMs:[0,0],maxConsecutiveWorkerFailures:5});
+ assert.equal(callsPlain,1);
+ assert.equal(plain.results[0].capacityRetry,undefined);
+ let callsMixed=0;
+ const mixed=await runLiveCases(items,{evaluateCase:async()=>{
+  callsMixed++;
+  if(callsMixed===1)throw capacityError();
+  const error=new Error('HTTP 500');error.requestFailure={stage:'answer',httpStatus:500,failureCode:'http-error',message:'boom',workerFailure:true};throw error;
+ },capacityRetryDelaysMs:[0,0,0],maxConsecutiveWorkerFailures:5});
+ assert.equal(callsMixed,2);
+ assert.equal(mixed.results[0].requestFailure.failureCode,'http-error');
+ assert.equal(mixed.results[0].capacityRetry.recovered,false);
+ assert.deepEqual(mixed.results[0].capacityRetry.history.map(entry=>entry.outcome),
+  ['capacity-failure','failed']);
+});
+test('paired runner continues after a capacity-exhausted all-books evaluation',async()=>{
+ const items=[{id:'x',question:'first',required_source_groups:[]},{id:'y',question:'second',required_source_groups:[]}];
+ const run=await runPairedScopeCases(items,{evaluateCase:async(item,options)=>{
+  if(item.id==='x'&&!options.preparedPlan)throw capacityError();
+  return {id:item.id,question:item.question,passed:true,outcome:'verified-source-draft',sourceGroups:[],
+   plannerQueries:['query'],plannerFallback:false};
+ },capacityRetryDelaysMs:[0,0]});
+ assert.equal(run.stopReason,'');
+ assert.deepEqual(run.results.map(result=>result.id),
+  ['x::all-books','x::selected-books','y::all-books','y::selected-books']);
+ assert.equal(run.results[0].requestFailure.failureCode,'ai-capacity-unavailable');
+ assert.equal(run.results[0].capacityRetry.attempts,3);
+ assert.equal(run.results[1].requestFailure.failureCode,'shared-planner-unavailable');
+ assert.equal(run.results[2].passed,true);
+ assert.equal(run.results[3].passed,true);
+});
+test('capacity retry helper returns a clean result untouched when the first attempt succeeds',async()=>{
+ const item={id:'a',question:'first',required_source_groups:[]};
+ let calls=0;
+ const result=await evaluateCaseWithCapacityRetry(item,{evaluateCase:async()=>{
+  calls++;return {id:item.id,passed:true,sourceGroups:[]};
+ },capacityRetryDelaysMs:[0,0]});
+ assert.equal(calls,1);
+ assert.equal(result.passed,true);
+ assert.equal(result.capacityRetry,undefined);
 });
 
 
