@@ -2010,6 +2010,25 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   positionCoverage:retrieval.positionCoverage,retrievalCandidates,
   selectionCoverage:auditSelectionCoverage(answerCandidates,selected,partQuestions),selectionAudit};
 }
+/* Serialize candidate pages for a pilot-answer request with the routing
+ * hints retrieval attached, mirroring the live companion's handoff:
+ * candidatePartIds and the per-page facetRanks that evidence-search.mjs
+ * stamps on every pooled page ({facet, rank} — rank is the page's 1-based
+ * position within that facet's own result list). The gateway validates
+ * and normalizes the ranks per source, and the Worker's deterministic
+ * packing reserves each facet's rank-1 page from them (Stage B B1a;
+ * traced in the response as selectionTrace.facetAnchorReservations).
+ * A candidate carrying no ranks array sends no facetRanks key at all —
+ * absent ranks stay absent, per the gateway contract — and the Worker
+ * then traces 'no-facet-ranks' instead of reserving anchors. The
+ * evaluator loads v49 text while the Worker defaults omitted versions
+ * to v48, so libraryVersion is pinned exactly as the live client pins it. */
+export function pilotAnswerSources(candidates){
+ return (Array.isArray(candidates)?candidates:[]).map(({bookId,page,text,candidatePartIds,facetRanks})=>({bookId,page,text,
+  ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),
+  ...(Array.isArray(facetRanks)?{facetRanks:facetRanks.map(({facet,rank})=>({facet,rank}))}:{}),
+  libraryVersion:49}));
+}
 export function sourcesUsedForWorkerSelection(selection,workerSelected,submittedPool){
  // A valid no-evidence decision deliberately has no Worker-selected pages.
  // Preserve that empty set in quality audits instead of silently substituting
@@ -2229,8 +2248,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
    sharedSelectionResult=await callJson(fetcher,API+'/api/pilot-answer',token,{question:item.question,
     bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
     answerVariant:'with-review',selectionOnly:true,
-    sources:loaded.candidatePacket.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
-     ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))},async()=>{},'selection',timing.timedProgressEvent);
+    sources:pilotAnswerSources(loaded.candidatePacket)},async()=>{},'selection',timing.timedProgressEvent);
    sharedSelectionElapsedMs=Date.now()-selectionStarted;
    if(sharedSelectionResult.selectionOnly!==true||!Array.isArray(sharedSelectionResult.selectionSnapshot))
     throw attachRequestFailure(new Error('Worker did not confirm shared evaluation evidence selection.'),'selection',
@@ -2274,8 +2292,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
       bookId:plannerBookId,plan:plan?.plan||undefined,history:[],turnstileToken:'evaluation-runner-token',
       answerVariant:'with-review',inferenceTransport,
       ...(selectionSnapshot!==null?{selectionSnapshot}:{}),
-      sources:answerSources.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
-       ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))},async()=>{},'answer',timing.timedProgressEvent);
+      sources:pilotAnswerSources(answerSources)},async()=>{},'answer',timing.timedProgressEvent);
      const requestElapsedMs=Date.now()-requestStarted;
      if(Array.isArray(data.selectionSnapshot))selectionSnapshot=data.selectionSnapshot;
      if(data.inferenceTransport!==inferenceTransport)
@@ -2327,8 +2344,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     // The evaluator loads v49 text; the Worker defaults omitted versions to v48.
     // Match the live client handoff so offline acceptance runs exercise the
     // same part-linked evidence packet that the Worker receives in production.
-    sources:answerSources.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
-     ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))},beforeCall,'answer',timing.timedProgressEvent);
+    sources:pilotAnswerSources(answerSources)},beforeCall,'answer',timing.timedProgressEvent);
    const candidateByLocator=new Map(loaded.candidates.map(source=>[String(source.bookId)+':'+source.page,source]));
    const workerSelected=(Array.isArray(data.sourceSelection?.pages)?data.sourceSelection.pages:[])
     .map(source=>{
