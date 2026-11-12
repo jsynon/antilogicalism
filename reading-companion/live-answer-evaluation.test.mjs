@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,evaluateCaseWithCapacityRetry,CAPACITY_RETRY_DELAYS_MS,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,pilotAnswerSources,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps,structuralFailureReasons,traceSummaryParts,FIRING_FIELDS,firingCensusForCases,firingCensusLines} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,evaluateCaseWithCapacityRetry,CAPACITY_RETRY_DELAYS_MS,evaluateCaseWithTransientRetry,TRANSIENT_RETRY_DELAYS_MS,TRANSIENT_RETRY_FAILURE_CODES,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,pilotAnswerSources,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps,structuralFailureReasons,traceSummaryParts,FIRING_FIELDS,firingCensusForCases,firingCensusLines} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -2135,8 +2135,13 @@ test('live runner stops after two consecutive Worker failures and keeps prior re
 const capacityError=()=>{const error=new Error('Worker capacity unavailable');
  error.requestFailure={stage:'planner',httpStatus:502,failureCode:'ai-capacity-unavailable',
   failureDetail:'capacity_unavailable',message:'ai-capacity-unavailable',workerFailure:true};return error;};
-test('capacity retry policy defaults to three attempts with 30s then 60s backoff',()=>{
- assert.deepEqual(CAPACITY_RETRY_DELAYS_MS,[30_000,60_000]);
+test('transient retry policy defaults to three attempts with 30s then 60s backoff',()=>{
+ assert.deepEqual(TRANSIENT_RETRY_DELAYS_MS,[30_000,60_000]);
+ assert.deepEqual(CAPACITY_RETRY_DELAYS_MS,[30_000,60_000],
+  'the B7-era constant remains as an alias');
+ assert.deepEqual([...TRANSIENT_RETRY_FAILURE_CODES].sort(),
+  ['ai-capacity-unavailable','network-error'],
+  'capacity and network failures are the transient classes');
 });
 test('live runner retries a capacity failure and completes the case when a later attempt succeeds',async()=>{
  const item={id:'a',question:'first',required_source_groups:[]};
@@ -2151,15 +2156,15 @@ test('live runner retries a capacity failure and completes the case when a later
  assert.deepEqual(sleeps,[5,7]);
  assert.equal(run.stopReason,'');
  assert.equal(run.results[0].passed,true);
- assert.equal(run.results[0].capacityRetry.attempts,3);
- assert.equal(run.results[0].capacityRetry.recovered,true);
- assert.deepEqual(run.results[0].capacityRetry.history.map(entry=>entry.outcome),
-  ['capacity-failure','capacity-failure','succeeded']);
- assert.deepEqual(run.results[0].capacityRetry.history.map(entry=>entry.delayBeforeMs),[0,5,7]);
- assert.equal(run.results[0].capacityRetry.history[0].failureCode,'ai-capacity-unavailable');
+ assert.equal(run.results[0].transientRetry.attempts,3);
+ assert.equal(run.results[0].transientRetry.recovered,true);
+ assert.deepEqual(run.results[0].transientRetry.history.map(entry=>entry.outcome),
+  ['transient-failure','transient-failure','succeeded']);
+ assert.deepEqual(run.results[0].transientRetry.history.map(entry=>entry.delayBeforeMs),[0,5,7]);
+ assert.equal(run.results[0].transientRetry.history[0].failureCode,'ai-capacity-unavailable');
  assert.deepEqual(events.map(event=>event.phase),['waiting','waiting','recovered']);
- assert.match(events[0].message,/CAPACITY RETRY/);
- assert.match(events[2].message,/CAPACITY RECOVERED/);
+ assert.match(events[0].message,/TRANSIENT RETRY/);
+ assert.match(events[2].message,/TRANSIENT RECOVERED/);
 });
 test('live runner records a capacity-exhausted case as failed and still runs later cases',async()=>{
  const items=[{id:'a',question:'first',required_source_groups:[]},{id:'b',question:'second',required_source_groups:[]}];
@@ -2174,12 +2179,12 @@ test('live runner records a capacity-exhausted case as failed and still runs lat
  assert.equal(run.stopReason,'');
  assert.equal(run.results[0].outcome,'request-failed');
  assert.equal(run.results[0].requestFailure.failureCode,'ai-capacity-unavailable');
- assert.equal(run.results[0].capacityRetry.attempts,3);
- assert.equal(run.results[0].capacityRetry.recovered,false);
- assert.deepEqual(run.results[0].capacityRetry.history.map(entry=>entry.outcome),
-  ['capacity-failure','capacity-failure','capacity-failure']);
+ assert.equal(run.results[0].transientRetry.attempts,3);
+ assert.equal(run.results[0].transientRetry.recovered,false);
+ assert.deepEqual(run.results[0].transientRetry.history.map(entry=>entry.outcome),
+  ['transient-failure','transient-failure','transient-failure']);
  assert.equal(run.results[1].passed,true);
- assert.equal(run.results[1].capacityRetry,undefined);
+ assert.equal(run.results[1].transientRetry,undefined);
  assert.ok(events.some(event=>event.phase==='exhausted'&&/continuing/.test(event.message)));
 });
 test('live runner does not retry a non-capacity failure and stops retrying if the failure class changes',async()=>{
@@ -2190,7 +2195,7 @@ test('live runner does not retry a non-capacity failure and stops retrying if th
   const error=new Error('HTTP 500');error.requestFailure={stage:'answer',httpStatus:500,failureCode:'http-error',message:'boom',workerFailure:true};throw error;
  },capacityRetryDelaysMs:[0,0],maxConsecutiveWorkerFailures:5});
  assert.equal(callsPlain,1);
- assert.equal(plain.results[0].capacityRetry,undefined);
+ assert.equal(plain.results[0].transientRetry,undefined);
  let callsMixed=0;
  const mixed=await runLiveCases(items,{evaluateCase:async()=>{
   callsMixed++;
@@ -2199,9 +2204,9 @@ test('live runner does not retry a non-capacity failure and stops retrying if th
  },capacityRetryDelaysMs:[0,0,0],maxConsecutiveWorkerFailures:5});
  assert.equal(callsMixed,2);
  assert.equal(mixed.results[0].requestFailure.failureCode,'http-error');
- assert.equal(mixed.results[0].capacityRetry.recovered,false);
- assert.deepEqual(mixed.results[0].capacityRetry.history.map(entry=>entry.outcome),
-  ['capacity-failure','failed']);
+ assert.equal(mixed.results[0].transientRetry.recovered,false);
+ assert.deepEqual(mixed.results[0].transientRetry.history.map(entry=>entry.outcome),
+  ['transient-failure','failed']);
 });
 test('paired runner continues after a capacity-exhausted all-books evaluation',async()=>{
  const items=[{id:'x',question:'first',required_source_groups:[]},{id:'y',question:'second',required_source_groups:[]}];
@@ -2214,7 +2219,7 @@ test('paired runner continues after a capacity-exhausted all-books evaluation',a
  assert.deepEqual(run.results.map(result=>result.id),
   ['x::all-books','x::selected-books','y::all-books','y::selected-books']);
  assert.equal(run.results[0].requestFailure.failureCode,'ai-capacity-unavailable');
- assert.equal(run.results[0].capacityRetry.attempts,3);
+ assert.equal(run.results[0].transientRetry.attempts,3);
  assert.equal(run.results[1].requestFailure.failureCode,'shared-planner-unavailable');
  assert.equal(run.results[2].passed,true);
  assert.equal(run.results[3].passed,true);
@@ -2227,7 +2232,61 @@ test('capacity retry helper returns a clean result untouched when the first atte
  },capacityRetryDelaysMs:[0,0]});
  assert.equal(calls,1);
  assert.equal(result.passed,true);
- assert.equal(result.capacityRetry,undefined);
+ assert.equal(result.transientRetry,undefined);
+});
+const networkError=()=>{const error=new Error('fetch failed');
+ error.requestFailure={stage:'answer',httpStatus:null,failureCode:'network-error',
+  message:'fetch failed',workerFailure:true};return error;};
+test('stage B.1: live runner retries an answer-stage network failure and completes the case when a later attempt succeeds',async()=>{
+ // Stage B validation lost empires AP1, Conrad SP1 and Orwell SP2
+ // to 'fetch failed' at the answer stage — no HTTP status, no
+ // Worker involvement. A connection-level blip is transient like
+ // a capacity failure and gets the same bounded retry.
+ const item={id:'a',question:'first',required_source_groups:[]};
+ const events=[];let calls=0;
+ const run=await runLiveCases([item],{evaluateCase:async()=>{
+  calls++;
+  if(calls<2)throw networkError();
+  return {id:item.id,question:item.question,passed:true,outcome:'verified-source-draft',sourceGroups:[]};
+ },transientRetryDelaysMs:[0,0],onTransientRetry:async event=>events.push(event)});
+ assert.equal(calls,2);
+ assert.equal(run.stopReason,'');
+ assert.equal(run.results[0].passed,true);
+ assert.equal(run.results[0].transientRetry.attempts,2);
+ assert.equal(run.results[0].transientRetry.recovered,true);
+ assert.equal(run.results[0].transientRetry.history[0].failureCode,'network-error');
+ assert.deepEqual(run.results[0].transientRetry.history.map(entry=>entry.outcome),
+  ['transient-failure','succeeded']);
+ assert.match(events[0].message,/TRANSIENT RETRY.*network-error/,
+  'the watched log line names the failure class');
+ assert.match(events[events.length-1].message,/TRANSIENT RECOVERED/);
+});
+test('stage B.1: a network-exhausted case is recorded as failed and the pass continues',async()=>{
+ const items=[{id:'a',question:'first',required_source_groups:[]},{id:'b',question:'second',required_source_groups:[]}];
+ let callsA=0,callsB=0;
+ const run=await runLiveCases(items,{evaluateCase:async item=>{
+  if(item.id==='a'){callsA++;throw networkError();}
+  callsB++;return {id:item.id,question:item.question,passed:true,outcome:'verified-source-draft',sourceGroups:[]};
+ },transientRetryDelaysMs:[0,0]});
+ assert.equal(callsA,3);
+ assert.equal(callsB,1);
+ assert.equal(run.stopReason,'');
+ assert.equal(run.results[0].outcome,'request-failed');
+ assert.equal(run.results[0].requestFailure.failureCode,'network-error');
+ assert.equal(run.results[0].transientRetry.recovered,false);
+ assert.equal(run.results[1].passed,true);
+});
+test('stage B.1: a daily-limit failure is never retried and still stops the pass',async()=>{
+ const item={id:'a',question:'first',required_source_groups:[]};
+ let calls=0;
+ const run=await runLiveCases([item],{evaluateCase:async()=>{
+  calls++;
+  const error=new Error('daily limit');error.requestFailure={stage:'answer',httpStatus:429,
+   failureCode:'ai-daily-limit-reached',message:'quota',workerFailure:true};throw error;
+ },transientRetryDelaysMs:[0,0]});
+ assert.equal(calls,1,'quota failures are terminal, not transient');
+ assert.equal(run.results[0].transientRetry,undefined);
+ assert.equal(run.stopReason,'provider-limit-or-capacity');
 });
 
 

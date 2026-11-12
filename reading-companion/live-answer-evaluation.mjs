@@ -2541,68 +2541,90 @@ const TERMINAL_PROVIDER_FAILURES=new Set([
 // with the remaining cases instead of abandoning them. Quota failures
 // ('ai-daily-limit-reached') and rate limiting ('ai-rate-limited') are not
 // retried and keep their terminal behavior via TERMINAL_PROVIDER_FAILURES.
+// Stage B.1: 'network-error' (the fetch to the Worker failed outright —
+// no HTTP status at all) joins the transient class. The Stage B
+// validation lost three cases to answer-stage fetch failures while the
+// capacity class never fired once; a connection-level blip is transient
+// in exactly the same way. The mechanism is renamed accordingly: the
+// trace field is now `transientRetry`, log lines name the actual
+// failure code, and the B7-era exported names remain as aliases.
+export const TRANSIENT_RETRY_FAILURE_CODES=new Set(['ai-capacity-unavailable','network-error']);
+export const TRANSIENT_RETRY_DELAYS_MS=[30_000,60_000];
 export const CAPACITY_RETRY_FAILURE_CODES=new Set(['ai-capacity-unavailable']);
-export const CAPACITY_RETRY_DELAYS_MS=[30_000,60_000];
-const defaultCapacityRetrySleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
-function isCapacityFailure(result){
+export const CAPACITY_RETRY_DELAYS_MS=TRANSIENT_RETRY_DELAYS_MS;
+const defaultTransientRetrySleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+function isTransientFailure(result){
  return Boolean(result?.requestFailure?.workerFailure===true&&
-  CAPACITY_RETRY_FAILURE_CODES.has(result.requestFailure.failureCode));
+  TRANSIENT_RETRY_FAILURE_CODES.has(result.requestFailure.failureCode));
 }
-// Re-evaluates one case while its failures are provider-capacity failures.
-// Returns the final case result; when any attempt capacity-failed, the
-// result carries a `capacityRetry` trace ({attempts, recovered, history})
+// Re-evaluates one case while its failures are transient failures.
+// Returns the final case result; when any attempt transient-failed, the
+// result carries a `transientRetry` trace ({attempts, recovered, history})
 // so a recovered case is distinguishable from a clean one and an exhausted
 // case shows every attempt's stage/status/code and the wait before it.
-export async function evaluateCaseWithCapacityRetry(item,{evaluateCase,evaluateLiveCase,evaluateOptions={},
- capacityRetryDelaysMs=CAPACITY_RETRY_DELAYS_MS,capacityRetrySleep=defaultCapacityRetrySleep,
- onCapacityRetry=async()=>{}}={}){
- const delays=Array.isArray(capacityRetryDelaysMs)?capacityRetryDelaysMs:CAPACITY_RETRY_DELAYS_MS;
+export async function evaluateCaseWithTransientRetry(item,{evaluateCase,evaluateLiveCase,evaluateOptions={},
+ transientRetryDelaysMs,transientRetrySleep,onTransientRetry,
+ capacityRetryDelaysMs,capacityRetrySleep,onCapacityRetry}={}){
+ const delaysInput=transientRetryDelaysMs??capacityRetryDelaysMs;
+ const delays=Array.isArray(delaysInput)?delaysInput:TRANSIENT_RETRY_DELAYS_MS;
+ const sleep=transientRetrySleep||capacityRetrySleep||defaultTransientRetrySleep;
+ const onRetry=onTransientRetry||onCapacityRetry||(async()=>{});
  const maxAttempts=delays.length+1;
  const history=[];let result=null;
  for(let attempt=1;attempt<=maxAttempts;attempt++){
   const delayBeforeMs=attempt===1?0:(delays[attempt-2]??delays[delays.length-1]??0);
   if(attempt>1){
-   await onCapacityRetry({caseId:item.id,phase:'waiting',attempt,maxAttempts,delayMs:delayBeforeMs,
+   await onRetry({caseId:item.id,phase:'waiting',attempt,maxAttempts,delayMs:delayBeforeMs,
     failure:history[history.length-1],
-    message:'CAPACITY RETRY: attempt '+(attempt-1)+' failed with ai-capacity-unavailable; '+
+    message:'TRANSIENT RETRY: attempt '+(attempt-1)+' failed with '+
+     history[history.length-1].failureCode+'; '+
      'retrying in '+Math.round(delayBeforeMs/1000)+'s (attempt '+attempt+' of '+maxAttempts+')'});
-   if(delayBeforeMs>0)await capacityRetrySleep(delayBeforeMs);
+   if(delayBeforeMs>0)await sleep(delayBeforeMs);
   }
   try{result=await evaluateCase(item,evaluateOptions);}
   catch(error){result=failedCaseResult(item,error);}
   const failure=result?.requestFailure||null;
-  history.push({attempt,outcome:failure?(isCapacityFailure(result)?'capacity-failure':'failed'):'succeeded',
+  history.push({attempt,outcome:failure?(isTransientFailure(result)?'transient-failure':'failed'):'succeeded',
    stage:failure?.stage||null,httpStatus:failure?.httpStatus??null,
    failureCode:failure?.failureCode||null,delayBeforeMs});
-  if(!isCapacityFailure(result))break;
+  if(!isTransientFailure(result))break;
   if(attempt===maxAttempts){
-   await onCapacityRetry({caseId:item.id,phase:'exhausted',attempt,maxAttempts,delayMs:0,
+   await onRetry({caseId:item.id,phase:'exhausted',attempt,maxAttempts,delayMs:0,
     failure:history[history.length-1],
-    message:'CAPACITY EXHAUSTED: all '+maxAttempts+' attempts failed with ai-capacity-unavailable; '+
+    message:'TRANSIENT EXHAUSTED: all '+maxAttempts+' attempts failed with '+
+     history[history.length-1].failureCode+'; '+
      'case recorded as failed — continuing with the remaining cases'});
   }
  }
- if(history.some(entry=>entry.outcome==='capacity-failure')){
+ if(history.some(entry=>entry.outcome==='transient-failure')){
   const recovered=!result?.requestFailure;
-  result={...result,capacityRetry:{attempts:history.length,recovered,history}};
-  if(recovered)await onCapacityRetry({caseId:item.id,phase:'recovered',attempt:history.length,
+  result={...result,transientRetry:{attempts:history.length,recovered,history}};
+  if(recovered)await onRetry({caseId:item.id,phase:'recovered',attempt:history.length,
    maxAttempts,delayMs:0,failure:null,
-   message:'CAPACITY RECOVERED: case succeeded on attempt '+history.length+' of '+maxAttempts+
-    ' after ai-capacity-unavailable'});
+   message:'TRANSIENT RECOVERED: case succeeded on attempt '+history.length+' of '+maxAttempts+
+    ' after '+history[history.length-2].failureCode});
  }
  return result;
 }
-export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluateOptions={},onResult=async()=>{},maxConsecutiveWorkerFailures=2,capacityRetryDelaysMs,capacityRetrySleep,onCapacityRetry}={}){
+// B7-era alias: forwards to the transient evaluator (its capacity-named
+// options are accepted there).
+export async function evaluateCaseWithCapacityRetry(item,options={}){
+ return evaluateCaseWithTransientRetry(item,options);
+}
+export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluateOptions={},onResult=async()=>{},maxConsecutiveWorkerFailures=2,transientRetryDelaysMs,transientRetrySleep,onTransientRetry,capacityRetryDelaysMs,capacityRetrySleep,onCapacityRetry}={}){
+ const retryOptions={transientRetryDelaysMs:transientRetryDelaysMs??capacityRetryDelaysMs,
+  transientRetrySleep:transientRetrySleep||capacityRetrySleep,
+  onTransientRetry:onTransientRetry||onCapacityRetry};
  const results=[];let consecutiveWorkerFailures=0,stopReason='';
  for(const item of cases){
-  const result=await evaluateCaseWithCapacityRetry(item,{evaluateCase,evaluateOptions,
-   capacityRetryDelaysMs,capacityRetrySleep,onCapacityRetry});
+  const result=await evaluateCaseWithTransientRetry(item,{evaluateCase,evaluateOptions,
+   ...retryOptions});
   results.push(result);
   await onResult(result,results);
   if(result.requestFailure?.workerFailure){
-   if(CAPACITY_RETRY_FAILURE_CODES.has(result.requestFailure.failureCode)){
+   if(TRANSIENT_RETRY_FAILURE_CODES.has(result.requestFailure.failureCode)){
     // Retries are exhausted; the case is recorded as failed above and the
-    // pass continues. Capacity failures neither stop the pass nor count
+    // pass continues. Transient failures neither stop the pass nor count
     // toward the consecutive-worker-failure stop.
    }else if(TERMINAL_PROVIDER_FAILURES.has(result.requestFailure.failureCode)){
     stopReason='provider-limit-or-capacity';
@@ -2615,13 +2637,16 @@ export async function runLiveCases(cases,{evaluateCase=evaluateLiveCase,evaluate
  }
  return {results,stopReason};
 }
-export async function runPairedScopeCases(cases,{evaluateCase=evaluateLiveCase,evaluateOptions={},onResult=async()=>{},maxConsecutiveWorkerFailures=2,capacityRetryDelaysMs,capacityRetrySleep,onCapacityRetry}={}){
+export async function runPairedScopeCases(cases,{evaluateCase=evaluateLiveCase,evaluateOptions={},onResult=async()=>{},maxConsecutiveWorkerFailures=2,transientRetryDelaysMs,transientRetrySleep,onTransientRetry,capacityRetryDelaysMs,capacityRetrySleep,onCapacityRetry}={}){
+ const retryOptions={transientRetryDelaysMs:transientRetryDelaysMs??capacityRetryDelaysMs,
+  transientRetrySleep:transientRetrySleep||capacityRetrySleep,
+  onTransientRetry:onTransientRetry||onCapacityRetry};
  const results=[];let consecutiveWorkerFailures=0,stopReason='';
  const record=async(result)=>{
   results.push(result);await onResult(result,results);
   if(result.requestFailure?.workerFailure){
-   if(CAPACITY_RETRY_FAILURE_CODES.has(result.requestFailure.failureCode)){
-    // Capacity retries are exhausted (see evaluateCaseWithCapacityRetry);
+   if(TRANSIENT_RETRY_FAILURE_CODES.has(result.requestFailure.failureCode)){
+    // Transient retries are exhausted (see evaluateCaseWithTransientRetry);
     // the case is recorded as failed and the pass continues.
    }else if(TERMINAL_PROVIDER_FAILURES.has(result.requestFailure.failureCode))stopReason='provider-limit-or-capacity';
    else if(++consecutiveWorkerFailures>=maxConsecutiveWorkerFailures)stopReason='consecutive-worker-failures';
@@ -2629,10 +2654,10 @@ export async function runPairedScopeCases(cases,{evaluateCase=evaluateLiveCase,e
  };
  for(const item of cases){
   const allItem={...item,selected_book_ids:[]};
-  const all=await evaluateCaseWithCapacityRetry(allItem,{evaluateCase,
+  const all=await evaluateCaseWithTransientRetry(allItem,{evaluateCase,
    evaluateOptions:{...evaluateOptions,useFixedQueries:false,
     onProgress:event=>evaluateOptions.onProgress?.({...event,pairedCaseId:item.id,scope:'all-books'})},
-   capacityRetryDelaysMs,capacityRetrySleep,onCapacityRetry});
+   ...retryOptions});
   await record({...all,id:item.id+'::all-books',pairedCaseId:item.id,scope:'all-books',plannerReused:false});
   if(stopReason)break;
 
@@ -2648,10 +2673,10 @@ export async function runPairedScopeCases(cases,{evaluateCase=evaluateLiveCase,e
     workerVersionId:all.plannerWorkerVersionId||null,
     workerSourceBuild:all.plannerWorkerSourceBuild||null,
     workerSourceRevision:all.plannerWorkerSourceRevision||null};
-   selected=await evaluateCaseWithCapacityRetry(item,{evaluateCase,
+   selected=await evaluateCaseWithTransientRetry(item,{evaluateCase,
     evaluateOptions:{...evaluateOptions,useFixedQueries:false,preparedPlan,
      onProgress:event=>evaluateOptions.onProgress?.({...event,pairedCaseId:item.id,scope:'selected-books'})},
-    capacityRetryDelaysMs,capacityRetrySleep,onCapacityRetry});
+    ...retryOptions});
   }
   await record({...selected,id:item.id+'::selected-books',pairedCaseId:item.id,scope:'selected-books',
    plannerReused:!all.requestFailure});
@@ -2922,15 +2947,15 @@ async function main(){
     ...options,onProgress:event=>printProgress(event)
    });
   };
-  const printCapacityRetry=event=>{
+  const printTransientRetry=event=>{
    console.log('['+new Date().toISOString()+'] ['+String(event.caseId||'case')+'] '+
-    String(event.message||'CAPACITY RETRY'));
+    String(event.message||'TRANSIENT RETRY'));
   };
   const run=await (args.mode==='paired'?runPairedScopeCases(cases,{evaluateCase:evaluateLiveCase,
-   evaluateOptions:{library,manifest,allowed,token,beforeCall,answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,onProgress:printProgress},onResult,onCapacityRetry:printCapacityRetry}):
+   evaluateOptions:{library,manifest,allowed,token,beforeCall,answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,onProgress:printProgress},onResult,onTransientRetry:printTransientRetry}):
    runLiveCases(cases,{evaluateCase:evaluateWithAttempt,maxConsecutiveWorkerFailures:args.repeatCount>1?6:2,
   evaluateOptions:{library,manifest,allowed,token,beforeCall,useFixedQueries:usesEvaluationMode&&!evaluationUsesPlanner,
-   answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,onProgress:printProgress},onResult,onCapacityRetry:printCapacityRetry}));
+   answerVariant:args.answerVariant,retrievalProfile:args.retrievalProfile,onProgress:printProgress},onResult,onTransientRetry:printTransientRetry}));
   report.cases=run.results;report.stopReason=run.stopReason;
   report.completedCases=run.results.length;report.notRunCases=report.caseCount-run.results.length;
   report.requestFailureCases=run.results.filter(item=>item.requestFailure).length;
