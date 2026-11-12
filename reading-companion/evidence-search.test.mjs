@@ -1923,7 +1923,7 @@ test('browser sends bounded full candidate pages and leaves semantic selection t
  assert.match(js,/const candidatePacket=\[\]/);
  assert.match(js,/prepareAnswerCandidates\(candidates\)\.slice\(0,LIVE_RETRIEVAL_CONFIG\.maxCandidates\)/);
  assert.match(js,/candidateTextBytes\+textBytes>250000/);
- assert.match(js,/sources:candidatePacket\.map\(\(\{bookId,page,text,candidatePartIds\}\)=>\(\{bookId,page,text,/);
+ assert.match(js,/sources:pilotAnswerSources\(candidatePacket\)/);
  assert.doesNotMatch(js,/sources:chosen\.map/);
  assert.match(js,/plan:currentPlan\|\|undefined/);
  assert.match(js,/\.\.\.LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT/);

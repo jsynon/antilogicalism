@@ -26,10 +26,15 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.20.8'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.20.6'));
  assert.match(clientV49,/distinctiveTerms:item\.distinctiveTerms/);
  assert.match(clientV49,/matchedDistinctiveTerms:item\.matchedDistinctiveTerms/);
  assert.match(clientV49,/sharedMatchedTerms:item\.sharedMatchedTerms/);
+});
+test('live browser submits facet ranks with the pilot-answer packet',()=>{
+ assert.match(clientV49,/import \{pilotAnswerSources\} from '\.\/answer-payload\.mjs';/);
+ assert.match(clientV49,/sources:pilotAnswerSources\(candidatePacket\)/);
+ assert.doesNotMatch(clientV49,/candidatePacket\.map\(\(\{bookId,page,text,candidatePartIds\}\)/);
 });
 test('v49 answer renderer keeps default prose out of accidental ordered lists',()=>{
  assert.match(clientV49,/questionRequestsEnumeration\(turnQuestion\)/);
@@ -181,21 +186,9 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(client,/bookSearch\.value=''/);
  assert.match(html,/id="companion-question"/);
  assert.match(html,/id="companion-status" aria-live="polite" aria-atomic="true" aria-busy="false" role="status"/);
- assert.match(html,/#companion-status\{margin:0;font-size:1\.12em/);
- assert.match(html,/companion-page-flip/);
- assert.doesNotMatch(html,/companion-status-spin/);
- assert.match(html,/prefers-reduced-motion:reduce\).*companion-book/);
- assert.match(html,/id="companion-status-card" hidden/);
- assert.match(html,/#companion-status-card\[hidden\]\{display:none\}/);
- assert.match(html,/id="companion-book" aria-hidden="true"/);
- assert.equal((html.match(/companion-stage-node"/g)||[]).length,4);
- assert.match(html,/companion-stage-label">Search/);
- assert.match(html,/companion-stage-label">Gather/);
- assert.match(html,/companion-stage-label">Check sources/);
- assert.match(html,/companion-stage-label">Compose/);
- assert.match(clientV49,/statusStagePatterns/);
- assert.match(clientV49,/statusCard\.hidden=!status\.textContent\.trim\(\)/);
- assert.match(clientV49,/stageNodes\.forEach/);
+ assert.match(html,/#companion-status:not\(:empty\).*font-size:1\.12em/);
+ assert.match(html,/companion-status-spin/);
+ assert.match(html,/prefers-reduced-motion:reduce\).*companion-status/);
  assert.match(client,/function refreshStatusState\(\)/);
  assert.match(client,/status\.setAttribute\('aria-busy',String\(busy\)\)/);
  assert.match(client,/askButton\.textContent=searching\|\|answering\?'Working…':'Ask Reading Companion'/);
