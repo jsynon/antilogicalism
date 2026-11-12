@@ -295,6 +295,36 @@ export function termFamily(term, partition) {
     const base=term.slice(0,-4);
     if(base.length>=3)candidates.add(base+'ion');
   }
+  // (e) Batch 35 (B35-5-reduced): -ance/-ence nouns pair with -ant/-ent
+  // adjectives on the shared stem (ignorance <-> ignorant, innocence
+  // <-> innocent), in both directions. The batch-35 prototype measured
+  // this exact gap: a facet saying "ignorance" never reached the Smith
+  // torpor passage's "ignorant"; the bridge moved that page from rank
+  // #23 to #11 in its key facet with zero regressions across 22 control
+  // leaf sets. The stem floor keeps short stems out, and the -ment
+  // guard keeps the suffix class honest: -ment words (comment,
+  // government, document) are nouns built with a different suffix, not
+  // -ent adjectives, and without the guard "comment" would bridge to
+  // the unrelated common word "commence" (and back), which the
+  // attestation check alone would admit because period texts use
+  // "commence" constantly. Known cost of the candidate-side guard:
+  // clemence -> clement is blocked too; accepted.
+  if(term.length>6&&term.endsWith('ance')){
+    const stem=term.slice(0,-4);
+    if(stem.length>=3)candidates.add(stem+'ant');
+  }
+  if(term.length>6&&term.endsWith('ence')){
+    const derived=term.slice(0,-4)+'ent';
+    if(term.length-4>=3&&!derived.endsWith('ment'))candidates.add(derived);
+  }
+  if(term.length>5&&term.endsWith('ant')){
+    const stem=term.slice(0,-3);
+    if(stem.length>=3)candidates.add(stem+'ance');
+  }
+  if(term.length>5&&term.endsWith('ent')&&!term.endsWith('ment')){
+    const stem=term.slice(0,-3);
+    if(stem.length>=3)candidates.add(stem+'ence');
+  }
   // (d) Spelling classes: -or/-our, -er/-re, -ize/-ise. These matter for a
   // corpus of mostly British-spelling source texts searched with American
   // planner wording (labor never reached the 319 pages saying "labour").

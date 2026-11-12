@@ -1115,6 +1115,87 @@ export function traceSummaryParts(evidenceTrace,result){
   parts.push('dropped-facets: '+droppedFacets.map(facet=>String(facet?.partId||'?')).join(', '));
  return parts;
 }
+// Batch 35 (B35-4): the production-firing ledger, harness side. Three
+// batch items in a row (B33-9, B34-2's claim-level test, B34-7) passed
+// fixture pilots and then never fired in production, discovered only by
+// scorers reading artifacts by hand. This registry names the trace
+// records that prove a mechanism fired; the end-of-run census below
+// counts them per pass file and flags any field that fired in zero
+// cases as NEVER FIRED, so an inert mechanism announces itself in the
+// run log and in the artifact (report.firingCensus) instead of hiding.
+// Seeded from the batch-34 artifact key census (32 phase-2 cases) and,
+// for the region record, the Worker source: B34-7's checks ride
+// reviewContract.apparatusFramingChecks, spread into the trace only
+// when non-empty — which is precisely why no batch-34 artifact ever
+// showed the key. The Worker registers its own field list on its side;
+// this list is the harness-side consumer and is finalized against it at
+// integration. "Fired" means the record is present AND non-empty in the
+// sense noted per field; assemblyDisclosureDropped is an alarm field —
+// it must always be empty, so its "fired" count is the number of cases
+// where a disclosure was actually dropped, and its silence is correct.
+const nonEmptyArray=value=>Array.isArray(value)&&value.length>0;
+const arrayLength=value=>Array.isArray(value)?value.length:0;
+export const FIRING_FIELDS=[
+ {field:'evidenceTrace.assemblyAntecedentGuard',
+  fired:trace=>{const guard=trace.assemblyAntecedentGuard;
+   return Boolean(guard)&&['restored','rewritten','removed'].some(key=>nonEmptyArray(guard[key]));}},
+ {field:'evidenceTrace.final.claimLevelUncitedLabels',
+  fired:trace=>nonEmptyArray(trace.final?.claimLevelUncitedLabels)},
+ {field:'evidenceTrace.assemblyDisclosureDropped',alarm:true,
+  fired:trace=>nonEmptyArray(trace.assemblyDisclosureDropped)},
+ {field:'evidenceTrace.stages[].selectionDiversity',
+  fired:trace=>(Array.isArray(trace.stages)?trace.stages:[]).some(stage=>{
+   const diversity=stage?.selectionDiversity;
+   return Boolean(diversity)&&(arrayLength(diversity.inserted)+arrayLength(diversity.deferred))>0;})},
+ {field:'evidenceTrace.stages[].selectionDroppedFacets',
+  fired:trace=>(Array.isArray(trace.stages)?trace.stages:[]).some(stage=>
+   nonEmptyArray(stage?.selectionDroppedFacets))},
+ {field:'evidenceTrace.assemblyLoss',
+  fired:trace=>nonEmptyArray(trace.assemblyLoss)},
+ {field:'evidenceTrace.reviewContract.boundarySubjectChecks',
+  fired:trace=>nonEmptyArray(trace.reviewContract?.boundarySubjectChecks)},
+ {field:'evidenceTrace.reviewContract.apparatusFramingChecks',
+  fired:trace=>nonEmptyArray(trace.reviewContract?.apparatusFramingChecks)},
+ {field:'evidenceTrace.vetoCensus',
+  fired:trace=>nonEmptyArray(trace.vetoCensus)||
+   nonEmptyArray(trace.reviewContract?.vetoCensus)},
+ // Batch 35 (integration): the Worker side's BATCH35_FIRING_FIELDS
+ // registry, consumed here so a batch-35 mechanism that never fires
+ // in production flags NEVER FIRED in the run's own census.
+ {field:'evidenceTrace.reviewContract.spanRegionClassifications',
+  fired:trace=>nonEmptyArray(trace.reviewContract?.spanRegionClassifications)},
+ {field:'evidenceTrace.reviewContract.gateDemotionsSuppressed',
+  fired:trace=>nonEmptyArray(trace.reviewContract?.gateDemotionsSuppressed)},
+ {field:'evidenceTrace.final.unansweredRequirementLabels',
+  fired:trace=>nonEmptyArray(trace.final?.unansweredRequirementLabels)},
+ {field:'evidenceTrace.synthesisProvenanceDropped',
+  fired:trace=>nonEmptyArray(trace.synthesisProvenanceDropped)},
+ {field:'selectionTrace.diversityFinal',
+  fired:(trace,item)=>Boolean(item?.selectionTrace?.diversityFinal)||
+   Boolean(trace.selectionTrace?.diversityFinal)}
+];
+export function firingCensusForCases(cases){
+ const rows=Array.isArray(cases)?cases:[];
+ const fields={};
+ for(const entry of FIRING_FIELDS){
+  const count=rows.filter(item=>entry.fired(item?.evidenceTrace||item?.trace||{},item)).length;
+  fields[entry.field]={cases:count,neverFired:count===0,
+   ...(entry.alarm?{alarm:true}:{})};
+ }
+ return {totalCases:rows.length,fields};
+}
+export function firingCensusLines(census){
+ const total=Number(census?.totalCases)||0;
+ const lines=['FIRING CENSUS ('+total+' cases):'];
+ for(const entry of FIRING_FIELDS){
+  const record=census?.fields?.[entry.field]||{cases:0,neverFired:true};
+  let line=' '+entry.field+': fired in '+record.cases+'/'+total+' cases';
+  if(record.neverFired)line+=' — NEVER FIRED'+
+   (entry.alarm?' (alarm field: silence is the correct state)':'');
+  lines.push(line);
+ }
+ return lines;
+}
 const MANUAL_REVIEW_DIMENSIONS=['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness'];
 const HIGHLIGHT_REVIEW_DIMENSIONS=['fidelity','coverage','context','claimRelevance','completeness'];
 const NON_PRODUCED_OUTCOMES=new Set(['generation-failed','request-failed','shared-selection-failed']);
@@ -2814,7 +2895,14 @@ async function main(){
     reviewedShippedAttributionConflicts:shippedConflicts,
     citationGateIntegrity:report.summary.citationGateIntegrity};
   }
+  // Batch 35 (B35-4): the firing census rides the pass result JSON as
+  // an additive field and prints as one log block after the last case.
+  // Planner mode records no answer traces by design, so it is skipped
+  // there rather than reporting a wall of false NEVER FIRED flags.
+  if(args.mode!=='planner')report.firingCensus=firingCensusForCases(report.cases);
   await saveReport();
+  if(args.mode!=='planner')
+   for(const line of firingCensusLines(report.firingCensus))console.log(line);
   if(args.mode==='transport-ab'){
    const comparisons=report.summary.transportComparison;
    const pathSummary=transport=>{

@@ -270,3 +270,70 @@ test('scoped name search reaches the source spelling of a character name',async(
  assert.equal(result.sources.length,1);
  assert.equal(result.sources[0]?.page,317);
 });
+
+// Batch 35 (B35-5-reduced): the -ance/-ant and -ence/-ent bridge. The
+// batch-35 prototype measured the gap in termFamily: a facet saying
+// "ignorance" never reached source text saying "ignorant" (the Smith
+// Book V torpor passage's diction). The bridge swaps the suffix on the
+// identical stem, in both directions, and — like every family rule —
+// admits a generated form only when the index partition attests it.
+
+test('term families bridge -ance/-ant and -ence/-ent pairs in both directions',()=>{
+ const pairs=[
+  ['ignorance','ignorant'],['importance','important'],['distance','distant'],
+  ['absence','absent'],['innocence','innocent'],['patience','patient'],
+  ['silence','silent'],['evidence','evident'],['difference','different']
+ ];
+ for(const [noun,adjective] of pairs){
+  const suffix=adjective.endsWith('ant')?'ance':'ence';
+  assert.ok(termFamily(noun,{[noun]:[],[adjective]:[]}).includes(adjective),
+   noun+' must reach '+adjective+' (-'+suffix+'/-'+(suffix==='ance'?'ant':'ent')+')');
+  assert.ok(termFamily(adjective,{[adjective]:[],[noun]:[]}).includes(noun),
+   adjective+' must reach '+noun+' (the bridge runs in both directions)');
+ }
+});
+
+test('-ance/-ence bridges stay out when unattested, stem-shifted, or colliding',()=>{
+ assert.deepEqual(termFamily('ignorance',{ignorance:[]}),['ignorance'],
+  'an unattested derived form (ignorant) stays out');
+ assert.ok(!termFamily('nuance',{nuance:[],nuant:[]}).includes('nuant'),
+  'a short-stem form is not generated even when the index attests it');
+ assert.ok(!termFamily('appearance',{appearance:[],apparent:[]}).includes('apparent'),
+  'appearance/apparent is not an identical-stem pair and must not bridge');
+ assert.ok(!termFamily('comment',{comment:[],commence:[]}).includes('commence'),
+  'comment must not bridge to the unrelated common word commence (-ment guard)');
+ assert.ok(!termFamily('commence',{commence:[],comment:[]}).includes('comment'),
+  'commence must not bridge back to comment');
+ assert.ok(!termFamily('government',{government:[],governance:[]}).includes('governance'),
+  'a -ment noun generates no -ence form');
+});
+
+test('search reaches a page whose only matching forms are the -ant/-ent adjectives',async()=>{
+ // Miniature of the Smith Book V shape for the new bridge class: the
+ // page argues in the source's adjective forms (ignorant, innocent);
+ // the query uses the planner's abstract nouns (ignorance, innocence).
+ // Before this bridge the page matched neither query term.
+ const corpus={
+  'manifest.json':{
+   version:49,postings_encoding:'delta-json-v1',prefix_length:2,
+   pages:1,page_books:[42],partitions:['ig','in'],
+   books:{'42':{title:'A Treatise on Work — A. Writer',
+    drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}
+  },
+  'terms-ig.json':{ignorant:[0]},
+  'terms-in.json':{innocent:[0]},
+  'book-42.json':{pages:[{id:0,page:611,text:'He remained ignorant of the wider world and innocent of any design beyond his daily task, spending his whole life at the same bench in the same workshop, year after year.'}]}
+ };
+ const localFetch=async url=>{
+  const name=String(url).split('/').pop().replace(/\.gz$/,'');
+  if (name === 'url-suppressions.json') return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
+  return name in corpus?
+   new Response(gzipSync(JSON.stringify(corpus[name])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v49/',localFetch);
+ const result=await finder.search('ignorance innocence',{allowedBookIds:new Set(['42']),
+  maxBooks:1,pagesPerBook:2});
+ assert.equal(result.sources.length,1);
+ assert.equal(result.sources[0]?.page,611);
+});

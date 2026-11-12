@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps,structuralFailureReasons,traceSummaryParts} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps,structuralFailureReasons,traceSummaryParts,FIRING_FIELDS,firingCensusForCases,firingCensusLines} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -2270,4 +2270,90 @@ test('trace summary parts flag dropped disclosures loudly and list uncited label
  assert.deepEqual(traceSummaryParts(null,{evidenceTrace:{
    assemblyAntecedentGuard:{restored:[{partId:'P1',claimId:'P1-C1'}],rewritten:[],removed:[]}}}),
   ['antecedent-guard: restored 1']);
+});
+
+// Batch 35 (B35-4): the firing census. A mechanism whose trace record is
+// absent or empty in every case of a pass file must surface as NEVER
+// FIRED instead of being discovered by hand after the fact.
+
+test('firing fields registry names the seeded batch-34 trace records',()=>{
+ assert.deepEqual(FIRING_FIELDS.map(entry=>entry.field),[
+  'evidenceTrace.assemblyAntecedentGuard',
+  'evidenceTrace.final.claimLevelUncitedLabels',
+  'evidenceTrace.assemblyDisclosureDropped',
+  'evidenceTrace.stages[].selectionDiversity',
+  'evidenceTrace.stages[].selectionDroppedFacets',
+  'evidenceTrace.assemblyLoss',
+  'evidenceTrace.reviewContract.boundarySubjectChecks',
+  'evidenceTrace.reviewContract.apparatusFramingChecks',
+  'evidenceTrace.vetoCensus',
+  'evidenceTrace.reviewContract.spanRegionClassifications',
+  'evidenceTrace.reviewContract.gateDemotionsSuppressed',
+  'evidenceTrace.final.unansweredRequirementLabels',
+  'evidenceTrace.synthesisProvenanceDropped',
+  'selectionTrace.diversityFinal']);
+});
+
+test('firing census counts present non-empty records per field across cases',()=>{
+ const firedCase={evidenceTrace:{
+  assemblyAntecedentGuard:{restored:[],rewritten:[{partId:'P3',claimId:'P3-C3',
+   subject:'Underground Man'}],removed:[]},
+  assemblyDisclosureDropped:[],
+  assemblyLoss:[{partId:'P1',claimId:'P1-C5',reason:'unexplained',disposition:'traced'}],
+  final:{claimLevelUncitedLabels:[]},
+  reviewContract:{boundarySubjectChecks:[{claimId:'P1-C5'}],vetoCensus:[{claimId:'P1-C5'}]},
+  stages:[{selectionDiversity:{inserted:[{bookId:'103'}],deferred:[]},
+   selectionDroppedFacets:[{partId:'P2',bookId:'236'}]}]}};
+ const labelsCase={evidenceTrace:{
+  assemblyDisclosureDropped:[{partId:'P1',claimId:'P1-C9'}],
+  final:{claimLevelUncitedLabels:[{partId:'P2',claimIds:['P2-C4']}]},
+  stages:[{selectionDiversity:{inserted:[],deferred:[{bookId:'287'}]}}]}};
+ const silentCase={evidenceTrace:{assemblyDisclosureDropped:[],final:{},
+  reviewContract:{},stages:[{}]}};
+ const emptyGuardCase={evidenceTrace:{assemblyAntecedentGuard:
+  {restored:[],rewritten:[],removed:[]}}};
+ const census=firingCensusForCases([firedCase,labelsCase,silentCase,emptyGuardCase]);
+ assert.equal(census.totalCases,4);
+ assert.deepEqual(census.fields['evidenceTrace.assemblyAntecedentGuard'],
+  {cases:1,neverFired:false});
+ assert.deepEqual(census.fields['evidenceTrace.final.claimLevelUncitedLabels'],
+  {cases:1,neverFired:false});
+ assert.deepEqual(census.fields['evidenceTrace.assemblyDisclosureDropped'],
+  {cases:1,neverFired:false,alarm:true});
+ assert.deepEqual(census.fields['evidenceTrace.stages[].selectionDiversity'],
+  {cases:2,neverFired:false});
+ assert.deepEqual(census.fields['evidenceTrace.stages[].selectionDroppedFacets'],
+  {cases:1,neverFired:false});
+ assert.deepEqual(census.fields['evidenceTrace.assemblyLoss'],
+  {cases:1,neverFired:false});
+ assert.deepEqual(census.fields['evidenceTrace.reviewContract.boundarySubjectChecks'],
+  {cases:1,neverFired:false});
+ assert.deepEqual(census.fields['evidenceTrace.reviewContract.apparatusFramingChecks'],
+  {cases:0,neverFired:true});
+ assert.deepEqual(census.fields['evidenceTrace.vetoCensus'],
+  {cases:1,neverFired:false});
+});
+
+test('firing census accepts the top-level trace alias and empty input',()=>{
+ const census=firingCensusForCases([{trace:{vetoCensus:[{claimId:'C1'}]}},null,{}]);
+ assert.equal(census.totalCases,3);
+ assert.equal(census.fields['evidenceTrace.vetoCensus'].cases,1);
+ assert.equal(census.fields['evidenceTrace.assemblyLoss'].neverFired,true);
+ const empty=firingCensusForCases([]);
+ assert.equal(empty.totalCases,0);
+ assert.ok(Object.values(empty.fields).every(record=>record.neverFired));
+});
+
+test('firing census lines flag zero-firing fields and annotate the alarm field',()=>{
+ const lines=firingCensusLines(firingCensusForCases([
+  {evidenceTrace:{assemblyLoss:[{claimId:'C1'}]}}]));
+ assert.equal(lines[0],'FIRING CENSUS (1 cases):');
+ assert.ok(lines.some(line=>line.includes('evidenceTrace.assemblyLoss')&&
+  line.includes('fired in 1/1 cases')&&!line.includes('NEVER FIRED')));
+ assert.ok(lines.some(line=>line.includes(
+  'evidenceTrace.reviewContract.apparatusFramingChecks')&&
+  line.includes('0/1 cases — NEVER FIRED')));
+ assert.ok(lines.some(line=>line.includes('evidenceTrace.assemblyDisclosureDropped')&&
+  line.includes('NEVER FIRED')&&line.includes('alarm field')));
+ assert.equal(lines.length,FIRING_FIELDS.length+1);
 });
