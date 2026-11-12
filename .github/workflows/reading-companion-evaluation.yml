@@ -122,7 +122,7 @@ jobs:
 
   phase3:
     needs: phase2
-    if: ${{ inputs.confirm_live_ai }}
+    if: ${{ !cancelled() && inputs.confirm_live_ai && (needs.phase2.result == 'success' || needs.phase2.result == 'failure') }}
     runs-on: ubuntu-latest
     timeout-minutes: 300
     steps:
