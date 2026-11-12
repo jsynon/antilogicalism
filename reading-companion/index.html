@@ -270,7 +270,7 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <meta property="og:description" content="Ask questions across the Antilogicalism Digital Library, explore cited passages, and follow links to original books and source pages.">
 <meta name="twitter:text:title" content="Reading Companion | Antilogicalism">
 
-<script type="module" src="/antilogicalism/reading-companion/companion-v112.mjs?v=1.20.6"></script>
+<script type="module" src="/antilogicalism/reading-companion/companion-v112.mjs?v=1.20.7"></script>
 
 <style id="antilogicalism-theme-typography">
 /* Let Book Lite set the font and scale throughout every edited page. */
@@ -333,13 +333,27 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot button:disabled{border-color:#596167;background:#596167;color:#fff;opacity:1;cursor:not-allowed}
 #companion-pilot .companion-hint{color:#111;font-size:.87em;line-height:1.6}
 #companion-pilot #companion-challenge:empty{display:none}
-#companion-pilot #companion-status{display:none}
-#companion-pilot #companion-status:not(:empty){display:block;position:relative;margin:1.05rem 0;padding:1rem 1.2rem 1.05rem 3.3rem;border:1px solid #dce4e8;border-left:4px solid #55788b;border-radius:5px;background:linear-gradient(135deg,#fcfdfd 0%,#f1f5f7 100%);box-shadow:0 2px 8px rgba(28,48,59,.06);color:#26343c;font-size:1.12em;font-weight:500;line-height:1.6}
-#companion-pilot #companion-status:not(:empty)::before{content:"READING COMPANION";display:block;margin:0 0 .2rem;color:#587383;font-size:.64em;font-weight:700;letter-spacing:.11em;line-height:1.4}
-#companion-pilot #companion-status.is-busy{border-left-color:#315d73}
-#companion-pilot #companion-status.is-busy::after{content:"";position:absolute;left:1.05rem;top:1.16rem;width:1.1rem;height:1.1rem;border:3px solid #d1dce1;border-top-color:#315d73;border-right-color:#55788b;border-radius:50%;transform-origin:center;animation:companion-status-spin .7s linear infinite;will-change:transform}
-@keyframes companion-status-spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){#companion-pilot #companion-status.is-busy::after{animation:companion-status-spin 2s linear infinite}}
+#companion-pilot #companion-status-card{position:relative;margin:1.05rem 0;padding:1rem 1.2rem 1.05rem 3.3rem;border:1px solid #dce4e8;border-left:4px solid #55788b;border-radius:5px;background:linear-gradient(135deg,#fcfdfd 0%,#f1f5f7 100%);box-shadow:0 2px 8px rgba(28,48,59,.06);color:#26343c}
+#companion-pilot #companion-status-card[hidden]{display:none}
+#companion-pilot #companion-status-card.is-busy{border-left-color:#315d73}
+#companion-pilot #companion-status{margin:0;font-size:1.12em;font-weight:500;line-height:1.6}
+#companion-pilot #companion-status::before{content:"READING COMPANION";display:block;margin:0 0 .2rem;color:#587383;font-size:.64em;font-weight:700;letter-spacing:.11em;line-height:1.4}
+#companion-pilot #companion-book{display:none;position:absolute;left:.6rem;top:1.05rem;width:2.4rem;height:1.75rem}
+#companion-pilot #companion-status-card.is-busy #companion-book{display:block}
+#companion-pilot #companion-book .pg{position:absolute;top:0;width:1.2rem;height:1.75rem;background:#fdfdf8;border:2px solid #55788b}
+#companion-pilot #companion-book .pg.l{left:0;border-radius:5px 2px 2px 5px;background:#eef3f5}
+#companion-pilot #companion-book .pg.r{right:0;border-radius:2px 5px 5px 2px}
+#companion-pilot #companion-book .flip{position:absolute;top:0;right:0;width:1.2rem;height:1.75rem;background:#fdfdf8;border:2px solid #55788b;border-radius:2px 5px 5px 2px;transform-origin:left center;animation:companion-page-flip 1.7s ease-in-out infinite;will-change:transform}
+#companion-pilot #companion-book .flip::after{content:"";position:absolute;inset:4px 3px;background:repeating-linear-gradient(#c9d6dd 0 1.5px,transparent 1.5px 6px);opacity:.7}
+@keyframes companion-page-flip{0%{transform:rotateY(0deg)}55%,100%{transform:rotateY(-180deg)}}
+#companion-pilot #companion-stages{display:none;position:relative;height:1.7rem;margin-top:.55rem}
+#companion-pilot #companion-status-card.is-busy #companion-stages{display:block}
+#companion-pilot #companion-stage-track{position:absolute;left:6px;right:6px;top:5px;height:3px;border-radius:2px;background:#d1dce1}
+#companion-pilot #companion-stage-fill{position:absolute;left:6px;top:5px;height:3px;width:2%;border-radius:2px;background:#315d73;transition:width 1.1s ease}
+#companion-pilot .companion-stage-node{position:absolute;top:0;width:13px;height:13px;margin-left:-6.5px;border-radius:50%;background:#fff;border:2.5px solid #b9cbd4}
+#companion-pilot .companion-stage-node.on{border-color:#315d73;background:#315d73}
+#companion-pilot .companion-stage-label{position:absolute;top:15px;left:50%;transform:translateX(-50%);font-size:.58em;font-weight:600;letter-spacing:.04em;color:#587383;white-space:nowrap}
+@media(prefers-reduced-motion:reduce){#companion-pilot #companion-book .flip{animation-duration:6s}#companion-pilot #companion-stage-fill{transition:none}}
 #companion-pilot #companion-check-hint{margin-top:1.1rem}
 #companion-pilot #companion-turnstile{margin:.8rem 0}
 #companion-pilot .companion-source-entry,#companion-pilot .companion-key-passage{padding:.9rem 0;border-bottom:1px solid #dfe2e3}
@@ -472,7 +486,11 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <p id="companion-check-hint" class="companion-hint">The quick check below simply confirms you’re a person rather than a bot — the Ask button unlocks as soon as it passes, and you may be asked to pass it again before a follow-up question.</p>
 <div id="companion-turnstile" aria-label="Quick check"></div>
 </form>
+<div id="companion-status-card" hidden>
+<div id="companion-book" aria-hidden="true"><span class="pg l"></span><span class="pg r"></span><span class="flip"></span></div>
 <p id="companion-status" aria-live="polite" aria-atomic="true" aria-busy="false" role="status"></p>
+<div id="companion-stages" aria-hidden="true"><span id="companion-stage-track"></span><span id="companion-stage-fill"></span><span class="companion-stage-node" style="left:2%"><span class="companion-stage-label">Search</span></span><span class="companion-stage-node" style="left:35%"><span class="companion-stage-label">Gather</span></span><span class="companion-stage-node" style="left:68%"><span class="companion-stage-label">Check sources</span></span><span class="companion-stage-node" style="left:98%"><span class="companion-stage-label">Compose</span></span></div>
+</div>
 <section id="companion-answer" aria-live="polite" aria-label="Reading Companion response"></section>
 <section id="companion-source-reader" class="companion-source-reader" aria-label="Read original source passage" hidden>
 <div class="companion-source-actions"><button type="button" id="companion-close-source">← Return to answer</button></div>
