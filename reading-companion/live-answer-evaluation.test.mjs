@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,evaluateCaseWithCapacityRetry,CAPACITY_RETRY_DELAYS_MS,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps,structuralFailureReasons,traceSummaryParts,FIRING_FIELDS,firingCensusForCases,firingCensusLines} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,evaluateCaseWithCapacityRetry,CAPACITY_RETRY_DELAYS_MS,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,pilotAnswerSources,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps,structuralFailureReasons,traceSummaryParts,FIRING_FIELDS,firingCensusForCases,firingCensusLines} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -1504,6 +1504,100 @@ test('all-books evaluation sends retrieved candidates for Worker selection befor
  assert.equal(result.submittedSources.length,6);
 });
 
+test('pilot answer payload carries retrieval facet ranks in the live per-source shape',async()=>{
+ const item={id:'facet-ranks-payload',
+  question:'How do Darwin in On the Origin of Species and Hawking in A Brief History of Time explain their evidence?',
+  selected_book_ids:[],planner_queries:['Darwin On the Origin of Species natural selection evidence',
+   'Hawking A Brief History of Time black hole observations'],review_focus:[],required_source_groups:[]};
+ const pages=new Map();
+ for(const [bookId,title] of [['529','On the Origin of Species — Charles Darwin'],
+   ['102','A Brief History of Time — Stephen Hawking']]){
+  for(let index=0;index<3;index++){
+   const page=100+index+(bookId==='102'?10:0),globalPageId=Number(bookId)*100+index;
+   pages.set(bookId+':'+globalPageId,{id:globalPageId,page,
+    text:`${title} passage ${index+1} gives a distinct observation and explanation relevant to the question.`});
+  }
+ }
+ const library={search:async(_query,{bookId})=>({sources:[...pages.entries()]
+   .filter(([key])=>key.startsWith(String(bookId)+':')).map(([,page],index)=>({
+    bookId:String(bookId),title:String(bookId)==='529'?'On the Origin of Species — Charles Darwin':'A Brief History of Time — Stephen Hawking',
+    page:page.page,globalPageId:page.id,preview:page.text,score:50-index,
+    url:`https://example.test/#page=${page.page}`}))}),
+  jsonGzip:async(path)=>{const id=path.match(/book-(\d+)\.json/)[1];return {pages:[...pages.entries()]
+   .filter(([key])=>key.startsWith(id+':')).map(([,page])=>page)};}};
+ let answerBody;
+ const result=await evaluateLiveCase(item,{library,
+  manifest:{books:{529:{title:'On the Origin of Species — Charles Darwin'},
+   102:{title:'A Brief History of Time — Stephen Hawking'}}},
+  allowed:new Set(['529','102']),token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,
+  fetcher:async(_url,options)=>{answerBody=JSON.parse(options.body);return new Response(JSON.stringify({
+   outcome:'verified-source-draft',coverage:'full',answer:'Claims from both works [S1, S4].',
+   citations:[],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
+ // The ranks on the wire are exactly the ranks retrieval stamped on the
+ // same pages, which the case record keeps in retrievalCandidates: join
+ // by book and page instead of assuming a facet numbering.
+ const recorded=new Map(result.retrievalCandidates.map(source=>[source.bookId+':'+source.page,source.facetRanks]));
+ assert.ok(answerBody.sources.length>0);
+ for(const source of answerBody.sources){
+  assert.deepEqual(source.facetRanks,recorded.get(source.bookId+':'+source.page),
+   'sent facetRanks must equal the ranks recorded for the same page');
+  for(const entry of source.facetRanks){
+   assert.deepEqual(Object.keys(entry).sort(),['facet','rank'],
+    'each rank entry carries exactly the live {facet, rank} fields');
+   assert.ok(Number.isSafeInteger(entry.facet)&&entry.facet>=0);
+   assert.ok(Number.isSafeInteger(entry.rank)&&entry.rank>=1);
+  }
+ }
+ // Every facet retrieval used keeps its rank-1 anchor page in the sent
+ // packet, so the Worker's facet-anchor reservation (B1a) has a seed to
+ // reserve for each facet instead of tracing 'no-facet-ranks'.
+ const recordedFacets=new Set(result.retrievalCandidates.flatMap(source=>(source.facetRanks||[]).map(entry=>entry.facet)));
+ assert.ok(recordedFacets.size>=2,'the fixture must exercise more than one facet');
+ const anchorFacets=new Set(answerBody.sources.flatMap(source=>source.facetRanks.filter(entry=>entry.rank===1).map(entry=>entry.facet)));
+ assert.deepEqual(anchorFacets,recordedFacets);
+});
+
+test('transport A/B selection and answer payloads carry facet ranks on every call',async()=>{
+ const calls=[];
+ const item={id:'transport-facet-ranks',question:'What does the source say about liberty?',
+  selected_book_ids:['1'],planner_queries:['What does the source say about liberty?'],review_focus:[],required_source_groups:[]};
+ const library={search:async()=>({sources:[{id:'page-1',bookId:'1',title:'A Source',page:1,globalPageId:1,
+   preview:'The source discusses liberty and the meaning of individual freedom.',score:10}]}),
+  jsonGzip:async()=>({pages:[{id:1,page:1,text:'The source discusses liberty and the meaning of individual freedom.'}]})};
+ const snapshot=[{bookId:'1',page:1,candidateId:'C1',candidatePartIds:[],candidatePartSupport:[]}];
+ await evaluateLiveCase(item,{library,manifest:{books:{1:{title:'A Source'}}},allowed:new Set(['1']),
+  token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,answerVariant:'transport-ab',
+  fetcher:async(url,options)=>{
+   const body=JSON.parse(options.body);calls.push({url,body});
+   if(body.selectionOnly)return new Response(JSON.stringify({selectionOnly:true,selectionSnapshot:snapshot,
+    sourceSelectionStatus:'selected',sourceSelection:{status:'selected',pages:[{id:'S1',bookId:'1',page:1,candidatePartIds:[]}]}}),
+    {status:200,headers:{'content-type':'application/json'}});
+   return new Response(JSON.stringify({inferenceTransport:body.inferenceTransport,
+    outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'The source discusses liberty [S1].',
+    citations:[{id:'S1',bookId:'1'}],evidenceHighlights:[],sourceSelection:{status:'selected',pages:[{id:'S1',bookId:'1',page:1,candidatePartIds:[]}]}}),
+    {status:200,headers:{'content-type':'application/json'}});
+  }});
+ const pilotCalls=calls.filter(({url})=>/pilot-answer$/.test(url));
+ assert.equal(pilotCalls.length,3,'one shared selection call plus both transport answer calls');
+ assert.equal(pilotCalls[0].body.selectionOnly,true);
+ for(const {body} of pilotCalls)
+  assert.deepEqual(body.sources[0].facetRanks,[{facet:0,rank:1}],
+   'the single-facet retrieval rank rides every pilot-answer payload');
+});
+
+test('pilotAnswerSources omits facetRanks when a candidate carries none',()=>{
+ assert.deepEqual(pilotAnswerSources([{bookId:'341',page:119,text:'Darcy letter text.',
+   candidatePartIds:['P3'],facetRanks:[{facet:2,rank:1},{facet:0,rank:4}]}]),
+  [{bookId:'341',page:119,text:'Darcy letter text.',candidatePartIds:['P3'],
+   facetRanks:[{facet:2,rank:1},{facet:0,rank:4}],libraryVersion:49}]);
+ const absent=pilotAnswerSources([{bookId:'341',page:118,text:'Narrative text.',candidatePartIds:['P3']}]);
+ assert.equal('facetRanks' in absent[0],false,
+  'absent ranks stay absent so the Worker traces no-facet-ranks instead of reserving from an empty set');
+ const malformed=pilotAnswerSources([{bookId:'341',page:117,text:'Earlier narrative text.',facetRanks:'none'}]);
+ assert.equal('facetRanks' in malformed[0],false,'a non-array ranks value is not sent');
+ assert.equal('candidatePartIds' in malformed[0],false);
+});
+
 test('transport A/B selects one verified packet and reuses it for both complete answer paths',async()=>{
  const calls=[];
  const item={id:'transport-pair-liberty',question:'What does the source say about liberty?',
@@ -1881,7 +1975,7 @@ const item={id:'paired-test',question:'Explain the source question.',selected_bo
  assert.equal(calls.length,2);
  assert.deepEqual(calls.map(call=>call.body.answerVariant),['with-review','compose-only']);
  assert.deepEqual(calls[0].body.sources,calls[1].body.sources);
- assert.deepEqual(calls[0].body.sources,[{bookId:'638',page:10,text:'A sufficiently long source passage for the fake test page.',libraryVersion:49}]);
+ assert.deepEqual(calls[0].body.sources,[{bookId:'638',page:10,text:'A sufficiently long source passage for the fake test page.',facetRanks:[{facet:0,rank:1},{facet:1,rank:1},{facet:2,rank:1}],libraryVersion:49}]);
  assert.equal(result.answerVariant,'paired-review-ablation');
  assert.equal(result.passed,true);
  assert.deepEqual(result.reviewAblation.variants.map(variant=>variant.answerVariant),['with-review','compose-only']);
