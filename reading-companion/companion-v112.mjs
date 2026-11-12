@@ -98,7 +98,7 @@ const statusStagePatterns=[
   /promising leads|looking for a couple more/i,
   /picking out the best clues|checking that they fit your question/i,
   /following those ideas|strongest passages are gathered|pieces are coming together|taking shape|giving the citations|polishing the explanation|tracing each part|still among the books/i];
-const statusStageFill=['2%','35%','68%','98%'];
+const statusStageFill=['2%','35%','68%','97%'];
 let statusStage=0;
 function refreshStatusState(){
   const busy=Boolean(status.textContent.trim())&&(searching||answering);
