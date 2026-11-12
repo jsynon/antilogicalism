@@ -34,6 +34,9 @@ const bookSearchStatus=el('companion-book-search-status');
 const askButton=el('companion-ask-button');
 const answerBox=el('companion-answer');
 const status=el('companion-status');
+const statusCard=el('companion-status-card');
+const stageFill=el('companion-stage-fill');
+const stageNodes=statusCard?[...statusCard.querySelectorAll('.companion-stage-node')]:[];
 const challenge=el('companion-challenge');
 const challengeBox=el('companion-turnstile');
 const diagnosticPanel=el('companion-diagnostic-panel');
@@ -91,10 +94,30 @@ function node(tag,textValue,className){
   if(className)e.className=className;
   return e;
 }
+const statusStagePatterns=[
+  /book hunt|browsing the books|searching with your question/i,
+  /promising leads|looking for a couple more/i,
+  /picking out the best clues|checking that they fit your question/i,
+  /following those ideas|strongest passages are gathered|pieces are coming together|taking shape|giving the citations|polishing the explanation|tracing each part|still among the books/i];
+const statusStageFill=['2%','35%','68%','97%'];
+let statusStage=0;
 function refreshStatusState(){
   const busy=Boolean(status.textContent.trim())&&(searching||answering);
   status.classList.toggle('is-busy',busy);
   status.setAttribute('aria-busy',String(busy));
+  if(statusCard){
+    statusCard.hidden=!status.textContent.trim();
+    statusCard.classList.toggle('is-busy',busy);
+    if(!busy)statusStage=0;
+    else{
+      const text=status.textContent;
+      statusStagePatterns.forEach((pattern,stage)=>{
+        if(pattern.test(text))statusStage=stage===0?0:Math.max(statusStage,stage);
+      });
+      stageNodes.forEach((node,stage)=>node.classList.toggle('on',stage<=statusStage));
+      if(stageFill)stageFill.style.width=statusStageFill[statusStage];
+    }
+  }
 }
 function setStatus(message){status.textContent=message;refreshStatusState();}
 const longWaitNotices=[
