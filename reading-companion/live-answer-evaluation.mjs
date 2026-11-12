@@ -1013,6 +1013,108 @@ export function auditLiveAnswer(data,submitted,requiredGroups,requiredPartSource
   answerQualityStatus:'pending-human-review',answerQualityPass:null,
   passed:reviewStatus==='answer-draft-unverified'?null:structuralPassed};
 }
+// Display-only: name WHICH structural conditions failed, derived from
+// the same result fields auditLiveAnswer's structuralPassed conjunction
+// consumed. The per-case console line used to print STRUCTURAL-MISS with
+// only the outcome, leaving a watcher no way to tell a missing citation
+// from a dropped part. Returns [] unless the case actually missed.
+export function structuralFailureReasons(result){
+ if(!result||result.passed!==false||result.requestFailure)return [];
+ const reasons=[];
+ const generalContextOnly=result.evidenceApplicability==='not-applicable';
+ const completenessContractSatisfied=result.answerCompleteness==='full'||
+  (result.answerCompleteness==='unknown'&&result.coverage==='full');
+ if(!completenessContractSatisfied&&!generalContextOnly)reasons.push('completeness-contract');
+ const sourceGroups=Array.isArray(result.sourceGroups)?result.sourceGroups:[];
+ if(sourceGroups.some(group=>!group.found))reasons.push('source-group-not-found');
+ if(sourceGroups.some(group=>group.linkedToSupportedEvidence===false))reasons.push('source-group-not-linked');
+ if((result.inlineIdsWithoutSource||[]).length)reasons.push('missing-inline-citation');
+ if(!(Number(result.citationCount)>0)&&!generalContextOnly)reasons.push('no-citations');
+ if(result.answerCoverageConsistent===false)reasons.push('coverage-inconsistent');
+ if(result.partEvidenceComplete===false)reasons.push('part-evidence-incomplete');
+ if((result.sourcePartAlignment||[]).some(item=>!item.aligned))reasons.push('source-part-misaligned');
+ if(result.reviewerLabels?.contractStatus==='incomplete'||
+  result.reviewStatus==='review-contract-incomplete')reasons.push('review-contract-incomplete');
+ if(result.failureCode)reasons.push('failure-code');
+ if((result.answerInternalIdLeaks||[]).length||Number(result.internalIdLeakCount)>0)
+  reasons.push('internal-id-leak');
+ if(result.reviewStatus==='pipeline-failed')reasons.push('pipeline-failed');
+ if(result.reviewStatus==='generation-format-failed'||result.reviewStatus==='review-format-failed')
+  reasons.push('review-format-failed');
+ if(result.selectionHandoffAudit?.status==='mismatch')reasons.push('selection-handoff-mismatch');
+ if(result.noAnswerFailure===true)reasons.push('no-answer');
+ return reasons;
+}
+// Display-only: one-line summary of the batch-33/34 trace machinery that
+// fired for a case, so a watcher sees labels shipped, antecedent-guard
+// actions, assembly loss, selection diversity, and timeouts live instead
+// of only in the artifact. Drawn from production trace shapes: guard and
+// loss entries are arrays on the trace, labels ride trace.final, and
+// B34-4's selection records ride the selection stage entry in
+// trace.stages. assemblyDisclosureDropped must always be empty; a
+// non-empty value is flagged loudly.
+export function traceSummaryParts(evidenceTrace,result){
+ const trace=evidenceTrace||result?.evidenceTrace||result?.trace||{};
+ const parts=[];
+ const guard=trace.assemblyAntecedentGuard;
+ if(guard){
+  const counts=[['restored',guard.restored],['rewritten',guard.rewritten],['removed',guard.removed]]
+   .map(([name,entries])=>[name,Array.isArray(entries)?entries.length:0])
+   .filter(([,count])=>count>0);
+  if(counts.length)parts.push('antecedent-guard: '+counts.map(([name,count])=>name+' '+count).join(', '));
+ }
+ const final=trace.final||{};
+ if(Array.isArray(final.absentPartLabelsInAnswer)&&final.absentPartLabelsInAnswer.length)
+  parts.push('absent-part-labels: '+final.absentPartLabelsInAnswer.join(', '));
+ if(Array.isArray(final.uncitedPartLabelsInAnswer)&&final.uncitedPartLabelsInAnswer.length)
+  parts.push('uncited-part-labels: '+final.uncitedPartLabelsInAnswer.join(', '));
+ if(Array.isArray(final.claimLevelUncitedLabels)&&final.claimLevelUncitedLabels.length)
+  parts.push('claim-level-uncited-labels: '+final.claimLevelUncitedLabels
+   .flatMap(entry=>Array.isArray(entry?.claimIds)&&entry.claimIds.length?entry.claimIds:
+    [entry?.partId].filter(Boolean)).join(', '));
+ const dropped=trace.assemblyDisclosureDropped;
+ if(Array.isArray(dropped)&&dropped.length)
+  parts.push('DISCLOSURE-DROPPED: '+dropped.length+' (must always be empty)');
+ const loss=Array.isArray(trace.assemblyLoss)?trace.assemblyLoss:[];
+ if(loss.length){
+  const byReason=new Map();
+  for(const entry of loss){
+   const reason=String(entry?.reason||'unknown');
+   byReason.set(reason,(byReason.get(reason)||0)+1);
+  }
+  parts.push('assembly-loss: '+loss.length+' ('+
+   [...byReason].map(([reason,count])=>reason+' '+count).join(', ')+')');
+  const unexplained=byReason.get('unexplained')||0;
+  if(unexplained)parts.push('UNEXPLAINED-LOSS: '+unexplained);
+ }
+ const timeouts=new Map();
+ for(const call of Array.isArray(trace.inferenceCalls)?trace.inferenceCalls:[]){
+  if(!call?.timeoutFired)continue;
+  const stage=String(call.stage||'unknown');
+  timeouts.set(stage,(timeouts.get(stage)||0)+1);
+ }
+ if(timeouts.size)parts.push('timeouts: '+[...timeouts].map(([stage,count])=>stage+' '+count).join(', '));
+ const containment=trace.sourceRequiredContainment;
+ if(containment?.disposition&&containment.disposition!=='all-shipped-source-parts-cited'){
+  const uncited=Array.isArray(containment.uncitedPartIds)&&containment.uncitedPartIds.length?
+   ' (uncited: '+containment.uncitedPartIds.join(', ')+')':'';
+  parts.push('containment: '+containment.disposition+uncited);
+ }
+ let inserted=0,deferred=0;const droppedFacets=[];
+ for(const stage of Array.isArray(trace.stages)?trace.stages:[]){
+  const diversity=stage?.selectionDiversity;
+  if(diversity){
+   inserted+=Array.isArray(diversity.inserted)?diversity.inserted.length:0;
+   deferred+=Array.isArray(diversity.deferred)?diversity.deferred.length:0;
+  }
+  if(Array.isArray(stage?.selectionDroppedFacets))
+   for(const facet of stage.selectionDroppedFacets)droppedFacets.push(facet);
+ }
+ if(inserted||deferred)parts.push('selection-diversity: inserted '+inserted+', deferred '+deferred);
+ if(droppedFacets.length)
+  parts.push('dropped-facets: '+droppedFacets.map(facet=>String(facet?.partId||'?')).join(', '));
+ return parts;
+}
 const MANUAL_REVIEW_DIMENSIONS=['accuracy','questionCoverage','explanationQuality','citationSupport','citationCompleteness'];
 const HIGHLIGHT_REVIEW_DIMENSIONS=['fidelity','coverage','context','claimRelevance','completeness'];
 const NON_PRODUCED_OUTCOMES=new Set(['generation-failed','request-failed','shared-selection-failed']);
@@ -2117,6 +2219,9 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
      await progress('answer','completed',`${inferenceTransport} returned ${audit.outcome||'no outcome'} with ${audit.coverage} coverage and ${audit.citationCount} citations.`,
       {variant:inferenceTransport,outcome:audit.outcome,coverage:audit.coverage,citations:audit.citationCount,
        requestElapsedMs,usage:data.usage||null});
+     const transportTraceParts=traceSummaryParts(data.trace,audit);
+     if(transportTraceParts.length)
+      await progress('trace','summary',transportTraceParts.join('; '),{variant:inferenceTransport});
     }catch(error){
      const requestElapsedMs=Date.now()-requestStarted;
      timing.record(`answer-${inferenceTransport}`,'failed',requestElapsedMs);
@@ -2164,6 +2269,9 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     ...(data.trace?{evidenceTrace:data.trace}:{})});
    await progress('answer','completed',`${variant} returned ${audit.outcome||'no outcome'} with ${audit.coverage} coverage and ${audit.citationCount} citations.`,
     {variant,outcome:audit.outcome,coverage:audit.coverage,citations:audit.citationCount,usage:data.usage||null});
+   const traceParts=traceSummaryParts(data.trace,audit);
+   if(traceParts.length)
+    await progress('trace','summary',traceParts.join('; '),{variant});
   }
   if(answerVariant!=='transport-ab')timing.record('answer','completed',timing.requestStageMs.answer);
  }catch(error){if(!error.requestFailure)error.requestFailure={stage:'answer',httpStatus:null,failureCode:'answer-failed',message:String(error.message||error).slice(0,240),workerFailure:false};
@@ -2639,7 +2747,8 @@ async function main(){
    }));
    await saveReport();
    const label=args.mode==='planner'?'PLANNER':'STRUCTURAL';
-   console.log((result.passed===true?label+'-PASS':result.passed===null?'UNSCORED':result.requestFailure?'REQUEST-FAIL':label+'-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome'));
+   const missReasons=result.passed===false&&!result.requestFailure?structuralFailureReasons(result):[];
+   console.log((result.passed===true?label+'-PASS':result.passed===null?'UNSCORED':result.requestFailure?'REQUEST-FAIL':label+'-MISS')+' '+result.id+': '+(result.outcome||result.requestFailure?.failureCode||'no outcome')+(missReasons.length?' [failed: '+missReasons.join(', ')+']':''));
   };
   const evaluateWithAttempt=async(item,options)=>{
    activeRepeatAttempt=item.repeatAttempt||0;

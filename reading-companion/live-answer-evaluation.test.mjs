@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps} from './live-answer-evaluation.mjs';
+import {auditLiveAnswer,auditHighlightClaimCoverage,auditSelectionHandoff,auditEvidenceContinuity,summarizeEvidenceContinuity,recheckQualityReport,applyHumanScorecard,createHumanScorecardTemplate,deriveLinkageCompleteness,BATCH22_ACCEPTANCE_THRESHOLDS,evaluationRunContext,selectLiveCases,applyQualityScope,evaluationUsesLivePlanner,evaluateLiveCase,evaluatePlannerCase,runLiveCases,runPairedScopeCases,restrictPlanToSelectedBooks,summarizeManualReviews,summarizeHighlightReviews,summarizeAnswerVariants,summarizeReviewerLabels,summarizePipelineFailures,summarizeCitationGateIntegrity,summarizeQualityByFailureStage,partFacetsFromPlan,validatePublishedCorpus,validateEvaluationBookScopes,sourcesUsedForWorkerSelection,summarizeInferenceTransport,hasProducedAnswer,summarizeBatch22Metrics,rescueOrVetoClaims,claimAuditCompletenessGaps,structuralFailureReasons,traceSummaryParts} from './live-answer-evaluation.mjs';
 import {LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs';
 
 const suite={cases:[{id:'science-hawking-black-holes'},{id:'philosophy-aristotle-habituation'}]};
@@ -2174,4 +2174,100 @@ test('planner-only evaluation records planner and retrieval stage timings',async
  assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
   ['planner:completed','retrieval:completed']);
  assert.ok(result.stageTimings.every(entry=>Number.isFinite(entry.elapsedMs)&&entry.elapsedMs>=0));
+});
+
+test('structural failure reasons stay empty for passes, unscored, and request failures',()=>{
+ assert.deepEqual(structuralFailureReasons({passed:true}),[]);
+ assert.deepEqual(structuralFailureReasons({passed:null}),[]);
+ assert.deepEqual(structuralFailureReasons({passed:false,requestFailure:{failureCode:'provider-limit'}}),[]);
+ assert.deepEqual(structuralFailureReasons(null),[]);
+});
+
+test('structural failure reasons name the one failed condition on a produced miss',()=>{
+ // Machiavelli-shaped: a verified draft with full coverage and citations
+ // still missed in production; the log line must say which condition.
+ const result={passed:false,outcome:'verified-source-draft',coverage:'full',
+  answerCompleteness:'full',evidenceApplicability:'required',
+  sourceGroups:[{found:true,linkedToSupportedEvidence:true}],
+  inlineIdsWithoutSource:[],citationCount:5,answerCoverageConsistent:true,
+  partEvidenceComplete:false,sourcePartAlignment:[{aligned:true}],
+  reviewerLabels:{contractStatus:'complete'},failureCode:'',
+  answerInternalIdLeaks:[],internalIdLeakCount:0,reviewStatus:'claim-review',
+  selectionHandoffAudit:{status:'ok'},noAnswerFailure:false};
+ assert.deepEqual(structuralFailureReasons(result),['part-evidence-incomplete']);
+});
+
+test('structural failure reasons list every failed condition in audit order',()=>{
+ const result={passed:false,outcome:'verified-source-draft',coverage:'partial',
+  answerCompleteness:'partial',evidenceApplicability:'required',
+  sourceGroups:[{found:false,linkedToSupportedEvidence:false},
+   {found:true,linkedToSupportedEvidence:false}],
+  inlineIdsWithoutSource:['S9'],citationCount:0,answerCoverageConsistent:false,
+  partEvidenceComplete:true,sourcePartAlignment:[{aligned:false}],
+  reviewerLabels:{contractStatus:'incomplete'},failureCode:'reviewer-stalled',
+  answerInternalIdLeaks:['P1-C2'],internalIdLeakCount:1,reviewStatus:'claim-review',
+  selectionHandoffAudit:{status:'mismatch'},noAnswerFailure:false};
+ assert.deepEqual(structuralFailureReasons(result),[
+  'completeness-contract','source-group-not-found','source-group-not-linked',
+  'missing-inline-citation','no-citations','coverage-inconsistent',
+  'source-part-misaligned','review-contract-incomplete','failure-code',
+  'internal-id-leak','selection-handoff-mismatch']);
+});
+
+test('structural failure reasons cover terminal review statuses and no-answer',()=>{
+ const base={passed:false,coverage:'full',answerCompleteness:'full',
+  evidenceApplicability:'required',sourceGroups:[],inlineIdsWithoutSource:[],
+  citationCount:3,answerCoverageConsistent:true,partEvidenceComplete:true,
+  sourcePartAlignment:[],reviewerLabels:{contractStatus:'complete'},
+  failureCode:'',answerInternalIdLeaks:[],selectionHandoffAudit:{status:'ok'}};
+ assert.deepEqual(structuralFailureReasons({...base,reviewStatus:'pipeline-failed',
+  noAnswerFailure:true}),['pipeline-failed','no-answer']);
+ assert.deepEqual(structuralFailureReasons({...base,reviewStatus:'review-format-failed',
+  noAnswerFailure:false}),['review-format-failed']);
+ assert.deepEqual(structuralFailureReasons({...base,reviewStatus:'review-contract-incomplete',
+  noAnswerFailure:false}),['review-contract-incomplete']);
+});
+
+test('trace summary parts stay empty when nothing fired',()=>{
+ assert.deepEqual(traceSummaryParts({},{}),[]);
+ assert.deepEqual(traceSummaryParts(null,null),[]);
+ assert.deepEqual(traceSummaryParts({assemblyDisclosureDropped:[],
+  sourceRequiredContainment:{disposition:'all-shipped-source-parts-cited'}},{}),[]);
+});
+
+test('trace summary parts surface batch 33/34 firings from a production-shaped trace',()=>{
+ const trace={assemblyAntecedentGuard:{restored:[],
+   rewritten:[{partId:'P3',claimId:'P3-C3',subject:'Underground Man'}],removed:[]},
+  final:{absentPartLabelsInAnswer:['P2']},
+  assemblyDisclosureDropped:[],
+  assemblyLoss:[{partId:'P1',claimId:'P1-C5',reason:'unexplained',disposition:'unexplained-partial'},
+   {partId:'P2',claimId:'P2-C13',reason:'scaffolding-omit',disposition:'traced'}],
+  inferenceCalls:[{stage:'review',kind:'initial',timeoutFired:true},
+   {stage:'compose',kind:'initial',timeoutFired:false}],
+  sourceRequiredContainment:{disposition:'answer-level-shipped-with-uncited-parts',
+   uncitedPartIds:['P2']},
+  stages:[{selectionDiversity:{inserted:[{candidateId:'C4',bookId:'103',
+    displacedCandidateId:'C21',reason:'duplicate-book-slot'}],deferred:['C21']},
+   selectionDroppedFacets:[{partId:'P2',bookId:'236',
+    reason:'packet-filled-with-distinct-books'}]}]};
+ assert.deepEqual(traceSummaryParts(trace,{}),[
+  'antecedent-guard: rewritten 1',
+  'absent-part-labels: P2',
+  'assembly-loss: 2 (unexplained 1, scaffolding-omit 1)',
+  'UNEXPLAINED-LOSS: 1',
+  'timeouts: review 1',
+  'containment: answer-level-shipped-with-uncited-parts (uncited: P2)',
+  'selection-diversity: inserted 1, deferred 1',
+  'dropped-facets: P2']);
+});
+
+test('trace summary parts flag dropped disclosures loudly and list uncited labels',()=>{
+ assert.deepEqual(traceSummaryParts({assemblyDisclosureDropped:[{partId:'P1'}]},{}),
+  ['DISCLOSURE-DROPPED: 1 (must always be empty)']);
+ assert.deepEqual(traceSummaryParts({final:{uncitedPartLabelsInAnswer:['P2'],
+   claimLevelUncitedLabels:[{partId:'P1',claimIds:['P1-C4','P1-C7']}]}},{}),
+  ['uncited-part-labels: P2','claim-level-uncited-labels: P1-C4, P1-C7']);
+ assert.deepEqual(traceSummaryParts(null,{evidenceTrace:{
+   assemblyAntecedentGuard:{restored:[{partId:'P1',claimId:'P1-C1'}],rewritten:[],removed:[]}}}),
+  ['antecedent-guard: restored 1']);
 });
