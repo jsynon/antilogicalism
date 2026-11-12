@@ -18,6 +18,7 @@ import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber,source
 import {citationExcerptsForAnswer} from './citation-evidence.mjs';
 import {keyPassageExcerpts} from './citation-evidence.mjs';
 import {parseAnswerMarkdown,parseInlineMarkdown} from './answer-markdown.mjs';
+import {pilotAnswerSources} from './answer-payload.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
@@ -796,11 +797,11 @@ async function askQuestion(questionText){
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
         history,bookId:bookFilter.value||'',plan:currentPlan||undefined,
-        // Carry retrieval's part associations alongside each candidate. They
-        // are routing hints only: the Worker still verifies page identity and
-        // reviews whether cited spans actually support each answer claim.
-        sources:candidatePacket.map(({bookId,page,text,candidatePartIds})=>({bookId,page,text,
-          ...(Array.isArray(candidatePartIds)?{candidatePartIds}:{}),libraryVersion:49}))})
+        // Carry retrieval's part associations and facet ranks alongside each
+        // candidate. They are routing hints only: the Worker still verifies
+        // page identity and reviews whether cited spans actually support each
+        // answer claim.
+        sources:pilotAnswerSources(candidatePacket)})
     });
     let data;
     try{data=await response.json();}catch{
