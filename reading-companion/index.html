@@ -333,12 +333,12 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot button:disabled{border-color:#596167;background:#596167;color:#fff;opacity:1;cursor:not-allowed}
 #companion-pilot .companion-hint{color:#111;font-size:.87em;line-height:1.6}
 #companion-pilot #companion-challenge:empty{display:none}
-#companion-pilot #companion-status-card{position:relative;margin:1.05rem 0;padding:1rem 1.2rem 1.3rem 3.9rem;border:1px solid #dce4e8;border-left:4px solid #55788b;border-radius:5px;background:linear-gradient(135deg,#fcfdfd 0%,#f1f5f7 100%);box-shadow:0 2px 8px rgba(28,48,59,.06);color:#26343c}
+#companion-pilot #companion-status-card{position:relative;margin:1.05rem 0;padding:1.1rem 1.3rem 1.6rem 4.3rem;border:1px solid #dce4e8;border-left:4px solid #55788b;border-radius:5px;background:linear-gradient(135deg,#fcfdfd 0%,#f1f5f7 100%);box-shadow:0 2px 8px rgba(28,48,59,.06);color:#26343c}
 #companion-pilot #companion-status-card[hidden]{display:none}
 #companion-pilot #companion-status-card.is-busy{border-left-color:#315d73}
 #companion-pilot #companion-status{margin:0;font-size:1.12em;font-weight:500;line-height:1.6}
 #companion-pilot #companion-status::before{content:"READING COMPANION";display:block;margin:0 0 .2rem;color:#587383;font-size:.64em;font-weight:700;letter-spacing:.11em;line-height:1.4}
-#companion-pilot #companion-book{display:none;position:absolute;left:1rem;top:1.15rem;width:2.4rem;height:1.75rem}
+#companion-pilot #companion-book{display:none;position:absolute;left:1.25rem;top:1.25rem;width:2.4rem;height:1.75rem}
 #companion-pilot #companion-status-card.is-busy #companion-book{display:block}
 #companion-pilot #companion-book .pg{position:absolute;top:0;width:1.2rem;height:1.75rem;background:#fdfdf8;border:2px solid #55788b}
 #companion-pilot #companion-book .pg.l{left:0;border-radius:5px 2px 2px 5px;background:#eef3f5}
@@ -346,13 +346,13 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot #companion-book .flip{position:absolute;top:0;right:0;width:1.2rem;height:1.75rem;background:#fdfdf8;border:2px solid #55788b;border-radius:2px 5px 5px 2px;transform-origin:left center;animation:companion-page-flip 1.7s ease-in-out infinite;will-change:transform}
 #companion-pilot #companion-book .flip::after{content:"";position:absolute;inset:4px 3px;background:repeating-linear-gradient(#c9d6dd 0 1.5px,transparent 1.5px 6px);opacity:.7}
 @keyframes companion-page-flip{0%{transform:rotateY(0deg)}55%,100%{transform:rotateY(-180deg)}}
-#companion-pilot #companion-stages{display:none;position:relative;height:2.1rem;margin-top:.7rem}
+#companion-pilot #companion-stages{display:none;position:relative;height:2.6rem;margin-top:.9rem}
 #companion-pilot #companion-status-card.is-busy #companion-stages{display:block}
 #companion-pilot #companion-stage-track{position:absolute;left:6px;right:6px;top:5px;height:3px;border-radius:2px;background:#d1dce1}
 #companion-pilot #companion-stage-fill{position:absolute;left:6px;top:5px;height:3px;width:2%;border-radius:2px;background:#315d73;transition:width 1.1s ease}
 #companion-pilot .companion-stage-node{position:absolute;top:0;width:13px;height:13px;margin-left:-6.5px;border-radius:50%;background:#fff;border:2.5px solid #b9cbd4}
 #companion-pilot .companion-stage-node.on{border-color:#315d73;background:#315d73}
-#companion-pilot .companion-stage-label{position:absolute;top:16px;left:50%;transform:translateX(-50%);font-size:.58em;font-weight:600;letter-spacing:.04em;line-height:1.2;color:#587383;white-space:nowrap}
+#companion-pilot .companion-stage-label{position:absolute;top:20px;left:50%;transform:translateX(-50%);font-size:.58em;font-weight:600;letter-spacing:.04em;line-height:1.2;color:#587383;white-space:nowrap}
 @media(prefers-reduced-motion:reduce){#companion-pilot #companion-book .flip{animation-duration:6s}#companion-pilot #companion-stage-fill{transition:none}}
 #companion-pilot #companion-check-hint{margin-top:1.1rem}
 #companion-pilot #companion-turnstile{margin:.8rem 0}
