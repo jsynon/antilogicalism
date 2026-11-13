@@ -607,6 +607,25 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    }
   }
  }
+ // Stage B.3: the direct-question facet is the reader's own words, and a
+ // part scope is a planner claim that can be wrong (a collective byline
+ // once scoped every facet of an all-books question to 55 anthology
+ // volumes). When any part carries a hard scope, run that one facet
+ // unscoped and link it to every scoped part as a control: candidates it
+ // finds stay eligible for those parts even outside the scope, bounding
+ // the damage of any wrong scope. Every other facet keeps full scope
+ // discipline, and the Worker still judges support before anything ships.
+ const directFacetIndex=baseQueries.findIndex(value=>
+  value.trim().toLocaleLowerCase()===direct.toLocaleLowerCase());
+ const scopedControlPartIds=useDirect||directFacetIndex<0?[]:
+  partQuestions.filter(part=>typeof part?.partId==='string'&&
+   /^P[1-9]\d*$/.test(part.partId)&&Array.isArray(part?.sourceBookIds)&&
+   part.sourceBookIds.length).map(part=>part.partId);
+ const controlFacetIndex=scopedControlPartIds.length?directFacetIndex:-1;
+ if(controlFacetIndex>=0)for(const partId of scopedControlPartIds){
+  if(!partFacetIndices.some(item=>item.partId===partId&&item.facet===controlFacetIndex))
+   partFacetIndices.push({partId,facet:controlFacetIndex,kind:'unscoped-control'});
+ }
  // Part rewrites can drop an explicit citation from the reader's question.
  // Carry a single unambiguous scripture reference into each unscoped part
  // facet so search does not reinterpret a biblical name (James, John, etc.)
@@ -627,6 +646,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  const targetBookIds=namedBookIds.length?namedBookIds:[null];
  const retrievalAllowed=selected.length?selectedAllowed:allowedBookIds;
  const sourceIdsForFacet=facet=>{
+  if(facet===controlFacetIndex)return [];
   const linkedPartIds=new Set(partFacetIndices.filter(item=>item.facet===facet)
    .map(item=>item.partId));
   const ids=[...new Set(partQuestions.filter(part=>linkedPartIds.has(part?.partId)&&
@@ -650,6 +670,10 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)),executedQuery,scopeReference,
    targetBookIds:facetBookIds.filter(Boolean).map(String)};
  }));
+ if(controlFacetIndex>=0&&searchSets[controlFacetIndex]){
+  searchSets[controlFacetIndex].unscopedControl=true;
+  searchSets[controlFacetIndex].controlPartIds=scopedControlPartIds;
+ }
  // In a two-source comparison, one author's query can miss because its wording
  // does not occur in that author's books even when the other side retrieved a
  // clear topic. Reuse that existing topic query once, scoped to the missing
@@ -940,6 +964,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   // with the part's own wording that already targeted all of its works
   // would return the same empty result.
   const alreadyRan=partFacetIndices.some(item=>item.partId===partId&&
+   item.kind!=='unscoped-control'&&
    searchQueries[item.facet]?.trim().toLocaleLowerCase()===query.toLocaleLowerCase()&&
    (!scopeIds.length||scopeIds.every(id=>
     (searchSets[item.facet]?.targetBookIds||[]).map(String).includes(id))));
@@ -1088,6 +1113,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   // starved-part trigger's guard): it would return the same result set.
   // That execution's outcome stands as this requirement's chase result.
   const ranItem=partFacetIndices.find(item=>item.partId===partId&&
+   item.kind!=='unscoped-control'&&
    searchQueries[item.facet]?.trim().toLocaleLowerCase()===text.toLocaleLowerCase()&&
    (diversityStarved||!scopeIds.length||scopeIds.every(id=>
     (searchSets[item.facet]?.targetBookIds||[]).map(String).includes(id))));
@@ -1184,6 +1210,12 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   const sourceIds=partSourceBookIds.get(partId)||[];
   return !sourceIds.length||sourceIds.includes(String(bookId));
  };
+ // The unscoped-control facet (Stage B.3) is the one deliberate exception
+ // to partAllowsBook: a candidate the reader's own words found may join a
+ // scoped part it controls for, whatever book it sits in.
+ const controlPartLinks=new Set(partFacetIndices
+  .filter(item=>item.kind==='unscoped-control')
+  .map(item=>item.partId+'|'+item.facet));
  for(const source of [...representatives,...others]){
   const page=await pageLoader(source);
   if(!page||typeof page.text!=='string')continue;
@@ -1191,7 +1223,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   if(byteLength<25||byteLength>pageLimit)continue;
   const matchedFacets=new Set((source.facetRanks||[]).map(item=>item.facet));
   const candidatePartIds=new Set(partFacetIndices.filter(item=>matchedFacets.has(item.facet)&&
-   partAllowsBook(item.partId,source.bookId))
+   (partAllowsBook(item.partId,source.bookId)||
+    controlPartLinks.has(item.partId+'|'+item.facet)))
    .map(item=>item.partId));
   // A page can answer more than the one planner facet that found it. Add a
   // second part link only when the hydrated page shares at least two
@@ -1245,6 +1278,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   searches:searchSets.map((set,index)=>({
   query:searchSets[index].executedQuery+(namedBookIds.length?' [named books: '+namedBookIds.join(', ')+']':''),
   ...(searchSets[index].scopeReference?{originalQuery:searchQueries[index],scopeInherited:true}:{}),
+  ...(searchSets[index].unscopedControl?{unscopedControl:true,
+   controlPartIds:searchSets[index].controlPartIds}:{}),
   ...(searchSets[index].inheritedPartScope?{partScopeInherited:searchSets[index].inheritedPartScope}:{}),
   ...(searchSets[index].quoteFallback?{quoteFallback:true}:{}),
   ...(searchSets[index].groupScopeRecovery?{groupScopeRecovery:true,
