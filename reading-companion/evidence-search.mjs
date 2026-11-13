@@ -546,7 +546,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
     gapQueryPartLinks.some(link=>!link||typeof link.query!=='string'||
      !gapQueries.some(query=>query.trim().toLocaleLowerCase()===link.query.trim().toLocaleLowerCase())||
      !Array.isArray(link.partIds)||link.partIds.length<1||link.partIds.length>6||
-     link.partIds.some(id=>!knownPartIds.has(id))))
+     link.partIds.some(id=>!knownPartIds.has(id))||
+     (link.kind!==undefined&&link.kind!=='gap'&&link.kind!=='gap-fallback')))
   throw Error('Conditional retrieval query links are invalid');
  if(!Array.isArray(sourceGroups)||sourceGroups.length>8||sourceGroups.some(group=>
    !group||!['primary','subject','commentary','unspecified'].includes(group.role)||
@@ -580,7 +581,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   const facet=searchQueries.findIndex(value=>value.trim().toLocaleLowerCase()===link.query.trim().toLocaleLowerCase());
   for(const partId of link.partIds){
    if(facet>=0&&!partFacetIndices.some(item=>item.partId===partId&&item.facet===facet))
-    partFacetIndices.push({partId,facet,kind:'gap'});
+    partFacetIndices.push({partId,facet,
+     kind:link.kind==='gap-fallback'?'gap-fallback':'gap'});
   }
  }
  // The planner's main queries can be more useful than the part's natural-
@@ -789,7 +791,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  for(const part of partQuestions){
   if(typeof part?.partId!=='string')continue;
   const explicit=Array.isArray(part.sourceBookIds)?part.sourceBookIds.map(String):[];
-  const resolved=partFacetIndices.filter(item=>item.partId===part.partId&&item.kind!=='gap')
+  const resolved=partFacetIndices.filter(item=>item.partId===part.partId&&
+    item.kind!=='gap'&&item.kind!=='gap-fallback')
    .flatMap(item=>searchSets[item.facet]?.targetBookIds||[]);
   const ids=[...new Set(explicit.length?explicit:resolved)];
   if(ids.length)partSourceBookIds.set(part.partId,ids);
@@ -1047,6 +1050,20 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  // coupling remains the shared budget only; statuses and the
  // positionCoverage shape are unchanged.
  const POSITION_CHASE_LIMIT=6;
+ // Stage B.5 (item 4): a requirement is only genuinely covered when at
+ // least one matched term is distinctive to its part — measured against
+ // the sibling parts, or against the full question for a single-part
+ // plan. An empty distinctive set (the requirement restates the whole
+ // question) keeps the previous overlap-only rule.
+ const requirementDistinctiveTerms=(partId,text)=>{
+  const terms=facetTerms(text);
+  if(!terms.length)return new Set();
+  const siblings=scopedPartQuestions.filter(part=>part.partId!==partId);
+  const excluded= siblings.length
+   ?new Set(siblings.flatMap(part=>facetTerms(String(part?.question||''))))
+   :new Set(facetTerms(direct));
+  return new Set(terms.filter(term=>!excluded.has(term)));
+ };
  let positionChasesRun=0;
  const positionCoverage=[];
  const partChaseStates=[];
@@ -1073,14 +1090,24 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  const chaseRequirement=async(state,text)=>{
   const {partId,scopeIds,allowedScopeIds,candidateSources,records}=state;
   if(facetTerms(text).length<2)return;
+  const distinctive=requirementDistinctiveTerms(partId,text);
   let best=0,judged=0;const coveringBooks=new Set();
   for(const source of candidateSources){
    const snippet=source.preview||source.excerpt||source.text||'';
    if(!snippet)continue;
    judged++;
-   const overlap=localFacetTextMatch(text,snippet).overlap;
-   if(overlap>best)best=overlap;
-   if(overlap>=2)coveringBooks.add(String(source.bookId));
+   const match=localFacetTextMatch(text,snippet);
+   if(match.overlap>best)best=match.overlap;
+   // Overlap on shared topic words alone is the masking shape (the
+   // ballroom page "covering" the letter part): a covering page must
+   // also touch a term distinctive to this part. The requirement's
+   // quoted phrase turning up in the page is the other identity
+   // signal, judged by the same tolerant match the quote fallback's
+   // gate uses to decide the phrase is already retrieved.
+   if((match.overlap>=2&&
+      (!distinctive.size||match.matchedTerms.some(term=>distinctive.has(term))))||
+      quotedPhraseMatchLength(text,snippet)>0)
+    coveringBooks.add(String(source.bookId));
   }
   // Candidates carrying no snippet text at all cannot judge coverage;
   // absence of text is not evidence of a low-overlap miss (B6-6's rule).
@@ -1090,8 +1117,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
     booksCovering:[...new Set(candidateSources.map(source=>String(source.bookId)))]});
    return;
   }
-  const diversityStarved=best>=2&&!scopeIds.length&&coveringBooks.size===1;
-  if(best>=2&&!diversityStarved){
+  const diversityStarved=coveringBooks.size===1&&!scopeIds.length;
+  if(coveringBooks.size&&!diversityStarved){
    records.push({requirement:text,status:'covered',booksCovering:[...coveringBooks]});
    return;
   }
@@ -1166,7 +1193,7 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    requirements:state.records});
  }
  const partFacetScopes=partQuestions.length?partFacetIndices.map(item=>({partId:item.partId,facet:item.facet,
-  sourceBookIds:(item.kind==='gap'||item.kind==='part-gap')?(partSourceBookIds.get(item.partId)||[]):
+  sourceBookIds:(item.kind==='gap'||item.kind==='gap-fallback'||item.kind==='part-gap')?(partSourceBookIds.get(item.partId)||[]):
    (partSourceBookIds.get(item.partId)||searchSets[item.facet]?.targetBookIds||[])})):[];
  const directQuestionFacetIndex=searchQueries.findIndex(value=>
   value.trim().toLocaleLowerCase()===direct.toLocaleLowerCase());
@@ -1321,9 +1348,19 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
   :[{partId:'P1',question:String(question||'')}];
  const partTerms=parts.map(part=>facetTerms(part.question.replace(
   /\b(?:explain|source|question|detail|specific|named|book|passage|answer|enough|sufficiently|testing|fake)\b/giu,' ')));
+ const fullQuestionTerms=new Set(facetTerms(String(question||'').replace(
+  /\b(?:explain|source|question|detail|specific|named|book|passage|answer|enough|sufficiently|testing|fake)\b/giu,' ')));
  const assessments=parts.map((part,partIndex)=>{
   const siblingTerms=new Set(partTerms.filter((_,index)=>index!==partIndex).flat());
-  const distinctiveTerms=partTerms[partIndex].filter(term=>!siblingTerms.has(term));
+  // Stage B.5 (item 4): a single-part plan has no sibling parts to be
+  // distinctive against, so distinctiveness is measured against the full
+  // question instead — the terms the part itself adds (a named document,
+  // a specific mechanism) are what a covering page must actually touch.
+  // When the part restates the full question the set is empty and the
+  // zero-distinctive rule below stays inert, exactly as before.
+  const distinctiveTerms=parts.length>1
+   ?partTerms[partIndex].filter(term=>!siblingTerms.has(term))
+   :partTerms[partIndex].filter(term=>!fullQuestionTerms.has(term));
   let best={overlap:0,matchedTerms:[],windowStart:-1,source:null};
   let bestIndex={overlap:0,matchedTerms:[],windowStart:-1,source:null};
   let indexLikeSource=null;
@@ -1364,7 +1401,7 @@ export function assessEvidenceCoverage(candidates,question,partQuestions=[]){
   // question. They cannot, by themselves, establish that this particular
   // part has a relevant retrieval lead. This remains a retrieval trigger;
   // semantic selection and answer review still decide what the text supports.
-  const onlySharedPartTerms=parts.length>1&&distinctiveTerms.length>0&&
+  const onlySharedPartTerms=distinctiveTerms.length>0&&
    matchedDistinctiveTerms.length===0;
   const weak=missingRequestedSource||(terms.length>0&&overlap<required)||onlySharedPartTerms;
   const indexLikeIsStrongest=bestIndex.overlap>best.overlap;
@@ -1639,6 +1676,53 @@ export function canFallbackToDirectSearch(status,code=''){
  if(Number.isInteger(status)&&status>=500)return true;
  if(Number.isInteger(status)&&status>=400)return false;
  return ['invalid-response','search-planning-failed','network-error'].includes(code);
+}
+
+/* Stage B.5 (item 3): when the conditional gap planner cannot produce
+ * queries — invalid response or provider failure, after the caller's
+ * single retry — the weak parts still carry their own requirement
+ * texts, and the position chase already proves a requirement issued
+ * verbatim retrieves. Build one deterministic facet per weak part
+ * from its first usable requirement text (the part's own question
+ * when it carries none), linked back to that part as 'gap-fallback',
+ * bounded by the same limits retrieveEvidence enforces on
+ * planner-issued gap queries: at most 3 queries of 8–160 chars and
+ * 3 links. Parts whose texts cannot form a legal gap query are
+ * skipped rather than trimmed — verbatim is the point. */
+export function deterministicGapFallbackQueries(weakParts=[],partQuestions=[]){
+ const partsById=new Map((Array.isArray(partQuestions)?partQuestions:[])
+  .filter(part=>typeof part?.partId==='string')
+  .map(part=>[part.partId,part]));
+ const queries=[],queryPartLinks=[],byText=new Map();
+ for(const weak of Array.isArray(weakParts)?weakParts:[]){
+  const partId=typeof weak?.partId==='string'?weak.partId:'';
+  if(!/^P[1-9]\d*$/.test(partId))continue;
+  const part=partsById.get(partId);
+  const texts=[...(Array.isArray(part?.requirements)?part.requirements:[]),
+   ...(Array.isArray(weak?.requirements)?weak.requirements:[]),
+   typeof part?.question==='string'?part.question:'',
+   typeof weak?.question==='string'?weak.question:''];
+  // Requirement texts arrive as plain strings on weak-part records
+  // and as {id, text} objects on plan parts; either shape contributes
+  // its text verbatim when its trimmed length fits the facet bounds.
+  const text=texts.map(value=>typeof value==='string'?value:
+    (value&&typeof value.text==='string'?value.text:''))
+   .find(value=>value.trim().length>=8&&value.trim().length<=160);
+  if(!text)continue;
+  const key=text.toLocaleLowerCase();
+  const existing=byText.get(key);
+  if(existing){
+   if(!existing.partIds.includes(partId)&&existing.partIds.length<6)
+    existing.partIds.push(partId);
+   continue;
+  }
+  if(queries.length>=3)break;
+  const link={query:text,partIds:[partId],kind:'gap-fallback'};
+  byText.set(key,link);
+  queries.push(text);
+  queryPartLinks.push(link);
+ }
+ return {queries,queryPartLinks};
 }
 
 function crossSourceSides(partQuestions){

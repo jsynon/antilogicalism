@@ -573,7 +573,7 @@ test('generic author wording does not scope all-books retrieval to collective by
 
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,boundAnswerSources,facetTopBooks,selectionDroppedFacets,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,prepareAnswerCandidates,dedupeWorkEditions,workEditionKey} from './evidence-search.mjs';
+import {mergeFacetSearches,validSearchPlan,buildSearchFacets,selectAnswerSources,boundAnswerSources,facetTopBooks,selectionDroppedFacets,canFallbackToDirectSearch,matchExplicitBookIds,targetBooksForFacet,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,prepareAnswerCandidates,dedupeWorkEditions,workEditionKey,deterministicGapFallbackQueries} from './evidence-search.mjs';
 import {catalogFallbackPlan,catalogIdentity,normalizePlan,sourceProvenance} from './reader-contract.mjs';
 import {sourceAttributionLabel} from './citation-numbering.mjs';
 
@@ -671,6 +671,70 @@ test('a multi-part facet with its own distinctive term does not trigger recovery
  const coverage=assessEvidenceCoverage([source],question,parts);
  assert.ok(coverage.parts[1].matchedDistinctiveTerms.includes('heroism'));
  assert.ok(!coverage.weakParts.some(part=>part.partId==='P2'));
+});
+test('shared subject words do not hide a missing facet in a single-part question (B.5)',()=>{
+ // Stage B.5 (item 4a): distinctiveness is measured against the full
+ // question for single-part plans too, not only between sibling parts.
+ const question='How does the ballroom shape Elizabeth’s view of Darcy?';
+ const parts=[{partId:'P1',question:'How does the ballroom shape Elizabeth’s view of Darcy and his later letter about Wickham?'}];
+ const sharedOnly={bookId:'301',page:88,
+  excerpt:'The ballroom shaped Elizabeth’s view of Darcy that evening, and she spoke of little else.'};
+ const coverage=assessEvidenceCoverage([sharedOnly],question,parts);
+ assert.equal(coverage.parts[0].overlap>=coverage.parts[0].requiredTermCount,true,
+  'raw overlap reproduces the false positive seen in the live trace');
+ assert.deepEqual(coverage.parts[0].matchedDistinctiveTerms,[]);
+ assert.ok(coverage.parts[0].distinctiveTerms.includes('wickham'));
+ assert.equal(coverage.parts[0].coverageReason,'only-shared-part-terms');
+ assert.deepEqual(coverage.weakParts.map(part=>part.partId),['P1']);
+ assert.equal(coverage.shouldSearch,true);
+ const distinctive={bookId:'301',page:112,
+  excerpt:'Darcy’s letter about Wickham changed Elizabeth’s view after the ballroom.'};
+ const rescued=assessEvidenceCoverage([distinctive],question,parts);
+ assert.ok(rescued.parts[0].matchedDistinctiveTerms.includes('wickham'));
+ assert.deepEqual(rescued.weakParts,[]);
+ // A part that merely restates the full question has no distinctive
+ // terms, so the rule stays inert and overlap alone decides, as before.
+ const restated=assessEvidenceCoverage([sharedOnly],question,
+  [{partId:'P1',question}]);
+ assert.deepEqual(restated.parts[0].distinctiveTerms,[]);
+ assert.deepEqual(restated.weakParts,[]);
+});
+test('deterministic gap fallback queries use weak-part texts verbatim (B.5)',()=>{
+ const partQuestions=[
+  {partId:'P1',question:'What does Darcy write in his letter to Elizabeth?',
+   requirements:[{id:'P1-R1',text:'Identify what the letter reveals about Wickham'}]},
+  {partId:'P2',question:'How does Elizabeth answer the letter in her own reflections?'},
+  {partId:'P3',question:'What does the narrator conclude about pride by the final chapter?'},
+  {partId:'P4',question:'How does the final chapter resolve the entail question for the family?'},
+  {partId:'P5',question:'What role does the entail play in the opening chapters of the novel?'}
+ ];
+ const fallback=deterministicGapFallbackQueries([
+  {partId:'P1'},
+  {partId:'P2',requirements:['short']},
+  {partId:'P3',requirements:['Identify what the letter reveals about Wickham']},
+  {partId:'P4'},
+  {partId:'P5'},
+  {partId:'PX'}
+ ],partQuestions);
+ // P1 contributes its requirement verbatim; P2's only requirement is
+ // below the facet length floor, so its question is used; P3 repeats
+ // P1's text and merges into the same link; P5's text would be a
+ // fourth distinct facet and is cut by the gap-round cap; PX is not
+ // a plan part.
+ assert.deepEqual(fallback.queries,[
+  'Identify what the letter reveals about Wickham',
+  'How does Elizabeth answer the letter in her own reflections?',
+  'How does the final chapter resolve the entail question for the family?']);
+ assert.deepEqual(fallback.queryPartLinks,[
+  {query:'Identify what the letter reveals about Wickham',partIds:['P1','P3'],kind:'gap-fallback'},
+  {query:'How does Elizabeth answer the letter in her own reflections?',partIds:['P2'],kind:'gap-fallback'},
+  {query:'How does the final chapter resolve the entail question for the family?',partIds:['P4'],kind:'gap-fallback'}]);
+ assert.deepEqual(deterministicGapFallbackQueries([],partQuestions),
+  {queries:[],queryPartLinks:[]});
+ const oversized=deterministicGapFallbackQueries([{partId:'P1'}],
+  [{partId:'P1',question:'Short?',requirements:['x'.repeat(200)]}]);
+ assert.deepEqual(oversized,{queries:[],queryPartLinks:[]},
+  'a part with no text inside the facet bounds contributes nothing');
 });
 test('index-style entries cannot combine unrelated terms into answer coverage',()=>{
  const indexPage={bookId:'114',page:1264,globalPageId:'114:1264',

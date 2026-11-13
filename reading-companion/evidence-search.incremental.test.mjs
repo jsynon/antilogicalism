@@ -330,6 +330,72 @@ test('the per-position chase fires in the initial round, before any gap planning
  assert.equal(traced[0].reason,'position');
 });
 
+test('a page matching only shared terms does not cover a requirement; the distinctive page is chased (B.5)',async()=>{
+ // Stage B.5 (item 4b): coverage inside the position chase needs a
+ // term distinctive to the part (here, against the full question for
+ // a single-part plan), not just overlap on the shared topic words.
+ const requirement='the letter Darcy wrote to Elizabeth about Wickham';
+ const sharedPage={bookId:'301',title:'Pride and Prejudice',page:88,
+  globalPageId:3088,score:70,
+  preview:'Darcy gave Elizabeth the letter at the ballroom, and everyone talked of the assembly.'};
+ const letterPage={bookId:'301',title:'Pride and Prejudice',page:112,
+  globalPageId:3112,score:66,
+  preview:'In the letter Darcy owned that Wickham had deceived Georgiana.'};
+ const calls=[];
+ const library={search:async(query,options={})=>{
+  const bookId=options.bookId?String(options.bookId):'';
+  const allowed=[...(options.allowedBookIds||[])].map(String);
+  calls.push({query,bookId,allowed});
+  if(bookId==='301')return {sources:[sharedPage]};
+  if(query===requirement&&allowed.length===1&&allowed[0]==='301')
+   return {sources:[letterPage]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({
+  question:'What does Darcy write in his letter to Elizabeth?',
+  queries:['Darcy letter Elizabeth','Darcy Rosings assembly'],
+  partQueries:[{partId:'P1',query:'Darcy letter Elizabeth'}],
+  partQuestions:[{partId:'P1',question:'What does Darcy write in his letter to Elizabeth?',
+   sourceBookIds:['301'],requirements:[requirement]}],
+  library,books:[{id:'301',title:'Pride and Prejudice'}],
+  allowedBookIds:new Set(['301']),
+  pageLoader:async source=>({text:source.page===112?letterPage.preview:sharedPage.preview})});
+ assert.equal(calls.filter(call=>call.query===requirement).length,1,
+  'the masked requirement is chased exactly once, inside the part scope');
+ const traced=result.searches.filter(search=>search.partGapRecovery);
+ assert.equal(traced.length,1);
+ assert.equal(traced[0].starvedPartId,'P1');
+ assert.equal(traced[0].reason,'position');
+ assert.deepEqual(result.positionCoverage,[
+  {partId:'P1',requirements:[{requirement,status:'chased-covered',booksCovering:['301']}]}]);
+});
+
+test('a page touching a distinctive term covers its requirement without a chase (B.5)',async()=>{
+ const requirement='the letter Darcy wrote to Elizabeth about Wickham';
+ const letterPage={bookId:'301',title:'Pride and Prejudice',page:112,
+  globalPageId:3112,score:70,
+  preview:'Darcy gave Elizabeth the letter about Wickham at the ballroom.'};
+ const calls=[];
+ const library={search:async(query,options={})=>{
+  calls.push({query,bookId:String(options.bookId||'')});
+  if(options.bookId==='301')return {sources:[letterPage]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({
+  question:'What does Darcy write in his letter to Elizabeth?',
+  queries:['Darcy letter Elizabeth','Darcy Rosings assembly'],
+  partQueries:[{partId:'P1',query:'Darcy letter Elizabeth'}],
+  partQuestions:[{partId:'P1',question:'What does Darcy write in his letter to Elizabeth?',
+   sourceBookIds:['301'],requirements:[requirement]}],
+  library,books:[{id:'301',title:'Pride and Prejudice'}],
+  allowedBookIds:new Set(['301']),
+  pageLoader:async()=>({text:letterPage.preview})});
+ assert.equal(calls.filter(call=>call.query===requirement).length,0,
+  'no chase fires when the pooled page already carries a distinctive term');
+ assert.deepEqual(result.positionCoverage,[
+  {partId:'P1',requirements:[{requirement,status:'covered',booksCovering:['301']}]}]);
+});
+
 test('a part without threaded requirements falls back to its own question as the requirement text',async()=>{
  const calls=[];
  const genericSource={bookId:'10',title:COVERAGE_BOOKS[0].title,page:44,

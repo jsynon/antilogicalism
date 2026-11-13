@@ -1999,18 +1999,88 @@ test('planner and conditional gap fallback keep the unchanged reader question in
    return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',
     answer:'In 1 John, God’s love is revealed and calls people to love one another [S1].',
     citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
- assert.equal(calls.length,3);
+ // Stage B.5 (item 3): the fallback-eligible gap-planner failure is
+ // retried once, then rescued with deterministic fallback queries, so
+ // the Worker sees plan, gap, gap retry, answer.
+ assert.equal(calls.length,4);
  assert.match(calls[0].url,/pilot-plan$/);assert.match(calls[1].url,/pilot-plan$/);
- assert.ok(calls[1].body.retrievalGap);assert.match(calls[2].url,/pilot-answer$/);
+ assert.ok(calls[1].body.retrievalGap);
+ assert.match(calls[2].url,/pilot-plan$/);assert.ok(calls[2].body.retrievalGap);
+ assert.match(calls[3].url,/pilot-answer$/);
  assert.equal(result.plannerFallback,true);
  assert.deepEqual(result.plannerQueries,[]);
  assert.deepEqual(result.plannerFailure,{httpStatus:502,failureCode:'search-planning-failed'});
  assert.equal(result.gapPlannerFailure,'search-planning-failed');
- assert.deepEqual(searched,[question]);
+ assert.equal(result.gapRetryAttempted,true);
+ assert.equal(result.gapFallbackUsed,true);
+ assert.ok(result.gapFallbackQueries.length>=1);
+ assert.deepEqual(result.gapQueries,result.gapFallbackQueries);
+ // The planner-fallback plan's weak part carries the reader question
+ // as its own text, so the deterministic fallback facet is that same
+ // wording, searched a second time as a gap-linked facet.
+ assert.deepEqual(searched,[question,...result.gapFallbackQueries]);
  assert.ok(result.searches.some(search=>search.query===question));
  assert.ok(result.submittedSources.some(source=>source.bookId==='638'&&source.page===1821),
   'the Bible page must survive retrieval and reach the Worker packet');
  assert.equal(result.passed,true);
+});
+
+test('gap planner failure is retried once and the retry can rescue the round (B.5)',async()=>{
+ const calls=[];let gapCalls=0;
+ const pageText='Experience and perception are discussed at length in this passage about the senses and the mind.';
+ const library={search:async query=>query==='properties of perceived reality query'?{sources:[{bookId:'638',title:'A Source',
+   page:4,globalPageId:44,preview:pageText,score:8}]}:{sources:[]},
+  jsonGzip:async()=>({pages:[{id:44,page:4,text:pageText}]})};
+ const item={id:'gap-retry-rescue',question:'What are the properties of the external world?',
+  selected_book_ids:['638'],
+  planner_queries:['external world reality existence query','properties of perceived reality query'],
+  required_source_groups:[{label:'A Source',book_ids:['638']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'A Source'}}},
+  allowed:new Set(['638']),token:'x'.repeat(40),useFixedQueries:true,
+  fetcher:async(url,options)=>{
+   const body=JSON.parse(options.body);calls.push({url,body});
+   if(body.retrievalGap){gapCalls++;
+    if(gapCalls===1)return new Response(JSON.stringify({failureCode:'search-planning-failed'}),
+     {status:502,headers:{'content-type':'application/json'}});
+    return new Response(JSON.stringify({queries:['alternate wording search lead']}),
+     {status:200,headers:{'content-type':'application/json'}});}
+   return new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',
+    reviewStatus:'review',answer:'The source discusses experience and perception [S1].',
+    citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),
+    {status:200,headers:{'content-type':'application/json'}});
+  }});
+ assert.equal(gapCalls,2,'the failed gap call is retried exactly once');
+ assert.equal(result.gapRetryAttempted,true);
+ assert.equal(result.gapFallbackUsed,false);
+ assert.deepEqual(result.gapFallbackQueries,[]);
+ assert.equal(result.gapPlannerFailure,'search-planning-failed',
+  'the first failure stays on the record even though the retry rescued the round');
+ assert.deepEqual(result.gapQueries,['alternate wording search lead']);
+ assert.equal(result.passed,true);
+});
+
+test('gap planner quota failure rethrows with no retry and no fallback (B.5)',async()=>{
+ const calls=[];
+ const pageText='Experience and perception are discussed at length in this passage about the senses and the mind.';
+ const library={search:async query=>query==='properties of perceived reality query'?{sources:[{bookId:'638',title:'A Source',
+   page:4,globalPageId:44,preview:pageText,score:8}]}:{sources:[]},
+  jsonGzip:async()=>({pages:[{id:44,page:4,text:pageText}]})};
+ const item={id:'gap-quota',question:'What are the properties of the external world?',
+  selected_book_ids:['638'],
+  planner_queries:['external world reality existence query','properties of perceived reality query'],
+  required_source_groups:[{label:'A Source',book_ids:['638']}]};
+ await assert.rejects(evaluateLiveCase(item,{library,manifest:{books:{638:{title:'A Source'}}},
+  allowed:new Set(['638']),token:'x'.repeat(40),useFixedQueries:true,
+  fetcher:async(url,options)=>{calls.push({url,body:JSON.parse(options.body)});
+   return new Response(JSON.stringify({failureCode:'ai-rate-limited'}),
+    {status:429,headers:{'content-type':'application/json'}});}}),
+  error=>{
+   assert.equal(error.requestFailure.stage,'gap-planner');
+   assert.equal(error.requestFailure.failureCode,'ai-rate-limited');
+   assert.equal(error.requestFailure.httpStatus,429);
+   return true;});
+ assert.equal(calls.length,1,'a quota failure is never retried and no answer is attempted');
+ assert.ok(calls[0].body.retrievalGap);
 });
 
 test('planner rate limit remains fail-closed and skips answer generation',async()=>{
@@ -2334,7 +2404,7 @@ test('stage timings mark fixed-query planning as skipped and record both conditi
  assert.equal(result.stageTimings[0].elapsedMs,0);
 });
 
-test('stage timings mark planner and gap-planner fallbacks with the failed request durations',async()=>{
+test('stage timings record the rescued gap round after planner and gap-planner failures',async()=>{
  const calls=[];
  const question='What does “God is love” mean?';
  const library={search:async()=>({sources:[{id:'B1',bookId:'638',title:'The New Oxford Annotated Bible',
@@ -2350,8 +2420,14 @@ test('stage timings mark planner and gap-planner fallbacks with the failed reque
     citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}});}});
  assert.equal(result.plannerFallback,true);
  assert.equal(result.gapPlannerFailure,'search-planning-failed');
+ // Stage B.5 (item 3): the failed gap round is retried and rescued by
+ // deterministic fallback queries, so it completes (its recorded
+ // duration still accumulates both failed attempts) and a gap
+ // retrieval stage runs, instead of the old bare gap-planner fallback.
+ assert.equal(result.gapRetryAttempted,true);
+ assert.equal(result.gapFallbackUsed,true);
  assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
-  ['planner:fallback','retrieval:completed','gap-planner:fallback','answer:completed']);
+  ['planner:fallback','retrieval:completed','gap-planner:completed','gap-retrieval:completed','answer:completed']);
 });
 
 test('stage timings mark a prepared paired plan as reused with no planner duration',async()=>{
