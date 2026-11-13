@@ -10,7 +10,7 @@ import {RemoteLibrary} from './remote-library.mjs';
 import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.6';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,deterministicGapFallbackQueries,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.6';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -755,6 +755,24 @@ async function askQuestion(questionText){
             diagnosticState?.gapFailureCode))throw error;
           if(diagnosticState){diagnosticState.gapPlannerFailure=diagnosticState.gapFailureCode||'gap-planning-failed';
             diagnosticState.gapFailureHttpStatus=null;diagnosticState.gapFailureCode='';}
+          // Stage B.5 (item 3): a fallback-eligible gap failure is retried
+          // once; a second failure builds deterministic queries from the
+          // weak parts' own requirement texts instead of abandoning the
+          // round. Quota and 4xx failures rethrew above and never retry.
+          if(diagnosticState){diagnosticState.gapRetryAttempted=true;refreshDiagnostic();}
+          try{
+            const gapToken=await nextTurnstileToken();turnstileToken='';
+            const retryPlan=await requestRetrievalGap(q,gapToken,history,planned?.queries||[q],
+              partQuestions,coverage,candidates);
+            gapQueries=retryPlan.queries;gapQueryPartLinks=retryPlan.queryPartLinks;
+          }catch(retryError){
+            if(!canFallbackToDirectSearch(diagnosticState?.gapFailureHttpStatus,
+              diagnosticState?.gapFailureCode))throw retryError;
+            const fallback=deterministicGapFallbackQueries(coverage.weakParts,partQuestions);
+            gapQueries=fallback.queries;gapQueryPartLinks=fallback.queryPartLinks;
+            if(diagnosticState){diagnosticState.gapFallbackUsed=gapQueries.length>0;
+              diagnosticState.gapFallbackQueries=gapQueries;refreshDiagnostic();}
+          }
         }
         if(gapQueries.length){
           const expanded=await retrieveSources(planned?.queries||null,{plannerFallback,

@@ -8,7 +8,7 @@ import {fileURLToPath} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {RemoteLibrary,DEFAULT_INDEX_ROOT} from './remote-library.mjs';
-import {validSearchPlan,selectAnswerSources,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,auditEvidencePacketSelection,LIVE_RETRIEVAL_CONFIG,RETRIEVAL_PROFILES} from './evidence-search.mjs';
+import {validSearchPlan,selectAnswerSources,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,auditSelectionCoverage,auditEvidencePacketSelection,deterministicGapFallbackQueries,LIVE_RETRIEVAL_CONFIG,RETRIEVAL_PROFILES} from './evidence-search.mjs';
 import {auditCitationIds} from './diagnostic-report.mjs';
 
 const ROOT=resolve(dirname(fileURLToPath(import.meta.url)),'..');
@@ -2144,6 +2144,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   timing.record('retrieval','failed',Date.now()-retrievalStarted);
   timing.attach(error);throw error;}
  let gapQueries=[],gapQueryPartLinks=[],gapPlannerFailure=null,gapPlannerFailureDiagnostics=null;
+ let gapRetryAttempted=false,gapFallbackUsed=false,gapFallbackQueries=[];
  const initialSearches=loaded.searches;
  const initialPositionCoverage=loaded.positionCoverage;
  const initialRetrievalCandidates=loaded.retrievalCandidates;
@@ -2154,7 +2155,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  if(retrievalCoverage.shouldSearch){
   await progress('gap-planner','started','Retrieved passages leave at least one question part weakly covered; asking the librarian for optional alternate search terms.',
    {weakPartCount:retrievalCoverage.weakParts.length});
-  try{
+  const attemptGapPlan=async()=>{
    const gap=await callJson(fetcher,API+'/api/pilot-plan',token,{question:item.question,
     bookId:plannerBookId,history:[],turnstileToken:'evaluation-runner-token',retrievalGap:{
      weakParts:retrievalCoverage.weakParts.slice(0,6).map(part=>({partId:part.partId,part:part.question,
@@ -2170,17 +2171,63 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
      typeof value!=='string'||value.trim().length<8||value.trim().length>160))
     throw attachRequestFailure(new Error('Conditional retrieval planner returned invalid queries.'),
      'gap-planner',{httpStatus:200,failureCode:'invalid-response',failureDetail:'invalid_output',workerFailure:false});
-   gapQueries=[...new Set(gap.queries.map(value=>value.trim()))];
+   const plannedQueries=[...new Set(gap.queries.map(value=>value.trim()))];
    const weakPartIds=new Set(retrievalCoverage.weakParts.slice(0,6).map(part=>part.partId));
-   gapQueryPartLinks=Array.isArray(gap.queryPartLinks)?gap.queryPartLinks.filter(link=>
-    link&&typeof link.query==='string'&&gapQueries.some(query=>
+   let plannedLinks=Array.isArray(gap.queryPartLinks)?gap.queryPartLinks.filter(link=>
+    link&&typeof link.query==='string'&&plannedQueries.some(query=>
       query.toLocaleLowerCase()===link.query.trim().toLocaleLowerCase())&&
     Array.isArray(link.partIds)&&link.partIds.length>0&&
     link.partIds.every(id=>weakPartIds.has(id))):[];
-   if(!gapQueryPartLinks.length&&weakPartIds.size===1)
-    gapQueryPartLinks=gapQueries.map(query=>({query,partIds:[[...weakPartIds][0]]}));
+   if(!plannedLinks.length&&weakPartIds.size===1)
+    plannedLinks=plannedQueries.map(query=>({query,partIds:[[...weakPartIds][0]]}));
+   return {queries:plannedQueries,queryPartLinks:plannedLinks,usage:gap.usage||null};
+  };
+  try{
+   let gapPlan=null;
+   try{
+    gapPlan=await attemptGapPlan();
+   }catch(firstError){
+    const firstFailure=firstError.requestFailure||{};
+    if(!canFallbackToDirectSearch(firstFailure.httpStatus,firstFailure.failureCode))throw firstError;
+    // The first failure is on the record whatever rescues the round —
+    // the same semantics as the live driver — so validation can count
+    // attempted / failed / rescued gap rounds separately.
+    if(!gapPlannerFailure){
+     gapPlannerFailure=firstFailure.failureCode||'gap-planning-failed';
+     gapPlannerFailureDiagnostics={stage:'gap-planner',workerFailureStage:firstFailure.workerFailureStage||'gap-planning',
+      httpStatus:firstFailure.httpStatus,failureCode:gapPlannerFailure,
+      failureDetail:firstFailure.failureDetail||'unknown',workerFailure:firstFailure.workerFailure===true};
+    }
+    // Stage B.5 (item 3): a fallback-eligible gap-planner failure gets
+    // one retry; a second failure builds deterministic fallback queries
+    // from the weak parts' own requirement texts. Quota and 4xx
+    // failures rethrow and are never retried.
+    gapRetryAttempted=true;
+    await progress('gap-planner','started','Conditional search planning failed; retrying it once.',
+     {failureCode:firstFailure.failureCode||'gap-planning-failed'});
+    try{
+     gapPlan=await attemptGapPlan();
+     await progress('gap-planner','recovered','Conditional search planning succeeded on the retry.',{});
+    }catch(retryError){
+     const retryFailure=retryError.requestFailure||{};
+     if(!canFallbackToDirectSearch(retryFailure.httpStatus,retryFailure.failureCode)){
+      if(retryError.requestFailure)retryError.requestFailure.gapRetryAttempted=true;
+      throw retryError;
+     }
+     const fallback=deterministicGapFallbackQueries(retrievalCoverage.weakParts,partQuestions);
+     gapFallbackQueries=fallback.queries;
+     if(fallback.queries.length){
+      gapFallbackUsed=true;
+      gapPlan={queries:fallback.queries,queryPartLinks:fallback.queryPartLinks,usage:null};
+      await progress('gap-planner','recovered','Conditional search planning failed twice; using deterministic fallback queries from the weak parts’ requirement texts.',
+       {queryCount:fallback.queries.length});
+     }
+    }
+    if(!gapPlan)throw firstError;
+   }
+   gapQueries=gapPlan.queries;gapQueryPartLinks=gapPlan.queryPartLinks;
    await progress('gap-planner','completed',`Conditional retrieval returned ${gapQueries.length} optional search terms.`,
-    {queryCount:gapQueries.length,usage:gap.usage||null});
+    {queryCount:gapQueries.length,usage:gapPlan.usage});
    timing.record('gap-planner','completed',timing.requestStageMs['gap-planner']);
    if(gapQueries.length){
     const gapRetrievalStarted=Date.now();
@@ -2216,6 +2263,9 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   const error=attachRequestFailure(new Error('Retrieval produced no fingerprint-eligible candidate pages.'),
    'retrieval',{failureCode:'no-eligible-sources',workerFailure:false});
   error.requestFailure.gapPlannerAttempted=gapSearchTriggered;
+  error.requestFailure.gapRetryAttempted=gapRetryAttempted;
+  error.requestFailure.gapFallbackUsed=gapFallbackUsed;
+  error.requestFailure.gapFallbackQueries=gapFallbackQueries;
   if(gapPlannerFailure)error.requestFailure.gapPlannerFailure=gapPlannerFailure;
   error.requestFailure.stageTimings=stageTimings;
   throw error;
@@ -2415,6 +2465,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
   ...(gapRetrievalRerun?{retrievalCoverageAfterGap:{parts:retrievalCoverage.parts,
    weakParts:retrievalCoverage.weakParts}}:{}),
   gapPlannerAttempted:gapSearchTriggered,gapQueries,gapQueryPartLinks,
+  gapRetryAttempted,gapFallbackUsed,gapFallbackQueries,
   retrievalBaselineSelectionCoverage:loaded.selectionCoverage,
   retrievalBaselineSelectionAudit:loaded.selectionAudit,
   ...(gapPlannerFailure?{gapPlannerFailure,gapPlannerFailureDiagnostics}:{}),
@@ -2518,6 +2569,8 @@ function failedCaseResult(item,error){
   answerWorkerSourceRevision:failure.stage==='answer'?failure.workerSourceRevision:null,
   missing:'',
   plannerFallback:failure.plannerFallback===true,gapPlannerAttempted:failure.gapPlannerAttempted===true,
+  gapRetryAttempted:failure.gapRetryAttempted===true,gapFallbackUsed:failure.gapFallbackUsed===true,
+  gapFallbackQueries:Array.isArray(failure.gapFallbackQueries)?failure.gapFallbackQueries:[],
   ...(failure.gapPlannerFailure?{gapPlannerFailure:failure.gapPlannerFailure}:{}),
   ...(failure.plannerFailure?{plannerFailure:failure.plannerFailure}:{}),
   stageTimings:Array.isArray(failure.stageTimings)?failure.stageTimings:[],searches:[],
