@@ -422,10 +422,12 @@ test('one shared keyword does not satisfy named-source retrieval coverage',async
   library,books,allowedBookIds:new Set(['454']),pageLoader:async source=>({text:
    source.page===131?'Literacy and education gave people tools to contest political barriers and pursue freedom.':
     'Freedom is an important ideal.'})});
- assert.equal(calls.filter(call=>call.query===question&&call.allowed.includes('454')).length,2,
-  'the original global facet and one source-scoped recovery should both run');
+ assert.equal(calls.filter(call=>call.query===question&&call.allowed.includes('454')).length,1,
+  'Stage B.3: the direct facet runs once as the unscoped control; it found '+
+  'coherent in-scope evidence, so the source-scoped recovery retry is not spent');
  assert.ok(result.candidates.some(source=>source.page===131&&source.candidatePartIds.includes('P1')));
- assert.ok(result.searches.some(search=>search.groupScopeRecoveryReason==='weak-linked-source-match'));
+ assert.ok(result.searches.some(search=>search.unscopedControl),
+  'the direct facet is recorded as the unscoped control');
  assert.ok(result.candidates.length<=32);
 });
 test('an empty comparison-side facet retries with the other side’s topic inside the missing source scope',async()=>{
@@ -2148,4 +2150,55 @@ test('answer-source selection represents facet tops and exposes the dropped-face
   'the passed-over facet-top book is traced on the selection');
  assert.deepEqual(Object.keys(selected),['0','1'],
   'the trace is non-enumerable: consumers see the plain source list');
+});
+
+test('the direct-question facet runs unscoped as a control for scoped parts (B.3)',async()=>{
+ const books=[
+  {id:'7',title:'Nicomachean Ethics — Aristotle'},
+  {id:'9',title:'Politics — Aristotle'}];
+ const question='How is virtue formed through habit?';
+ const calls=[];
+ const library={search:async(query,options={})=>{
+  calls.push({query,bookId:options.bookId||null});
+  if(options.bookId==='7')return {sources:[{bookId:'7',page:10,score:5,
+   preview:'Virtue habit excellence character state'}]};
+  if(!options.bookId&&query===question)return {sources:[
+   {bookId:'9',page:20,score:9,preview:'Virtue habit excellence character state'},
+   {bookId:'7',page:10,score:5,preview:'Virtue habit excellence character state'}]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question,
+  queries:['Aristotle virtue habit formation','Aristotle excellence character state'],
+  partQueries:[{partId:'P1',query:'Aristotle virtue habit formation'}],
+  partQuestions:[{partId:'P1',question:'How is virtue formed through habit in Aristotle?',
+   sourceBookIds:['7']}],
+  library,books,allowedBookIds:new Set(['7','9']),
+  pageLoader:async source=>({text:source.preview+
+   ' A substantive passage about virtue and habit formation.'})});
+ assert.ok(calls.some(call=>call.query===question&&call.bookId===null),
+  'the direct facet executed without a book scope');
+ assert.ok(calls.some(call=>call.query==='Aristotle virtue habit formation'&&call.bookId==='7'),
+  'the planner facet kept the part scope');
+ const control=result.candidates.find(source=>source.bookId==='9'&&source.page===20);
+ assert.ok(control&&control.candidatePartIds.includes('P1'),
+  'a control-facet candidate outside the scope is eligible for the scoped part');
+ const record=result.searches.find(entry=>entry.unscopedControl);
+ assert.ok(record&&record.controlPartIds.includes('P1'),
+  'the search record marks the unscoped control facet and its parts');
+});
+
+test('no control facet is marked when no part carries a scope (B.3)',async()=>{
+ const books=[{id:'7',title:'Nicomachean Ethics — Aristotle'}];
+ const question='How is virtue formed through habit?';
+ const result=await retrieveEvidence({question,
+  queries:['Aristotle virtue habit formation','Aristotle excellence character state'],
+  partQueries:[{partId:'P1',query:'Aristotle virtue habit formation'}],
+  partQuestions:[{partId:'P1',question:'How is virtue formed through habit in Aristotle?'}],
+  library:{search:async()=>({sources:[{bookId:'7',page:10,score:5,
+   preview:'Virtue habit excellence character state'}]})},
+  books,allowedBookIds:new Set(['7']),
+  pageLoader:async source=>({text:source.preview+
+   ' A substantive passage about virtue and habit formation.'})});
+ assert.ok(result.searches.every(entry=>!entry.unscopedControl),
+  'unscoped plans gain no control marking');
 });
