@@ -801,6 +801,37 @@ test('deduplicates common matches and selects a distinct second facet page',()=>
  assert.deepEqual(out.slice(0,2).map(x=>x.page),[38,48]);
  assert.equal(out.length,3);
 });
+test('merge admission is lossless when facet returns fit the candidate cap',()=>{
+ const letterFacet=[0,1,2,3,4,5].map(i=>({...page(50+i,'9'),score:90-i}));
+ const otherFacet=[0,1,2,3,4,5].map(i=>({...page(70+i,'8'),score:95-i}));
+ const out=mergeFacetSearches([{sources:otherFacet},{sources:letterFacet}],48);
+ assert.equal(out.length,12);
+ // The decisive page sits at rank 5 of its only facet; it still enters,
+ // admitted by the rank rounds rather than the corroboration fill.
+ const deep=out.find(x=>x.bookId==='9'&&x.page===55);
+ assert.ok(deep);
+ assert.equal(deep.mergeAdmission,'facet-round');
+ assert.ok(out.every(x=>['reserved','facet-round','rank-fill'].includes(x.mergeAdmission)));
+});
+test('rank rounds guarantee every facet breadth when the cap binds',()=>{
+ const facet=(bookId,base)=>[0,1,2,3,4,5].map(i=>({...page(base+i,bookId),score:100-i}));
+ const out=mergeFacetSearches([
+  {sources:facet('1',100)},
+  {sources:facet('2',200)},
+  {sources:facet('3',300)}
+ ],12);
+ assert.equal(out.length,12);
+ assert.deepEqual(out.slice(0,3).map(x=>x.page),[100,200,300]);
+ assert.ok(out.slice(0,3).every(x=>x.mergeAdmission==='reserved'));
+ // Each facet's pages enter in rank order up to the cap: ranks 0-3 of
+ // every facet are in; rank 4 and deeper stay out.
+ for(const base of [100,200,300]){
+  for(const offset of [0,1,2,3])
+   assert.ok(out.some(x=>x.page===base+offset),`page ${base+offset} admitted`);
+  for(const offset of [4,5])
+   assert.ok(!out.some(x=>x.page===base+offset),`page ${base+offset} held out`);
+ }
+});
 test('comparison queries can surface source pages from different books',()=>{
  const out=mergeFacetSearches([
   {sources:[page(72,'7')]},
@@ -2026,7 +2057,7 @@ test('a linked conceptual gap query reaches its part and selection coverage reco
 // broad facets corroborate other books' pages so heavily that reciprocal
 // rank alone spends the whole 32 cap before the gap facet's deeper pages.
 // Verified against the pre-batch-32 merge: book 13 kept only page 1.
-test('per-facet reservation keeps a scoped facet rank-3 page under a crowded cap',()=>{
+test('per-facet rank rounds keep a scoped facet deep under a crowded cap',()=>{
  const src=(bookId,page,score)=>({bookId:String(bookId),page,globalPageId:page,
   title:'Work '+bookId+' — Author '+bookId,score});
  const facets=[];
@@ -2048,8 +2079,10 @@ test('per-facet reservation keeps a scoped facet rank-3 page under a crowded cap
  for(const page of [1,2,3])
   assert.ok(out.some(source=>source.bookId==='13'&&source.page===page),
    'the scoped facet page '+page+' must survive the merge');
- assert.ok(!out.some(source=>source.bookId==='13'&&source.page===4),
-  'the guarantee is the facet share (top 3 of 10 facets at cap 32), not the whole facet');
+ assert.ok(out.some(source=>source.bookId==='13'&&source.page===4),
+  'full-depth rank rounds admit the scoped facet past its old share');
+ assert.ok(!out.some(source=>source.bookId==='13'&&source.page===6),
+  'the cap still binds: the facet rank spent last is its deepest page');
 });
 
 // Batch-32 dropped-page trace: a floor-passing leaf page that never
