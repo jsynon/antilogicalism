@@ -2266,3 +2266,52 @@ test('no control facet is marked when no part carries a scope (B.3)',async()=>{
  assert.ok(result.searches.every(entry=>!entry.unscopedControl),
   'unscoped plans gain no control marking');
 });
+
+test('the unscoped control survives the scoped pass in a single-part plan (repair tranche)',async()=>{
+ const books=[
+  {id:'7',title:'Nicomachean Ethics — Aristotle'},
+  {id:'9',title:'Politics — Aristotle'}];
+ const question='How is virtue formed through habit?';
+ const library={search:async(query,options={})=>{
+  if(options.bookId==='7')return {sources:[{bookId:'7',page:10,score:5,
+   preview:'Virtue habit excellence character state'}]};
+  if(!options.bookId&&query===question)return {sources:[
+   {bookId:'9',page:20,score:9,preview:'Virtue habit excellence character state'},
+   {bookId:'7',page:10,score:5,preview:'Virtue habit excellence character state'}]};
+  return {sources:[]};
+ }};
+ const result=await retrieveEvidence({question,
+  queries:['Aristotle virtue habit formation','Aristotle excellence character state'],
+  partQueries:[{partId:'P1',query:'Aristotle virtue habit formation'}],
+  partQuestions:[{partId:'P1',question,sourceBookIds:['7']}],
+  library,books,allowedBookIds:new Set(['7','9']),
+  pageLoader:async source=>({text:source.preview+
+   ' A substantive passage about virtue and habit formation.'})});
+ const control=result.candidates.find(source=>source.bookId==='9'&&source.page===20);
+ assert.ok(control&&control.candidatePartIds.includes('P1'),
+  'a single-part plan must not let the scoped pass rewrite the control facet to in-scope-only sources');
+ const record=result.searches.find(entry=>entry.unscopedControl);
+ assert.ok(record&&!record.partScopeInherited,
+  'the control facet record carries no inherited part scope');
+});
+
+test('candidate merge reserves a sole-survivor page from a part-linked facet (repair tranche)',()=>{
+ const strong=Array.from({length:6},(_,i)=>({bookId:'7',page:i+1,score:100-i}));
+ const out=mergeFacetSearches([
+  {sources:[...strong,{bookId:'9',page:20,score:50}]},
+  {sources:strong.map((entry,i)=>({...entry,page:i+11,score:90-i}))}
+ ],8,[],{directQuestionFacetIndex:0,partQuestions:[],partFacetScopes:[]});
+ const survivor=out.find(source=>source.bookId==='9'&&source.page===20);
+ assert.ok(survivor,'the thin book\u2019s only page survives the merge');
+ assert.equal(survivor.soleSurvivor,true,'the reservation is marked in the pool');
+});
+
+test('sole-survivor reservation requires a part-linked facet (repair tranche)',()=>{
+ const strong=Array.from({length:6},(_,i)=>({bookId:'7',page:i+1,score:100-i}));
+ const out=mergeFacetSearches([
+  {sources:[...strong,{bookId:'9',page:20,score:50}]},
+  {sources:strong.map((entry,i)=>({...entry,page:i+11,score:90-i}))}
+ ],8,[],{directQuestionFacetIndex:-1,partQuestions:[],partFacetScopes:[]});
+ assert.ok(!out.some(source=>source.soleSurvivor),
+  'an unlinked facet earns no sole-survivor reservation');
+});

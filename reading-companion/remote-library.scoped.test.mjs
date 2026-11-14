@@ -587,10 +587,15 @@ test('scoped search in a large book reserves leaf slots for unreached sections',
   const pages=result.sources.map(source=>source.page);
   // The four rank-selected pages keep the production cap positions and
   // the top-ranked hit is never displaced; the diversity slots append
-  // the last-quartile page and the next rank page.
+  // the last-quartile page and the next rank page. The repair tranche's
+  // neighborhood rescore may append up to two further floor-passing
+  // pages beside the selected ones, each marked as such.
   assert.deepEqual(pages.slice(0,4),[1,2,3,4]);
-  assert.equal(pages.length,6);
-  assert.ok(pages.includes(119),'the last-quartile evidence page is returned');
+  assert.ok(pages.slice(0,6).includes(119),'the last-quartile evidence page is returned');
+  const extras=result.sources.slice(6);
+  assert.ok(extras.length<=2,'neighborhood admissions stay within their per-book cap');
+  assert.ok(extras.every(source=>source.neighborhood===true),
+   'pages past the rank and diversity slots are neighborhood admissions');
 });
 
 test('unscoped search keeps the plain per-book cap (no diversity slots)',async()=>{
@@ -605,5 +610,46 @@ test('scoped search in a small book keeps the plain per-book cap',async()=>{
   const finder=new RemoteLibrary('https://example.test/v49/',diversityFetch(diversityCorpus()));
   const result=await finder.search('harbor lantern signal watch',{
     bookId:'43',allowedBookIds:new Set(['42','43'])});
-  assert.deepEqual(result.sources.map(source=>source.page),[1,2,3,4]);
+  // The rank cap itself is unchanged: the first four sources are the
+  // cap's pages in order. Only the repair tranche's marked neighborhood
+  // admissions (at most two) may follow them.
+  assert.deepEqual(result.sources.slice(0,4).map(source=>source.page),[1,2,3,4]);
+  const extras=result.sources.slice(4);
+  assert.ok(extras.length<=2&&extras.every(source=>source.neighborhood===true),
+   'anything past the cap is a marked neighborhood admission');
+});
+
+test('book-scoped search admits a floor-passing neighbor of a selected page (repair tranche)',async()=>{
+ const cluster='Virtue and habit shape character. Through habit, virtue forms character in the soul.';
+ const strong=cluster+' '+cluster+' '+cluster;
+ const filler='A quiet page about unrelated matters in the same volume, kept for spacing and extent.';
+ const pages=[];
+ const texts={12:cluster,14:strong,15:strong,16:strong,17:strong,30:cluster};
+ for(let page=10;page<=30;page++)pages.push({id:page-10,page,text:texts[page]||filler});
+ const ids=[2,2,1,1,1,13]; // delta-encoded postings for pages 12,14,15,16,17,30
+ const neighborFixture={
+  'manifest.json':{version:49,postings_encoding:'delta-json-v1',prefix_length:2,
+   pages:pages.length,page_books:pages.map(()=>7),
+   partitions:['vi','ha','ch'],
+   books:{'7':{title:'Ethics — Aristotle',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}},
+  'terms-vi.json':{virtue:ids},
+  'terms-ha.json':{habit:ids},
+  'terms-ch.json':{character:ids},
+  'book-7.json':{pages}};
+ const fetchNeighbor=async url=>{
+  const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  if(key==='url-suppressions.json')return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
+  return key in neighborFixture?new Response(gzipSync(JSON.stringify(neighborFixture[key])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v49/',fetchNeighbor);
+ const scoped=await finder.search('virtue habit character',{bookId:'7',allowedBookIds:new Set(['7'])});
+ const neighbor=scoped.sources.find(source=>source.page===12);
+ assert.ok(neighbor,'the floor-passing page three pages before the selected block is admitted');
+ assert.equal(neighbor.neighborhood,true,'the admission is marked as a neighborhood rescore');
+ assert.ok(!scoped.sources.some(source=>source.page===30),
+  'a floor-passing page far from every selected page is not admitted');
+ const unscoped=await finder.search('virtue habit character',{allowedBookIds:new Set(['7'])});
+ assert.ok(!unscoped.sources.some(source=>source.neighborhood),
+  'unscoped searches gain no neighborhood admissions');
 });
