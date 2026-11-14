@@ -226,6 +226,57 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
      reserved.push(candidate);reservedKeys.add(key);
    }
  }
+ // Repair tranche: sole-survivor reservation. Reciprocal-rank
+ // corroboration starves a book whose entire evidence is one or two
+ // pages returned by a single facet — it can never accumulate
+ // cross-facet rank, however strong its best page is within the book
+ // (Proust's ambition pages: the book's only floor-passing pages for
+ // the facet, lost at merge in one record, left to the slice in the
+ // rest). Reserve such a book's best page from that facet ahead of the
+ // global fill. Bounded: at most four reservations, ordered by the
+ // page's rank within its facet, and only for facets linked to a
+ // question part or the direct question itself.
+ const partLinkedFacets=new Set((Array.isArray(partFacetScopes)?partFacetScopes:[])
+   .map(item=>item?.facet).filter(Number.isInteger));
+ if(Number.isInteger(directQuestionFacetIndex)&&directQuestionFacetIndex>=0)
+   partLinkedFacets.add(directQuestionFacetIndex);
+ const footprint=new Map();
+ groups.forEach((group)=>{
+   for(const entry of group){
+     if(!valid(entry))continue;
+     const bookId=String(entry.bookId);
+     let record=footprint.get(bookId);
+     if(!record){record={pages:new Set(),facets:new Set()};footprint.set(bookId,record);}
+     record.pages.add(bookId+':'+entry.page);
+   }
+ });
+ groups.forEach((group,facet)=>{
+   for(const entry of group)if(valid(entry))footprint.get(String(entry.bookId))?.facets.add(facet);
+ });
+ const soleSurvivors=[];
+ groups.forEach((group,facet)=>{
+   if(!partLinkedFacets.has(facet))return;
+   const bestByBook=new Map();
+   group.forEach((entry,rank)=>{
+     if(!valid(entry))return;
+     const bookId=String(entry.bookId);
+     if(!bestByBook.has(bookId))bestByBook.set(bookId,{entry,rank});
+   });
+   for(const [bookId,{entry,rank}] of bestByBook){
+     const record=footprint.get(bookId);
+     if(record&&record.pages.size<=2&&record.facets.size===1)
+       soleSurvivors.push({entry,rank,score:Number(entry.score)||0});
+   }
+ });
+ soleSurvivors.sort((a,b)=>a.rank-b.rank||b.score-a.score);
+ for(const {entry} of soleSurvivors.slice(0,4)){
+   const key=String(entry.bookId)+':'+entry.page;
+   const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
+   if(candidate&&!reservedKeys.has(key)&&reserved.length<limit){
+     candidate.soleSurvivor=true;
+     reserved.push(candidate);reservedKeys.add(key);
+   }
+ }
  for(const facet of [...new Set(reserveFacetIndexes)]){
    const facetPages=groups[facet]||[];
    const pagesToReserve=[];
@@ -925,6 +976,16 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   }else{
    searchSet=searchSets[facet];
   }
+  // Repair tranche: the unscoped-control facet is exempt from this pass.
+  // In a single-part plan the part's question IS the direct question, so
+  // the text match above resolves to the control facet, and the rewrite
+  // below would replace its unscoped sources with in-scope-only ones —
+  // defeating the control in exactly the plan shape it exists for (the
+  // phase-2 science records: the control's out-of-scope returns were
+  // filtered to the part's anthology scope before merge). The part's
+  // scoped coverage comes from its other facets; the control keeps what
+  // the reader's own words found.
+  if(facet===controlFacetIndex)continue;
   const alreadySearched=new Set((searchSet?.targetBookIds||[]).map(String));
   const missingIds=sourceIds.filter(id=>retrievalAllowed.has(String(id))&&!alreadySearched.has(String(id)));
   if(!missingIds.length)continue;

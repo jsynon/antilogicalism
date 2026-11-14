@@ -981,11 +981,42 @@ export class RemoteLibrary {
         if (selected.length >= leafLimit) break;
         if (!selected.some(existing => existing.item.id === entry.item.id)) selected.push(entry);
       }
+      // Repair tranche: neighborhood rescore for book-scoped searches.
+      // Scene-split substance strands beside pages the rank cut admits:
+      // the Faust pact formula sits one page before the signing page the
+      // wager facet returns, and Smith's torpor pages sit within five
+      // pages of a returned page of the same article — each passing the
+      // coherence floor yet ranked far below the per-book cut. Rescore
+      // the neighborhood of every selected page with the same evidence
+      // function and admit floor-passing neighbors on their own scores:
+      // at most two per book, marked so the pool can tell them apart
+      // from rank-admitted pages.
+      if (bookId && selected.length) {
+        const chosen = new Set(selected.map(entry => entry.item.page));
+        const neighborCandidates = [];
+        for (const entry of selected) {
+          for (let delta = -5; delta <= 5; delta++) {
+            if (!delta) continue;
+            const page = entry.item.page + delta;
+            if (page < 1 || chosen.has(page)) continue;
+            const record = proseByPage.get(page);
+            if (!record) continue;
+            chosen.add(page);
+            const evidence = substantivePageEvidence(record.text,
+              bookEvidenceGroups, bookTitleTerms, phrase, evidenceOptions);
+            if (!evidence || (evidence.localUnique < minimumEvidenceTerms && !evidence.phraseMatches)) continue;
+            neighborCandidates.push({item: record.item, rank: evidence.score, neighborhood: true});
+          }
+        }
+        neighborCandidates.sort((a, b) => b.rank - a.rank || a.item.page - b.item.page);
+        for (const entry of neighborCandidates.slice(0, 2)) selected.push(entry);
+      }
       for (const entry of selected) {
         const {item}=entry;
         const url = 'https://drive.google.com/file/d/' + pdfId + '/view?usp=sharing#page=' + item.page;
         sources.push({bookId:book.id, title:meta.title, page:item.page, globalPageId:item.id,
           url, preview:excerptAroundEvidence(this.searchVisibleText(item.text,book.id,item.page,suppressionPolicy),bookEvidenceTerms), textLength:item.text.length,
+          ...(entry.neighborhood?{neighborhood:true}:{}),
           score:entry.rank});
       }
     }
