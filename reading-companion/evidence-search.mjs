@@ -3,14 +3,14 @@ import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms,
 import {catalogFallbackPlan,catalogIdentity,normalizePlan} from './reader-contract.mjs';
 
 // Keep live browser and workflow retrieval breadth on one shared contract. The
-// candidate handoff now uses the semantic selector's full 48-candidate
-// contract (pool-formation tranche, P-A: the 2026-11-14 census counted 5,905
-// facet-returned pages dying before the Worker ever saw them); the final
-// answer packet stays separately capped at six pages.
-export const LIVE_RETRIEVAL_CONFIG=Object.freeze({maxCandidates:48,
+// 32-page candidate handoff gives the semantic selector room for facet-only
+// works while remaining below its existing 48-candidate contract and transport
+// byte budget; the final answer packet stays separately capped at six pages.
+export const LIVE_RETRIEVAL_CONFIG=Object.freeze({maxCandidates:32,
  maxBooks:PRODUCTION_MAX_BOOKS,pagesPerBook:PRODUCTION_PAGES_PER_BOOK});
-// The wider profile is for controlled evaluations: it widens book and page
-// breadth, not the candidate handoff, which the live contract now fills.
+// The wider profile is for controlled evaluations. Public traffic keeps the
+// proven baseline until saved-trace review shows a recall gain without weaker
+// final source packets or unacceptable latency.
 export const RETRIEVAL_PROFILES=Object.freeze({
  baseline:LIVE_RETRIEVAL_CONFIG,
  expanded:Object.freeze({maxCandidates:48,maxBooks:6,pagesPerBook:4})
@@ -216,7 +216,6 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
    const key=String(entry.bookId)+':'+entry.page;
    const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
    if(candidate&&!reservedKeys.has(key)&&reserved.length<limit){
-     candidate.mergeAdmission='reserved';
      reserved.push(candidate);reservedKeys.add(key);
    }
  }
@@ -224,7 +223,6 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
    const key=String(entry.bookId)+':'+entry.page;
    const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
    if(candidate&&!reservedKeys.has(key)&&reserved.length<limit){
-     candidate.mergeAdmission='reserved';
      reserved.push(candidate);reservedKeys.add(key);
    }
  }
@@ -251,7 +249,6 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
      const key=String(entry.bookId)+':'+entry.page;
      const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
      if(candidate&&!reservedKeys.has(key)&&reserved.length<limit){
-       candidate.mergeAdmission='reserved';
        reserved.push(candidate);reservedKeys.add(key);
      }
    }
@@ -273,7 +270,6 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
      const key=String(entry.bookId)+':'+entry.page;
      const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
      if(!candidate)continue;
-     candidate.mergeAdmission='reserved';
      reserved.push(candidate);reservedKeys.add(key);
      representedBooks.add(String(candidate.bookId));
      added=true;
@@ -290,17 +286,8 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
  // floor(limit / facet count) pages, at most three — reserved round-robin
  // by rank, strongest page first within each rank, so its proven pages
  // cannot be crowded out by other facets' volume.
- // Pool-formation tranche (P-A): the fair-share cap itself became the
- // loss point — the census counted thousands of facet-returned pages
- // dying in this merge, including a decisive page at rank 5 of its only
- // facet, below the share the cap guaranteed it. The rank rounds now
- // run to every facet's full depth: admission is per-facet round-robin
- // by rank until the candidate cap, and the reciprocal-rank fill below
- // only sweeps what the rounds cannot reach. Every admitted candidate
- // records how it entered (mergeAdmission: 'reserved', 'facet-round',
- // or 'rank-fill') so pool composition stays auditable in the trace.
- const maxRank=groups.reduce((max,group)=>Math.max(max,group.length),0);
- for(let rank=0;rank<maxRank&&reserved.length<limit;rank++){
+ const facetShare=Math.min(3,Math.max(1,Math.floor(limit/Math.max(1,groups.length))));
+ for(let rank=0;rank<facetShare&&reserved.length<limit;rank++){
    const round=[];
    for(let facet=0;facet<groups.length;facet++){
      const entry=groups[facet][rank];
@@ -317,7 +304,6 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
      // Two facets can nominate the same page at the same rank; the round
      // was gathered before any of its pushes marked keys reserved.
      if(reservedKeys.has(key))continue;
-     candidate.mergeAdmission='facet-round';
      reserved.push(candidate);reservedKeys.add(key);
    }
  }
@@ -325,7 +311,6 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
    const key=String(candidate.bookId)+':'+candidate.page;
    if(reservedKeys.has(key))continue;
    if(reserved.length>=limit)break;
-   candidate.mergeAdmission='rank-fill';
    reserved.push(candidate);reservedKeys.add(key);
  }
  return reserved;
