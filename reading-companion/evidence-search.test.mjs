@@ -2356,3 +2356,87 @@ test('sole-survivor reservation requires a part-linked facet (repair tranche)',(
  assert.ok(!out.some(source=>source.soleSurvivor),
   'an unlinked facet earns no sole-survivor reservation');
 });
+
+test('a base facet whose searches all fail degrades instead of failing the retrieval (audit fix C2)',async()=>{
+ const books=[{id:'10',title:'Alpha Tales — Ann Alpha'}];
+ const result=await retrieveEvidence({question:'What does Alpha say about courage?',
+  queries:['bad facet query','Alpha courage habit fear inaction'],
+  library:{search:async query=>{
+   if(query==='bad facet query')throw Error('search backend outage');
+   return {sources:[{bookId:'10',title:books[0].title,page:3,globalPageId:1003,score:80}]};
+  }},
+  books,allowedBookIds:new Set(['10']),
+  pageLoader:async()=>({text:'Alpha writes that courage is the habit of acting well when fear would excuse inaction, and returns to the point often.'})});
+ assert.ok(result.candidates.some(source=>source.bookId==='10'&&source.page===3),
+  'the surviving facet still populates candidates');
+ const failed=result.searches.find(search=>search.failure);
+ assert.equal(failed?.failure,'base-facet-failed');
+ assert.equal(failed?.resultCount,0);
+});
+
+test('retrieval still fails when every base facet fails (audit fix C2)',async()=>{
+ const books=[{id:'10',title:'Alpha Tales — Ann Alpha'}];
+ await assert.rejects(retrieveEvidence({question:'What does Alpha say about courage?',
+  queries:['another facet query','Alpha courage habit fear inaction'],
+  library:{search:async()=>{throw Error('total search outage');}},
+  books,allowedBookIds:new Set(['10']),pageLoader:async()=>({text:'unused'})}),
+  /every base search facet failed/);
+});
+
+test('a page loader error drops only that page and is recorded as a loader error (audit fix C2)',async()=>{
+ const books=[{id:'10',title:'Alpha Tales — Ann Alpha'}];
+ const result=await retrieveEvidence({question:'What does Alpha say about courage?',
+  queries:['Alpha courage habit fear','Alpha courage acting well'],
+  library:{search:async()=>({sources:[
+   {bookId:'10',title:books[0].title,page:3,globalPageId:1003,score:80},
+   {bookId:'10',title:books[0].title,page:4,globalPageId:1004,score:70}]})},
+  books,allowedBookIds:new Set(['10']),
+  pageLoader:async source=>{
+   if(source.page===4)throw Error('page fetch failed');
+   return {text:'Alpha writes that courage is the habit of acting well when fear would excuse inaction, and returns to the point often.'};
+  }});
+ assert.deepEqual(result.candidates.map(source=>source.page),[3],
+  'the loadable page still hydrates');
+ const drop=result.droppedPassingPages.find(entry=>entry.page===4);
+ assert.equal(drop?.stage,'hydration');
+ assert.equal(drop?.reason,'loader-error');
+});
+
+test('the scoped part pass records the out-of-scope pages it discards (audit fix C2)',async()=>{
+ const books=[
+  {id:'10',title:'Alpha Tales — Ann Alpha'},
+  {id:'20',title:'Beta Tales — Bob Beta'},
+  {id:'30',title:'Gamma Tales — Gail Gamma'}
+ ];
+ const partQuestion='courage resolve in wartime';
+ // Two parts ask the same question text against different works. The
+ // pass creates a facet for P1 and fills it with P1's books; when P2's
+ // turn reuses that facet by text match, the rewrite discards P1's
+ // pages as out of P2's scope. C2 records those discards on the facet
+ // instead of letting them vanish before drop accounting runs.
+ const result=await retrieveEvidence({question:'What do the tales say about courage?',
+  queries:['Alpha tales opening chapters summary','Gamma tales closing chapters summary'],
+  partQuestions:[
+   {partId:'P1',question:partQuestion,sourceBookIds:['10','30']},
+   {partId:'P2',question:partQuestion,sourceBookIds:['20']}
+  ],
+  library:{search:async(query,{bookId}={})=>{
+   if(bookId==='10')return {sources:[{bookId:'10',title:books[0].title,page:3,globalPageId:1003,score:70}]};
+   if(bookId==='30')return {sources:[{bookId:'30',title:books[2].title,page:7,globalPageId:3007,score:60}]};
+   if(bookId==='20')return {sources:[{bookId:'20',title:books[1].title,page:5,globalPageId:2005,score:90}]};
+   return {sources:[]};
+  }},
+  books,allowedBookIds:new Set(['10','20','30']),
+  pageLoader:async source=>({text:
+   'The passage explains that courage is the habit of acting well when fear would excuse inaction, and returns to the point often.'})});
+ const rewritten=result.searches.find(search=>search.scopedOutDrops);
+ assert.ok(rewritten,'a facet record carries the scoped-out drops');
+ assert.deepEqual(rewritten?.scopedOutDrops,[
+  {bookId:'10',page:3,globalPageId:1003},
+  {bookId:'30',page:7,globalPageId:3007}],
+  'both discarded pages are recorded with their identities');
+ assert.equal(rewritten?.partScopeInherited,'P2',
+  'the facet ends up scoped to the part whose rewrite discarded them');
+ assert.ok(result.candidates.some(source=>source.bookId==='20'&&source.page===5),
+  'the in-scope page survives the rewrite into the candidate pool');
+});

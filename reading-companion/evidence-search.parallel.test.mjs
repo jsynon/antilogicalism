@@ -131,13 +131,17 @@ test('a failing quote retry is tolerated identically with and without prefetch',
   'the failed retry is still recorded as an empty quote-fallback facet');
 });
 
-test('a failing base facet search rejects the retrieval identically with and without prefetch',async()=>{
+test('a failing base facet search degrades identically with and without prefetch (audit fix C2)',async()=>{
  const sequential=fixtureLibrary({failBaseQuery:QUERIES[1]});
- await assert.rejects(
-  retrieveEvidence({...sequential.input,prefetchPartSearches:false}),
-  /base facet index unavailable/);
+ const expected=await retrieveEvidence({...sequential.input,prefetchPartSearches:false});
  const parallel=fixtureLibrary({failBaseQuery:QUERIES[1]});
- await assert.rejects(retrieveEvidence(parallel.input),/base facet index unavailable/);
+ const actual=await retrieveEvidence(parallel.input);
+ assert.deepEqual(actual,expected,
+  'a base facet failure degrades to a recorded empty facet in either flow');
+ assert.ok(actual.searches.some(search=>search.failure==='base-facet-failed'),
+  'the failed facet is recorded in the trace instead of rejecting the retrieval');
+ assert.ok(actual.candidates.length>0,
+  'the surviving facets still populate the candidate pool');
 });
 
 test('search prefetch dedupes identical jobs and returns results for consumption in any order',async()=>{

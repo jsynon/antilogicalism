@@ -631,7 +631,16 @@ export class RemoteLibrary {
   async search(question, {bookId = '', allowedBookIds = null, maxBooks = PRODUCTION_MAX_BOOKS, pagesPerBook = PRODUCTION_PAGES_PER_BOOK} = {}) {
     const started = performance.now();
     const manifest = await this.manifest();
-    const suppressionPolicy = await this.urlSuppressions();
+    // Audit fix C2: degradation is recorded, not fatal, below the
+    // manifest. The suppressions file is a secondary cosmetic policy;
+    // its failure must not block searches that do not strictly need
+    // it (the loader clears its own cache on failure, so a later
+    // search retries it).
+    const loadIssues = [];
+    const suppressionPolicy = await this.urlSuppressions().catch(() => {
+      loadIssues.push('url-suppressions');
+      return null;
+    });
     const selectedTitle = bookId ? String(manifest.books[String(bookId)]?.title || '') : '';
     // The catalog title puts the author's name after a dash. In a selected
     // work, author names are scope metadata, not evidence for a page-level
@@ -699,7 +708,10 @@ export class RemoteLibrary {
     const prefixes = [...new Set(terms.map(t => t.slice(0,2)))];
     // Keep indexed term matches available for candidate generation; relevance
     // is evaluated per book after separating author metadata from topic terms.
-    const data = new Map(await Promise.all(prefixes.map(async p => [p, await this.partition(p)])));
+    const data = new Map(await Promise.all(prefixes.map(async p => {
+      try { return [p, await this.partition(p)]; }
+      catch { loadIssues.push('partition:' + p); return [p, {}]; }
+    })));
     const termGroups=queryGroups.map(group=>[...new Set(group
       .flatMap(term=>termFamily(term,data.get(term.slice(0,2)))))])
       .filter(group=>group.length);
@@ -818,12 +830,13 @@ export class RemoteLibrary {
     // the per-book processing below is local and fast. Each load is still
     // awaited only when the loop reaches its book, in the original
     // candidate order, so sources, counting, and scoring are unchanged.
-    // Error semantics are preserved too: a failed load rejects the search
-    // at exactly the point the serial await would have thrown. The no-op
-    // catch merely marks each load as handled, so a rejection in a book
-    // the loop never reaches (early break, or a book skipped for having
-    // no evidence terms) cannot surface as an unhandled rejection; the
-    // loop's own await still observes every rejection it reaches. The
+    // Error semantics (audit fix C2): a failed load is observed by the
+    // loop's await, recorded in loadIssues, and skips only that book —
+    // it no longer rejects the whole search and discards the sources
+    // earlier books already gathered. The no-op catch merely marks
+    // each load as handled, so a rejection in a book the loop never
+    // reaches (early break, or a book skipped for having no evidence
+    // terms) cannot surface as an unhandled rejection. The
     // cost is bounded over-fetch: at most this capped slice is downloaded,
     // which the serial loop already downloads in the worst case.
     const shardLoads = new Map(candidateBooks.map(book => {
@@ -863,9 +876,11 @@ export class RemoteLibrary {
       const minimumEvidenceTerms = bookTerms.length >= 2
         ? (comparison || namedAuthorBookIds.size ? 2 : Math.max(2, Math.min(3, Math.floor(bookTerms.length / 2)))) : 1;
       if (!bookTerms.length) continue;
-      const shard = await shardLoads.get(book.id);
+      let shard;
+      try { shard = await shardLoads.get(book.id); }
+      catch { loadIssues.push('shard:' + book.id); continue; }
       booksScanned++;
-      if (!Array.isArray(shard.pages)) throw new Error('Invalid source shard for ' + book.id);
+      if (!Array.isArray(shard.pages)) { loadIssues.push('shard:' + book.id); continue; }
       // Mean word count over this shard's usable prose pages, for BM25-style
       // length normalization in the weighted page scorer. The pre-pass uses
       // the same page-eligibility checks as the scan loop below; the scan
@@ -1052,7 +1067,8 @@ export class RemoteLibrary {
       }
     }
     return {terms, sources:sources.map((item,i) => ({id:'S'+(i+1),...item})),
-      booksScanned, discardedNavigation, elapsedMs:Math.round(performance.now() - started)};
+      booksScanned, discardedNavigation, ...(loadIssues.length ? {loadIssues} : {}),
+      elapsedMs:Math.round(performance.now() - started)};
   }
 }
 

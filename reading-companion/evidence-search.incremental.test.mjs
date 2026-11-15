@@ -104,7 +104,7 @@ test('a gap round with no new queries executes nothing and still matches the ful
   'no library search executes when the gap round adds no new query');
 });
 
-test('a failing gap facet rejects the incremental round exactly like the full re-run',async()=>{
+test('a failing gap facet degrades identically in the incremental round and the full re-run (audit fix C2)',async()=>{
  const fixture=()=>{ 
   const library={search:async query=>{
    if(query==='reality external world skepticism')throw Error('gap partition unavailable');
@@ -123,12 +123,15 @@ test('a failing gap facet rejects the incremental round exactly like the full re
   gapQueryPartLinks:[{query:'reality external world skepticism',partIds:['P1']}]};
  const full=fixture();
  await retrieveEvidence(full.input);
- await assert.rejects(retrieveEvidence({...full.input,...gap}),/gap partition unavailable/);
+ const fullRound2=await retrieveEvidence({...full.input,...gap});
  const incremental=fixture();
  const searchCache=createRetrievalSearchCache();
  await retrieveEvidence({...incremental.input,searchCache});
- await assert.rejects(retrieveEvidence({...incremental.input,...gap,searchCache}),
-  /gap partition unavailable/);
+ const incRound2=await retrieveEvidence({...incremental.input,...gap,searchCache});
+ assert.deepEqual(incRound2,fullRound2,
+  'the degraded gap facet produces the identical merged result in both flows');
+ assert.ok(fullRound2.searches.some(search=>search.failure==='base-facet-failed'),
+  'the failed gap facet is recorded in the trace instead of rejecting the round');
 });
 
 test('search prefetch facades share settled executions through one retrieval cache',async()=>{
