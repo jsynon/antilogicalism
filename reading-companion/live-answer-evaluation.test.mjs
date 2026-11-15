@@ -89,6 +89,22 @@ test('phase-2 library-all suite covers eight open all-books questions with no ex
  assert.deepEqual(cases.map(item=>item.discipline),
   ['philosophy','philosophy','literature','history','science','history','literature','society']);
 });
+test('live-open suite holds six single open unscoped questions in the live shape (2026-11-15)',()=>{
+ const cases=selectLiveCases(suite,'live-open','all');
+ assert.equal(cases.length,6);
+ assert.deepEqual(cases.map(item=>item.id),[
+  'live-open-kierkegaard-faith','live-open-nietzsche-christianity','live-open-hume-causation',
+  'live-open-plato-poetry','live-open-aurelius-death','live-open-austen-marriage']);
+ assert.ok(cases.every(item=>item.evaluation_scope==='all-books'));
+ assert.ok(cases.every(item=>item.selected_book_ids.length===0));
+ assert.ok(cases.every(item=>item.required_source_groups.length===0&&item.review_focus.length===0));
+ assert.ok(cases.every(item=>item.planner_queries.length===1&&item.planner_queries[0]===item.question));
+ // The first two are Joshua's own live questions, verbatim.
+ assert.equal(cases[0].question,'What did Kierkegaard have to say about faith?');
+ assert.equal(cases[1].question,'What did Nietzsche think about Christianity?');
+ assert.ok(evaluationUsesLivePlanner('live-open','case-default'),
+  'live-open questions go through the live planner like production');
+});
 test('Batch 22 registered full-suite thresholds are present before evaluation',()=>{
  assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.answerProducedMeanMinimum,7.9);
  assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.highlightProducedMeanMinimum,8.4);
