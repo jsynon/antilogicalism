@@ -193,7 +193,7 @@ test('v1.10 presents a clean ask-and-read flow while preserving answer sections'
  assert.match(html,/id="companion-status-card" hidden/);
  assert.match(html,/#companion-status-card\[hidden\]\{display:none\}/);
  assert.match(html,/id="companion-book" aria-hidden="true"/);
- assert.match(html,/#companion-book\{display:none;position:absolute;left:1\.15rem;top:1\.12rem;width:3\.9rem;height:2\.95rem\}/);
+ assert.match(html,/#companion-book\{display:none;position:absolute;left:1\.5rem;top:1\.12rem;width:3\.9rem;height:2\.95rem\}/);
  assert.doesNotMatch(html,/companion-stages|companion-stage-node|companion-stage-label/);
  assert.doesNotMatch(clientV49,/statusStagePatterns|stageNodes/);
  assert.match(clientV49,/statusCard\.hidden=!status\.textContent\.trim\(\)/);
