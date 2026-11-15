@@ -2733,3 +2733,43 @@ test('firing census lines flag zero-firing fields and annotate the alarm field',
   line.includes('NEVER FIRED')&&line.includes('alarm field')));
  assert.equal(lines.length,FIRING_FIELDS.length+1);
 });
+
+test('selection handoff audit is satisfiable at production shape: unselected nominations are counted, not vetoed (audit fix C5)',()=>{
+ const packet=[
+  {candidateId:'C1',candidatePartIds:['P1']},
+  {candidateId:'C2',candidatePartIds:['P1']},
+  {candidateId:'C3',candidatePartIds:['P2']},
+  {candidateId:'C4',candidatePartIds:['P3']},
+  {candidateId:'C5',candidatePartIds:['P4']},
+  {candidateId:'C6',candidatePartIds:['P4']}
+ ];
+ const result=auditSelectionHandoff({stages:[{stage:'evidence-selection',status:'selected',
+  decision:{selectedCandidateIds:['C1','C2','C3','C4','C5','C6'],parts:[
+   {partId:'P1',candidateIds:['C1','C2','C7'],coverage:'supported',evidence:[
+    {candidateId:'C1',support:'direct'},{candidateId:'C2',support:'context'}]},
+   {partId:'P2',candidateIds:['C3','C8','C9'],coverage:'supported',evidence:[
+    {candidateId:'C3',support:'direct'}]},
+   {partId:'P3',candidateIds:['C4','C10','C11'],coverage:'supported',evidence:[
+    {candidateId:'C4',support:'direct'}]},
+   {partId:'P4',candidateIds:['C5','C6','C12'],coverage:'supported',evidence:[
+    {candidateId:'C5',support:'context'},{candidateId:'C6',support:'direct'}]}
+  ]},selected:packet}]});
+ assert.equal(result.status,'consistent',
+  'a perfect handoff of a 12-nomination plan into a 6-page packet passes');
+ assert.equal(result.unselectedNominations,6,
+  'the six nominees the packet had no room for are counted, not hidden');
+ assert.equal(result.checkedRelations,6);
+});
+
+test('evaluation artifact rows keep the sole-survivor and neighborhood reservation flags (audit fix C5)',async()=>{
+ const library={search:async()=>({sources:[{id:'S1',bookId:'529',title:'On the Origin of Species',page:10,globalPageId:10,preview:'Charles Darwin discusses species variation and natural selection.',score:4,neighborhood:true}]}),
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'Charles Darwin discusses species variation and natural selection in the source.'}]})};
+ const item={id:'flag-retention-test',question:'What did Darwin explain about natural selection?',discipline:'science',selected_book_ids:['529'],
+  planner_queries:['first distinct fixed search concept','second distinct fixed search concept'],review_focus:[],
+  required_source_groups:[{label:'Darwin',book_ids:['529']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{529:{title:'On the Origin of Species'}}},allowed:new Set(['529']),token:'x'.repeat(40),beforeCall:async()=>{},useFixedQueries:true,
+  fetcher:async()=>new Response(JSON.stringify({outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'529'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}})});
+ assert.equal(result.retrievalCandidates.length,1);
+ assert.equal(result.retrievalCandidates[0].neighborhood,true,
+  'the leaf neighborhood reservation flag survives into the artifact');
+});
