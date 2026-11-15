@@ -1,4 +1,29 @@
-import {inlineCitationGroups} from './diagnostic-report.mjs';
+// Audit fix C6: inlineCitationGroups and auditCitationIds moved here
+// from diagnostic-report.mjs when the diagnostic pipeline was
+// deleted. They are live citation machinery (rendering + the harness
+// citation audit), not diagnostics.
+
+// Accept both a single marker ([S1]) and grouped markers ([S1, S3]) for
+// rendering. The audit below intentionally remains broader so malformed or
+// unmatched markers still surface.
+export function inlineCitationGroups(answer){
+  return [...String(answer||'').matchAll(/\[((?:S[1-9]\d*)(?:\s*,\s*S[1-9]\d*)*)\]/g)]
+    .map(match=>({start:match.index,end:match.index+match[0].length,
+      ids:match[1].split(/\s*,\s*/)}));
+}
+
+export function auditCitationIds(answer,citations=[]){
+  const inlineIds=[...new Set([...String(answer||'').matchAll(/\[([^\]]+)\]/g)]
+    .flatMap(match=>match[1].match(/\bS[1-9]\d*\b/g)||[]))];
+  const returnedIds=[...new Set(citations.map(source=>source?.id)
+    .filter(id=>typeof id==='string'&&/^S[1-9][0-9]*$/.test(id)))];
+  return {
+    inlineIds,
+    returnedIds,
+    inlineIdsWithoutSource:inlineIds.filter(id=>!returnedIds.includes(id)),
+    sourcesNotCited:returnedIds.filter(id=>!inlineIds.includes(id))
+  };
+}
 
 export function buildCitationNumbering(answer,citations=[]){
  const available=new Set(citations.map(source=>String(source?.id||'')));

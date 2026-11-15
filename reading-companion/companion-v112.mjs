@@ -6,15 +6,14 @@
  * the Worker independently verifies submitted page text before inference.
  * This client is separate from the local Python/Ollama workbench.
  */
-import {RemoteLibrary} from './remote-library.mjs?v=1.20.15';
-import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs?v=1.20.15';
+import {RemoteLibrary} from './remote-library.mjs?v=1.20.16';
+import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs?v=1.20.16';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,deterministicGapFallbackQueries,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.15';
-import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
-  inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,deterministicGapFallbackQueries,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.16';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
-import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
+import {auditCitationIds,buildCitationNumbering,citationDisplayLabel,inlineCitationGroups,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
+import {failureCodeForStatus,userFailureMessage} from './failure-codes.mjs';
 import {citationExcerptsForAnswer} from './citation-evidence.mjs';
 import {keyPassageExcerpts} from './citation-evidence.mjs';
 import {parseAnswerMarkdown,parseInlineMarkdown} from './answer-markdown.mjs';
@@ -54,12 +53,6 @@ const status=el('companion-status');
 const statusCard=el('companion-status-card');
 const challenge=el('companion-challenge');
 const challengeBox=el('companion-turnstile');
-const diagnosticPanel=el('companion-diagnostic-panel');
-const diagnosticToggle=el('companion-diagnostic-toggle');
-const diagnosticDetails=el('companion-diagnostic-details');
-const diagnosticOutput=el('companion-diagnostic-output');
-const diagnosticCopy=el('companion-diagnostic-copy');
-const diagnosticCopyStatus=el('companion-diagnostic-copy-status');
 const newConversationButton=el('companion-new-conversation');
 const library=new RemoteLibrary();
 const sourceShards=new Map();
@@ -69,7 +62,15 @@ let bookList=[FALLBACK_BOOK], allowed=new Set(['152']), oldPilotFallback=true;
 let pilotEnabled=false, searchPlanningEnabled=false, turnstileToken='', turnstileId=null;
 let pendingTurnstile=null;
 let candidates=[], searching=false, answering=false;
-let diagnosticState=null;
+// Audit fix C6: the diagnostic pipeline is deleted. What survives is
+// the failure bookkeeping live logic actually reads: the planner and
+// gap-planner failure status/code pairs (they gate the direct-search
+// fallback), the current request stage, and the last failure code
+// (it selects the user-facing error message). Reset per ask.
+let plannerFailure={status:null,code:''};
+let gapFailure={status:null,code:''};
+let requestStage='planning';
+let lastFailureCode='';
 let conversationHistory=[];
 let conversationBookScope='';
 
@@ -97,7 +98,6 @@ function startNewConversation(){
   answerBox.replaceChildren();
   question.value='';
   newConversationButton.hidden=true;
-  if(diagnosticPanel)diagnosticPanel.hidden=true;
   sourceReader.reset();
   setStatus('New conversation started.');
   updateButtons();
@@ -166,28 +166,11 @@ function cancelLongWaitNotice(){
     clearInterval(continuingLongWaitNoticeInterval);continuingLongWaitNoticeInterval=null;
   }
 }
-function refreshDiagnostic(){
-  if(!diagnosticState||!diagnosticOutput)return;
-  diagnosticOutput.textContent=JSON.stringify(createDiagnosticReport(diagnosticState),null,2);
-}
-function beginDiagnostic(questionText){
-  diagnosticState={question:questionText,selectedBookId:bookFilter.value||'all',
-    libraryVersion:49,fallbackMode:oldPilotFallback,stage:'planning',
-    plannerQueries:[],searches:[],candidates:[],submittedSources:[],
-    evidenceHighlights:[],failureHttpStatus:null,failureCode:'',
-    failureStage:null,failureProviderClass:null,failureProviderCode:null,
-    failureAnswerCharacters:null,failureDetail:null,
-    plannerWorkerVersionId:null,plannerWorkerVersionTag:null,plannerWorkerVersionTimestamp:null,
-    plannerWorkerSourceBuild:null,answerWorkerVersionId:null,answerWorkerVersionTag:null,
-    answerWorkerVersionTimestamp:null,answerWorkerSourceBuild:null};
-  if(diagnosticPanel&&diagnosticToggle&&diagnosticDetails&&diagnosticCopyStatus){
-    diagnosticPanel.hidden=false;
-    diagnosticToggle.checked=false;
-    diagnosticDetails.hidden=true;
-    diagnosticDetails.open=false;
-    diagnosticCopyStatus.textContent='';
-    refreshDiagnostic();
-  }
+function resetFailureTracking(){
+  plannerFailure={status:null,code:''};
+  gapFailure={status:null,code:''};
+  requestStage='planning';
+  lastFailureCode='';
 }
 function updateButtons(){
   askButton.disabled=searching||answering||!pilotEnabled||!turnstileToken||question.value.trim().length<5;
@@ -300,7 +283,7 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
   const q=question.value.trim();
   if(q.length<5||q.length>400)throw Error('Please enter a question of 5–400 characters.');
   candidates=[];
-  if(diagnosticState)diagnosticState.stage='retrieving';
+  requestStage='retrieving';
   searching=true;updateButtons();setStatus(plannerFallback?
     'My usual book-finding step hit a snag, so I’m searching with your question instead…':
     'I’m browsing the books for passages that might help…');
@@ -329,8 +312,6 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
             preview:p.text.replace(/\s+/g,' ').trim().slice(0,600)};
         }).filter(s=>new TextEncoder().encode(s.text).byteLength<=PDF_PAGE_LIMIT)
         .sort((a,b)=>b.score-a.score||a.page-b.page);
-      if(diagnosticState)diagnosticState.searches=[{query:q,
-        resultCount:populated.length,sources:populated.slice(0,8)}];
     }else{
       const retrieval=await retrieveEvidence({question:q,
         queries:plannerFallback||!plannedQueries?[q]:plannedQueries,
@@ -350,20 +331,8 @@ async function retrieveSources(plannedQueries=null,{plannerFallback=false,plan=n
           return page&&typeof page.text==='string'?{text:page.text}:null;
         }});
       populated=retrieval.candidates;
-      if(diagnosticState){
-        diagnosticState.searches=retrieval.searches;
-        diagnosticState.positionCoverage=retrieval.positionCoverage;
-        diagnosticState.gapQueries=gapQueries;
-      }
-      if(diagnosticState&&plan)diagnosticState.plannerPlan=plan;
     }
     candidates=populated.slice(0,LIVE_RETRIEVAL_CONFIG.maxCandidates);
-    if(diagnosticState){
-      diagnosticState.candidates=candidates;
-      diagnosticState.stage=candidates.length?'sources_retrieved':'no_matches';
-      if(!candidates.length)diagnosticState.outcome='no-matching-passages';
-      refreshDiagnostic();
-    }
     if(!candidates.length){
       setStatus('No promising passages turned up yet. Try another wording or choose a different book.');
       return allowEmpty;
@@ -536,39 +505,13 @@ function renderResponse(data,turnQuestion=''){
     }
     turn.append(panel);
   }
-  if(diagnosticState){
-    diagnosticState.stage='complete';
-    diagnosticState.outcome=data.outcome;
-    diagnosticState.coverage=data.coverage;
-    diagnosticState.reviewStatus=data.reviewStatus;
-    diagnosticState.pipeline=data.pipeline||null;
-    diagnosticState.usage=data.usage||null;
-    diagnosticState.reviewedEvidence=data.evidenceMap;
-    diagnosticState.questionParts=data.questionParts;
-    diagnosticState.answer=data.answer;
-    diagnosticState.citations=citations;
-    diagnosticState.evidenceHighlights=highlights.map(item=>{
-      const source=citations.find(s=>s.id===item.source_id&&Number(s.page)===Number(item.page));
-      const original=sourcePage(source);
-      const quotes=(Array.isArray(item.quotes)?item.quotes:[{quote:item.quote,claim_id:item.claim_id,point:item.point}])
-        .slice(0,3).map(quote=>{
-          const page=original?readablePageWithHighlight(original.text,quote.quote):null;
-          return {claim_id:quote.claim_id||'',point:quote.point||'',quote:quote.quote||'',
-            quoteLocated:Boolean(page?.match),partialMatch:page?.match?.partial===true};
-        });
-      return {source_id:item.source_id,page:Number(item.page),quote:item.quote,
-        claim_id:item.claim_id||'',point:item.point||'',quotes,
-        quoteLocated:quotes.some(quote=>quote.quoteLocated),partialMatch:quotes.some(quote=>quote.partialMatch)};
-    });
-    refreshDiagnostic();
-  }
   answerBox.append(turn);
   const reduceMotion=window.matchMedia&&
     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   turn.scrollIntoView({behavior:reduceMotion?'auto':'smooth',block:'start'});
 }
 async function requestSourcePlan(q,verificationToken,history){
-  if(diagnosticState)diagnosticState.stage='planning';
+  requestStage='planning';
   const res=await timedFetch(API+'/api/pilot-plan',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question:q,bookId:bookFilter.value,history,
@@ -576,38 +519,26 @@ async function requestSourcePlan(q,verificationToken,history){
   });
   let data;
   try{data=await res.json();}catch{
-    if(diagnosticState)diagnosticState.failureCode='invalid-response';
+    plannerFailure.code='invalid-response';lastFailureCode='invalid-response';
     throw Error('The evidence search service returned an invalid response.');
   }
-  if(diagnosticState){
-    diagnosticState.plannerWorkerVersionId=data.workerVersionId;
-    diagnosticState.plannerWorkerVersionTag=data.workerVersionTag;
-    diagnosticState.plannerWorkerVersionTimestamp=data.workerVersionTimestamp;
-    diagnosticState.plannerWorkerSourceBuild=data.workerSourceBuild;
-    refreshDiagnostic();
-  }
   if(!res.ok){
-    if(diagnosticState){
-      diagnosticState.failureHttpStatus=res.status;
-      diagnosticState.failureCode=diagnosticFailureCode(res.status,'planner',data.failureCode);
-      diagnosticState.failureProviderClass=data.failureProviderClass||null;
-      diagnosticState.failureProviderCode=data.failureProviderCode||null;
-    }
+    plannerFailure.status=res.status;
+    plannerFailure.code=failureCodeForStatus(res.status,'planner',data.failureCode);
+    lastFailureCode=plannerFailure.code;
     throw Error(data.error||'Evidence search planning is unavailable');
   }
   if(!validSearchPlan(data.queries)){
-    if(diagnosticState)diagnosticState.failureCode='search-planning-failed';
+    plannerFailure.code='search-planning-failed';lastFailureCode='search-planning-failed';
     throw Error('The evidence search plan was incomplete.');
   }
   const rawPlan=data.plan&&typeof data.plan==='object'&&!Array.isArray(data.plan)?data.plan:null;
   const catalog=Object.fromEntries(bookList.map(book=>[String(book.id),book.title]));
   const plan=rawPlan?normalizePlan(rawPlan,q,catalog,bookFilter.value||''):null;
-  if(diagnosticState){diagnosticState.plannerQueries=data.queries;
-    diagnosticState.plannerPlan=plan;refreshDiagnostic();}
   return {queries:data.queries,plan};
 }
 async function requestRetrievalGap(q,verificationToken,history,originalQueries,partQuestions,coverage,candidates){
-  if(diagnosticState){diagnosticState.stage='gap-planning';diagnosticState.gapPlannerAttempted=true;}
+  requestStage='gap-planning';
   const weakParts=coverage.weakParts.slice(0,6).map(item=>({partId:item.partId,part:item.question,
     ...(Array.isArray(item.sourceBookIds)?{sourceBookIds:item.sourceBookIds.slice(0,16)}:{}),
     overlap:item.overlap,matchedTerms:item.matchedTerms,
@@ -622,8 +553,8 @@ async function requestRetrievalGap(q,verificationToken,history,originalQueries,p
         ...partQuestions.map(item=>item.question)].slice(0,7),candidates:evidence}})});
   let data;try{data=await res.json();}catch{throw Error('The evidence search service returned an invalid response.');}
   if(!res.ok){
-    if(diagnosticState){diagnosticState.gapFailureHttpStatus=res.status;
-      diagnosticState.gapFailureCode=diagnosticFailureCode(res.status,'planner',data.failureCode);}
+    gapFailure.status=res.status;
+    gapFailure.code=failureCodeForStatus(res.status,'planner',data.failureCode);
     throw Error(data.error||'Conditional evidence search is unavailable');
   }
   if(!Array.isArray(data.queries)||data.queries.length>3||data.queries.some(value=>
@@ -640,9 +571,6 @@ async function requestRetrievalGap(q,verificationToken,history,originalQueries,p
   // weak part, where every optional gap lead has an unambiguous destination.
   if(!queryPartLinks.length&&weakParts.length===1)
     queryPartLinks=queries.map(query=>({query,partIds:[weakParts[0].partId]}));
-  if(diagnosticState){diagnosticState.gapQueries=queries;
-    diagnosticState.gapQueryPartLinks=queryPartLinks;
-    diagnosticState.gapUsage=data.usage||null;refreshDiagnostic();}
   return {queries,queryPartLinks};
 }
 async function nextTurnstileToken(){
@@ -678,7 +606,7 @@ async function askQuestion(questionText){
   let partQuestions=[];
   if(conversationBookScope&&conversationBookScope!==currentScope)conversationHistory=[];
   conversationBookScope=currentScope;
-  beginDiagnostic(q);
+  resetFailureTracking();
   answering=true;updateButtons();sourceReader.reset();
   try{
     let currentPlan=null;
@@ -700,24 +628,14 @@ async function askQuestion(questionText){
       const deterministicPlan=deterministicSelectedBookPlan(q,bookList,bookFilter.value||'');
       if(deterministicPlan){
         planned=deterministicPlan;
-        if(diagnosticState){
-          diagnosticState.plannerSkipped=true;
-          diagnosticState.plannerSkipReason='selected-book-deterministic-plan';
-          diagnosticState.plannerQueries=deterministicPlan.queries;
-          diagnosticState.plannerPlan=deterministicPlan.plan;
-          refreshDiagnostic();
-        }
       }else{
         try{planned=await requestSourcePlan(q,token,history);}
         catch(error){
-          if(!canFallbackToDirectSearch(diagnosticState?.failureHttpStatus,
-            diagnosticState?.failureCode))throw error;
+          if(!canFallbackToDirectSearch(plannerFailure.status,
+            plannerFailure.code))throw error;
           plannerFallback=true;
-          if(diagnosticState){
-            diagnosticState.fallbackMode=true;
-            diagnosticState.failureHttpStatus=null;
-            diagnosticState.failureCode='';
-          }
+          plannerFailure={status:null,code:''};
+          lastFailureCode='';
         }
       }
       if(!planned?.plan){
@@ -725,7 +643,6 @@ async function askQuestion(questionText){
         const catalog=Object.fromEntries(bookList.map(book=>[String(book.id),book.title]));
         const fallback=catalogFallbackPlan(q,catalog,bookFilter.value||'');
         planned={queries:[q],plan:normalizePlan(fallback,q,catalog,bookFilter.value||'')};
-        if(diagnosticState)diagnosticState.fallbackMode=true;
       }
       currentPlan=planned?.plan||null;
       partQuestions=Array.isArray(planned?.plan?.parts)?planned.plan.parts.map(part=>{
@@ -748,8 +665,6 @@ async function askQuestion(questionText){
         plan:planned?.plan||null,partQuestions,allowEmpty:true,searchCache});
       if(!found)return;
       const coverage=assessEvidenceCoverage(candidates,q,partQuestions);
-      if(diagnosticState){diagnosticState.retrievalCoverage={parts:coverage.parts,
-        weakParts:coverage.weakParts,triggered:coverage.shouldSearch};refreshDiagnostic();}
       if(coverage.shouldSearch){
         setStatus('I’ve found some useful pages. I’m looking for a couple more that might round out the answer…');
         turnstileToken='';
@@ -760,36 +675,29 @@ async function askQuestion(questionText){
             partQuestions,coverage,candidates);
           gapQueries=gapPlan.queries;gapQueryPartLinks=gapPlan.queryPartLinks;
         }catch(error){
-          if(!canFallbackToDirectSearch(diagnosticState?.gapFailureHttpStatus,
-            diagnosticState?.gapFailureCode))throw error;
-          if(diagnosticState){diagnosticState.gapPlannerFailure=diagnosticState.gapFailureCode||'gap-planning-failed';
-            diagnosticState.gapFailureHttpStatus=null;diagnosticState.gapFailureCode='';}
+          if(!canFallbackToDirectSearch(gapFailure.status,
+            gapFailure.code))throw error;
+          gapFailure={status:null,code:''};
           // Stage B.5 (item 3): a fallback-eligible gap failure is retried
           // once; a second failure builds deterministic queries from the
           // weak parts' own requirement texts instead of abandoning the
           // round. Quota and 4xx failures rethrew above and never retry.
-          if(diagnosticState){diagnosticState.gapRetryAttempted=true;refreshDiagnostic();}
           try{
             const gapToken=await nextTurnstileToken();turnstileToken='';
             const retryPlan=await requestRetrievalGap(q,gapToken,history,planned?.queries||[q],
               partQuestions,coverage,candidates);
             gapQueries=retryPlan.queries;gapQueryPartLinks=retryPlan.queryPartLinks;
           }catch(retryError){
-            if(!canFallbackToDirectSearch(diagnosticState?.gapFailureHttpStatus,
-              diagnosticState?.gapFailureCode))throw retryError;
+            if(!canFallbackToDirectSearch(gapFailure.status,
+              gapFailure.code))throw retryError;
             const fallback=deterministicGapFallbackQueries(coverage.weakParts,partQuestions);
             gapQueries=fallback.queries;gapQueryPartLinks=fallback.queryPartLinks;
-            if(diagnosticState){diagnosticState.gapFallbackUsed=gapQueries.length>0;
-              diagnosticState.gapFallbackQueries=gapQueries;refreshDiagnostic();}
           }
         }
         if(gapQueries.length){
           const expanded=await retrieveSources(planned?.queries||null,{plannerFallback,
             plan:planned?.plan||null,partQuestions,gapQueries,gapQueryPartLinks,searchCache});
           if(!expanded)return;
-          const secondCoverage=assessEvidenceCoverage(candidates,q,partQuestions);
-          if(diagnosticState)diagnosticState.retrievalCoverageAfterGap={
-            parts:secondCoverage.parts,weakParts:secondCoverage.weakParts,triggered:true};
         }
       }
       if(!candidates.length){setStatus('No promising passages turned up yet. Try another wording or choose a different book.');return;}
@@ -812,11 +720,6 @@ async function askQuestion(questionText){
       candidateTextBytes+=textBytes;
     }
     if(!candidatePacket.length){setStatus('No promising passages turned up yet. Try another wording or choose a different book.');return;}
-    if(diagnosticState){
-      diagnosticState.candidatePool=candidatePacket.map((source,index)=>({...source,id:'C'+(index+1)}));
-      diagnosticState.stage='worker_selecting_evidence';
-      refreshDiagnostic();
-    }
     turnstileToken='';
     setStatus('I’ve found a trail of promising pages—now I’m picking out the best clues…');
     armLongWaitNotice();
@@ -832,54 +735,17 @@ async function askQuestion(questionText){
     });
     let data;
     try{data=await response.json();}catch{
-      if(diagnosticState)diagnosticState.failureCode='invalid-response';
+      lastFailureCode='invalid-response';
       throw Error('The answer service returned an invalid response.');
     }
-    if(diagnosticState){
-      diagnosticState.sourceSelection=data.sourceSelection||null;
-      diagnosticState.submittedSources=Array.isArray(data.sourceSelection?.pages)?
-        data.sourceSelection.pages:[];
-      diagnosticState.stage='answering';
-      diagnosticState.answerWorkerVersionId=data.workerVersionId;
-      diagnosticState.answerWorkerVersionTag=data.workerVersionTag;
-      diagnosticState.answerWorkerVersionTimestamp=data.workerVersionTimestamp;
-      diagnosticState.answerWorkerSourceBuild=data.workerSourceBuild;
-      refreshDiagnostic();
-    }
     if(!response.ok){
-      if(diagnosticState){
-        diagnosticState.failureHttpStatus=response.status;
-        diagnosticState.failureCode=diagnosticFailureCode(response.status,'answer',data.failureCode);
-        diagnosticState.failureProviderClass=data.failureProviderClass||null;
-        diagnosticState.failureProviderCode=data.failureProviderCode||null;
-        diagnosticState.failureStage=data.failureStage;
-        diagnosticState.failureProviderClass=data.failureProviderClass;
-        diagnosticState.failureAnswerCharacters=data.failureAnswerCharacters;
-        diagnosticState.failureDetail=data.failureDetail;
-      }
+      lastFailureCode=failureCodeForStatus(response.status,'answer',data.failureCode);
       throw Error('The answer service could not prepare an answer.');
     }
     const responseCitations=Array.isArray(data.citations)?data.citations:[];
     const citationAudit=auditCitationIds(data.answer,responseCitations);
     if(citationAudit.inlineIdsWithoutSource.length){
-      if(diagnosticState){
-        diagnosticState.stage='failed';
-        diagnosticState.failureCategory='answer-integrity-failed';
-        diagnosticState.failureCode='citation-source-mismatch';
-        diagnosticState.outcome=data.outcome;
-        diagnosticState.coverage=data.coverage;
-        diagnosticState.reviewStatus=data.reviewStatus;
-        diagnosticState.reviewedEvidence=data.evidenceMap;
-        diagnosticState.answer=data.answer;
-        diagnosticState.citations=responseCitations;
-        diagnosticState.evidenceHighlights=Array.isArray(data.evidenceHighlights)?
-          data.evidenceHighlights.map(item=>({source_id:item.source_id,
-            page:Number(item.page),quote:item.quote,claim_id:item.claim_id||'',point:item.point||'',
-            quotes:(Array.isArray(item.quotes)?item.quotes:[{quote:item.quote,claim_id:item.claim_id,point:item.point}])
-              .slice(0,3).map(quote=>({...quote,quoteLocated:false,partialMatch:false})),
-            quoteLocated:false,partialMatch:false})):[];
-        refreshDiagnostic();
-      }
+      lastFailureCode='citation-source-mismatch';
       setStatus('The answer included citations without matching sources. Please try again.');
       return;
     }
@@ -892,16 +758,9 @@ async function askQuestion(questionText){
        'These pages don’t quite answer the question yet. Try another wording or choose a different book.':'');
   }catch(error){
     console.error('Reading Companion request failed:',error);
-    if(diagnosticState){
-      const stage=diagnosticState.stage;
-      diagnosticState.stage='failed';
-      diagnosticState.failureCategory=stage==='planning'?'planner-request-failed':
-        stage==='retrieving'?'retrieval-failed':'answer-request-failed';
-      if(!diagnosticState.failureCode)
-        diagnosticState.failureCode=stage==='retrieving'?'retrieval-error':'network-error';
-      refreshDiagnostic();
-    }
-    setStatus(userFailureMessage(diagnosticState?.failureCode));
+    if(!lastFailureCode)
+      lastFailureCode=requestStage==='retrieving'?'retrieval-error':'network-error';
+    setStatus(userFailureMessage(lastFailureCode));
   }finally{
     cancelLongWaitNotice();
     answering=false;
@@ -909,18 +768,6 @@ async function askQuestion(questionText){
     updateButtons();
   }
 }
-if(diagnosticToggle&&diagnosticDetails)diagnosticToggle.addEventListener('change',()=>{
-  diagnosticDetails.hidden=!diagnosticToggle.checked;
-  if(diagnosticToggle.checked){diagnosticDetails.open=true;refreshDiagnostic();}
-});
-if(diagnosticCopy&&diagnosticOutput&&diagnosticCopyStatus)diagnosticCopy.addEventListener('click',async()=>{
-  try{
-    await navigator.clipboard.writeText(diagnosticOutput.textContent);
-    diagnosticCopyStatus.textContent='Diagnostic report copied.';
-  }catch{
-    diagnosticCopyStatus.textContent='Copy is unavailable here. You can select and copy the report text below.';
-  }
-});
 newConversationButton.addEventListener('click',startNewConversation);
 form.addEventListener('submit',event=>{event.preventDefault();askQuestion();});
 question.addEventListener('keydown',event=>{

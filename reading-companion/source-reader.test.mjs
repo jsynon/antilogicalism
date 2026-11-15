@@ -5,7 +5,6 @@ import {normalizeKnownOcrArtifacts,stripWebCaptureFooters,readableParagraphs,loc
 import {eligiblePages,renderHighlightedText} from './source-reader.mjs';
 
 const html=readFileSync(new URL('./index.html',import.meta.url),'utf8');
-const client=readFileSync(new URL('./companion-v110.mjs',import.meta.url),'utf8');
 const clientV49=readFileSync(new URL('./companion-v112.mjs',import.meta.url),'utf8');
 const source=readFileSync(new URL('./source-reader.mjs',import.meta.url),'utf8');
 
@@ -144,11 +143,13 @@ test('reader is hidden initially, preserves original PDF links, and loads no new
   'companion-source-pdf','companion-source-text'];
  for(const id of ids)assert(html.includes('id="'+id+'"'),id+' markup');
  assert.match(html,/id="companion-source-reader"[^>]+hidden/);
- assert.match(client,/Read highlighted passage/);
- assert.match(client,/Read source/);
- assert.match(client,/link\.href=source\.url/);
- assert.doesNotMatch(client,/View full page text|appendFullPage|companion-full-page/);
- assert.match(client,/sourceReader\.open\(\{\.\.\.source,excerpt\},read\)/);
+ // Audit fix C6: the v1.10 client is deleted; the reader integration
+ // assertions now pin the active v1.12 client's patterns.
+ assert.match(clientV49,/node\('button','Read passages','companion-inline-read'\)/);
+ assert.match(clientV49,/link\.href=safeUrl/);
+ assert.doesNotMatch(clientV49,/link\.href=source\.url/);
+ assert.doesNotMatch(clientV49,/View full page text|appendFullPage|companion-full-page/);
+ assert.match(clientV49,/sourceReader\.open\(\{\.\.\.source,excerpts\},read\)/);
  assert.match(clientV49,/import \{citationExcerptsForAnswer\} from '\.\/citation-evidence\.mjs'/,
   'the active client must pre-resolve exact claim-linked excerpts');
  assert.match(clientV49,/const evidenceMap=Array\.isArray\(data\.evidenceMap\)/);

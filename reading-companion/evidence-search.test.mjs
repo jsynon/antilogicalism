@@ -2016,8 +2016,10 @@ test('browser sends bounded full candidate pages and leaves semantic selection t
  assert.match(js,/parseAnswerMarkdown\(answer,\{allowLists\}\)/,
   'the browser renders the shared tested Markdown block parser');
  assert.match(js,/plan:planned\?\.plan\|\|null,partQuestions,allowEmpty:true,searchCache\}/);
- assert.match(js,/canFallbackToDirectSearch\(diagnosticState\?\.failureHttpStatus/);
- assert.match(js,/diagnosticState\.fallbackMode=true/);
+ assert.match(js,/canFallbackToDirectSearch\(plannerFailure\.status,/,
+  'the planner fallback decision reads the tracked planner failure (audit fix C6)');
+ assert.match(js,/plannerFailure=\{status:null,code:''\}/,
+  'a consumed planner failure is cleared before the direct-search fallback runs');
  assert.match(js,/catalogFallbackPlan\(q,catalog,bookFilter\.value\|\|''\)/,
   'planner failure and empty-plan responses should build fallback source groups from the loaded catalog');
  assert.match(js,/if\(!planned\?\.plan\)/,

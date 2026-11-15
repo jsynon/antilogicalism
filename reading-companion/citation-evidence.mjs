@@ -1,4 +1,4 @@
-import {inlineCitationGroups} from './diagnostic-report.mjs';
+import {inlineCitationGroups} from './citation-numbering.mjs';
 
 /* Match an inline citation to the reviewed evidence for its own answer claim.
  * The compact page-summary highlights are for source cards; they are not a

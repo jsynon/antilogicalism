@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
-import {buildCitationNumbering,citationDisplayLabel,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
+import {auditCitationIds,buildCitationNumbering,citationDisplayLabel,inlineCitationGroups,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
+
+const clientV49=readFileSync(new URL('./companion-v112.mjs',import.meta.url),'utf8');
 
 test('citation labels follow first inline use and source rows use the same order',()=>{
  const citations=[{id:'S1'},{id:'S2'},{id:'S3'}];
@@ -25,4 +28,25 @@ test('source attribution labels distinguish curated pseudonymous and editorial c
 test('sources absent from the answer are appended in their returned order',()=>{
  const numbering=buildCitationNumbering('Claim [S2].',[{id:'S1'},{id:'S2'},{id:'S3'}]);
  assert.deepEqual([...numbering],[['S2',1],['S1',2],['S3',3]]);
+});
+
+test('audits citation markers against the sources returned by the server (moved from diagnostic-report tests, audit fix C6)',()=>{
+ const audit=auditCitationIds('Darwin explains variation [S1, S2].',[{id:'S1'}]);
+ assert.deepEqual(audit.inlineIds,['S1','S2']);
+ assert.deepEqual(audit.returnedIds,['S1']);
+ assert.deepEqual(audit.inlineIdsWithoutSource,['S2']);
+ assert.deepEqual(audit.sourcesNotCited,[]);
+});
+
+test('parses grouped citation markers and the UI renders each source link (audit fix C6)',()=>{
+ const answer='The passages support this claim [S1, S3].';
+ assert.deepEqual(inlineCitationGroups(answer).map(group=>group.ids),[['S1','S3']]);
+ assert.match(clientV49,/const citationAudit=auditCitationIds\(data\.answer,responseCitations\)/);
+ assert.match(clientV49,/citationAudit\.inlineIdsWithoutSource\.length/);
+ assert.match(clientV49,/const groups=inlineCitationGroups\(answer\)/);
+ assert.match(clientV49,/appendCitation\(id,citationGroup,groupExcerpts\)/);
+ assert.match(clientV49,/citationGroup\.style\.whiteSpace='nowrap'/);
+ assert.match(clientV49,/citationGroup\.append\(document\.createTextNode\('\]'\)\)/);
+ const audit=auditCitationIds(answer,[{id:'S1'},{id:'S3'}]);
+ assert.deepEqual(audit.inlineIdsWithoutSource,[]);
 });
