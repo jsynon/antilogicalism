@@ -6,17 +6,17 @@
  * the Worker independently verifies submitted page text before inference.
  * This client is separate from the local Python/Ollama workbench.
  */
-import {RemoteLibrary} from './remote-library.mjs?v=1.20.16';
-import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs?v=1.20.16';
+import {RemoteLibrary} from './remote-library.mjs?v=1.20.17';
+import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs?v=1.20.17';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,deterministicGapFallbackQueries,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.16';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,deterministicGapFallbackQueries,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.17';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
 import {auditCitationIds,buildCitationNumbering,citationDisplayLabel,inlineCitationGroups,sortCitationsByNumber,sourceAttributionLabel} from './citation-numbering.mjs';
 import {failureCodeForStatus,userFailureMessage} from './failure-codes.mjs';
 import {citationExcerptsForAnswer} from './citation-evidence.mjs';
 import {keyPassageExcerpts} from './citation-evidence.mjs';
-import {parseAnswerMarkdown,parseInlineMarkdown} from './answer-markdown.mjs';
+import {parseAnswerMarkdown,parseInlineMarkdown} from './answer-markdown.mjs?v=1.20.17';
 import {pilotAnswerSources} from './answer-payload.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';

@@ -60,17 +60,68 @@ export function parseInlineMarkdown(value){
 // is the same rule as a parser backstop for any payload that bypasses it. A
 // paragraph counts as long — worth unwrapping — at two or more sentences or
 // over 200 characters of inner text, mirroring the Worker's threshold.
+//
+// Evasion fix (2026-11-15), mirroring the Worker: the clean-pair rule
+// refused any paragraph whose wrap contained further bold markers, which
+// is exactly the shape that recurred live (a wrapped opening paragraph
+// carrying bold label pairs inside it). Two readings, in order: the
+// outer pair — paragraph ends with the marker, count even, inner text
+// long, every span inside short — loses only its own two markers, so
+// internal label and emphasis pairs survive as written; otherwise a
+// pairwise span scan unwraps every long span from the opening marker.
+// Orphaned single markers on long paragraphs are stripped, as the
+// Worker strips them at assembly (the old backstop missed that shape).
 function isLongWrappedText(text){
  const sentences=(text.match(/[.!?](?=\s|$)/gu)||[]).length;
  return text.length>200||sentences>=2;
 }
 
+function boldSpansOf(text,marker){
+ const spans=[];let at=0;
+ while(true){
+  const open=text.indexOf(marker,at);
+  if(open<0)break;
+  const close=text.indexOf(marker,open+marker.length);
+  if(close<0)break;
+  spans.push(text.slice(open+marker.length,close));
+  at=close+marker.length;
+ }
+ return spans;
+}
+
 function unwrapBoldWrappedParagraph(text){
  const marker=text.startsWith('**')?'**':text.startsWith('__')?'__':null;
- if(!marker||!text.endsWith(marker))return text;
- if(text.split(marker).length-1!==2)return text;
- const inner=text.slice(marker.length,-marker.length).trim();
- return inner&&!inner.includes(marker)&&isLongWrappedText(inner)?inner:text;
+ if(marker){
+  if(text.endsWith(marker)&&(text.split(marker).length-1)%2===0){
+   const inner=text.slice(marker.length,-marker.length).trim();
+   if(inner&&isLongWrappedText(inner)&&
+     boldSpansOf(inner,marker).every(span=>!isLongWrappedText(span)))return inner;
+  }
+  let result='';let rest=text;let unwrapped=0;
+  while(rest.startsWith(marker)){
+   const close=rest.indexOf(marker,marker.length);
+   if(close<0)break;
+   const inner=rest.slice(marker.length,close);
+   if(!isLongWrappedText(inner))break;
+   result+=inner;rest=rest.slice(close+marker.length);unwrapped++;
+   const next=rest.indexOf(marker);
+   if(next<0){result+=rest;rest='';break;}
+   result+=rest.slice(0,next);rest=rest.slice(next);
+  }
+  if(unwrapped){
+   let opened=result+rest;
+   if(opened.endsWith(marker)&&(opened.split(marker).length-1)%2===1)
+    opened=opened.slice(0,-marker.length);
+   return opened;
+  }
+  if((text.split(marker).length-1)===1&&isLongWrappedText(text.slice(marker.length)))
+   return text.slice(marker.length);
+  return text;
+ }
+ const closer=text.endsWith('**')?'**':text.endsWith('__')?'__':null;
+ if(closer&&(text.split(closer).length-1)===1&&isLongWrappedText(text.slice(0,-closer.length)))
+  return text.slice(0,-closer.length);
+ return text;
 }
 
 function splitInlineListMarkers(line){

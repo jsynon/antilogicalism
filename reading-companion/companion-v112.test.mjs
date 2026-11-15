@@ -28,7 +28,7 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.20.16'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.20.17'));
  assert.match(clientV49,/distinctiveTerms:item\.distinctiveTerms/);
  assert.match(clientV49,/matchedDistinctiveTerms:item\.matchedDistinctiveTerms/);
  assert.match(clientV49,/sharedMatchedTerms:item\.sharedMatchedTerms/);
@@ -105,6 +105,52 @@ test('batch 9 parser backstop unwraps whole-paragraph bold but spares titles, la
  // A bold lead-in inside a paragraph is untouched.
  const leadIn='Faith involves two movements of the soul. **Beyond Resignation:** faith goes further than infinite resignation, receiving the finite back through the power of the absurd.';
  assert.deepEqual(parseAnswerMarkdown(leadIn),[{type:'paragraph',text:leadIn}]);
+});
+
+test('parser backstop opens a bold wrap that carries bold labels inside it (B9-8 evasion, 2026-11-15)',()=>{
+ // The 2026-11-15 live shape: the wrapped opening paragraph contains
+ // bold label pairs, so the old clean-pair backstop refused it and the
+ // whole block rendered bold. The outer pair comes off; the label
+ // pair inside survives as written.
+ const labelled='**Faith Against Christendom Kierkegaard argues that institutional religion fails the test of faith because it replaces suffering with social respectability and comfortable belonging [S5]. The established church, he argues, has made Christianity into a matter of custom and citizenship rather than discipleship [S5]. **Social Honor:** True belief seeks honor from God rather than from men, and receiving honor from one another makes belief impossible, since the believer must stand alone before God in opposition to the crowd [S5]. The honor of men is precisely what the confession of faith must renounce [S5].**';
+ const blocks=parseAnswerMarkdown(labelled);
+ // The parser's section-heading splitter reaches the label first and
+ // breaks the wrap at it; the backstop then strips the orphaned
+ // opening marker from the first piece and the orphaned closing
+ // marker from the last, so nothing renders bold or shows a marker.
+ assert.deepEqual(blocks.map(block=>block.type),['paragraph','heading','paragraph']);
+ assert.ok(blocks[0].text.startsWith('Faith Against Christendom Kierkegaard argues'));
+ assert.ok(!blocks[0].text.includes('**'),'the orphaned opening marker is stripped');
+ assert.equal(blocks[1].text,'Social Honor');
+ assert.ok(blocks[2].text.startsWith('True belief seeks honor from God'));
+ assert.ok(blocks[2].text.endsWith('must renounce [S5].'),'the orphaned closing marker is stripped');
+ // The pairwise-artifact form stays one paragraph, and its label
+ // pair survives as written.
+ const artifact='**Faith Against Christendom Kierkegaard argues that institutional religion fails the test of faith because it replaces suffering with social respectability and comfortable belonging in the congregation of the respectable [S5].**Social Honor:**True belief seeks honor from God rather than from men, and receiving honor from one another makes belief impossible for the person who will not stand alone before God. The honor of men is precisely what the confession of faith must renounce in every generation [S5].**';
+ const artifactBlocks=parseAnswerMarkdown(artifact);
+ assert.equal(artifactBlocks.length,1);
+ assert.equal(artifactBlocks[0].type,'paragraph');
+ assert.equal(artifactBlocks[0].text,artifact.slice(2,-2),
+  'only the outer marker pair is removed; the label pair and text are byte-identical');
+ // A short emphasis span inside a wrap also survives.
+ const withShortSpan='**Faith as Passion The experience of faith requires a specific kind of spiritual intensity that reason cannot produce or mediate for the learner, who must receive the condition itself from the god in the Moment of encounter [S2]. The **knight of faith** then returns to finitude.**';
+ const opened=parseAnswerMarkdown(withShortSpan);
+ assert.equal(opened.length,1);
+ assert.equal(opened[0].text,withShortSpan.slice(2,-2));
+ // An orphaned opening marker on a long paragraph is stripped (the
+ // Worker strips these at assembly; the old backstop let them render).
+ const orphaned='**Necessity and Custom Hume explains that our idea of necessity arises from the uniformity observable in nature [S1]. The mind is then determined by custom to infer one event from the other in the same way [S1].';
+ const orphanBlocks=parseAnswerMarkdown(orphaned);
+ assert.equal(orphanBlocks.length,1);
+ assert.equal(orphanBlocks[0].text,orphaned.slice(2));
+ // A line that opens with a short bold label is the parser's heading
+ // case, however long the prose that follows runs: the label becomes
+ // a heading and the prose a plain paragraph — never a bold block.
+ const labelFirst='**Non-Rationality:** The leap is not a conclusion of reason but a movement of the whole person toward what reason cannot settle, a transition from the infinite back into the finite that no mediation can perform on the individual\u2019s behalf or explain after the fact.';
+ const labelBlocks=parseAnswerMarkdown(labelFirst);
+ assert.deepEqual(labelBlocks.map(block=>block.type),['heading','paragraph']);
+ assert.equal(labelBlocks[0].text,'Non-Rationality');
+ assert.ok(labelBlocks[1].text.startsWith('The leap is not a conclusion of reason'));
 });
 test('v49 Reading Companion page retains Book Lite and loads the v49 client',()=>{
  assert.match(html,/wp-content\/themes\/book-lite/);
@@ -235,11 +281,11 @@ test('book selector search matches title or author without changing source entri
  assert.deepEqual(bookOrder.filterBooksByText(books,''),books);
 });
 test('current browser client validates the v3 fingerprint coverage manifest',()=>{
- assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.20\.16'/,
+ assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.20\.17'/,
   'the active client cache-busts the changed shared retriever');
- assert.match(clientV49,/from '\.\/remote-library\.mjs\?v=1\.20\.16'/,
+ assert.match(clientV49,/from '\.\/remote-library\.mjs\?v=1\.20\.17'/,
   'the leaf engine import is cache-busted at the same release (audit fix C4)');
- assert.match(clientV49,/from '\.\/reader-contract\.mjs\?v=1\.20\.16'/,
+ assert.match(clientV49,/from '\.\/reader-contract\.mjs\?v=1\.20\.17'/,
   'the reader contract import is cache-busted at the same release (audit fix C4)');
  assert(clientV49.includes("reader-fingerprints-v3/coverage-v3.json"));
  assert.match(clientV49,/antilogicalism-reader-coverage-v3/);
