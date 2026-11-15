@@ -96,11 +96,15 @@ test('candidate shards download in parallel and results match the serial behavio
   assert.deepEqual(stripElapsed(result),stripElapsed(expected));
 });
 
-test('a candidate shard that fails to load rejects the search when the loop reaches it',async()=>{
+test('a candidate shard that fails to load is skipped and recorded when the loop reaches it (audit fix C2)',async()=>{
   const failing=makeFetcher({failures:new Set(['book-2.json'])});
-  await assert.rejects(
-    new RemoteLibrary(ROOT,failing.fetcher).search(QUERY),
-    /Corpus request returned HTTP 404/);
+  const result=await new RemoteLibrary(ROOT,failing.fetcher).search(QUERY);
+  assert.deepEqual(result.loadIssues,['shard:2'],
+   'the failed shard is named in the search result load issues');
+  assert.deepEqual(result.sources.map(source=>source.bookId),
+   ['1','1','3','3','4','4','5','5'],
+   'the loop keeps the sources of the books that did load and moves on to the next candidate');
+  assert.equal(result.booksScanned,4);
 });
 
 test('a failed shard past the early break does not fail the search',async()=>{

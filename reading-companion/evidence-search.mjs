@@ -714,15 +714,43 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   // reusing it here may accidentally constrain a Kant facet to Aristotle IDs.
   const partScopeIds=sourceIdsForFacet(index);
   const queryScopeIds=partScopeIds.length?partScopeIds:targetBookIds;
-  const facetBookIds=targetBooksForFacet(executedQuery,books,
-   queryScopeIds[0]===null?null:queryScopeIds);
-  const targeted=await Promise.all(facetBookIds.map(bookId=>runSearch(executedQuery,{
-   ...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook
-  })));
+  // Audit fix C2: the base facet layer degrades like every recovery
+  // layer below it. One facet's failure (a corpus-host 503 the leaf
+  // could not absorb) leaves the other facets' pools intact and is
+  // recorded on the facet's trace record; one targeted search's
+  // failure leaves the facet's other targeted results intact.
+  let facetBookIds=[];
+  try{
+   facetBookIds=targetBooksForFacet(executedQuery,books,
+    queryScopeIds[0]===null?null:queryScopeIds);
+  }catch{
+   return {sources:[],executedQuery,scopeReference,targetBookIds:[],
+    failure:'base-facet-failed'};
+  }
+  let targetedFailures=0;
+  const targeted=await Promise.all(facetBookIds.map(async bookId=>{
+   try{
+    return await runSearch(executedQuery,{
+     ...(bookId?{bookId}:{}),allowedBookIds:retrievalAllowed,maxBooks,pagesPerBook});
+   }catch{targetedFailures++;return {sources:[]};}
+  }));
+  const loadIssues=[...new Set(targeted.flatMap(set=>
+   Array.isArray(set?.loadIssues)?set.loadIssues:[]))];
   return {sources:targeted.flatMap(set=>Array.isArray(set?.sources)?set.sources:[])
    .sort((a,b)=>(Number(b.score)||0)-(Number(a.score)||0)),executedQuery,scopeReference,
+   ...(loadIssues.length?{loadIssues}:{}),
+   ...(targetedFailures?{targetedFailures}:{}),
+   ...(facetBookIds.length&&targetedFailures>=facetBookIds.length?
+    {failure:'base-facet-failed'}:{}),
    targetBookIds:facetBookIds.filter(Boolean).map(String)};
  }));
+ // Partial degradation is absorbed above; total failure still fails
+ // the retrieval. An empty pool manufactured from 100% facet failure
+ // would masquerade as 'no evidence exists' to the caller, so when
+ // every base facet recorded a hard failure and produced nothing,
+ // surface the failure exactly as the pre-C2 fatal layer did.
+ if(searchSets.length&&searchSets.every(set=>set.failure&&!(set.sources||[]).length))
+  throw Error('Retrieval failed: every base search facet failed.');
  if(controlFacetIndex>=0&&searchSets[controlFacetIndex]){
   searchSets[controlFacetIndex].unscopedControl=true;
   searchSets[controlFacetIndex].controlPartIds=scopedControlPartIds;
@@ -993,6 +1021,13 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    try{return await scopedSearch(query,{bookId:String(bookId),allowedBookIds:retrievalAllowed,
     maxBooks,pagesPerBook});}catch{return {sources:[]};}
   }));
+  // Audit fix C2: the rewrite below discards the facet's out-of-scope
+  // returns; record them on the facet so the drop appears in the
+  // trace instead of vanishing before drop accounting runs.
+  const scopedOut=(searchSet?.sources||[]).filter(source=>!sourceIds.includes(String(source.bookId)));
+  if(scopedOut.length)searchSet.scopedOutDrops=[...(searchSet.scopedOutDrops||[]),
+   ...scopedOut.map(source=>({bookId:String(source.bookId),page:source.page,
+    ...(source.globalPageId!==undefined?{globalPageId:source.globalPageId}:{})}))];
   const retained=(searchSet?.sources||[]).filter(source=>sourceIds.includes(String(source.bookId)));
   const seen=new Set(retained.map(source=>String(source.bookId)+':'+source.page));
   for(const result of scopedResults)for(const source of Array.isArray(result?.sources)?result.sources:[]){
@@ -1304,8 +1339,11 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
  const controlPartLinks=new Set(partFacetIndices
   .filter(item=>item.kind==='unscoped-control')
   .map(item=>item.partId+'|'+item.facet));
+ const hydrationErrorKeys=new Set();
  for(const source of [...representatives,...others]){
-  const page=await pageLoader(source);
+  let page=null;
+  try{page=await pageLoader(source);}
+  catch{hydrationErrorKeys.add(String(source.bookId)+':'+source.page);continue;}
   if(!page||typeof page.text!=='string')continue;
   const byteLength=new TextEncoder().encode(page.text).byteLength;
   if(byteLength<25||byteLength>pageLimit)continue;
@@ -1356,7 +1394,8 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
    if(populatedKeys.has(key))continue;
    const entry={bookId:String(source.bookId),page:source.page,
     ...(source.globalPageId!==undefined?{globalPageId:source.globalPageId}:{}),
-    stage:!mergedKeys.has(key)?'merge':!pooledKeys.has(key)?'dedupe':'hydration'};
+    stage:!mergedKeys.has(key)?'merge':!pooledKeys.has(key)?'dedupe':'hydration',
+    ...(hydrationErrorKeys.has(key)?{reason:'loader-error'}:{})};
    droppedPassingPages.push({facet,...entry});
    if(!droppedByFacet.has(facet))droppedByFacet.set(facet,[]);
    droppedByFacet.get(facet).push(entry);
@@ -1369,6 +1408,10 @@ export async function retrieveEvidence({question,queries,partQueries=[],gapQueri
   ...(searchSets[index].unscopedControl?{unscopedControl:true,
    controlPartIds:searchSets[index].controlPartIds}:{}),
   ...(searchSets[index].inheritedPartScope?{partScopeInherited:searchSets[index].inheritedPartScope}:{}),
+  ...(searchSets[index].failure?{failure:searchSets[index].failure}:{}),
+  ...(searchSets[index].loadIssues?{loadIssues:searchSets[index].loadIssues}:{}),
+  ...(searchSets[index].targetedFailures?{targetedFailures:searchSets[index].targetedFailures}:{}),
+  ...(searchSets[index].scopedOutDrops?.length?{scopedOutDrops:searchSets[index].scopedOutDrops}:{}),
   ...(searchSets[index].quoteFallback?{quoteFallback:true}:{}),
   ...(searchSets[index].groupScopeRecovery?{groupScopeRecovery:true,
    sourceGroupLabel:searchSets[index].sourceGroupLabel,
