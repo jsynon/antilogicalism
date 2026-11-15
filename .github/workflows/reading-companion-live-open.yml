@@ -1,0 +1,90 @@
+name: Reading Companion evaluation (live-open mini-suite)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_live_ai:
+        description: I understand this runs the live-open mini-suite (6 open questions in the shape of real reader questions) against the live Worker and incurs AI usage
+        type: boolean
+        required: true
+        default: false
+      repeats:
+        description: How many full passes over the suite to run inside this single workflow run
+        type: choice
+        options:
+          - '1'
+          - '2'
+          - '3'
+        required: true
+        default: '3'
+
+permissions:
+  contents: read
+
+# Share the cross-run regression group so this workflow and the older
+# evaluation workflows can never run simultaneously and distort each
+# other's latency measurements.
+concurrency:
+  group: reading-companion-cross-run-regression
+  cancel-in-progress: false
+
+# The budget suite (2026-11-15): six single, open, unscoped questions —
+# the shape readers actually ask, which the 64-case suites never
+# contained. One pass is 6 builds; the default three passes are 18,
+# instead of 128 for the combined phase-2 + phase-3 run.
+
+jobs:
+  live-open:
+    if: ${{ inputs.confirm_live_ai }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify explicit live AI confirmation and evaluation token
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          test "${{ inputs.confirm_live_ai }}" = "true"
+          test -n "$PILOT_EVALUATION_TOKEN"
+          mkdir -p "$GITHUB_WORKSPACE/reading-companion-live-open-evaluation"
+      - name: Pass 1 — live-open suite
+        if: ${{ !cancelled() }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode live-open --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-live-open-evaluation/live-open-pass1.json"
+      - name: Pass 2 — live-open suite
+        if: ${{ !cancelled() && inputs.repeats != '1' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode live-open --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-live-open-evaluation/live-open-pass2.json"
+      - name: Pass 3 — live-open suite
+        if: ${{ !cancelled() && inputs.repeats == '3' }}
+        env:
+          PILOT_EVALUATION_TOKEN: ${{ secrets.PILOT_EVALUATION_TOKEN }}
+        run: |
+          node reading-companion/live-answer-evaluation.mjs \
+            --mode live-open --scope case-default --case all --repeat 1 \
+            --answer-variant with-review --retrieval-profile baseline \
+            --report-only true --confirm-live-ai true \
+            --output "$GITHUB_WORKSPACE/reading-companion-live-open-evaluation/live-open-pass3.json"
+      - name: Preserve all live-open evaluation reports and traces
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reading-companion-live-open-evaluation
+          path: ${{ github.workspace }}/reading-companion-live-open-evaluation/*.json
+          if-no-files-found: warn
+          retention-days: 30
