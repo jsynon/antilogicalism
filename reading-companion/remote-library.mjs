@@ -779,7 +779,32 @@ export class RemoteLibrary {
     // If some books have joint topic terms, don't force single-term
     // incidental mentions into the limited set of cited books.
     if (books.some(book => book.hits[0].matched >= 2)) {
-      books = books.filter(book => book.hits[0].matched >= 2);
+      // Audit fix C3: phrase-match appeal. The filter below deletes a
+      // single-term book before its shard opens, so the page-level
+      // phrase rescue (phraseMatches bypassing the evidence floor)
+      // can never run for it — the ambition-case recall cliff, where
+      // the quoted phrase's other words are stopwords and the book's
+      // prose matches only the one indexed phrase term. A deleted
+      // book appeals when one of its posting-hit pages matches every
+      // indexed term group of the reader's quoted phrase: the shard
+      // then opens and the exact phrase check decides. Bounded to
+      // the two strongest appeals so shard cost stays capped.
+      const phraseTerms = new Set(phrase ? queryTerms(phrase) : []);
+      const phraseGroupKeys = new Set(termGroups
+        .filter(group => group.some(term => phraseTerms.has(term)))
+        .map(group => group[0]));
+      const phraseAppeal = book => {
+        if (!phraseGroupKeys.size) return false;
+        return book.hits.some(hit => {
+          const matched = scores.get(hit.id)?.matchedTerms;
+          return matched && [...phraseGroupKeys].every(key => matched.has(key));
+        });
+      };
+      const appealed = books
+        .filter(book => book.hits[0].matched < 2 && phraseAppeal(book))
+        .sort((a, b) => b.hits[0].score - a.hits[0].score || Number(a.id) - Number(b.id))
+        .slice(0, 2);
+      books = books.filter(book => book.hits[0].matched >= 2 || appealed.includes(book));
     }
     books.sort((a,b) => b.score - a.score || Number(a.id) - Number(b.id));
     // A query that strongly matches a work's own title should not spend

@@ -2440,3 +2440,24 @@ test('the scoped part pass records the out-of-scope pages it discards (audit fix
  assert.ok(result.candidates.some(source=>source.bookId==='20'&&source.page===5),
   'the in-scope page survives the rewrite into the candidate pool');
 });
+
+test('sole-survivor reservations spend their own budget when part reservations exhaust the shared cap (audit fix C3)',()=>{
+ const groups=[{sources:[
+  {bookId:'10',page:1,score:90},
+  {bookId:'20',page:1,score:80},
+  {bookId:'30',page:1,score:70}
+ ]}];
+ const out=mergeFacetSearches(groups,2,[],{
+  directQuestionFacetIndex:-1,
+  partQuestions:[
+   {partId:'P1',question:'First part question without quotes'},
+   {partId:'P2',question:'Second part question without quotes'}],
+  partFacetScopes:[
+   {partId:'P1',facet:0,sourceBookIds:['10']},
+   {partId:'P2',facet:0,sourceBookIds:['20']}]});
+ const sole=out.find(source=>String(source.bookId)==='30');
+ assert.ok(sole,'the sole-survivor page is reserved even though the two part reservations filled the shared cap of 2');
+ assert.equal(sole?.soleSurvivor,true);
+ assert.equal(out.length,3,
+  'the pool exceeds the shared cap only by the sole-survivor reservation');
+});
