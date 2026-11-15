@@ -194,6 +194,56 @@ test('phase-3 suites permit one selected case and no question duplicates an earl
   'no phase-3 question duplicates an earlier suite question');
  assert.ok(phase3.every(item=>!earlierIds.has(item.id)),'no phase-3 case id repeats an earlier suite');
 });
+test('holdout library-holdout suite covers eight open all-books questions with no expected sources',()=>{
+ const cases=selectLiveCases(suite,'library-holdout','all');
+ assert.equal(cases.length,8);
+ assert.ok(cases.every(item=>item.evaluation_scope==='all-books'));
+ assert.ok(cases.every(item=>item.selected_book_ids.length===0));
+ assert.ok(cases.every(item=>item.required_source_groups.length===0&&item.review_focus.length===0));
+ assert.ok(cases.every(item=>item.planner_queries.length===1&&item.planner_queries[0]===item.question));
+ assert.ok(evaluationUsesLivePlanner('library-holdout','case-default'));
+ assert.deepEqual(applyQualityScope(cases,'case-default').map(item=>item.selected_book_ids),
+  cases.map(()=>[]));
+ assert.deepEqual(cases.map(item=>item.discipline),
+  ['philosophy','philosophy','philosophy','politics','literature','society','literature','literature']);
+});
+test('holdout library-holdout-selected suite scopes eight questions to eight distinct catalog books',()=>{
+ const cases=selectLiveCases(suite,'library-holdout-selected','all');
+ assert.equal(cases.length,8);
+ assert.ok(cases.every(item=>item.evaluation_scope==='selected-books'));
+ assert.ok(cases.every(item=>item.selected_book_ids.length===1));
+ assert.equal(new Set(cases.map(item=>item.selected_book_ids[0])).size,8);
+ assert.ok(cases.every(item=>item.required_source_groups.length===1&&
+  item.required_source_groups[0].book_ids.length===1&&
+  item.required_source_groups[0].book_ids[0]===item.selected_book_ids[0]));
+ assert.ok(cases.every(item=>item.planner_queries.length===1&&item.planner_queries[0]===item.question));
+ assert.ok(evaluationUsesLivePlanner('library-holdout-selected','case-default'));
+ assert.deepEqual(applyQualityScope(cases,'case-default').map(item=>item.selected_book_ids),
+  [['633'],['84'],['321'],['354'],['129'],['204'],['105'],['314']]);
+});
+test('holdout suites permit one selected case and duplicate no earlier suite question, id, or book',()=>{
+ const selected=selectLiveCases(suite,'library-holdout-selected','library-holdout-selected-seneca-letters-time');
+ assert.equal(selected.length,1);
+ assert.deepEqual(selected[0].selected_book_ids,['633']);
+ assert.throws(()=>selectLiveCases(suite,'library-holdout-selected','not-a-library-case'),/Unknown library-holdout-selected case/);
+ assert.throws(()=>selectLiveCases(suite,'library-holdout','library-holdout-selected-seneca-letters-time'),/Unknown library-holdout case/);
+ const earlierQuestions=new Set(),earlierIds=new Set(),earlierBooks=new Set();
+ for(const mode of ['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','library-all-3','library-selected-3']){
+  for(const item of selectLiveCases({cases:[]},mode,'all')){
+   earlierQuestions.add(item.question);earlierIds.add(item.id);
+   for(const id of item.selected_book_ids)earlierBooks.add(id);
+   for(const group of item.required_source_groups)for(const id of group.book_ids)earlierBooks.add(id);
+  }
+ }
+ const holdout=[...selectLiveCases({cases:[]},'library-holdout','all'),
+  ...selectLiveCases({cases:[]},'library-holdout-selected','all')];
+ assert.equal(new Set(holdout.map(item=>item.question)).size,16,'holdout questions are mutually distinct');
+ assert.ok(holdout.every(item=>!earlierQuestions.has(item.question)),
+  'no holdout question duplicates an earlier suite question');
+ assert.ok(holdout.every(item=>!earlierIds.has(item.id)),'no holdout case id repeats an earlier suite');
+ assert.ok(holdout.every(item=>item.selected_book_ids.every(id=>!earlierBooks.has(id))),
+  'no holdout selected book appears in any earlier suite');
+});
 test('batch-17 transport suite pairs all 16 phase-2 questions without changing their scopes',()=>{
  const cases=selectLiveCases({cases:[]},'transport-ab','all');
  assert.equal(cases.length,16);
