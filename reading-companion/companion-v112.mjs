@@ -6,11 +6,11 @@
  * the Worker independently verifies submitted page text before inference.
  * This client is separate from the local Python/Ollama workbench.
  */
-import {RemoteLibrary} from './remote-library.mjs';
-import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs';
+import {RemoteLibrary} from './remote-library.mjs?v=1.20.15';
+import {catalogFallbackPlan,normalizePlan} from './reader-contract.mjs?v=1.20.15';
 import {createSourceReader} from './source-reader.mjs';
 import {readablePageWithHighlight} from './source-text-format.mjs';
-import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,deterministicGapFallbackQueries,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.7';
+import {validSearchPlan,prepareAnswerCandidates,canFallbackToDirectSearch,retrieveEvidence,assessEvidenceCoverage,createRetrievalSearchCache,deterministicSelectedBookPlan,deterministicGapFallbackQueries,LIVE_RETRIEVAL_CONFIG} from './evidence-search.mjs?v=1.20.15';
 import {auditCitationIds,createDiagnosticReport,diagnosticFailureCode,
   inlineCitationGroups,userFailureMessage} from './diagnostic-report.mjs';
 import {filterBooksByText,sortBooksForSelector} from './book-order.mjs';
@@ -22,6 +22,23 @@ import {pilotAnswerSources} from './answer-payload.mjs';
 
 const ROOT='https://jsynon.github.io/antilogicalism-library-data/';
 const API='https://antilogicalism-companion-public.jsynon.workers.dev';
+// Audit fix C4: every API fetch carries an abort deadline so a wedged
+// Worker or network path surfaces as an error instead of an endless
+// 'still working' card. Answers legitimately take over a minute, so
+// the plan/answer ceiling is generous (300s); the small status and
+// coverage reads get 30s.
+const LONG_FETCH_TIMEOUT_MS=300000;
+const QUICK_FETCH_TIMEOUT_MS=30000;
+async function timedFetch(url,options={},timeoutMs=LONG_FETCH_TIMEOUT_MS){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),timeoutMs);
+  try{return await fetch(url,{...options,signal:controller.signal});}
+  catch(error){
+    if(error?.name==='AbortError')
+      throw Error('The service took too long to respond. Please try again.');
+    throw error;
+  }finally{clearTimeout(timer);}
+}
 const FALLBACK_BOOK={id:'152',title:'History of the Peloponnesian War — Thucydides'};
 const PDF_PAGE_LIMIT=14000;
 const el=id=>document.getElementById(id);
@@ -202,7 +219,7 @@ function populateBooks(){
 }
 async function loadCoverage(){
   try{
-    const response=await fetch(ROOT+'reader-fingerprints-v3/coverage-v3.json',{cache:'no-store'});
+    const response=await timedFetch(ROOT+'reader-fingerprints-v3/coverage-v3.json',{cache:'no-store'},QUICK_FETCH_TIMEOUT_MS);
     if(!response.ok)throw Error('The v49 fingerprint collection is not available yet.');
     const index=await response.json();
     if(index.schema!=='antilogicalism-reader-coverage-v3'||
@@ -230,7 +247,7 @@ async function loadCoverage(){
 }
 async function loadStatus(){
   try{
-    const response=await fetch(API+'/api/pilot-status',{cache:'no-store'});
+    const response=await timedFetch(API+'/api/pilot-status',{cache:'no-store'},QUICK_FETCH_TIMEOUT_MS);
     if(!response.ok)throw Error('Public pilot status unavailable');
     const data=await response.json();
     searchPlanningEnabled=data.searchPlanning===true;
@@ -498,11 +515,21 @@ function renderResponse(data,turnQuestion=''){
         try{await sourceReader.open({...source,excerpts},read);}
         catch(error){setStatus('Source reader: '+error.message);}
       });
-      const link=document.createElement('a');link.href=source.url;
-      link.target='_blank';link.rel='noopener noreferrer';
-      link.textContent=source.title+' · p. '+source.page;
       // The title opens the scan; Read passages remains the excerpt control.
-      card.append(read,link);
+      // Audit fix C4: source.url arrives in the Worker payload, so only
+      // an https URL may become a link — a javascript: or data: value
+      // must never reach an href. Anything else renders as plain text.
+      let safeUrl=null;
+      try{const parsed=new URL(String(source.url||''));
+        if(parsed.protocol==='https:')safeUrl=parsed.href;}catch{}
+      if(safeUrl){
+        const link=document.createElement('a');link.href=safeUrl;
+        link.target='_blank';link.rel='noopener noreferrer';
+        link.textContent=source.title+' · p. '+source.page;
+        card.append(read,link);
+      }else{
+        card.append(read,node('span',source.title+' · p. '+source.page));
+      }
       const attribution=sourceAttributionLabel(source.provenance);
       if(attribution)card.append(node('p',attribution,'companion-source-attribution'));
       panel.append(card);
@@ -542,7 +569,7 @@ function renderResponse(data,turnQuestion=''){
 }
 async function requestSourcePlan(q,verificationToken,history){
   if(diagnosticState)diagnosticState.stage='planning';
-  const res=await fetch(API+'/api/pilot-plan',{
+  const res=await timedFetch(API+'/api/pilot-plan',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question:q,bookId:bookFilter.value,history,
       turnstileToken:verificationToken})
@@ -589,7 +616,7 @@ async function requestRetrievalGap(q,verificationToken,history,originalQueries,p
     coverageReason:item.coverageReason,coverageSource:item.coverageSource}));
   const evidence=candidates.slice(0,6).map(source=>({title:source.title,
     excerpt:String(source.preview||source.text||'').slice(0,420)}));
-  const res=await fetch(API+'/api/pilot-plan',{method:'POST',headers:{'Content-Type':'application/json'},
+  const res=await timedFetch(API+'/api/pilot-plan',{method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({question:q,bookId:bookFilter.value,history,
       turnstileToken:verificationToken,retrievalGap:{weakParts,originalQueries:[...originalQueries,
         ...partQuestions.map(item=>item.question)].slice(0,7),candidates:evidence}})});
@@ -793,7 +820,7 @@ async function askQuestion(questionText){
     turnstileToken='';
     setStatus('I’ve found a trail of promising pages—now I’m picking out the best clues…');
     armLongWaitNotice();
-    const response=await fetch(API+'/api/pilot-answer',{
+    const response=await timedFetch(API+'/api/pilot-answer',{
       method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({question:q,turnstileToken:token,
         history,bookId:bookFilter.value||'',plan:currentPlan||undefined,

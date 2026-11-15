@@ -130,3 +130,17 @@ test('prefetch uses the shard cache: a repeat search downloads nothing again',as
   assert.equal(again.booksScanned,4);
   assert.equal(again.sources.length,8);
 });
+
+test('an explicit maxBooks above the production default is honored up to the hard limit (audit fix C4)',async()=>{
+  const wide=await new RemoteLibrary(ROOT,makeFetcher().fetcher).search(QUERY,{maxBooks:6});
+  assert.equal(wide.booksScanned,6,
+    'the controlled-evaluation breadth of 6 books is actually scanned');
+  assert.deepEqual([...new Set(wide.sources.map(source=>source.bookId))].sort(),
+    ['1','2','3','4','5','6']);
+  const capped=await new RemoteLibrary(ROOT,makeFetcher().fetcher).search(QUERY,{maxBooks:99});
+  assert.equal(capped.booksScanned,6,
+    'requests beyond the hard limit are still capped');
+  const standard=await new RemoteLibrary(ROOT,makeFetcher().fetcher).search(QUERY);
+  assert.equal(standard.booksScanned,4,
+    'the production default is unchanged');
+});

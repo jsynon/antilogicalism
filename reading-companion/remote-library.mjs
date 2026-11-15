@@ -10,6 +10,15 @@ export const DEFAULT_INDEX_ROOT = 'https://jsynon.github.io/antilogicalism-libra
 // retrieval contract. Callers may ask for fewer works, but never more than four.
 export const PRODUCTION_MAX_BOOKS = 4;
 export const PRODUCTION_PAGES_PER_BOOK = 4;
+// Hard safety ceilings for any caller (audit fix C4). The production
+// values above are what live traffic requests, but the leaf used to
+// clamp every search back to them — silently defeating the
+// controlled-evaluation profile (RETRIEVAL_PROFILES.expanded asks
+// for 6 books), so profile comparisons measured a breadth difference
+// that never occurred. Explicit requests are now honored up to these
+// ceilings; nothing may exceed them.
+export const MAX_BOOKS_HARD_LIMIT = 6;
+export const MAX_PAGES_PER_BOOK_HARD_LIMIT = 6;
 // Batch 33 (B33-7a): a search scoped to one large book may return up to
 // SCOPED_DIVERSITY_SLOTS pages beyond the per-book production cap. The
 // first pageLimit pages are the pure rank selection, exactly as before;
@@ -844,8 +853,8 @@ export class RemoteLibrary {
     }
     const sources = [];
     let booksScanned = 0, discardedNavigation = 0;
-    const bookLimit = Math.max(1, Math.min(maxBooks, PRODUCTION_MAX_BOOKS));
-    const pageLimit = Math.max(1, Math.min(pagesPerBook, PRODUCTION_PAGES_PER_BOOK));
+    const bookLimit = Math.max(1, Math.min(maxBooks, MAX_BOOKS_HARD_LIMIT));
+    const pageLimit = Math.max(1, Math.min(pagesPerBook, MAX_PAGES_PER_BOOK_HARD_LIMIT));
     // A small reserve of candidate works allows replacement of an index-
     // only book, without downloading all 644 book shards.
     const candidateBooks = books.slice(0, Math.max(bookLimit, Math.min(6, books.length)));
