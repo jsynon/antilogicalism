@@ -1397,6 +1397,40 @@ test('an unmentioned but catalog-valid planner source does not become an exclusi
  assert.equal(plan.parts[0].sourceBookIds,null);
 });
 
+test('a collective Various-authors source never hard-scopes a part (audit fix C1, F4.1)',()=>{
+ // The science-case shape: one planner source carrying an anthology
+ // set. The Worker copies un-scope it (collective); the browser copy
+ // must too, or its scoped pass restricts the part's searches to the
+ // anthology books and the answer route cannot recover the rest.
+ const catalog={
+  '283':'The Ante-Nicene Fathers, Volume 1 — Various authors',
+  '284':'The Ante-Nicene Fathers, Volume 2 — Various authors',
+  '285':'The Ante-Nicene Fathers, Volume 3 — Various authors',
+  '9':'Physics — Aristotle'};
+ const question='What do the Ante-Nicene Fathers say about creation?';
+ const plan=normalizePlan({intent:'explain',resolvedQuestion:question,sources:[
+  {label:'Various authors',role:'primary',bookIds:['283','284','285']}
+ ],parts:[{question:'What do the Ante-Nicene Fathers say about creation?'}],
+ queries:['Ante-Nicene Fathers creation']},question,catalog);
+ assert.deepEqual(plan.collectiveSources,[{label:'Various authors',bookCount:3}],
+  'a source whose every book carries the collective byline is reported collective');
+ assert.equal(plan.parts[0].sourceBookIds,null,
+  'the collective source stays a search lead, never a part scope');
+ // The count rule: a validated set wider than the limit is collective
+ // whatever its byline says.
+ const wideCatalog={};
+ const wideIds=[];
+ for(let i=0;i<25;i++){const id=String(900+i);wideIds.push(id);
+  wideCatalog[id]='Dialogue '+id+' — Plato';}
+ const wideQuestion='What does Plato say about the forms?';
+ const wide=normalizePlan({intent:'explain',resolvedQuestion:wideQuestion,sources:[
+  {label:'Plato',role:'primary',bookIds:wideIds}
+ ],parts:[{question:'What does Plato say about the forms?'}],
+ queries:['Plato forms']},wideQuestion,wideCatalog);
+ assert.deepEqual(wide.collectiveSources,[{label:'Plato',bookCount:25}]);
+ assert.equal(wide.parts[0].sourceBookIds,null);
+});
+
 test('planner requirements survive normalization with the retrieval bounds applied (batch 10 B10-6)',()=>{
  const question='How do Aristotle and Darwin differ in explaining change?';
  const catalog={
@@ -1417,12 +1451,15 @@ test('planner requirements survive normalization with the retrieval bounds appli
    'a fifth requirement beyond the cap of four']},
   {question:'How does Darwin explain change?'}
  ],queries:['Aristotle change','Darwin change']},question,catalog);
+ // Synced contract (audit fix C1): requirements are the Worker copy's
+ // objects — {id, text, questionAnchor} — capped at the first four
+ // raw entries, deduplicated by text; the retrieval layer applies
+ // its own 5–200 char bounds when threading them (partRequirementTexts).
  assert.deepEqual(plan.parts[0].requirements,[
-  'state the four causes account of change',
-  'give the role of form and matter in change',
-  'name the unmoved mover as final cause',
-  'distinguish potency from actuality in change'],
-  'string and {text} forms survive; duplicates, out-of-bound entries, and entries past four are dropped');
+  {id:'P1-R1',text:'state the four causes account of change',questionAnchor:question},
+  {id:'P1-R2',text:'give the role of form and matter in change',questionAnchor:question},
+  {id:'P1-R3',text:'no',questionAnchor:question}],
+  'string and {text} forms survive as anchored objects; the duplicate and every entry past the raw cap of four are dropped');
  assert.ok(!('requirements' in plan.parts[1]),
   'a part the planner gave no requirements keeps its previous shape');
 });
@@ -1439,7 +1476,7 @@ test('a plan without requirements normalizes exactly as before (batch 10 B10-6)'
   ['id','question','searchQueries','sourceBookIds']);
 });
 
-test('requirements are carried when parts collapse to a single direct question (batch 10 B10-6)',()=>{
+test('a broad author question resets to the single resolved part (batch 10 B10-6, synced by audit fix C1)',()=>{
  const question='What does Aristotle say about change?';
  const catalog={'4':'Metaphysics — Aristotle'};
  const plan=normalizePlan({intent:'explain',sources:[
@@ -1449,10 +1486,14 @@ test('requirements are carried when parts collapse to a single direct question (
   {text:'distinguish potency from actuality in change'}]}],
  queries:['Aristotle change']},question,catalog);
  assert.equal(plan.parts.length,1);
- assert.deepEqual(plan.parts[0].requirements,[
-  'state the four causes account of change',
-  'distinguish potency from actuality in change'],
-  'the single-part shape live questions take keeps the planner requirements');
+ // The Worker copy's broad-author reset replaces the parts with the
+ // single resolved question and drops planner requirements — and it
+ // already did so at the plan route, before the browser re-normalized,
+ // so the old client copy's preservation here could never fire in
+ // production. C1 keeps the authoritative behavior in both copies.
+ assert.ok(!('requirements' in plan.parts[0]),
+  'the broad-author reset drops planner requirements in both copies');
+ assert.equal(plan.parts[0].question,question);
 });
 
 test('an explicitly selected book stays scoped and named work in collected volume remains retrievable',()=>{
