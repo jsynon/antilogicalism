@@ -625,7 +625,7 @@ export function auditSelectionHandoff(trace){
  if(!selectedRows.length||selectedRows.some(item=>!Array.isArray(item.candidatePartIds)))
   return {status:'unavailable',reason:'selection-part-links-not-recorded',checkedRelations:0,issues:[]};
  const selected=new Map(selectedRows.map(item=>[item.candidateId,item]));
- const issues=[];let checkedRelations=0;
+ const issues=[];let checkedRelations=0,unselectedNominations=0;
  const supportRelations={direct:0,context:0};
  let partsWithDirectEvidence=0,contextOnlyParts=0;
  for(const part of stage.decision.parts){
@@ -652,9 +652,17 @@ export function auditSelectionHandoff(trace){
      support:String(item?.support||'')});
    else if(item?.support==='direct'||item?.support==='context')supportRelations[item.support]++;
   }
+  // Audit fix C5: an unselected nomination is not an issue. The
+  // selector's candidateIds are nominations; the packet is capped at
+  // six pages while nominations are unbounded, so demanding every
+  // nominee be selected was arithmetically unsatisfiable at
+  // production shape and fired mismatch regardless of handoff
+  // quality. The satisfiable form of the same guarantee is the
+  // evidence loop above: every evidence item the selector declared
+  // for a part must be in the packet carrying that part's link.
+  // Unselected nominees are counted for visibility instead.
   for(const candidateId of partCandidateIds){
-   if(!selected.has(String(candidateId)))
-    issues.push({code:'part-link-source-not-selected',partId,candidateId:String(candidateId)});
+   if(!selected.has(String(candidateId)))unselectedNominations++;
   }
   if(part?.coverage==='supported'&&!evidence.some(item=>item?.support==='direct'&&
     selected.has(String(item?.candidateId||''))))
@@ -673,7 +681,7 @@ export function auditSelectionHandoff(trace){
    issues.push({code:'recovered-part-link-missing',partId,candidateId});
  }
  return {status:issues.length?'mismatch':'consistent',checkedRelations,supportRelations,
-  partsWithDirectEvidence,contextOnlyParts,issues};
+  partsWithDirectEvidence,contextOnlyParts,unselectedNominations,issues};
 }
 function tracePayload(stage){
  const text=stage?.messages?.find(message=>message?.role==='user')?.content;
@@ -2034,9 +2042,15 @@ async function loadSources(item,queries,{library,manifest,allowed,directFallback
   candidatePacket.push(source);candidateTextBytes+=bytes;
  }
  const selectionAudit=auditEvidencePacketSelection(answerCandidates,selected,item.question,partQuestions);
+ // Audit fix C5: keep the reservation flags on the artifact rows.
+ // soleSurvivor (merge reservation) and neighborhood (leaf per-anchor
+ // reservation) are the only evidence in a run artifact that those
+ // two shipped mechanisms fired; stripping them made both mechanisms
+ // unverifiable from artifacts. Unflagged rows stay byte-identical.
  const retrievalCandidates=populated.map(({bookId,title,page,globalPageId,score,facet,facetRanks,
-  matchedFacets,candidatePartIds,preview,text})=>({bookId,title,page,globalPageId,score,facet,facetRanks,
-  matchedFacets,candidatePartIds,excerpt:String(preview||text||'').slice(0,1200)}));
+  matchedFacets,candidatePartIds,preview,text,soleSurvivor,neighborhood})=>({bookId,title,page,globalPageId,score,facet,facetRanks,
+  matchedFacets,candidatePartIds,excerpt:String(preview||text||'').slice(0,1200),
+  ...(soleSurvivor?{soleSurvivor:true}:{}),...(neighborhood?{neighborhood:true}:{})}));
  return {selected,candidates:answerCandidates,candidatePacket,searches:retrieval.searches,
   positionCoverage:retrieval.positionCoverage,retrievalCandidates,
   selectionCoverage:auditSelectionCoverage(answerCandidates,selected,partQuestions),selectionAudit};
