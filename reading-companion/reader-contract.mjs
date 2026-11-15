@@ -1,10 +1,27 @@
-// Site-side reader-contract helpers. Production retrieval currently imports
-// catalogIdentity; the other normalizers are exercised by contract tests.
-// The Worker copy is in book-chatbot/hosting-poc/reader-contract.mjs. These
-// implementations are not byte-identical: planner normalization currently
-// differs, so compare both copies before changing shared plan or citation rules.
+// Site-side reader-contract helpers. Production retrieval imports
+// catalogIdentity, catalogFallbackPlan, and normalizePlan from here
+// (companion-v112.mjs, evidence-search.mjs).
+// The Worker copy is in book-chatbot/hosting-poc/reader-contract.mjs.
+// Audit fix C1 (2026-11-15): the two copies are kept IDENTICAL except
+// for this header and the v49 wording in the curated-voice note —
+// a plan is normalized three times (plan route, this browser copy,
+// answer route), and the copies had diverged: this copy lacked the
+// collective-source handling, object requirements with question
+// anchors, planner-query linkage, and single-part query inheritance
+// the Worker copy applies, so a 'Various authors' anthology set
+// could hard-scope browser-side searches the Worker had un-scoped.
+// Diff the two files before changing shared plan or citation
+// behavior; any difference beyond the header is a bug. Server-side
+// quote cleanup (removeUnsupportedQuoteMarks) runs only in the
+// Worker; it is mirrored here so the files stay diff-clean.
 export const CONTRACT_VERSION='reader-evidence-v2';
-export const RETRIEVAL_LIMIT=12;
+// A validated plan source whose book set is wider than any single
+// author's presence in the catalog is a collective credit (an anthology
+// byline shared by unrelated works), not a scope. Measured on v49: the
+// widest genuine author byline is Plato at 22 books, while a collective
+// "Various authors" set validated to 55. The limit is a catalog
+// property, not a per-question choice; see stageB3-checkpoint.
+export const COLLECTIVE_SOURCE_BOOK_LIMIT=24;
 export function citationIds(text){
   return [...new Set([...String(text||'').matchAll(/\[([^\]]+)\]/g)]
     .flatMap(match=>match[1].match(/\bS\d+\b/g)||[]))];
@@ -59,7 +76,7 @@ export function catalogFallbackPlan(question,catalog={},selectedBookId=''){
   const namedWorkIds=new Set([...aliasOwners.entries()]
     .filter(([alias,owners])=>owners.size===1&&contains(text,alias))
     .flatMap(([,owners])=>[...owners]));
-  const sources=matchedAuthors.map(([key,entry])=>{
+  const sources=matchedAuthors.map(([,entry])=>{
     const titleNarrowed=[...entry.bookIds].filter(id=>namedWorkIds.has(id));
     return {label:entry.label,role:'primary',bookIds:titleNarrowed.length?titleNarrowed:[...entry.bookIds]};
   });
@@ -86,7 +103,11 @@ const CURATED_VOICE_IDENTITIES=Object.freeze({
       18:{kind:'editorial-introduction',name:'David A. Dilworth',creditedAuthor:'Kitarō Nishida'}
     }},
   '178':{title:'Mūlamadhyamakakārikā — Nāgārjuna',
-    editorialPages:{88:{kind:'editorial-introduction',name:'David J. Kalupahana',creditedAuthor:'Nāgārjuna'}}},
+    editorialPages:{
+      88:{kind:'editorial-introduction',name:'David J. Kalupahana',creditedAuthor:'Nāgārjuna'},
+      104:{kind:'editorial-commentary',name:'David J. Kalupahana',creditedAuthor:'Nāgārjuna'},
+      164:{kind:'editorial-commentary',name:'David J. Kalupahana',creditedAuthor:'Nāgārjuna'}
+    }},
   '239':{title:'The Portable Nietzsche — Friedrich Nietzsche (edited by Walter Kaufmann)',
     editorialPages:{578:{kind:'editorial-commentary',name:'Walter Kaufmann',creditedAuthor:'Friedrich Nietzsche'}}}
 });
@@ -101,9 +122,13 @@ export function sourceProvenance(source,plan,pageText=''){
   const curated=CURATED_VOICE_IDENTITIES[String(source?.bookId)];
   const titleMatches=curated&&String(source?.title||'').trim()===curated.title;
   const pageVoice=titleMatches?curated.editorialPages?.[Number(source?.page)]:undefined;
+  const effectiveSectionHint=pageVoice?.kind?.includes('commentary')?'commentary':
+    pageVoice?.kind?.includes('introduction')?'introduction':pageSectionHint;
+  const effectiveVoiceHint=pageVoice?
+    `${pageVoice.kind.replace(/^editorial-/u,'')} by ${pageVoice.name}`:pageVoiceHint;
   return {work:identity.work||String(source?.title||''),creditedAuthors:identity.authors||[],
     creditedEditors:identity.editors||[],creditedTranslators:identity.translators||[],plannerSourceRole:role,
-    pageSectionHint,pageVoiceHint,
+    pageSectionHint:effectiveSectionHint,pageVoiceHint:effectiveVoiceHint,
     ...(titleMatches&&curated.workVoice?{workVoice:curated.workVoice}:{}),
     ...(pageVoice?{pageVoice}:{}),
     roleMeaning:'The planner role describes intended source selection, not the voice or genre of this individual page.'};
@@ -138,29 +163,25 @@ export function auditFinalAnswer(answer,sources){
   }
   return {ok:!unknownIds.length&&!quoteFailures.length,ids,unknownIds,quoteFailures};
 }
+// A phrase that is not an exact source quotation can still be a sound
+// paraphrase. Remove only its quote marks, then let the ordinary source-span
+// reviewer decide whether the cited claim is supported; never silently keep it
+// as a direct quotation.
+export function removeUnsupportedQuoteMarks(answer,sources){
+  let text=String(answer||'');
+  const audit=auditFinalAnswer(text,sources);
+  const repairs=[];
+  for(const quote of audit.quoteFailures.slice().sort((a,b)=>b.start-a.start)){
+    if(quote.end<=quote.start+1)continue;
+    const value=text.slice(quote.start+1,quote.end-1);
+    text=text.slice(0,quote.start)+value+text.slice(quote.end);
+    repairs.unshift({quote:String(quote.text||value).slice(0,180),
+      sourceIds:[...(quote.sourceIds||[])],action:'removed-nonexact-quotation-marks'});
+  }
+  return {text,repairs,unknownIds:audit.unknownIds};
+}
 export function normalizePlan(raw,question,catalog={},selectedBookId=''){
   const bounded=(v,max)=>typeof v==='string'?v.trim().slice(0,max):'';
-  // Batch 10 (B10-6): preserve the planner's per-part requirement texts so
-  // live retrieval judges the positions the plan actually named (the eval
-  // harness reads the raw plan and has always seen them; the normalized
-  // plan dropped them, so every requirement-keyed retrieval mechanism ran
-  // on part-question wording for real readers). The bounds mirror exactly
-  // what the retrieval layer enforces on threaded requirements: plain
-  // strings or {text} entries, trimmed, 5–200 chars, deduplicated, ≤4.
-  const normalizeRequirements=value=>{
-    const seen=new Set(),texts=[];
-    for(const item of Array.isArray(value)?value:[]){
-      const text=typeof item==='string'?item.trim()
-        :typeof item?.text==='string'?item.text.trim():'';
-      const key=text.toLocaleLowerCase();
-      if(text.length<5||text.length>200||seen.has(key))continue;
-      seen.add(key);texts.push(text);
-      if(texts.length>=4)break;
-    }
-    return texts;
-  };
-  const withRequirements=(part,requirements)=>requirements.length
-    ?{...part,requirements}:part;
   const fallback=catalogFallbackPlan(question,catalog,selectedBookId);
   const planInput=raw&&typeof raw==='object'&&!Array.isArray(raw)?raw:fallback;
   const resolvedQuestion=bounded(planInput.resolvedQuestion,600)||question;
@@ -204,14 +225,72 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
   }).filter(source=>source.bookIds.length);
   if(!sources.length&&fallback.sources.length)sources.push(...fallback.sources.slice(0,8));
   if(selectedBookId)sources.splice(0,sources.length,{label:catalog[selectedBookId],role:'primary',bookIds:[selectedBookId]});
+  // Collective sources stay in the plan as leads (their queries remain
+  // search facets) but never hard-scope a part, a question-named match,
+  // or a comparison side: scoping to an anthology byline's full set
+  // silently excludes every book outside it, including the ones the
+  // reader's question is actually about.
+  // Retrieval tranche: the count rule alone misses the planner's
+  // recurring anthology set — a single 'Various authors' source carrying
+  // the Ante-Nicene Fathers, the NKJV, and the Sacred Books of the East
+  // (16 books, under the limit) hard-scoped the science and suffering
+  // parts in every recorded run. A source whose every book is bylined
+  // with exactly that collective byline is collective at any count; a
+  // genuine author's multi-book set (Plato's 22 dialogues) names a
+  // person and still scopes.
+  const collectiveBylineSource=(source)=>source.bookIds.length>0&&
+    source.bookIds.every(id=>{
+      const authors=catalogIdentity(catalog[id]).authors.map(identity);
+      return authors.length===1&&authors[0]==='various authors';
+    });
+  const collectiveSourceIndexes=new Set(sources
+    .map((source,index)=>source.bookIds.length>COLLECTIVE_SOURCE_BOOK_LIMIT||
+      collectiveBylineSource(source)?index:-1)
+    .filter(index=>index>=0));
+  const collectiveSources=sources
+    .filter((source,index)=>collectiveSourceIndexes.has(index))
+    .map(source=>({label:source.label,bookCount:source.bookIds.length}));
   const intent=['explain','compare','interpret','locate'].includes(planInput.intent)?planInput.intent:'explain';
   const queries=Array.isArray(planInput.queries)?planInput.queries.slice(0,4).map(q=>bounded(q,160)).filter(Boolean):[];
-  const parts=(Array.isArray(planInput.parts)?planInput.parts:[]).slice(0,6).map((p,i)=>withRequirements(
-    {id:'P'+(i+1),question:bounded(typeof p==='string'?p:p?.question,240)},
-    normalizeRequirements(typeof p==='string'?null:p?.requirements))).filter(p=>p.question);
-  let normalizedParts=parts.length?parts:[{id:'P1',question}];
+  const exactQuestionAnchor=(candidate,partQuestion)=>{
+    const anchor=typeof candidate==='string'?candidate.trim():'';
+    // Anchors are literal excerpts from the current reader turn. Resolved
+    // follow-up wording and planner paraphrases are useful context, but are
+    // not substitutes for the words the reader actually supplied.
+    if(anchor.length>=3&&anchor.length<=400&&question.includes(anchor))return anchor;
+    if(typeof partQuestion==='string'&&partQuestion.length>=3&&partQuestion.length<=400&&
+       question.includes(partQuestion))return partQuestion;
+    return question.slice(0,400);
+  };
+  const parts=(Array.isArray(planInput.parts)?planInput.parts:[]).slice(0,6).map((p,i)=>({
+    id:'P'+(i+1),question:bounded(typeof p==='string'?p:p?.question,240),
+    requirements:Array.isArray(p?.requirements)?p.requirements.slice(0,4).flatMap(requirement=>{
+      const text=bounded(typeof requirement==='string'?requirement:requirement?.text,200);
+      if(!text)return [];
+      return [{text,questionAnchor:exactQuestionAnchor(
+        typeof requirement==='object'?requirement?.questionAnchor??requirement?.anchor:'',
+        bounded(typeof p==='string'?p:p?.question,240))}];
+    }).filter((requirement,index,all)=>all.findIndex(item=>
+      item.text.toLocaleLowerCase()===requirement.text.toLocaleLowerCase())===index):[],
+    plannedSearchQueries:Array.isArray(p?.searchQueries)?[...new Set(p.searchQueries
+      .slice(0,5).map(query=>bounded(query,400)).filter(Boolean))]:[]
+  })).filter(p=>p.question);
+  let normalizedParts=parts.length?parts:[{id:'P1',question,requirements:[]}];
   const identityText=value=>String(value||'').normalize('NFKC').toLocaleLowerCase()
     .replace(/[’‘]/g,"'").replace(/[^\p{L}\p{N}]+/gu,' ').trim().replace(/\s+/g,' ');
+  const plannerQueryStopWords=new Set(['a','an','and','are','as','at','be','by','do','does','for','from','how',
+    'in','into','is','it','of','on','or','that','the','their','them','they','this','to','what','when','where',
+    'which','who','why','with']);
+  const queryTerms=value=>[...new Set(identityText(value).split(' ').map(term=>
+    term.length>5&&term.endsWith('s')?term.slice(0,-1):term)
+    .filter(term=>term.length>2&&!plannerQueryStopWords.has(term)))];
+  const plannerQueryAffinity=(query,part)=>{
+    const terms=queryTerms(query),partTerms=new Set(queryTerms(part));
+    if(terms.length<2||partTerms.size<2)return 0;
+    const overlap=terms.filter(term=>partTerms.has(term)).length;
+    const ratio=overlap/Math.min(terms.length,partTerms.size);
+    return overlap>=2&&ratio>=0.3?overlap+ratio:0;
+  };
   const containsPhrase=(haystack,phrase)=>{
     const normalized=identityText(phrase);
     return normalized.length>=4&&(' '+identityText(haystack)+' ').includes(' '+normalized+' ');
@@ -230,13 +309,22 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
   const hypotheticalAuthorResponse=/\b(?:what|how)\s+would\b[^?!.]{0,120}\b(?:think|say|respond|react|view|regard)\b[^?!.]{0,100}\b(?:about|of|on|regarding|concerning|to)\b/i.test(resolvedQuestion);
   const comparisonPattern=/\b(?:compare|contrast|differ(?:s|ed|ence|ent)?|versus|vs\.?|similar(?:ity)?|alike)\b/i;
   const hasMultipleQuestions=(resolvedQuestion.match(/\?/g)||[]).length>1;
-  const explicitMultiPartRequest=asksAnotherFacet||hasMultipleQuestions||comparisonPattern.test(resolvedQuestion);
+  // The planner can distinguish coordinated outcomes that this compact
+  // surface-form check cannot name in advance. Preserve that decision when a
+  // coordinated question arrives with multiple parts, while keeping ordinary
+  // single questions on the one-part path.
+  const plannerDecomposedCoordination=normalizedParts.length>1&&/\b(?:and|or)\b/i.test(resolvedQuestion);
+  const explicitMultiPartRequest=asksAnotherFacet||hasMultipleQuestions||
+    comparisonPattern.test(resolvedQuestion)||plannerDecomposedCoordination;
   // Planner parts become required coverage obligations. Keep a single direct
   // question as one part; use search leads and supported prose for helpful
   // context instead of turning inferred themes into new answer requirements.
-  if(!explicitMultiPartRequest&&!hypotheticalAuthorResponse)
-    normalizedParts=[withRequirements({id:'P1',question:resolvedQuestion},
-      normalizeRequirements(normalizedParts.flatMap(part=>part.requirements||[])))];
+  if(!explicitMultiPartRequest&&!hypotheticalAuthorResponse){
+    const plannedSearchQueries=[...new Set(normalizedParts.flatMap(part=>part.plannedSearchQueries||[]))];
+    const requirements=[...new Map(normalizedParts.flatMap(part=>part.requirements||[])
+      .map(requirement=>[requirement.text.toLocaleLowerCase(),requirement])).values()];
+    normalizedParts=[{id:'P1',question:resolvedQuestion,plannedSearchQueries,requirements}];
+  }
   const sourcePhrases=source=>{
     const phrases=[source.label];
     for(const token of String(source.label||'').split(/[^\p{L}\p{N}]+/u))
@@ -264,7 +352,8 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
     return [...String(text||'').matchAll(/(?<![\p{L}\p{N}])([\p{Lu}][\p{L}\p{N}-]{2,})(?:['’]s)?(?![\p{L}\p{N}])/gu)]
       .some(match=>match.index>0&&!catalogTokens.has(identityText(match[1])));
   });
-  const counterfactualSources=sources.filter(source=>['primary','subject'].includes(source.role)&&source.bookIds.length);
+  const counterfactualSources=sources.filter((source,index)=>['primary','subject'].includes(source.role)&&source.bookIds.length&&
+    !collectiveSourceIndexes.has(index));
   if(hypotheticalAuthorResponse&&counterfactualSources.length===2){
     counterfactualSources.sort((a,b)=>sourceMentionIndex(a)-sourceMentionIndex(b));
     const [stance,object]=counterfactualSources;
@@ -281,14 +370,14 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
     const broadAuthorQuestion=resolvedQuestion.match(/^\s*what\s+(?:(?:did|does|do)\s+)?(.{2,100}?)\s+(?:have\s+to\s+say|say|think|argue|believe|write|teach|hold|maintain)\s+(?:anything\s+)?(?:about|on|regarding|concerning)\s+(.+?)\??\s*$/i);
     const topic=broadAuthorQuestion?.[2]||'';
     if(broadAuthorQuestion&&!/\b(?:and|or|versus|vs\.?|compare|contrast)\b/i.test(topic))
-      normalizedParts=[withRequirements({id:'P1',question:resolvedQuestion},
-        normalizeRequirements(normalizedParts.flatMap(part=>part.requirements||[])))];
+      normalizedParts=[{id:'P1',question:resolvedQuestion}];
   }
   const questionNamedSources=sources.map((source,index)=>({source,index,phrases:sourcePhrases(source)}))
-    .filter(group=>group.phrases.some(phrase=>containsSourcePhrase(resolvedQuestion,phrase)));
+    .filter(group=>!collectiveSourceIndexes.has(group.index)&&
+      group.phrases.some(phrase=>containsSourcePhrase(resolvedQuestion,phrase)));
   const partSourceGroups=normalizedParts.map(part=>{
     let matches=sources.map((source,index)=>({source,index,phrases:sourcePhrases(source)}))
-      .filter(group=>group.phrases.some(phrase=>
+      .filter(group=>!collectiveSourceIndexes.has(group.index)&&group.phrases.some(phrase=>
         containsSourcePhrase(part.question,phrase)&&containsSourcePhrase(resolvedQuestion,phrase)));
     // For an author asking about another thinker, the answer belongs to the
     // named primary author unless the plan explicitly makes this a comparison.
@@ -296,12 +385,19 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
       const primary=matches.filter(group=>group.source.role==='primary');
       if(primary.length)matches=primary;
     }
+    // A planner's single catalog-valid source is only a search lead unless
+    // the reader named it. An explicit book selection remains a hard scope.
     if(!matches.length&&selectedBookId){
       matches=sources.map((source,index)=>({source,index}))
         .filter(group=>group.source.bookIds.some(id=>String(id)===String(selectedBookId)));
     }
-    if(!matches.length&&!selectedBookId&&sources.length===1&&
-       namesAWorkInCollection(sources[0],resolvedQuestion)&&namesAWorkInCollection(sources[0],part.question))
+    // A named play, poem, or other work can live inside a cataloged collected
+    // works volume even when the individual work is not a catalog entry.
+    // Preserve that explicit work request when the planner supplied its
+    // validated primary author as the sole source lead.
+    if(!matches.length&&!selectedBookId&&sources.length===1&&!collectiveSourceIndexes.has(0)&&
+       namesAWorkInCollection(sources[0],resolvedQuestion)&&
+       namesAWorkInCollection(sources[0],part.question))
       matches=sources.map((source,index)=>({source,index}));
     if(!matches.length&&intent==='compare'&&questionNamedSources.length>1)
       matches=questionNamedSources;
@@ -327,8 +423,9 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
     });
     return narrowed.length?[...new Set(narrowed)]:null;
   });
-  const comparisonSources=sources.filter(source=>['primary','subject'].includes(source.role)&&source.bookIds.length&&
-    (selectedBookId?source.bookIds.some(id=>String(id)===String(selectedBookId)):
+  const comparisonSources=sources.filter((source,index)=>['primary','subject'].includes(source.role)&&
+    source.bookIds.length&&!collectiveSourceIndexes.has(index)&&(selectedBookId?
+      source.bookIds.some(id=>String(id)===String(selectedBookId)):
       questionNamedSources.some(group=>group.source===source)));
   const hasPlannedComparison=normalizedParts.some((part,index)=>comparisonPattern.test(part.question)&&
     comparisonSources.filter(source=>source.bookIds.some(id=>(partSourceGroups[index]||[]).includes(id))).length>=2);
@@ -351,7 +448,17 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
     const wrapper=part.question.match(/^How do the named sources compare in response to this question:\s*(.+)$/i);
     if(wrapper&&seenParts.some(previous=>comparisonPartPattern.test(previous.question)))return false;
     seenParts.push(part);retainedPartSourceGroups.push(partSourceGroups[originalIndex]||null);return true;
-  }).map((part,index)=>({...part,id:'P'+(index+1)}));
+  }).map((part,index)=>{
+    const id='P'+(index+1);
+    const requirements=[...new Map((part.requirements||[]).map(requirement=>[
+      String(requirement?.text||'').trim().toLocaleLowerCase(),{
+        text:String(requirement?.text||'').trim(),
+        questionAnchor:exactQuestionAnchor(requirement?.questionAnchor,part.question)
+      }])).values()].filter(requirement=>requirement.text).slice(0,4)
+      .map((requirement,requirementIndex)=>({id:id+'-R'+(requirementIndex+1),...requirement}));
+    const {requirements:_,...normalizedPart}=part;
+    return {...normalizedPart,id,...(requirements.length?{requirements}:{})};
+  });
   partSourceGroups.splice(0,partSourceGroups.length,...retainedPartSourceGroups);
   const partsWithSources=normalizedParts.map((part,index)=>{
     const allowedIds=partSourceGroups[index]||[];
@@ -359,7 +466,10 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
       .filter(sourceIndex=>sourceIndex>=0);
     const matchingQueries=queries.filter(query=>sources.some((source,sourceIndex)=>
       allowedSourceIndexes.includes(sourceIndex)&&sourcePhrases(source).some(phrase=>containsPhrase(query,phrase))));
-    if(!matchingQueries.length&&sources.length===1)matchingQueries.push(...queries);
+    if(normalizedParts.length===1)matchingQueries.push(...queries);
+    // For one direct question, every planner query remains an optional search
+    // lead for that part, even when a conceptual phrasing shares few surface
+    // words. This grants retrieval eligibility only; it is not evidence.
     // The synthetic comparison part is a coverage check over the already
     // planned source-side searches. Searching its generic wording spends a
     // scarce page slot on a broad, often weak hit; source-side passages can
@@ -372,19 +482,21 @@ export function normalizePlan(raw,question,catalog={},selectedBookId=''){
     const contextualQuery=contextDependent&&intent!=='compare'&&!syntheticComparison
       ?[resolvedQuestion.slice(0,200),part.question.slice(0,200)].filter(Boolean).join(' ').slice(0,400)
       :part.question;
-    return {...part,sourceBookIds:partSourceGroups[index],
-      searchQueries:[...new Set([...matchingQueries,...(syntheticComparison||sourceSidePart?[]:[contextualQuery])])].slice(0,5)};
+    const {plannedSearchQueries=[],...normalizedPart}=part;
+    // Global planner queries can contain the clearest wording for a requested
+    // subpart even when they omit the catalog title/author. Link the single
+    // strongest lexical match as a bounded hint; it remains a retrieval cue,
+    // never evidence or a new coverage obligation.
+    const linkedPlannerQuery=normalizedParts.length>1?queries.map((query,queryIndex)=>({query,queryIndex,
+      affinity:plannerQueryAffinity(query,part.question)})).filter(item=>item.affinity>0)
+      .sort((a,b)=>b.affinity-a.affinity||a.queryIndex-b.queryIndex)[0]?.query:undefined;
+    return {...normalizedPart,sourceBookIds:partSourceGroups[index],
+      searchQueries:[...new Set([...(linkedPlannerQuery?[linkedPlannerQuery]:[]),...plannedSearchQueries,...matchingQueries,
+       ...(syntheticComparison||sourceSidePart?[]:[contextualQuery])])].slice(0,5)};
   });
   return {version:CONTRACT_VERSION,resolvedQuestion,intent,
-    sources,parts:partsWithSources,scope:bounded(planInput.scope,200),
+    sources,parts:partsWithSources,
+    ...(collectiveSources.length?{collectiveSources}:{}),
+    scope:bounded(planInput.scope,200),
     clarification:bounded(planInput.clarification,240),queries};
-}
-export async function fetchWithDeadline(fetcher,url,options={},timeoutMs=30000){
-  const controller=new AbortController();
-  const timer=setTimeout(()=>controller.abort(new Error('Request deadline exceeded')),timeoutMs);
-  const onAbort=()=>controller.abort(options.signal.reason);
-  if(options.signal?.aborted)onAbort();
-  else options.signal?.addEventListener('abort',onAbort,{once:true});
-  try{return await fetcher(url,{...options,signal:controller.signal});}
-  finally{clearTimeout(timer);options.signal?.removeEventListener('abort',onAbort);}
 }
