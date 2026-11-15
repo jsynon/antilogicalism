@@ -26,7 +26,7 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.20.14'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.20.15'));
  assert.match(clientV49,/distinctiveTerms:item\.distinctiveTerms/);
  assert.match(clientV49,/matchedDistinctiveTerms:item\.matchedDistinctiveTerms/);
  assert.match(clientV49,/sharedMatchedTerms:item\.sharedMatchedTerms/);
@@ -255,8 +255,12 @@ test('book selector search matches title or author without changing source entri
 });
 
 test('current browser client validates the v3 fingerprint coverage manifest',()=>{
- assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.20\.7'/,
+ assert.match(clientV49,/from '\.\/evidence-search\.mjs\?v=1\.20\.15'/,
   'the active client cache-busts the changed shared retriever');
+ assert.match(clientV49,/from '\.\/remote-library\.mjs\?v=1\.20\.15'/,
+  'the leaf is cache-busted on the same version (audit fix C4)');
+ assert.match(clientV49,/from '\.\/reader-contract\.mjs\?v=1\.20\.15'/,
+  'the contract is cache-busted on the same version (audit fix C4)');
  assert(clientV49.includes("reader-fingerprints-v3/coverage-v3.json"));
  assert.match(clientV49,/antilogicalism-reader-coverage-v3/);
  assert.match(clientV49,/libraryVersion!==49/);
@@ -343,7 +347,10 @@ test('answer citations open in the local page reader while Sources keeps the PDF
  assert.ok(clientV49.includes('// The title opens the scan; Read passages remains the excerpt control.'));
  assert.doesNotMatch(clientV49,/link\.textContent='\['\+citationDisplayLabel\(source\.id,numbering\)/,
   'the citation number is not part of the scanned-book link');
- assert.ok(clientV49.includes('link.href=source.url'));
+ assert.match(clientV49,/link\.href=safeUrl/,
+  'the source link href is the validated https URL (audit fix C4)');
+ assert.doesNotMatch(clientV49,/link\.href=source\.url/,
+  'the raw payload URL never reaches an href (audit fix C4)');
  assert.ok(clientV49.includes("panel.append(node('h3','Key passages from the source books'))"));
  assert.ok(html.includes('button.companion-inline-citation{-webkit-appearance:none;appearance:none'));
  assert.ok(html.includes('.companion-source-number{'));

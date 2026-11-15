@@ -1,6 +1,6 @@
 import {explicitScriptureReferences,hasExplicitScriptureReference,queryTerms,
- PRODUCTION_MAX_BOOKS,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs';
-import {catalogFallbackPlan,catalogIdentity,normalizePlan} from './reader-contract.mjs';
+ PRODUCTION_MAX_BOOKS,PRODUCTION_PAGES_PER_BOOK} from './remote-library.mjs?v=1.20.15';
+import {catalogFallbackPlan,catalogIdentity,normalizePlan} from './reader-contract.mjs?v=1.20.15';
 
 // Keep live browser and workflow retrieval breadth on one shared contract. The
 // 32-page candidate handoff gives the semantic selector room for facet-only
