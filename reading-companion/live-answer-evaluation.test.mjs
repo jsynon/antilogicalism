@@ -104,6 +104,20 @@ test('live-open suite holds six single open unscoped questions in the live shape
  assert.equal(cases[1].question,'What did Nietzsche think about Christianity?');
  assert.ok(evaluationUsesLivePlanner('live-open','case-default'),
   'live-open questions go through the live planner like production');
+ // A single live-open case can be selected on its own (the cheapest check).
+ assert.deepEqual(selectLiveCases(suite,'live-open','live-open-hume-causation')
+  .map(item=>item.id),['live-open-hume-causation']);
+});
+test('live-open is registered in every mode list main() validates against (2026-11-15)',async()=>{
+ // The first live-open workflow run died at argument validation:
+ // main() keeps two scope lists the selection tests never exercised.
+ // Pin all of the mode lists in source so the next suite cannot drift.
+ const {readFileSync}=await import('node:fs');
+ const source=readFileSync(new URL('./live-answer-evaluation.mjs',import.meta.url),'utf8');
+ assert.match(source,/args\.mode!=='library-all'&&args\.mode!=='live-open'/,
+  'live-open is exempt from the selected-books/all-books scope requirement');
+ assert.match(source,/args\.mode==='library-all'\|\|args\.mode==='live-open'/,
+  'live-open requires case-default scope like the other library suites');
 });
 test('Batch 22 registered full-suite thresholds are present before evaluation',()=>{
  assert.equal(BATCH22_ACCEPTANCE_THRESHOLDS.answerProducedMeanMinimum,7.9);
