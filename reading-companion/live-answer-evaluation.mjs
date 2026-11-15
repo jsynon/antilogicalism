@@ -165,6 +165,22 @@ const LIBRARY_ALL_CASES=[
  {id:'library-all-ambition-novels',discipline:'literature',evaluation_scope:'all-books',question:'How do novelists in the library portray ambition, and what does it tend to cost the characters who pursue it?',selected_book_ids:[],planner_queries:['How do novelists in the library portray ambition, and what does it tend to cost the characters who pursue it?'],required_source_groups:[],review_focus:[]},
  {id:'library-all-wealth-luxury',discipline:'society',evaluation_scope:'all-books',question:'What do authors in the library say about the effects of wealth and luxury on character and on society?',selected_book_ids:[],planner_queries:['What do authors in the library say about the effects of wealth and luxury on character and on society?'],required_source_groups:[],review_focus:[]},
 ];
+// Live-open suite (2026-11-15): six single, open, unscoped questions in
+// exactly the shape Joshua asks the production Companion himself — the
+// shape the 64-case suites never contained, which is how the batch-9
+// bold-wrap defect stayed invisible to them. This is the budget suite:
+// at repeat 3 it costs 18 builds instead of 128, and it measures the
+// live-question latency tail directly. The first two questions are
+// Joshua's own, verbatim. Like the library-all cases, they carry no
+// expected sources.
+const LIVE_OPEN_CASES=[
+ {id:'live-open-kierkegaard-faith',discipline:'philosophy',evaluation_scope:'all-books',question:'What did Kierkegaard have to say about faith?',selected_book_ids:[],planner_queries:['What did Kierkegaard have to say about faith?'],required_source_groups:[],review_focus:[]},
+ {id:'live-open-nietzsche-christianity',discipline:'philosophy',evaluation_scope:'all-books',question:'What did Nietzsche think about Christianity?',selected_book_ids:[],planner_queries:['What did Nietzsche think about Christianity?'],required_source_groups:[],review_focus:[]},
+ {id:'live-open-hume-causation',discipline:'philosophy',evaluation_scope:'all-books',question:'What did Hume think about causation?',selected_book_ids:[],planner_queries:['What did Hume think about causation?'],required_source_groups:[],review_focus:[]},
+ {id:'live-open-plato-poetry',discipline:'philosophy',evaluation_scope:'all-books',question:'What did Plato think about poetry?',selected_book_ids:[],planner_queries:['What did Plato think about poetry?'],required_source_groups:[],review_focus:[]},
+ {id:'live-open-aurelius-death',discipline:'philosophy',evaluation_scope:'all-books',question:'What did Marcus Aurelius think about death?',selected_book_ids:[],planner_queries:['What did Marcus Aurelius think about death?'],required_source_groups:[],review_focus:[]},
+ {id:'live-open-austen-marriage',discipline:'literature',evaluation_scope:'all-books',question:'What did Jane Austen think about marriage?',selected_book_ids:[],planner_queries:['What did Jane Austen think about marriage?'],required_source_groups:[],review_focus:[]},
+];
 const LIBRARY_SELECTED_CASES=[
  {id:'library-selected-conrad-marlow-kurtz',discipline:'literature',evaluation_scope:'selected-books',question:'In Heart of Darkness, how does Marlow’s picture of Kurtz take shape, and which parts of it rest on what Marlow sees himself as opposed to what others tell him or what Kurtz leaves in writing?',selected_book_ids:['315'],planner_queries:['In Heart of Darkness, how does Marlow’s picture of Kurtz take shape, and which parts of it rest on what Marlow sees himself as opposed to what others tell him or what Kurtz leaves in writing?'],required_source_groups:[{label:'Joseph Conrad, Heart of Darkness',book_ids:['315']}],review_focus:[]},
  {id:'library-selected-machiavelli-prince-limits',discipline:'politics',evaluation_scope:'selected-books',question:'What is the central argument of The Prince about how a ruler acquires and keeps power, and where does Machiavelli acknowledge limits to what a ruler’s skill can control?',selected_book_ids:['241'],planner_queries:['What is the central argument of The Prince about how a ruler acquires and keeps power, and where does Machiavelli acknowledge limits to what a ruler’s skill can control?'],required_source_groups:[{label:'Niccolò Machiavelli, The Prince',book_ids:['241']}],review_focus:[]},
@@ -327,7 +343,7 @@ function sourceRevision(){
 }
 function jsonDigest(value){return createHash('sha256').update(JSON.stringify(value),'utf8').digest('hex');}
 export function selectLiveCases(suite,mode='smoke',caseId=''){
- const evaluationCases=mode==='transport-ab'||mode==='batch18-acceptance'||mode==='batch19-acceptance'||mode==='batch21-compact-acceptance'?[...LIBRARY_ALL_CASES,...LIBRARY_SELECTED_CASES]:mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='library-all-3'?LIBRARY_ALL3_CASES:mode==='library-selected-3'?LIBRARY_SELECTED3_CASES:mode==='library-holdout'?LIBRARY_HOLDOUT_CASES:mode==='library-holdout-selected'?LIBRARY_HOLDOUT_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
+ const evaluationCases=mode==='transport-ab'||mode==='batch18-acceptance'||mode==='batch19-acceptance'||mode==='batch21-compact-acceptance'?[...LIBRARY_ALL_CASES,...LIBRARY_SELECTED_CASES]:mode==='philosophy3'?PHILOSOPHY3_CASES:mode==='handoff'?HANDOFF_CASES:mode==='fresh3'?FRESH3_CASES:mode==='fresh'?FRESH_CASES:mode==='library-all'?LIBRARY_ALL_CASES:mode==='live-open'?LIVE_OPEN_CASES:mode==='library-selected'?LIBRARY_SELECTED_CASES:mode==='library-all-3'?LIBRARY_ALL3_CASES:mode==='library-selected-3'?LIBRARY_SELECTED3_CASES:mode==='library-holdout'?LIBRARY_HOLDOUT_CASES:mode==='library-holdout-selected'?LIBRARY_HOLDOUT_SELECTED_CASES:mode==='holdout'?HOLDOUT_CASES:mode==='acceptance'?ACCEPTANCE_CASES:
   mode==='quality'&&caseId&&caseId!=='all'?[...QUALITY_CASES,...FOCUSED_CASES]:
   mode==='focused'?FOCUSED_CASES:mode==='paired'?PAIRED_CASES:QUALITY_CASES;
  if(mode==='transport-ab'&&caseId==='stage-profile-4'){
@@ -378,6 +394,7 @@ export function selectLiveCases(suite,mode='smoke',caseId=''){
  if(mode==='handoff')return HANDOFF_CASES.map(copyEvaluationCase);
  if(mode==='philosophy3')return PHILOSOPHY3_CASES.map(copyEvaluationCase);
  if(mode==='library-all')return LIBRARY_ALL_CASES.map(copyEvaluationCase);
+ if(mode==='live-open')return LIVE_OPEN_CASES.map(copyEvaluationCase);
  if(mode==='library-selected')return LIBRARY_SELECTED_CASES.map(copyEvaluationCase);
  if(mode==='library-all-3')return LIBRARY_ALL3_CASES.map(copyEvaluationCase);
  if(mode==='library-selected-3')return LIBRARY_SELECTED3_CASES.map(copyEvaluationCase);
@@ -415,7 +432,7 @@ export function applyQualityScope(cases,scope='selected-books'){
  return cases.map(item=>({...item,selected_book_ids:[]}));
 }
 export function evaluationUsesLivePlanner(mode,scope){
- if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3'||mode==='library-all'||mode==='library-selected'||mode==='library-all-3'||mode==='library-selected-3'||mode==='library-holdout'||mode==='library-holdout-selected'||mode==='transport-ab'||mode==='batch18-acceptance'||mode==='batch19-acceptance'||mode==='batch21-compact-acceptance')return true;
+ if(mode==='fresh'||mode==='fresh3'||mode==='handoff'||mode==='philosophy3'||mode==='library-all'||mode==='live-open'||mode==='library-selected'||mode==='library-all-3'||mode==='library-selected-3'||mode==='library-holdout'||mode==='library-holdout-selected'||mode==='transport-ab'||mode==='batch18-acceptance'||mode==='batch19-acceptance'||mode==='batch21-compact-acceptance')return true;
  return ['quality','focused','paired','holdout','acceptance'].includes(mode)&&
   (mode==='paired'||scope==='all-books');
 }
@@ -2869,11 +2886,11 @@ function summarizeInferenceTransport(cases){
 }
 export {summarizeInferenceTransport};
 async function main(){
- const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|handoff|philosophy3|library-all|library-selected|library-all-3|library-selected-3|library-holdout|library-holdout-selected|transport-ab|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation|transport-ab] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
+ const args=parseArgs(process.argv.slice(2));if(args.help){console.log('Usage: PILOT_EVALUATION_TOKEN=... node reading-companion/live-answer-evaluation.mjs --confirm-live-ai true [--mode planner|smoke|quality|focused|paired|holdout|acceptance|fresh|fresh3|handoff|philosophy3|library-all|live-open|library-selected|library-all-3|library-selected-3|library-holdout|library-holdout-selected|transport-ab|full] [--scope selected-books|all-books|case-default|paired] [--answer-variant with-review|compose-only|paired-review-ablation|paired-expansion-ablation|paired-selection-ablation|transport-ab] [--retrieval-profile baseline|expanded] [--case case-id] [--repeat 1..3] [--report-only true] [--output report.json]');return 0;}
  if(!args.confirm)throw Error('Live AI calls are disabled unless --confirm-live-ai true is provided.');
  if(!['with-review','compose-only','paired-review-ablation','paired-expansion-ablation','paired-selection-ablation','transport-ab'].includes(args.answerVariant))throw Error('Unsupported answer variant.');
  if(!Object.hasOwn(RETRIEVAL_PROFILES,args.retrievalProfile))throw Error('Unknown retrieval profile.');
- const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','library-selected','library-all-3','library-selected-3','library-holdout','library-holdout-selected','transport-ab','batch18-acceptance','batch19-acceptance','batch21-compact-acceptance'].includes(args.mode);
+ const usesEvaluationMode=['quality','focused','paired','holdout','acceptance','fresh','fresh3','handoff','philosophy3','library-all','live-open','library-selected','library-all-3','library-selected-3','library-holdout','library-holdout-selected','transport-ab','batch18-acceptance','batch19-acceptance','batch21-compact-acceptance'].includes(args.mode);
  if(args.mode==='paired'&&args.scope!=='paired')throw Error('The paired suite must use paired scope.');
  if(!usesEvaluationMode&&args.scope!=='selected-books')throw Error('The all-books scope is available only in a supported evaluation suite.');
  if(usesEvaluationMode&&args.mode!=='paired'&&args.mode!=='fresh'&&args.mode!=='fresh3'&&args.mode!=='handoff'&&args.mode!=='philosophy3'&&args.mode!=='library-all'&&args.mode!=='library-selected'&&args.mode!=='library-all-3'&&args.mode!=='library-selected-3'&&args.mode!=='library-holdout'&&args.mode!=='library-holdout-selected'&&args.mode!=='transport-ab'&&args.mode!=='batch18-acceptance'&&args.mode!=='batch19-acceptance'&&args.mode!=='batch21-compact-acceptance'&&!['selected-books','all-books'].includes(args.scope))throw Error('Evaluation scope must be selected-books or all-books.');
