@@ -653,3 +653,42 @@ test('book-scoped search admits a floor-passing neighbor of a selected page (rep
  assert.ok(!unscoped.sources.some(source=>source.neighborhood),
   'unscoped searches gain no neighborhood admissions');
 });
+
+test('neighborhood reservation gives the top anchor its own best neighbor a slot (retrieval tranche)',async()=>{
+ const cluster='Virtue and habit shape character. Through habit, virtue forms character in the soul.';
+ const rep=n=>Array(n).fill(cluster).join(' ');
+ const filler='A quiet page about unrelated matters in the same volume, kept for spacing and extent.';
+ const pages=[];
+ // Two anchor blocks: pages 14-15 are the facet's best pages (x4), pages
+ // 40-41 next (x3). The mid block's neighbors (38, 42 at x2) outscore the
+ // top block's only neighbor (12 at x1), so the old global competition
+ // admitted 38 and 42 and stranded 12; the reservation admits each
+ // anchor's own best neighbor first, in anchor order.
+ const texts={12:rep(1),14:rep(4),15:rep(4),38:rep(2),40:rep(3),41:rep(3),42:rep(2)};
+ for(let page=10;page<=45;page++)pages.push({id:page-10,page,text:texts[page]||filler});
+ const ids=[2,2,1,23,2,1,1]; // delta-encoded postings for pages 12,14,15,38,40,41,42
+ const reserveFixture={
+  'manifest.json':{version:49,postings_encoding:'delta-json-v1',prefix_length:2,
+   pages:pages.length,page_books:pages.map(()=>7),
+   partitions:['vi','ha','ch'],
+   books:{'7':{title:'Ethics — Aristotle',drive_url:'https://drive.google.com/file/d/'+driveId+'/view'}}},
+  'terms-vi.json':{virtue:ids},
+  'terms-ha.json':{habit:ids},
+  'terms-ch.json':{character:ids},
+  'book-7.json':{pages}};
+ const fetchReserve=async url=>{
+  const key=String(url).split('/').pop().replace(/\.gz$/,'');
+  if(key==='url-suppressions.json')return new Response(gzipSync(JSON.stringify({scopes:[]})),{status:200});
+  return key in reserveFixture?new Response(gzipSync(JSON.stringify(reserveFixture[key])),{status:200}):
+   new Response('Not found',{status:404});
+ };
+ const finder=new RemoteLibrary('https://example.test/v49/',fetchReserve);
+ const scoped=await finder.search('virtue habit character',{bookId:'7',allowedBookIds:new Set(['7'])});
+ const neighbors=scoped.sources.filter(source=>source.neighborhood).map(source=>source.page);
+ assert.ok(neighbors.includes(12),
+  'the top anchor\'s own floor-passing neighbor is admitted ahead of stronger neighbors of weaker anchors');
+ assert.ok(neighbors.includes(38),'the next anchor with a neighbor reserves its best one');
+ assert.equal(neighbors.length,2,'the per-book neighborhood cap is unchanged');
+ assert.ok(!scoped.sources.some(source=>source.page===42),
+  'the second strong neighbor of a weaker anchor yields to the reservation');
+});

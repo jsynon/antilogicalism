@@ -1005,11 +1005,42 @@ export class RemoteLibrary {
             const evidence = substantivePageEvidence(record.text,
               bookEvidenceGroups, bookTitleTerms, phrase, evidenceOptions);
             if (!evidence || (evidence.localUnique < minimumEvidenceTerms && !evidence.phraseMatches)) continue;
-            neighborCandidates.push({item: record.item, rank: evidence.score, neighborhood: true});
+            neighborCandidates.push({item: record.item, rank: evidence.score, neighborhood: true,
+              anchorPage: entry.item.page});
           }
         }
-        neighborCandidates.sort((a, b) => b.rank - a.rank || a.item.page - b.item.page);
-        for (const entry of neighborCandidates.slice(0, 2)) selected.push(entry);
+        // Retrieval tranche: per-anchor reservation. Adjacency to the
+        // facet's best pages is the stronger prior, so each selected
+        // page first contributes its own best floor-passing neighbor
+        // (in selection order); any slots left under the per-book cap
+        // then fill by the global score order as before. The cap is
+        // unchanged, so the pool neither grows nor shrinks — only
+        // which neighbors are admitted changes. (Faust's pact formula
+        // sits one page before the signing page every wager facet
+        // returns, and lost the global competition to higher-scoring
+        // neighbors of mid-ranked pages.)
+        const admittedNeighbors = [];
+        const admittedPages = new Set();
+        for (const anchor of selected) {
+          if (admittedNeighbors.length >= 2) break;
+          let best = null;
+          for (const candidate of neighborCandidates) {
+            if (candidate.anchorPage !== anchor.item.page ||
+                admittedPages.has(candidate.item.page)) continue;
+            if (!best || candidate.rank > best.rank ||
+                (candidate.rank === best.rank && candidate.item.page < best.item.page)) best = candidate;
+          }
+          if (best) { admittedNeighbors.push(best); admittedPages.add(best.item.page); }
+        }
+        if (admittedNeighbors.length < 2) {
+          neighborCandidates.sort((a, b) => b.rank - a.rank || a.item.page - b.item.page);
+          for (const entry of neighborCandidates) {
+            if (admittedNeighbors.length >= 2) break;
+            if (admittedPages.has(entry.item.page)) continue;
+            admittedNeighbors.push(entry); admittedPages.add(entry.item.page);
+          }
+        }
+        for (const entry of admittedNeighbors) selected.push(entry);
       }
       for (const entry of selected) {
         const {item}=entry;
