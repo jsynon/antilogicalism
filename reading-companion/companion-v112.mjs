@@ -60,6 +60,7 @@ const sourceReader=createSourceReader({getBook:id=>bookShard(id),
   getManifest:()=>library.manifest(),isAllowedBook:id=>allowed.has(id)});
 let bookList=[FALLBACK_BOOK], allowed=new Set(['152']), oldPilotFallback=true;
 let pilotEnabled=false, searchPlanningEnabled=false, turnstileToken='', turnstileId=null;
+let turnstileTokenAt=0, challengePass='', challengePassExpiryMs=0;
 let pendingTurnstile=null;
 let candidates=[], searching=false, answering=false;
 // Audit fix C6: the diagnostic pipeline is deleted. What survives is
@@ -248,7 +249,7 @@ async function loadStatus(){
       turnstileId=window.turnstile.render(challengeBox,{
         sitekey:data.turnstileSiteKey,action:'companion_ask',theme:'light',
         callback:token=>{
-          turnstileToken=token;
+          turnstileToken=token;turnstileTokenAt=Date.now();
           if(pendingTurnstile){
             const waiter=pendingTurnstile;
             pendingTurnstile=null;clearTimeout(waiter.timeout);
@@ -256,8 +257,8 @@ async function loadStatus(){
           }
           updateButtons();
         },
-        'expired-callback':()=>{turnstileToken='';updateButtons();},
-        'error-callback':()=>{turnstileToken='';updateButtons();}
+        'expired-callback':()=>{turnstileToken='';turnstileTokenAt=0;updateButtons();},
+        'error-callback':()=>{turnstileToken='';turnstileTokenAt=0;updateButtons();}
       });
     };
     script.onerror=()=>{challenge.textContent='The quick check is temporarily unavailable.';};
@@ -522,7 +523,9 @@ async function requestSourcePlan(q,verificationToken,history){
     plannerFailure.code='invalid-response';lastFailureCode='invalid-response';
     throw Error('The evidence search service returned an invalid response.');
   }
+  noteChallengePass(data);
   if(!res.ok){
+    if(res.status===403)forgetChallengePass(verificationToken);
     plannerFailure.status=res.status;
     plannerFailure.code=failureCodeForStatus(res.status,'planner',data.failureCode);
     lastFailureCode=plannerFailure.code;
@@ -552,7 +555,9 @@ async function requestRetrievalGap(q,verificationToken,history,originalQueries,p
       turnstileToken:verificationToken,retrievalGap:{weakParts,originalQueries:[...originalQueries,
         ...partQuestions.map(item=>item.question)].slice(0,7),candidates:evidence}})});
   let data;try{data=await res.json();}catch{throw Error('The evidence search service returned an invalid response.');}
+  noteChallengePass(data);
   if(!res.ok){
+    if(res.status===403)forgetChallengePass(verificationToken);
     gapFailure.status=res.status;
     gapFailure.code=failureCodeForStatus(res.status,'planner',data.failureCode);
     throw Error(data.error||'Conditional evidence search is unavailable');
@@ -596,6 +601,28 @@ async function nextTurnstileToken(){
     throw Error('Please complete the quick check.');
   return token;
 }
+// Challenge pass (2026-11-15): one solved check now covers the whole
+// question. The gateway mints a short-lived pass on the first verified
+// call; the remaining calls of the turn present it instead of making the
+// reader solve the box again for the gap planner and the answer.
+function noteChallengePass(data){
+  const pass=data&&typeof data.challengePass==='string'?data.challengePass:'';
+  if(!pass.startsWith('pass.'))return;
+  const expirySeconds=Number(pass.split('.')[1]);
+  if(!Number.isSafeInteger(expirySeconds))return;
+  challengePass=pass;challengePassExpiryMs=expirySeconds*1000;
+}
+function forgetChallengePass(presented){
+  if(presented&&presented===challengePass){challengePass='';challengePassExpiryMs=0;}
+}
+async function nextVerificationToken(){
+  if(challengePass&&Date.now()<challengePassExpiryMs-5000)return challengePass;
+  challengePass='';challengePassExpiryMs=0;
+  if(turnstileToken&&Date.now()-turnstileTokenAt<240000){
+    const token=turnstileToken;turnstileToken='';turnstileTokenAt=0;return token;
+  }
+  return nextTurnstileToken();
+}
 async function askQuestion(questionText){
   const q=String(questionText??question.value).trim();
   if(answering)return;
@@ -610,8 +637,7 @@ async function askQuestion(questionText){
   answering=true;updateButtons();sourceReader.reset();
   try{
     let currentPlan=null;
-    let token=turnstileToken;
-    if(!token)token=await nextTurnstileToken();
+    let token=await nextVerificationToken();
     const history=recentConversation();
     if(searchPlanningEnabled && !oldPilotFallback){
       // One extra bounded hosted AI call helps FIND source passages, not
@@ -670,7 +696,7 @@ async function askQuestion(questionText){
         turnstileToken='';
         let gapQueries=[],gapQueryPartLinks=[];
         try{
-          const gapToken=await nextTurnstileToken();turnstileToken='';
+          const gapToken=await nextVerificationToken();turnstileToken='';
           const gapPlan=await requestRetrievalGap(q,gapToken,history,planned?.queries||[q],
             partQuestions,coverage,candidates);
           gapQueries=gapPlan.queries;gapQueryPartLinks=gapPlan.queryPartLinks;
@@ -683,7 +709,7 @@ async function askQuestion(questionText){
           // weak parts' own requirement texts instead of abandoning the
           // round. Quota and 4xx failures rethrew above and never retry.
           try{
-            const gapToken=await nextTurnstileToken();turnstileToken='';
+            const gapToken=await nextVerificationToken();turnstileToken='';
             const retryPlan=await requestRetrievalGap(q,gapToken,history,planned?.queries||[q],
               partQuestions,coverage,candidates);
             gapQueries=retryPlan.queries;gapQueryPartLinks=retryPlan.queryPartLinks;
@@ -701,7 +727,7 @@ async function askQuestion(questionText){
         }
       }
       if(!candidates.length){setStatus('No promising passages turned up yet. Try another wording or choose a different book.');return;}
-      token=await nextTurnstileToken();
+      token=await nextVerificationToken();
     }else{
       const found=await retrieveSources();
       if(!found)return;
@@ -738,7 +764,9 @@ async function askQuestion(questionText){
       lastFailureCode='invalid-response';
       throw Error('The answer service returned an invalid response.');
     }
+    noteChallengePass(data);
     if(!response.ok){
+      if(response.status===403)forgetChallengePass(token);
       lastFailureCode=failureCodeForStatus(response.status,'answer',data.failureCode);
       throw Error('The answer service could not prepare an answer.');
     }
