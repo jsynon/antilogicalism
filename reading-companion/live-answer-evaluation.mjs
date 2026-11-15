@@ -1250,7 +1250,7 @@ export function summarizeBatch22Metrics(cases){
  const produced=rows.filter(hasProducedAnswer).length;
  const durations=rows.map(item=>Array.isArray(item?.stageTimings)?
   item.stageTimings.reduce((sum,timing)=>sum+
-   (Number.isFinite(timing?.elapsedMs)&&timing.elapsedMs>=0?timing.elapsedMs:0),0):null)
+   (timing?.stage!=='pacing'&&Number.isFinite(timing?.elapsedMs)&&timing.elapsedMs>=0?timing.elapsedMs:0),0):null)
   .filter(Number.isFinite).sort((a,b)=>a-b);
  const percentile=p=>durations.length?durations[Math.max(0,Math.ceil(durations.length*p)-1)]:null;
  const median=durations.length?(durations.length%2?
@@ -2088,6 +2088,15 @@ export function sourcesUsedForWorkerSelection(selection,workerSelected,submitted
 // which are measured after the inter-call pacing wait; local retrieval
 // stages are timed around the existing calls. Recording never changes
 // request flow, ordering, concurrency, or results.
+//
+// Two non-work segments are recorded beside the work stages so a case's
+// elapsedMs fully decomposes: 'pacing' (the inter-call wait beforeCall
+// imposes, measured by wrapping it; the CLI enforces a 30.5s minimum
+// gap between Worker calls, which the 2026-11-15 latency look found
+// accounts for nearly all of the previously untimed ~50s per case) and
+// 'post-answer-audit' (the local audit pass over a returned answer).
+// Pacing is harness overhead, not pipeline work: it is excluded from
+// every work-sum (sharedRealWorkStageSumMs, stageSumLatencyMs).
 function createStageTimingRecorder(progressEvent){
  const stageTimings=[];
  const requestStageMs={planner:0,'gap-planner':0,selection:0,answer:0};
@@ -2112,6 +2121,16 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
  await progress('case','started',`Starting ${answerVariant} evaluation for this question.`);
  const timing=createStageTimingRecorder(progressEvent);
  const stageTimings=timing.stageTimings;
+ // Wrap the caller's pacing hook so the wait before each Worker call is
+ // on the case record (see the recorder comment). Sub-5ms invocations
+ // are ordinary async overhead, not pacing, and are not recorded.
+ const providedBeforeCall=beforeCall;
+ beforeCall=async()=>{
+  const pacingStarted=Date.now();
+  await providedBeforeCall();
+  const waitedMs=Date.now()-pacingStarted;
+  if(waitedMs>=5)timing.record('pacing','waited',waitedMs);
+ };
  const selectedBookIds=Array.isArray(item.selected_book_ids)?item.selected_book_ids.map(String):[];
  const plannerBookId=selectedBookIds.length===1?selectedBookIds[0]:'';
  let plan,queries,plannerFallback=false,plannerFailure=null,plannerFailureDiagnostics=null,plannerSkipped=false,plannerReused=false,
@@ -2363,7 +2382,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     {requestElapsedMs:sharedSelectionElapsedMs,failureCode:sharedSelectionFailure.failureCode});
   }
  }
- const sharedRealWorkStageSumMs=stageTimings.filter(entry=>entry.stage!=='answer'&&Number.isFinite(entry.elapsedMs))
+ const sharedRealWorkStageSumMs=stageTimings.filter(entry=>entry.stage!=='answer'&&entry.stage!=='pacing'&&Number.isFinite(entry.elapsedMs))
   .reduce((sum,entry)=>sum+entry.elapsedMs,0);
  try{
   for(const variant of variants){
@@ -2393,6 +2412,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
      if(data.inferenceTransport!==inferenceTransport)
       throw attachRequestFailure(new Error('Worker did not confirm the requested inference transport.'),'answer',
        {httpStatus:200,failureCode:'transport-mismatch',failureDetail:'unconfirmed-transport',workerFailure:false});
+     const auditStarted=Date.now();
      const candidateByLocator=new Map(loaded.candidates.map(source=>[String(source.bookId)+':'+source.page,source]));
      const workerSelected=(Array.isArray(data.sourceSelection?.pages)?data.sourceSelection.pages:[])
       .map(source=>{const candidate=candidateByLocator.get(String(source.bookId)+':'+source.page);
@@ -2409,6 +2429,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
       submittedSources:submitted.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,excerpt:String(preview||'').slice(0,1200)})),
       pipeline:data.pipeline||null,...audit,usage:data.usage||null,
       ...(data.trace?{evidenceTrace:data.trace}:{})});
+     timing.record('post-answer-audit','completed',Date.now()-auditStarted);
      await progress('answer','completed',`${inferenceTransport} returned ${audit.outcome||'no outcome'} with ${audit.coverage} coverage and ${audit.citationCount} citations.`,
       {variant:inferenceTransport,outcome:audit.outcome,coverage:audit.coverage,citations:audit.citationCount,
        requestElapsedMs,usage:data.usage||null});
@@ -2440,6 +2461,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     // Match the live client handoff so offline acceptance runs exercise the
     // same part-linked evidence packet that the Worker receives in production.
     sources:pilotAnswerSources(answerSources)},beforeCall,'answer',timing.timedProgressEvent);
+   const auditStarted=Date.now();
    const candidateByLocator=new Map(loaded.candidates.map(source=>[String(source.bookId)+':'+source.page,source]));
    const workerSelected=(Array.isArray(data.sourceSelection?.pages)?data.sourceSelection.pages:[])
     .map(source=>{
@@ -2459,6 +2481,7 @@ export async function evaluateLiveCase(item,{library,manifest,allowed,token,fetc
     submittedSources:submitted.map(({bookId,title,page,globalPageId,preview,candidatePartIds})=>({bookId,title,page,globalPageId,candidatePartIds,excerpt:String(preview||'').slice(0,1200)})),
     pipeline:data.pipeline||null,...audit,usage:data.usage||null,
     ...(data.trace?{evidenceTrace:data.trace}:{})});
+   timing.record('post-answer-audit','completed',Date.now()-auditStarted);
    await progress('answer','completed',`${variant} returned ${audit.outcome||'no outcome'} with ${audit.coverage} coverage and ${audit.citationCount} citations.`,
     {variant,outcome:audit.outcome,coverage:audit.coverage,citations:audit.citationCount,usage:data.usage||null});
    const traceParts=traceSummaryParts(data.trace,audit);

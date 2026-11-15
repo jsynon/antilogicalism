@@ -2420,8 +2420,31 @@ test('stage timings record live planner, retrieval and answer durations for a se
    {outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}})});
  assert.equal(result.plannerSkipped,false);
  assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
-  ['planner:completed','retrieval:completed','answer:completed']);
+  ['planner:completed','retrieval:completed','post-answer-audit:completed','answer:completed']);
  assert.ok(result.stageTimings.every(entry=>Number.isFinite(entry.elapsedMs)&&entry.elapsedMs>=0));
+});
+
+test('stage timings record the pacing wait before each Worker call and the post-answer audit (latency look, 2026-11-15)',async()=>{
+ const library={search:async()=>({sources:[{id:'S1',bookId:'638',title:'Bible',page:10,globalPageId:10,url:'https://drive.google.com/file/d/abcdefghijk/view#page=10',preview:'A sufficiently long preview passage for testing.',score:4}]}),
+  jsonGzip:async()=>({pages:[{id:10,page:10,text:'A sufficiently long source passage for the fake test page.'}]})};
+ const item={question:'Explain the source question.',selected_book_ids:['638'],required_source_groups:[{label:'Bible',book_ids:['638']}]};
+ const result=await evaluateLiveCase(item,{library,manifest:{books:{638:{title:'Bible'}}},allowed:new Set(['638']),token:'x'.repeat(40),
+  beforeCall:async()=>{await new Promise(resolve=>setTimeout(resolve,30));},
+  fetcher:async(url)=>new Response(JSON.stringify(url.endsWith('pilot-plan')?{queries:['first distinct search concept','second distinct search concept'],
+   plan:{parts:[{id:'P1',question:item.question}]}}:
+   {outcome:'verified-source-draft',coverage:'full',reviewStatus:'review',answer:'Claim [S1].',citations:[{id:'S1',bookId:'638'}],evidenceHighlights:[]}),{status:200,headers:{'content-type':'application/json'}})});
+ const stages=result.stageTimings.map(entry=>entry.stage+':'+entry.status);
+ assert.ok(stages.includes('planner:completed')&&stages.includes('answer:completed'));
+ const pacing=result.stageTimings.filter(entry=>entry.stage==='pacing');
+ assert.equal(pacing.length,2,'one pacing entry per Worker call (planner and answer)');
+ assert.ok(pacing.every(entry=>entry.status==='waited'&&entry.elapsedMs>=5),
+  'each recorded wait carries the measured beforeCall duration');
+ assert.ok(result.stageTimings.some(entry=>entry.stage==='post-answer-audit'&&entry.status==='completed'),
+  'the local audit pass over the returned answer is timed');
+ // Pacing is harness overhead: batch metrics must not count it as work.
+ const metrics=summarizeBatch22Metrics([{outcome:'verified-source-draft',answerText:'A supported answer.',
+  stageTimings:[{stage:'planner',elapsedMs:20},{stage:'pacing',elapsedMs:30000},{stage:'answer',elapsedMs:30}]}]);
+ assert.equal(metrics.stageSumLatencyMs.median,50,'pacing entries are excluded from the stage-sum latency');
 });
 
 test('stage timings mark fixed-query planning as skipped and record both conditional gap stages',async()=>{
@@ -2450,7 +2473,7 @@ test('stage timings mark fixed-query planning as skipped and record both conditi
  assert.equal(result.plannerSkipped,true);
  assert.equal(result.gapPlannerAttempted,true);
  assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
-  ['planner:skipped','retrieval:completed','gap-planner:completed','gap-retrieval:completed','answer:completed']);
+  ['planner:skipped','retrieval:completed','gap-planner:completed','gap-retrieval:completed','post-answer-audit:completed','answer:completed']);
  assert.equal(result.stageTimings[0].elapsedMs,0);
 });
 
@@ -2477,7 +2500,7 @@ test('stage timings record the rescued gap round after planner and gap-planner f
  assert.equal(result.gapRetryAttempted,true);
  assert.equal(result.gapFallbackUsed,true);
  assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
-  ['planner:fallback','retrieval:completed','gap-planner:completed','gap-retrieval:completed','answer:completed']);
+  ['planner:fallback','retrieval:completed','gap-planner:completed','gap-retrieval:completed','post-answer-audit:completed','answer:completed']);
 });
 
 test('stage timings mark a prepared paired plan as reused with no planner duration',async()=>{
@@ -2493,7 +2516,7 @@ test('stage timings mark a prepared paired plan as reused with no planner durati
  assert.equal(result.plannerReused,true);
  assert.equal(calls.length,1);assert.match(calls[0],/pilot-answer$/);
  assert.deepEqual(result.stageTimings.map(entry=>entry.stage+':'+entry.status),
-  ['planner:reused','retrieval:completed','answer:completed']);
+  ['planner:reused','retrieval:completed','post-answer-audit:completed','answer:completed']);
  assert.equal(result.stageTimings[0].elapsedMs,0);
 });
 
