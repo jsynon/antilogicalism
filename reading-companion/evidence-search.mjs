@@ -269,10 +269,17 @@ export function mergeFacetSearches(results,limit=8,reserveFacetIndexes=[],{
    }
  });
  soleSurvivors.sort((a,b)=>a.rank-b.rank||b.score-a.score);
+ // Audit fix C3: sole-survivor reservations spend their OWN budget
+ // (the slice(0,4) cap below), not the shared reserved cap. Third in
+ // line behind the part-facet and direct-part reservations, they were
+ // crowded out entirely exactly in the many-part plans where pools
+ // are most contested — the mechanism silently no-oped. The classes
+ // after this one still respect the shared cap, so the pool can
+ // exceed the limit by at most these four reservations.
  for(const {entry} of soleSurvivors.slice(0,4)){
    const key=String(entry.bookId)+':'+entry.page;
    const candidate=ranked.find(value=>String(value.bookId)+':'+value.page===key);
-   if(candidate&&!reservedKeys.has(key)&&reserved.length<limit){
+   if(candidate&&!reservedKeys.has(key)){
      candidate.soleSurvivor=true;
      reserved.push(candidate);reservedKeys.add(key);
    }

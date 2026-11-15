@@ -68,3 +68,43 @@ test('a malformed candidate shard is skipped and recorded, keeping earlier books
   assert.ok(result.sources.length > 0 && result.sources.every(s => s.bookId === '7'),
     'the well-formed book still contributes its sources');
 });
+
+const appealCorpus = {
+  'manifest.json': {
+    version: 49, postings_encoding: 'delta-json-v1', prefix_length: 2,
+    pages: 3, page_books: [7, 8, 9], partitions: ['am', 'co', 'ho'],
+    books: {
+      '7': {title: 'First Book — Ann Alpha', drive_url: 'https://drive.google.com/file/d/' + driveId + '/view'},
+      '8': {title: 'Second Book — Bob Beta', drive_url: 'https://drive.google.com/file/d/' + driveId + '/view'},
+      '9': {title: 'Third Book — Cid Gamma', drive_url: 'https://drive.google.com/file/d/' + driveId + '/view'}
+    }
+  },
+  'url-suppressions.json': {scopes: []},
+  'terms-am.json': {ambition: [1]},
+  'terms-co.json': {courage: [0, 2]},
+  'terms-ho.json': {honor: [0]},
+  'book-7.json': {pages: [
+    {id: 0, page: 1, text: prose('the first topic')}]},
+  'book-8.json': {pages: [
+    {id: 1, page: 1, text: ('He writes that the ambition of novels is to render ' +
+      'a whole inner life in scenes, and he returns to that ambition whenever ' +
+      'a character must choose without knowing what the choice will cost. ').repeat(2)}]},
+  'book-9.json': {pages: [
+    {id: 2, page: 1, text: prose('the third topic')}]}
+};
+
+test('a single-term book containing the quoted phrase appeals the matched>=2 filter (audit fix C3)', async () => {
+  const library = new RemoteLibrary('https://example.test/data-v49/', async url => {
+    const name = String(url).split('/').pop().replace(/\.gz$/, '');
+    return name in appealCorpus
+      ? new Response(gzipSync(JSON.stringify(appealCorpus[name])), {status: 200})
+      : new Response('Not found', {status: 404});
+  });
+  const result = await library.search('How do courage and honor express the "ambition of novels"?');
+  const bookIds = [...new Set(result.sources.map(s => s.bookId))].sort();
+  assert.ok(bookIds.includes('7'), 'the joint-term book answers as before');
+  assert.ok(bookIds.includes('8'),
+    'the single-term book whose page carries the quoted phrase is rescued by the appeal');
+  assert.ok(!bookIds.includes('9'),
+    'a single-term book without the phrase stays filtered out');
+});
