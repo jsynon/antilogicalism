@@ -19,7 +19,6 @@ jobs:
         with:
           node-version: '24'
       - run: |
-          node --check reading-companion/companion-v110.mjs
           node --check reading-companion/remote-library.mjs
           node --check reading-companion/companion-v112.mjs
           node --check reading-companion/source-reader.mjs
