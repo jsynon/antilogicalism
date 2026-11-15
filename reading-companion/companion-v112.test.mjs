@@ -28,10 +28,26 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.20.17'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.20.18'));
  assert.match(clientV49,/distinctiveTerms:item\.distinctiveTerms/);
  assert.match(clientV49,/matchedDistinctiveTerms:item\.matchedDistinctiveTerms/);
  assert.match(clientV49,/sharedMatchedTerms:item\.sharedMatchedTerms/);
+});
+test('one solved check covers the whole question via the gateway challenge pass (2026-11-15)',()=>{
+ // Every verification call site goes through nextVerificationToken;
+ // the reset-and-solve flow survives only as its fallback.
+ assert.equal((clientV49.match(/nextVerificationToken\(\)/g)||[]).length,5,
+  'definition plus planner, gap, gap-retry, and answer call sites');
+ assert.equal((clientV49.match(/nextTurnstileToken\(\)/g)||[]).length,2,
+  'definition plus the single fallback call inside nextVerificationToken');
+ // The pass is captured on all three response paths and forgotten on a 403.
+ assert.equal((clientV49.match(/noteChallengePass\(data\)/g)||[]).length,4,
+  'definition plus planner, gap, and answer response paths');
+ assert.equal((clientV49.match(/forgetChallengePass\(/g)||[]).length,4,
+  'definition plus planner, gap, and answer 403 handlers');
+ assert.match(clientV49,/challengePassExpiryMs-5000/);
+ assert.match(clientV49,/Date\.now\(\)-turnstileTokenAt<240000/,
+  'a freshly solved widget token is consumed before any re-solve');
 });
 test('live browser submits facet ranks with the pilot-answer packet',()=>{
  assert.match(clientV49,/import \{pilotAnswerSources\} from '\.\/answer-payload\.mjs';/);

@@ -2027,7 +2027,7 @@ test('browser sends bounded full candidate pages and leaves semantic selection t
  assert.match(js,/plan:currentPlan\|\|undefined/,
   'the catalog-backed fallback plan should reach Worker validation with the question');
  assert.match(js,/My usual book-finding step hit a snag, so I’m searching with your question instead/);
- assert.match(js,/token=await nextTurnstileToken\(\)/);
+ assert.match(js,/token=await nextVerificationToken\(\)/);
  assert.match(js,/window\.turnstile\.reset\(turnstileId\)/);
  assert.match(js,/const candidatePacket=\[\]/);
  assert.match(js,/prepareAnswerCandidates\(candidates\)\.slice\(0,LIVE_RETRIEVAL_CONFIG\.maxCandidates\)/);
