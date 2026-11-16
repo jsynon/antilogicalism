@@ -121,6 +121,19 @@ function unwrapBoldWrappedParagraph(text){
  const closer=text.endsWith('**')?'**':text.endsWith('__')?'__':null;
  if(closer&&(text.split(closer).length-1)===1&&isLongWrappedText(text.slice(0,-closer.length)))
   return text.slice(0,-closer.length);
+ // A single marker stranded mid-paragraph is the boundary of a pair
+ // whose other half never shipped — the live-open Kierkegaard case
+ // (2026-11-15): a section title whose OPENING marker was lost,
+ // leaving its closer glued between the title and the body text.
+ // One marker can never form a pair, so on a long paragraph it is
+ // removed wherever it sits; paired markers are untouched.
+ for(const lone of ['**','__']){
+  if((text.split(lone).length-1)===1&&isLongWrappedText(text)){
+   const at=text.indexOf(lone);
+   if(at>0&&at<text.length-lone.length)
+    return text.slice(0,at)+text.slice(at+lone.length);
+  }
+ }
  return text;
 }
 

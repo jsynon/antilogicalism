@@ -28,7 +28,7 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.20.18'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.20.19'));
  assert.match(clientV49,/distinctiveTerms:item\.distinctiveTerms/);
  assert.match(clientV49,/matchedDistinctiveTerms:item\.matchedDistinctiveTerms/);
  assert.match(clientV49,/sharedMatchedTerms:item\.sharedMatchedTerms/);
@@ -167,6 +167,17 @@ test('parser backstop opens a bold wrap that carries bold labels inside it (B9-8
  assert.deepEqual(labelBlocks.map(block=>block.type),['heading','paragraph']);
  assert.equal(labelBlocks[0].text,'Non-Rationality');
  assert.ok(labelBlocks[1].text.startsWith('The leap is not a conclusion of reason'));
+});
+
+test('parser backstop removes a lone marker stranded mid-paragraph (live-open orphan, 2026-11-15)',()=>{
+ // The live-open Kierkegaard shape on the client edge: a section
+ // title whose opening marker was lost, leaving its closer glued
+ // between the title and the body text.
+ const stranded='The Knight of Faith vs. The Tragic Hero** A central image in the account of faith is the contrast between the knight of faith and the tragic hero, where the tragic hero renounces the universal for a higher ethical purpose while the knight of faith makes the double movement of resignation and belief [S4].';
+ const blocks=parseAnswerMarkdown(stranded);
+ assert.equal(blocks.length,1);
+ assert.equal(blocks[0].type,'paragraph');
+ assert.equal(blocks[0].text,stranded.replace('Hero**','Hero'));
 });
 test('v49 Reading Companion page retains Book Lite and loads the v49 client',()=>{
  assert.match(html,/wp-content\/themes\/book-lite/);
