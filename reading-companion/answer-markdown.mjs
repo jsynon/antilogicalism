@@ -181,11 +181,57 @@ function cleanListItem(value,line,hasPriorListItem){
  return text;
 }
 
+// Completion (2026-11-15), mirroring the Worker: a line carrying
+// exactly ONE bold marker holds the boundary of a pair whose other
+// half never shipped — the follow-up run's orphans sat on lines
+// glued to the previous section inside blocks full of paired
+// markers, where the per-paragraph rule cannot see them. Short
+// lines are untouched (a stray label fragment is a different
+// shape), and lines of pure marker characters carry no text.
+function stripOrphanedLineMarker(line){
+ if(line.trim().length<80||!/[A-Za-z0-9]/u.test(line))return line;
+ for(const marker of ['**','__']){
+  if((line.split(marker).length-1)!==1)continue;
+  const at=line.indexOf(marker);
+  return line.slice(0,at)+line.slice(at+marker.length);
+ }
+ return line;
+}
+
+// Completion (2026-11-15), mirroring the Worker: a paragraph block
+// past the long threshold is re-broken at sentence boundaries into
+// paragraphs of at most the target length, so a part composed as
+// one flowing block never renders as a wall of text. Wording is
+// untouched; abbreviations and initials do not end a sentence.
+function splitLongParagraphText(text){
+ if(text.length<=1200)return [text];
+ const chunks=text.match(/[^.!?]+(?:[.!?]+["'”’)]*(?:\s*\[[^\]]{1,12}\])?|$)/gu)
+  ?.map(chunk=>chunk.trim()).filter(Boolean)||[];
+ if(chunks.length<2)return [text];
+ const sentences=[];
+ for(const chunk of chunks){
+  const previous=sentences[sentences.length-1];
+  if(previous&&/(?:\b(?:Mr|Mrs|Ms|Dr|St|vs|etc|al)|[A-Z])\.$/u.test(previous))
+   sentences[sentences.length-1]=previous+' '+chunk;
+  else sentences.push(chunk);
+ }
+ const paragraphs=[];let current='';
+ for(const sentence of sentences){
+  if(current&&(current.length+1+sentence.length)>700){
+   paragraphs.push(current);current='';
+  }
+  current=current?current+' '+sentence:sentence;
+ }
+ if(current)paragraphs.push(current);
+ return paragraphs.length?paragraphs:[text];
+}
+
 export function parseAnswerMarkdown(value,{allowLists=false}={}){
  const blocks=[];let paragraph=[],listItems=[],listType='',listRun=false;
  const flushParagraph=()=>{
   const text=paragraph.join(' ').trim();
-  if(text)blocks.push({type:'paragraph',text:unwrapBoldWrappedParagraph(text)});
+  if(text)for(const piece of splitLongParagraphText(text))
+   blocks.push({type:'paragraph',text:unwrapBoldWrappedParagraph(piece)});
   paragraph=[];
  };
  const flushList=()=>{
@@ -198,7 +244,8 @@ export function parseAnswerMarkdown(value,{allowLists=false}={}){
  const flushAll=()=>{flushParagraph();flushList();listRun=false;};
  const rawLines=String(value||'').replace(/\r\n?/g,'\n').split('\n');
  const lines=rawLines.flatMap(line=>splitInlineSectionHeadings(line)
-  .split('\n').flatMap(part=>splitInlineListMarkers(part).split('\n')));
+  .split('\n').flatMap(part=>splitInlineListMarkers(part).split('\n')))
+  .map(stripOrphanedLineMarker);
  for(const original of lines){
   const line=original.trim();
   if(!line){flushAll();continue;}
