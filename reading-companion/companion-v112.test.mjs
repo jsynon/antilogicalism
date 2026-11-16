@@ -227,16 +227,13 @@ test('companion introduction explains how to use it and links to Library Search'
  assert(html.includes('Search the full-text collection with <a href="/antilogicalism/digital-library/">Library Search</a> or browse books by title with the <a href="/antilogicalism/primary-sources/">Bookshelf</a>.'));
  assert.doesNotMatch(html,/all 642 searchable titles|644-book library/);
 });
-test('waiting screen sets a time expectation and explains the quick check',()=>{
+test('waiting screen sets a time expectation',()=>{
  assert.match(html,/Give it a little time once you ask: answers usually take about one to two minutes/);
  assert.match(html,/searches the library and checks every quote before it replies/);
- assert.match(html,/The quick check below simply confirms you’re a person rather than a bot/);
- assert.match(html,/the Ask button unlocks as soon as it passes/);
- assert.match(html,/pass it again before a follow-up question/);
- const hintAt=html.indexOf('The quick check below simply confirms');
- const widgetAt=html.indexOf('id="companion-turnstile"');
- assert.ok(hintAt>=0&&widgetAt>hintAt,
-  'quick-check explanation sits immediately before the Turnstile widget container');
+ // The quick-check explanation paragraph was removed at Joshua's
+ // request (2026-11-15); the Turnstile widget itself remains.
+ assert.doesNotMatch(html,/The quick check below simply confirms/);
+ assert.doesNotMatch(html,/companion-check-hint/);
  assert.match(clientV49,/function armLongWaitNotice\(\)/);
  assert.match(clientV49,/},45000\);/);
  assert.match(clientV49,/I’m following those ideas through the sources and sorting out the details…/);
