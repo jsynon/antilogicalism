@@ -29,9 +29,9 @@ export function failureCodeForStatus(status,requestStage='answer',serverCode='')
 
 export function userFailureMessage(code=''){
   if(code==='ai-daily-free-allocation')
-    return 'Cloudflare Workers AI reported that this account reached its daily free allocation. If this Worker is on a paid Workers account, check that account’s Workers AI billing and usage; paid usage above the free allocation should be billed.';
+    return 'The Reading Companion has reached its daily free AI limit, so it can’t answer more questions today. Please try again tomorrow.';
   if(code==='ai-provider-usage-limit'||code==='ai-credit-limit')
-    return 'Cloudflare Workers AI reported a usage or billing limit for the account serving this Worker. Check that account’s Workers AI usage and billing. The Reading Companion cannot verify the account’s plan or spending limit.';
+    return 'The Reading Companion has reached its AI usage limit, so it can’t answer more questions right now. Please try again later.';
   if(code==='ai-capacity-unavailable')
     return 'The AI service is temporarily at capacity. Please wait a moment and try again.';
   if(code==='ai-rate-limited')
