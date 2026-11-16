@@ -347,7 +347,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 #companion-pilot #companion-book .flip::after{content:"";position:absolute;inset:6px 5px;background:repeating-linear-gradient(#c9d6dd 0 2px,transparent 2px 9px);opacity:.7}
 @keyframes companion-page-flip{0%{transform:rotateY(0deg)}55%,100%{transform:rotateY(-180deg)}}
 @media(prefers-reduced-motion:reduce){#companion-pilot #companion-book .flip{animation-duration:6s}}
-#companion-pilot #companion-check-hint{margin-top:1.1rem}
 #companion-pilot #companion-turnstile{margin:.8rem 0}
 #companion-pilot .companion-source-entry,#companion-pilot .companion-key-passage{padding:.9rem 0;border-bottom:1px solid #dfe2e3}
 /* Suppress Book Lite's article ornament throughout the companion; keep entry borders. */
@@ -476,7 +475,6 @@ img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}
 <button id="companion-new-conversation" type="button" hidden>New conversation</button>
 </div>
 <p id="companion-challenge" role="status" class="companion-hint"></p>
-<p id="companion-check-hint" class="companion-hint">The quick check below simply confirms you’re a person rather than a bot — the Ask button unlocks as soon as it passes, and you may be asked to pass it again before a follow-up question.</p>
 <div id="companion-turnstile" aria-label="Quick check"></div>
 </form>
 <div id="companion-status-card" hidden>
