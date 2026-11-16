@@ -28,7 +28,7 @@ test('live browser uses shared 32-candidate, four-book retrieval settings',()=>{
  assert.deepEqual(LIVE_RETRIEVAL_CONFIG,{maxCandidates:32,maxBooks:4,pagesPerBook:4});
  assert.ok(clientV49.includes('LIVE_RETRIEVAL_CONFIG'));
  assert.ok(clientV49.includes('...LIVE_RETRIEVAL_CONFIG,pageLimit:PDF_PAGE_LIMIT'));
- assert.ok(html.includes('companion-v112.mjs?v=1.20.19'));
+ assert.ok(html.includes('companion-v112.mjs?v=1.20.20'));
  assert.match(clientV49,/distinctiveTerms:item\.distinctiveTerms/);
  assert.match(clientV49,/matchedDistinctiveTerms:item\.matchedDistinctiveTerms/);
  assert.match(clientV49,/sharedMatchedTerms:item\.sharedMatchedTerms/);
@@ -179,6 +179,39 @@ test('parser backstop removes a lone marker stranded mid-paragraph (live-open or
  assert.equal(blocks[0].type,'paragraph');
  assert.equal(blocks[0].text,stranded.replace('Hero**','Hero'));
 });
+test('parser backstop removes an orphan glued onto a line inside a multi-section block (completion, 2026-11-15)',()=>{
+ // The follow-up run's recurrence shape: the orphan line is glued
+ // to the previous section by a single newline, and the block also
+ // holds a paired title — the per-paragraph rule counts markers
+ // across the joined block and never fires. The line rule does.
+ const glued='Faith is a paradox that thought cannot mediate, and the individual stands higher than the universal in the absolute relation to the absolute [S1].\n**Faith as Paradox** The leap moves beyond speculative philosophy and the comfort of human understanding in every generation of believers who take the paradox seriously [S1].\nThe Knight of Faith vs. The Tragic Hero** Johannes de Silentio further illustrates the nature of faith by contrasting the knight of faith with the tragic hero, who renounces the universal for a higher ethical purpose while the knight makes the double movement of resignation and belief [S6].';
+ const blocks=parseAnswerMarkdown(glued);
+ const prose=blocks.filter(block=>block.type==='paragraph')
+  .map(block=>block.text).join('\n');
+ assert.ok(prose.includes('The Tragic Hero Johannes'),
+  'the orphaned marker is removed from its line');
+ assert.ok(!prose.includes('Hero**'),'no stray marker survives');
+ assert.ok(blocks.some(block=>block.type==='heading'&&
+  block.text==='Faith as Paradox'),'the paired title still parses as a heading');
+});
+
+test('parser backstop re-breaks a wall-of-text paragraph at sentence boundaries (completion, 2026-11-15)',()=>{
+ // Joshua's live shape: one flowing block with no structure. The
+ // parser splits it into readable paragraphs; wording is intact.
+ const sentences=Array.from({length:10},(_,i)=>
+  `Hume observation ${i+1} links necessity to custom and regular conjunction in the experience of constant succession among resembling instances of cause and effect. [S1]`);
+ const blocks=parseAnswerMarkdown(sentences.join(' '));
+ assert.ok(blocks.length>=3,
+  `the wall of text is broken into paragraphs (got ${blocks.length})`);
+ assert.ok(blocks.every(block=>block.type==='paragraph'&&
+  block.text.length<=800),'no block is a wall of text');
+ for(const s of sentences)
+  assert.ok(blocks.some(block=>block.text.includes(
+   s.replace(' [S1]',''))),'every sentence survives verbatim');
+ // A short paragraph is left as one block.
+ assert.equal(parseAnswerMarkdown('Custom guides human life. [S1]').length,1);
+});
+
 test('v49 Reading Companion page retains Book Lite and loads the v49 client',()=>{
  assert.match(html,/wp-content\/themes\/book-lite/);
  assert.match(html,/id="masthead"/);
