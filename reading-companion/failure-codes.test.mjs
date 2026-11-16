@@ -25,10 +25,10 @@ test('failure codes preserve useful status categories without raw error text',()
 });
 
 test('user failure messages translate provider codes into reader prose',()=>{
- assert.match(userFailureMessage('ai-daily-free-allocation'),/Cloudflare Workers AI reported/);
- assert.match(userFailureMessage('ai-daily-free-allocation'),/paid Workers account/);
- assert.match(userFailureMessage('ai-provider-usage-limit'),/usage or billing limit/);
- assert.match(userFailureMessage('ai-credit-limit'),/cannot verify the account’s plan/);
+ assert.match(userFailureMessage('ai-daily-free-allocation'),/daily free AI limit/);
+ assert.match(userFailureMessage('ai-daily-free-allocation'),/try again tomorrow/);
+ assert.match(userFailureMessage('ai-provider-usage-limit'),/AI usage limit/);
+ assert.match(userFailureMessage('ai-credit-limit'),/AI usage limit/);
  assert.match(userFailureMessage('ai-capacity-unavailable'),/temporarily at capacity/);
  assert.match(userFailureMessage('ai-rate-limited'),/too many requests/);
  assert.equal(userFailureMessage('network-error'),
